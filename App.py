@@ -29,7 +29,6 @@ st.markdown("""
         color: white; border-radius: 12px; height: 50px; width: 100%; 
         font-size: 18px; font-weight: bold; border: none;
     }
-    .chat-row { display: flex; align-items: center; gap: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -46,40 +45,35 @@ ESSA_BIO = """
 """
 
 def check_identity(query):
-    patterns = [r"kisne banaya", r"who made you", r"owner", r"creator", r"essa awan", r"muhammad essa", r"maker"]
+    patterns = [r"kisne banaya", r"who made you", r"owner", r"creator", r"essa awan", r"muhammad essa"]
     return any(re.search(p, query.lower()) for p in patterns)
 
 # ==========================================
-# 3. ROBUST AI ENGINE (TRIPLE FAIL-SAFE)
+# 3. ROBUST AI ENGINE
 # ==========================================
 def get_es_ai_response(user_query, history):
     if check_identity(user_query): return ESSA_BIO
 
-    chat_context = "\n".join([f"{m['role']}: {m['content']}" for m in history[-3:]])
-    system_prompt = "You are ES AI, a smart assistant by Muhammad Essa Awan. Answer accurately."
-    full_prompt = f"{system_prompt}\n{chat_context}\nUser: {user_query}\nAI:"
+    context = "\n".join([f"{m['role']}: {m['content']}" for m in history[-3:]])
+    system_prompt = "You are ES AI, a smart assistant by Muhammad Essa Awan."
+    full_prompt = f"{system_prompt}\n{context}\nUser: {user_query}\nAI:"
     encoded = urllib.parse.quote(full_prompt)
 
-    # 3 High-Stability Engines
+    # Multi-Engine Stability
     urls = [
         f"https://text.pollinations.ai/{encoded}?model=openai&cache=true",
-        f"https://hercai.onrender.com/v3/hercai?question={encoded}",
-        f"https://api.paxsenix.biz/ai/gpt4?q={encoded}"
+        f"https://hercai.onrender.com/v3/hercai?question={encoded}"
     ]
 
     for url in urls:
         try:
-            response = requests.get(url, timeout=40)
+            response = requests.get(url, timeout=45)
             if response.status_code == 200:
-                if "hercai" in url or "paxsenix" in url:
-                    res_data = response.json()
-                    text = res_data.get('reply') or res_data.get('content')
-                else:
-                    text = response.text
-                if text and len(text.strip()) > 2: return text.strip()
+                if "hercai" in url: return response.json().get('reply')
+                return response.text
         except: continue
     
-    return "بھا ئی عیسیٰ، اس وقت تمام سرورز پر بوجھ زیادہ ہے۔ براہ کرم تھوڑی دیر بعد دوبارہ کوشش کریں۔"
+    return "بھا ئی عیسیٰ، اس وقت سرور پر بوجھ زیادہ ہے۔ براہ کرم تھوڑی دیر بعد دوبارہ کوشش کریں۔"
 
 # ==========================================
 # 4. MAIN UI INTERFACE
@@ -89,23 +83,27 @@ st.markdown("<p style='text-align: center; color: #00d4ff; letter-spacing: 5px; 
 
 tabs = st.tabs(["💬 ES Smart Chat", "🎙️ ES Voice Studio", "🎬 ES Movie Studio"])
 
-# --- TAB 1: CHAT (VOICE INPUT ADDED) ---
+# --- TAB 1: CHAT (VOICE INPUT FIXED) ---
 with tabs[0]:
     if "messages" not in st.session_state: st.session_state.messages = []
+    
+    # Display Chat History
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): st.write(m["content"])
 
-    # Voice Input Feature
-    st.write("🎙️ **Voice Typing:** بٹن دبا کر بولیں، آپ کی آواز ٹائپ ہو جائے گی۔")
-    audio = mic_recorder(start_prompt="Click to Speak (اردو/English)", stop_prompt="Stop Recording", key='recorder')
+    # Voice Input Section
+    st.write("🎙️ **Voice Control:** بٹن دبائیں اور بولیں۔")
+    audio = mic_recorder(start_prompt="Click to Speak", stop_prompt="Stop Recording", key='recorder')
     
-    voice_text = ""
     if audio:
-        # Placeholder message for voice processing (Requires external API for real STT, 
-        # but here we provide the UI structure as requested)
-        voice_text = "Voice recording captured! (Please type or edit below)"
+        st.success("آواز ریکارڈ ہو گئی ہے! اب نیچے چیٹ باکس میں ٹائپ کر کے اسے بھیجیں یا پوچھیے۔")
+        # Note: Professional STT (Speech to Text) usually requires paid APIs like OpenAI Whisper.
+        # Currently, it shows as captured.
 
-    if prompt := st.chat_input("مجھ سے کوئی بھی سوال پوچھیں...", value=voice_text):
+    # Fixed Chat Input (Removed the 'value' bug)
+    prompt = st.chat_input("مجھ سے کوئی بھی سوال پوچھیں...")
+
+    if prompt:
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.write(prompt)
 
@@ -132,13 +130,14 @@ with tabs[1]:
             async def generate_v(): await edge_tts.Communicate(v_text, selected_v).save("es_v.mp3")
             asyncio.run(generate_v())
             st.audio("es_v.mp3")
-        else: st.warning("Please enter text.")
+            with open("es_v.mp3", "rb") as f:
+                st.download_button("Download MP3 ⬇️", f, file_name="es_voice.mp3")
 
 # --- TAB 3: MOVIE STUDIO ---
 with tabs[2]:
     st.header("🎬 Pro Movie Studio")
     m_script = st.text_area("Movie Script Details:", height=200)
-    if st.button("Save Script"): st.success("Script saved! Run Movie Engine in Colab.")
+    if st.button("Save Script"): st.success("Script saved! Use Colab to Render Video.")
 
 st.markdown("---")
 st.markdown("<p style='text-align: center; color: #555;'>ES AI Studio | Muhammad Essa Awan</p>", unsafe_allow_html=True)
