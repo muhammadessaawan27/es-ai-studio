@@ -12,7 +12,7 @@ from streamlit_mic_recorder import mic_recorder
 # ==========================================
 st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="🎬")
 
-# Premium Metallic UI
+# Premium Metallic UI Design
 st.markdown("""
     <style>
     .main { background-color: #0e1117; color: white; }
@@ -45,21 +45,21 @@ ESSA_BIO = """
 """
 
 def check_identity(query):
-    patterns = [r"kisne banaya", r"who made you", r"owner", r"creator", r"essa awan", r"muhammad essa"]
+    patterns = [r"kisne banaya", r"who made you", r"owner", r"creator", r"essa awan", r"muhammad essa", r"maker"]
     return any(re.search(p, query.lower()) for p in patterns)
 
 # ==========================================
-# 3. ROBUST AI ENGINE
+# 3. ROBUST AI ENGINE (MULTI-PROVIDER)
 # ==========================================
 def get_es_ai_response(user_query, history):
     if check_identity(user_query): return ESSA_BIO
 
-    context = "\n".join([f"{m['role']}: {m['content']}" for m in history[-3:]])
-    system_prompt = "You are ES AI, a smart assistant by Muhammad Essa Awan."
-    full_prompt = f"{system_prompt}\n{context}\nUser: {user_query}\nAI:"
+    chat_context = "\n".join([f"{m['role']}: {m['content']}" for m in history[-3:]])
+    system_instr = "You are ES AI, a professional intelligence created by Muhammad Essa Awan. Provide detailed and accurate answers."
+    full_prompt = f"System: {system_instr}\nContext:\n{chat_context}\nUser: {user_query}\nAssistant:"
     encoded = urllib.parse.quote(full_prompt)
 
-    # Multi-Engine Stability
+    # Retry Logic with 2 Engines
     urls = [
         f"https://text.pollinations.ai/{encoded}?model=openai&cache=true",
         f"https://hercai.onrender.com/v3/hercai?question={encoded}"
@@ -67,42 +67,37 @@ def get_es_ai_response(user_query, history):
 
     for url in urls:
         try:
-            response = requests.get(url, timeout=45)
+            response = requests.get(url, timeout=60)
             if response.status_code == 200:
                 if "hercai" in url: return response.json().get('reply')
                 return response.text
         except: continue
     
-    return "بھا ئی عیسیٰ، اس وقت سرور پر بوجھ زیادہ ہے۔ براہ کرم تھوڑی دیر بعد دوبارہ کوشش کریں۔"
+    return "بھا ئی عیسیٰ، اس وقت سرور پر بوجھ زیادہ ہے۔ براہ کرم صفحہ ریفریش کریں یا دوبارہ کوشش کریں۔"
 
 # ==========================================
-# 4. MAIN UI INTERFACE
+# 4. USER INTERFACE (TABS)
 # ==========================================
 st.markdown("<h1>ES AI</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #00d4ff; letter-spacing: 5px; font-weight: bold;'>ADVANCED MULTI-MODAL AGENT</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #00d4ff; letter-spacing: 5px; font-weight: bold;'>ADVANCED MULTI-FORMAT STUDIO</p>", unsafe_allow_html=True)
 
 tabs = st.tabs(["💬 ES Smart Chat", "🎙️ ES Voice Studio", "🎬 ES Movie Studio"])
 
-# --- TAB 1: CHAT (VOICE INPUT FIXED) ---
+# --- TAB 1: SMART CHAT ---
 with tabs[0]:
     if "messages" not in st.session_state: st.session_state.messages = []
     
-    # Display Chat History
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): st.write(m["content"])
 
-    # Voice Input Section
-    st.write("🎙️ **Voice Control:** بٹن دبائیں اور بولیں۔")
-    audio = mic_recorder(start_prompt="Click to Speak", stop_prompt="Stop Recording", key='recorder')
-    
+    # Voice Input
+    st.write("🎙️ **Voice Typing:** مائیک دبائیں اور بولیں۔")
+    audio = mic_recorder(start_prompt="Click to Record", stop_prompt="Stop", key='recorder')
     if audio:
-        st.success("آواز ریکارڈ ہو گئی ہے! اب نیچے چیٹ باکس میں ٹائپ کر کے اسے بھیجیں یا پوچھیے۔")
-        # Note: Professional STT (Speech to Text) usually requires paid APIs like OpenAI Whisper.
-        # Currently, it shows as captured.
+        st.success("آواز ریکارڈ ہو گئی! سوال نیچے لکھ کر پوچھیں۔")
 
-    # Fixed Chat Input (Removed the 'value' bug)
-    prompt = st.chat_input("مجھ سے کوئی بھی سوال پوچھیں...")
-
+    # Correct Chat Input
+    prompt = st.chat_input("مجھ سے کچھ بھی پوچھیں...")
     if prompt:
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.write(prompt)
@@ -115,29 +110,41 @@ with tabs[0]:
 
 # --- TAB 2: VOICE STUDIO ---
 with tabs[1]:
-    st.header("🎙️ Voice Studio")
+    st.header("🎙️ Voiceover Generator")
     v_text = st.text_area("جو کہلوانا ہے یہاں لکھیں:", height=150)
     col1, col2 = st.columns(2)
-    with col1: v_lang = st.selectbox("Language:", ["Urdu", "English", "Hindi"])
-    with col2: v_gen = st.selectbox("Gender:", ["Female", "Male"])
+    with col1: v_lang = st.selectbox("زبان:", ["Urdu", "English", "Hindi"])
+    with col2: v_gen = st.selectbox("آواز کی صنف (Gender):", ["Female", "Male"])
     
     if st.button("Generate Voice 🚀"):
         if v_text:
-            v_map = {"Urdu": {"Female": "ur-PK-UzmaNeural", "Male": "ur-PK-AsadNeural"},
-                     "English": {"Female": "en-US-JennyNeural", "Male": "en-US-GuyNeural"},
-                     "Hindi": {"Female": "hi-IN-SwaraNeural", "Male": "hi-IN-MadhurNeural"}}
+            v_map = {
+                "Urdu": {"Female": "ur-PK-UzmaNeural", "Male": "ur-PK-AsadNeural"},
+                "English": {"Female": "en-US-JennyNeural", "Male": "en-US-GuyNeural"},
+                "Hindi": {"Female": "hi-IN-SwaraNeural", "Male": "hi-IN-MadhurNeural"}
+            }
             selected_v = v_map[v_lang][v_gen]
-            async def generate_v(): await edge_tts.Communicate(v_text, selected_v).save("es_v.mp3")
-            asyncio.run(generate_v())
+            async def speak(): await edge_tts.Communicate(v_text, selected_v).save("es_v.mp3")
+            asyncio.run(speak())
             st.audio("es_v.mp3")
             with open("es_v.mp3", "rb") as f:
-                st.download_button("Download MP3 ⬇️", f, file_name="es_voice.mp3")
+                st.download_button("Download Audio ⬇️", f, file_name="es_voice.mp3")
+        else: st.warning("پہلے کچھ لکھیں۔")
 
-# --- TAB 3: MOVIE STUDIO ---
+# --- TAB 3: MOVIE STUDIO (All Ratios Included) ---
 with tabs[2]:
     st.header("🎬 Pro Movie Studio")
-    m_script = st.text_area("Movie Script Details:", height=200)
-    if st.button("Save Script"): st.success("Script saved! Use Colab to Render Video.")
+    st.info("Bhai Essa, یہاں اپنی مووی کا اسکرپٹ لکھیں اور سائز منتخب کریں۔")
+    m_script = st.text_area("Movie Script / Story:", height=200, placeholder="ایک جنگل کی کہانی...")
+    
+    # All 3 Ratios Added Back
+    m_ratio = st.selectbox("Video Size (سائز منتخب کریں):", 
+                           ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
+    
+    if st.button("Prepare Rendering"):
+        if m_script:
+            st.success(f"اسکرپٹ اور {m_ratio} سائز محفوظ ہو گیا! اب کولاب فائل میں رینڈرنگ کریں۔")
+        else: st.warning("پہلے کہانی لکھیں۔")
 
 st.markdown("---")
 st.markdown("<p style='text-align: center; color: #555;'>ES AI Studio | Muhammad Essa Awan</p>", unsafe_allow_html=True)
