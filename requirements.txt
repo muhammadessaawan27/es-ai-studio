@@ -3,3 +3,4 @@ edge-tts
 moviepy==1.0.3
 requests
 streamlit-mic-recorder
+Pillow==9.5.0
