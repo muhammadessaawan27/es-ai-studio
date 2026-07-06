@@ -16,55 +16,49 @@ st.markdown("""
 st.markdown("<h1>ES AI</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #00d4ff; letter-spacing: 5px; font-weight: bold;'>MUHAMMAD ESSA'S MASTER STUDIO</p>", unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["💬 ES Smart Chat", "🎙️ ES Voice Studio", "🎬 ES Movie Studio"])
+tab1, tab2, tab3 = st.tabs(["💬 ES Smart Chat (Brain)", "🎙️ ES Voice Studio", "🎬 ES Movie Studio"])
 
-# --- NEW STABLE CHAT LOGIC (No More Time Out) ---
-def get_ai_response(text):
-    text = text.lower()
-    # Common Greetings (In ka jawab AI foran khud dega bina kisi error ke)
-    if "hal" in text or "kaise" in text:
-        return "Bhai Essa, main bilkul theek hoon! Aapka wafadar agent honay ke naate aapki khidmat mein hazir hoon. Bataiye aaj kya kaam karna hai?"
-    if "naam" in text:
-        return "Mera naam ES AI hai، aur mujhe Muhammad Essa Awan ne banaya hai."
-    
+# --- ADVANCED AI BRAIN (For detailed Info) ---
+def get_detailed_info(query):
     try:
-        # Agar koi mushkil sawal ho toh AI server se poochega
-        url = f"https://api.popcat.xyz/chatbot?msg={text}"
-        res = requests.get(url, timeout=5) # 5 second ka time limit
-        return res.json()['response']
+        # Ye API ab GPT-4 ki tarah lambe aur maloomati jawab degi
+        response = requests.get(f"https://hercai.onrender.com/v3/hercai?question={query}", timeout=10)
+        data = response.json()
+        return data['reply']
     except:
-        # Agar server busy ho toh ye wala pyara jawab aayega
-        return "Bhai Essa, main aapki baat samajh raha hoon. Main is waqt aapke agle hukum ka intezar kar raha hoon!"
+        return "Bhai Essa, main is waqt internet se maloomat nikaal raha hoon. Please thori der baad dobara poochein ya apna sawal wazeh karein."
 
 with tab1:
-    st.header("💬 ES AI Assistant")
+    st.header("💬 Intelligent Assistant")
+    st.write("Aap mujhse kitabon, science, ya kisi bhi topic par maloomat le sakte hain.")
+    
     if "chat_history" not in st.session_state: st.session_state.chat_history = []
     
     for chat in st.session_state.chat_history:
         with st.chat_message(chat["role"]): st.write(chat["content"])
 
-    user_msg = st.chat_input("Hukum karein Essa bhai...")
+    user_msg = st.chat_input("Bhai Essa, koi bhi sawal poochein...")
     if user_msg:
         st.session_state.chat_history.append({"role": "user", "content": user_msg})
         with st.chat_message("user"): st.write(user_msg)
         
-        # AI Response
-        answer = get_ai_response(user_msg)
-        with st.chat_message("assistant"): st.write(answer)
-        st.session_state.chat_history.append({"role": "assistant", "content": answer})
+        with st.spinner("Main research kar raha hoon..."):
+            answer = get_detailed_info(user_msg)
+            with st.chat_message("assistant"): st.write(answer)
+            st.session_state.chat_history.append({"role": "assistant", "content": answer})
 
 with tab2:
     st.header("🎙️ Voiceover Generator")
     v_text = st.text_area("Yahan wo likhein jo AI se bulwana hai:")
     c1, c2 = st.columns(2)
     with c1: lang = st.selectbox("Zaban:", ["Urdu", "English", "Hindi"])
-    with c2: gen = st.selectbox("Voice Gender:", ["Female", "Male"])
+    with c2: gen = st.selectbox("Voice Gender:", ["Female (Aurat)", "Male (Mard)"])
     
     if st.button("Generate Voice 🚀"):
         v_map = {
-            "Urdu": {"Female": "ur-PK-UzmaNeural", "Male": "ur-PK-AsadNeural"},
-            "English": {"Female": "en-US-JennyNeural", "Male": "en-US-GuyNeural"},
-            "Hindi": {"Female": "hi-IN-SwaraNeural", "Male": "hi-IN-MadhurNeural"}
+            "Urdu": {"Female (Aurat)": "ur-PK-UzmaNeural", "Male (Mard)": "ur-PK-AsadNeural"},
+            "English": {"Female (Aurat)": "en-US-JennyNeural", "Male (Mard)": "en-US-GuyNeural"},
+            "Hindi": {"Female (Aurat)": "hi-IN-SwaraNeural", "Male (Mard)": "hi-IN-MadhurNeural"}
         }
         v_code = v_map[lang][gen]
         async def speak():
@@ -75,5 +69,5 @@ with tab2:
 with tab3:
     st.header("🎬 Pro Movie Studio")
     st.write("Movie Dashboard Active Hai! Script likhein aur Colab chalayein.")
-    st.text_area("Script:", height=100)
+    st.text_area("Movie Script:", height=150)
     st.button("Generate Pro Movie")
