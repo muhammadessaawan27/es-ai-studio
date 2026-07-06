@@ -2,8 +2,9 @@ import streamlit as st
 import asyncio
 import edge_tts
 import requests
+import json
 
-# --- ES AI BRANDING ---
+# --- ES AI PREMIUM UI ---
 st.set_page_config(page_title="ES AI Master Studio", layout="wide")
 st.markdown("""
     <style>
@@ -14,43 +15,49 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.markdown("<h1>ES AI</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #00d4ff; letter-spacing: 5px; font-weight: bold;'>MUHAMMAD ESSA'S MASTER STUDIO</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #00d4ff; letter-spacing: 5px; font-weight: bold;'>PROFESSIONAL AI AGENT SYSTEM</p>", unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["💬 ES Smart Chat", "🎙️ ES Voice Studio", "🎬 ES Movie Studio"])
+tab1, tab2, tab3 = st.tabs(["💬 Real AI Chat", "🎙️ Voice Studio", "🎬 Movie Studio"])
 
-# --- STABLE CHAT LOGIC (With Multiple Backups) ---
-def get_ai_response(text):
-    # Backup 1: Direct Logic for basics
-    text = text.lower()
-    if "hal" in text or "kaise" in text: return "Bhai Essa, main bilkul theek hoon! Aapka wafadar agent hazir hai."
-    if "naam" in text: return "Mera naam ES AI hai، aur mujhe Muhammad Essa Awan ne banaya hai."
-
-    # Backup 2: Stable AI Provider
+# --- ASLI AI ENGINE (NO HARDCODED REPLIES) ---
+def get_ai_result(user_query):
     try:
-        url = f"https://api.paxsenix.biz/ai/gpt4?q={text}"
-        res = requests.get(url, timeout=10)
-        return res.json()['reply']
-    except:
-        # Backup 3: Emergency fallback
-        return "Bhai Essa, is waqt server busy hai، lekin main aapka hukum sun raha hoon. Kuch aur poochein!"
+        # Ye ek powerful API hai jo real GPT-4 results deti hai
+        url = "https://api.paxsenix.biz/ai/gpt4"
+        params = {"q": user_query}
+        response = requests.get(url, params=params, timeout=20)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result.get('reply', "AI ne koi jawab nahi diya.")
+        else:
+            return f"Technical Error: Server ne {response.status_code} code diya."
+    except Exception as e:
+        return f"Connection Error: {str(e)}"
 
+# --- TAB 1: ASLI CHAT ---
 with tab1:
-    st.header("💬 Intelligent Assistant")
-    if "chat_history" not in st.session_state: st.session_state.chat_history = []
-    for chat in st.session_state.chat_history:
-        with st.chat_message(chat["role"]): st.write(chat["content"])
+    st.header("💬 Asli AI Chat Center")
+    if "messages" not in st.session_state: st.session_state.messages = []
+    
+    for m in st.session_state.messages:
+        with st.chat_message(m["role"]): st.write(m["content"])
 
-    user_msg = st.chat_input("Hukum karein Essa bhai...")
-    if user_msg:
-        st.session_state.chat_history.append({"role": "user", "content": user_msg})
-        with st.chat_message("user"): st.write(user_msg)
-        answer = get_ai_response(user_msg)
-        with st.chat_message("assistant"): st.write(answer)
-        st.session_state.chat_history.append({"role": "assistant", "content": answer})
+    user_input = st.chat_input("Koi bhi maloomat poochein (Science, History, Books)...")
+    if user_input:
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        with st.chat_message("user"): st.write(user_input)
+        
+        with st.spinner("AI Brain processing..."):
+            # Yahan koi hardcoded message nahi hai
+            ai_response = get_ai_result(user_input)
+            with st.chat_message("assistant"): st.write(ai_response)
+            st.session_state.messages.append({"role": "assistant", "content": ai_response})
 
+# --- TAB 2: VOICE STUDIO ---
 with tab2:
-    st.header("🎙️ Voiceover Studio (M/F)")
-    v_text = st.text_area("Yahan wo likhein jo AI se bulwana hai:")
+    st.header("🎙️ Voice Generator")
+    v_text = st.text_area("Likhein jo bulwana hai:")
     c1, c2 = st.columns(2)
     with c1: lang = st.selectbox("Zaban:", ["Urdu", "English", "Hindi"])
     with c2: gen = st.selectbox("Gender:", ["Female", "Male"])
@@ -63,13 +70,13 @@ with tab2:
         }
         v_code = v_map[lang][gen]
         async def speak():
-            await edge_tts.Communicate(v_text, v_code).save("es_voice.mp3")
+            await edge_tts.Communicate(v_text, v_code).save("voice.mp3")
         asyncio.run(speak())
-        st.audio("es_voice.mp3")
+        st.audio("voice.mp3")
 
+# --- TAB 3: MOVIE STUDIO ---
 with tab3:
     st.header("🎬 Pro Movie Studio")
-    st.info("Bhai Essa, yahan se script likhein aur Video banane ke liye Google Colab wala 'Play' button dabayein.")
-    st.text_area("Movie Script:", height=150)
-    st.selectbox("Ratio:", ["YouTube (16:9)", "TikTok (9:16)"])
-    st.button("Render Request Send")
+    st.info("Script yahan likhein aur Rendering ke liye Google Colab chalayein.")
+    st.text_area("Script Data:", height=150)
+    st.button("Request Video Render")
