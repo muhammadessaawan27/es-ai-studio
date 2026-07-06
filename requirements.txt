@@ -1,3 +1,5 @@
 streamlit
 edge-tts
 moviepy
+requests
+streamlit-mic-recorder
