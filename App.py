@@ -16,51 +16,51 @@ st.markdown("""
 st.markdown("<h1>ES AI</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #00d4ff; letter-spacing: 5px; font-weight: bold;'>MUHAMMAD ESSA'S MASTER STUDIO</p>", unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["💬 ES Smart Chat (Brain)", "🎙️ ES Voice Studio", "🎬 ES Movie Studio"])
+tab1, tab2, tab3 = st.tabs(["💬 ES Chat (LLM Brain)", "🎙️ ES Voice Studio", "🎬 ES Movie Studio"])
 
-# --- ADVANCED AI BRAIN (For detailed Info) ---
-def get_detailed_info(query):
+# --- ASLI AI ENGINE (NO FAKE RESPONSES) ---
+def get_real_ai_brain(question):
     try:
-        # Ye API ab GPT-4 ki tarah lambe aur maloomati jawab degi
-        response = requests.get(f"https://hercai.onrender.com/v3/hercai?question={query}", timeout=10)
-        data = response.json()
+        # Ye aik real AI engine hai jo detailed maloomat deta hai
+        url = f"https://hercai.onrender.com/v3/hercai?question={question}"
+        res = requests.get(url, timeout=15)
+        data = res.json()
         return data['reply']
-    except:
-        return "Bhai Essa, main is waqt internet se maloomat nikaal raha hoon. Please thori der baad dobara poochein ya apna sawal wazeh karein."
+    except Exception as e:
+        return f"Error: AI Engine se rabta nahi ho saka. (Technical Detail: {str(e)})"
 
 with tab1:
-    st.header("💬 Intelligent Assistant")
-    st.write("Aap mujhse kitabon, science, ya kisi bhi topic par maloomat le sakte hain.")
+    st.header("💬 Advanced AI Assistant")
+    st.info("Aap mujhse dunya ki koi bhi maloomat le sakte hain (Kitabein, Science, History).")
     
-    if "chat_history" not in st.session_state: st.session_state.chat_history = []
-    
-    for chat in st.session_state.chat_history:
-        with st.chat_message(chat["role"]): st.write(chat["content"])
+    if "messages" not in st.session_state: st.session_state.messages = []
+    for m in st.session_state.messages:
+        with st.chat_message(m["role"]): st.write(m["content"])
 
-    user_msg = st.chat_input("Bhai Essa, koi bhi sawal poochein...")
-    if user_msg:
-        st.session_state.chat_history.append({"role": "user", "content": user_msg})
-        with st.chat_message("user"): st.write(user_msg)
+    msg = st.chat_input("Yahan apna sawal likhein...")
+    if msg:
+        st.session_state.messages.append({"role": "user", "content": msg})
+        with st.chat_message("user"): st.write(msg)
         
-        with st.spinner("Main research kar raha hoon..."):
-            answer = get_detailed_info(user_msg)
-            with st.chat_message("assistant"): st.write(answer)
-            st.session_state.chat_history.append({"role": "assistant", "content": answer})
+        with st.spinner("AI Souch raha hai..."):
+            # Ab sirf asli AI ka jawab aayega
+            final_reply = get_real_ai_brain(msg)
+            with st.chat_message("assistant"): st.write(final_reply)
+            st.session_state.messages.append({"role": "assistant", "content": final_reply})
 
 with tab2:
     st.header("🎙️ Voiceover Generator")
     v_text = st.text_area("Yahan wo likhein jo AI se bulwana hai:")
-    c1, c2 = st.columns(2)
-    with c1: lang = st.selectbox("Zaban:", ["Urdu", "English", "Hindi"])
-    with c2: gen = st.selectbox("Voice Gender:", ["Female (Aurat)", "Male (Mard)"])
+    v_lang = st.selectbox("Zaban:", ["Urdu", "English", "Hindi"])
+    v_gen = st.radio("Gender:", ["Female", "Male"])
     
     if st.button("Generate Voice 🚀"):
         v_map = {
-            "Urdu": {"Female (Aurat)": "ur-PK-UzmaNeural", "Male (Mard)": "ur-PK-AsadNeural"},
-            "English": {"Female (Aurat)": "en-US-JennyNeural", "Male (Mard)": "en-US-GuyNeural"},
-            "Hindi": {"Female (Aurat)": "hi-IN-SwaraNeural", "Male (Mard)": "hi-IN-MadhurNeural"}
+            "Urdu": {"Female": "ur-PK-UzmaNeural", "Male": "ur-PK-AsadNeural"},
+            "English": {"Female": "en-US-JennyNeural", "Male": "en-US-GuyNeural"},
+            "Hindi": {"Female": "hi-IN-SwaraNeural", "Male": "hi-IN-MadhurNeural"}
         }
-        v_code = v_map[lang][gen]
+        v_code = v_map[v_lang][v_gen]
         async def speak():
             await edge_tts.Communicate(v_text, v_code).save("es_voice.mp3")
         asyncio.run(speak())
@@ -68,6 +68,6 @@ with tab2:
 
 with tab3:
     st.header("🎬 Pro Movie Studio")
-    st.write("Movie Dashboard Active Hai! Script likhein aur Colab chalayein.")
-    st.text_area("Movie Script:", height=150)
-    st.button("Generate Pro Movie")
+    st.write("Movie Dashboard set hai. Script likhein aur Colab ka button dabayein.")
+    st.text_area("Movie Script:", height=100)
+    st.button("Render Movie")
