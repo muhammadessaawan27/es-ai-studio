@@ -9,12 +9,19 @@ import re
 import uuid
 from PIL import Image
 
-# Senior Engineer Fix: Independent scaling for high-traffic apps
+# Senior Engineer Fix: Global patch for ANTIALIAS removal in newer Pillow versions
+if not hasattr(Image, 'ANTIALIAS'):
+    # This makes the code compatible with BOTH old and new Pillow versions
+    if hasattr(Image, 'LANCZOS'):
+        Image.ANTIALIAS = Image.LANCZOS
+    else:
+        Image.ANTIALIAS = 1 # Fallback for very old versions
+
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 1. PRODUCTION GRADE CONFIGURATION
+# 1. CORE CONFIGURATION & BRANDING
 # ==========================================
 st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="🎬")
 
@@ -37,9 +44,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# ==========================================
-# 2. CREATOR DATA & LOGIC
-# ==========================================
+# Creator Data
 ESSA_BIO = """
 مجھے محمد عیسیٰ اعوان صاحب نے بنایا، ڈیزائن کیا اور کنفیگر کیا ہے۔
 محمد عیسیٰ اعوان صاحب، صوفی محمد انور رحمۃ اللہ علیہ کے صاحبزادے ہیں۔
@@ -50,38 +55,22 @@ ESSA_BIO = """
 """
 
 def is_creator_query(q):
-    p = [r"kisne banaya", r"who made you", r"creator", r"owner", r"essa awan", r"muhammad essa", r"maker", r"founder"]
+    p = [r"kisne banaya", r"who made you", r"creator", r"owner", r"essa awan", r"muhammad essa"]
     return any(re.search(pat, q.lower(), re.IGNORECASE) for pat in p)
 
-# ==========================================
-# 3. HIGH-STABILITY CHAT ENGINE (NO TIMEOUT)
-# ==========================================
-def get_professional_response(query, history):
+# AI Chat Engine
+def get_intelligent_response(query):
     if is_creator_query(query): return ESSA_BIO
-    
     encoded_q = urllib.parse.quote(query)
-    # Persisting the System Role for Every User
-    system_role = urllib.parse.quote("You are ES AI created by Muhammad Essa Awan. Answer professionally and smartly.")
-    
-    urls = [
-        f"https://text.pollinations.ai/{encoded_q}?model=openai&system={system_role}&cache=true",
-        f"https://hercai.onrender.com/v3/hercai?question={encoded_q}"
-    ]
-    
-    for url in urls:
-        try:
-            r = requests.get(url, timeout=60) # High timeout for complex queries
-            if r.status_code == 200:
-                data = r.json() if 'hercai' in url else r.text
-                return data.get('reply') if isinstance(data, dict) else data
-        except: continue
-    return "سسٹم اپ ڈیٹ ہو رہا ہے۔ براہ کرم تھوڑی دیر بعد دوبارہ کوشش کریں۔"
+    url = f"https://text.pollinations.ai/{encoded_q}?model=openai&cache=true"
+    try:
+        r = requests.get(url, timeout=30)
+        return r.text if r.status_code == 200 else "AI سرور اس وقت جواب نہیں دے رہا۔"
+    except: return "کنکشن کا مسئلہ ہے۔"
 
-# ==========================================
-# 4. PREMIUM UI INTERFACE
-# ==========================================
+# UI Header
 st.markdown("<h1>ES AI</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #00d4ff; letter-spacing: 5px; font-weight: bold;'>ULTIMATE AI AGENT SYSTEM</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #00d4ff; letter-spacing: 5px; font-weight: bold;'>ADVANCED MULTI-FORMAT STUDIO</p>", unsafe_allow_html=True)
 
 tabs = st.tabs(["💬 Smart Chat", "🎙️ Voice Studio", "🎬 Pro Movie Studio"])
 
@@ -90,83 +79,68 @@ with tabs[0]:
     if "messages" not in st.session_state: st.session_state.messages = []
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]): st.write(msg["content"])
-
-    st.write("🎙️ **Voice Command:**")
-    mic_recorder(start_prompt="Speak Now", stop_prompt="Stop", key='recorder')
-
-    if user_p := st.chat_input("مجھ سے کچھ بھی پوچھیں..."):
+    
+    mic_recorder(start_prompt="Record Command", stop_prompt="Stop", key='recorder')
+    
+    if user_p := st.chat_input("پوچھیں..."):
         st.session_state.messages.append({"role": "user", "content": user_p})
         with st.chat_message("user"): st.write(user_p)
         with st.chat_message("assistant"):
-            with st.spinner("ES AI سوچ رہا ہے..."):
-                response = get_professional_response(user_p, st.session_state.messages)
-                st.write(response)
-                st.session_state.messages.append({"role": "assistant", "content": response})
+            res = get_intelligent_response(user_p)
+            st.write(res)
+            st.session_state.messages.append({"role": "assistant", "content": res})
 
 # --- TAB 2: VOICE STUDIO ---
 with tabs[1]:
-    st.header("Professional Voiceover")
-    v_text = st.text_area("متن لکھیں جسے آواز میں بدلنا ہے:", height=100)
-    col_l, col_g = st.columns(2)
-    with col_l: lang = st.selectbox("Language:", ["Urdu", "English", "Hindi"], key="v_l")
-    with col_g: gen = st.selectbox("Gender:", ["Female", "Male"], key="v_g")
-    
-    if st.button("Generate Audio 🚀", key="v_btn"):
+    st.header("Voiceover Generator")
+    v_text = st.text_area("متن لکھیں:")
+    c1, c2 = st.columns(2)
+    with c1: lang = st.selectbox("Language:", ["Urdu", "English", "Hindi"])
+    with c2: gen = st.selectbox("Gender:", ["Female", "Male"])
+    if st.button("Generate Voice 🚀"):
         if v_text:
-            v_map = {"Urdu": {"Female": "ur-PK-UzmaNeural", "Male": "ur-PK-AsadNeural"},
-                     "English": {"Female": "en-US-JennyNeural", "Male": "en-US-GuyNeural"},
-                     "Hindi": {"Female": "hi-IN-SwaraNeural", "Male": "hi-IN-MadhurNeural"}}
-            v_code = v_map[lang][gen]
+            v_code = "ur-PK-UzmaNeural" if gen == "Female" else "ur-PK-AsadNeural"
             async def run_v(): await edge_tts.Communicate(v_text, v_code).save("voice.mp3")
             asyncio.run(run_v())
             st.audio("voice.mp3")
-            with open("voice.mp3", "rb") as f: st.download_button("Download", f, file_name="es_voice.mp3")
 
-# --- TAB 3: MOVIE STUDIO (THE MILLION-USER ENGINE) ---
+# --- TAB 3: MOVIE STUDIO ---
 with tabs[2]:
-    st.header("🎬 Pro Movie Studio")
-    m_script = st.text_area("مووی اسکرپٹ یہاں لکھیں:", height=150, placeholder="مثال: ایک بہادر شیر کی کہانی جو پہاڑوں پر رہتا تھا...")
-    
-    m_col1, m_col2 = st.columns(2)
-    with m_col1: m_voice_gen = st.selectbox("Voice Selection:", ["Female", "Male"], key="ms_gen")
-    with m_col2: m_ratio = st.selectbox("Video Size:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"], key="ms_ratio")
+    st.header("🎬 Pro Movie Engine")
+    m_script = st.text_area("کہانی لکھیں:", height=150)
+    col_v, col_r = st.columns(2)
+    with col_v: m_voice = st.selectbox("Voice Gender:", ["Female", "Male"], key="mv")
+    with col_r: m_ratio = st.selectbox("Size:", ["YouTube (16:9)", "TikTok (9:16)", "Instagram (1:1)"], key="mr")
 
-    if st.button("🚀 Generate High-Quality Video"):
+    if st.button("Generate Final Video 🚀"):
         if m_script:
-            with st.spinner("سینیمیٹک مناظر تیار ہو رہے ہیں..."):
+            with st.spinner("ویڈیو رینڈر ہو رہی ہے..."):
                 try:
-                    # Unique ID for concurrent users
-                    uid = str(uuid.uuid4())[:8]
-                    # 1. Voice Generation
-                    v_code = "ur-PK-UzmaNeural" if m_voice_gen == "Female" else "ur-PK-AsadNeural"
-                    async def gv(): await edge_tts.Communicate(m_script, v_code).save(f"{uid}_a.mp3")
+                    uid = str(uuid.uuid4())[:6]
+                    # 1. Voice
+                    v_code = "ur-PK-UzmaNeural" if m_voice == "Female" else "ur-PK-AsadNeural"
+                    async def gv(): await edge_tts.Communicate(m_script, v_code).save(f"{uid}.mp3")
                     asyncio.run(gv())
-                    audio = AudioFileClip(f"{uid}_a.mp3")
+                    audio = AudioFileClip(f"{uid}.mp3")
                     
-                    # 2. Dimensions Logic
+                    # 2. Dimensions
                     res = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
                     w, h = res[m_ratio]
 
-                    # 3. Smart Image Generation (Anti-Woman-Teacup Logic)
-                    # We add a strong modifier to ensure it matches the script
-                    img_prompt = f"Professional 3D cinematic animation style, {m_script[:70]}, vibrant lighting, 8k resolution, masterpiece, no text"
-                    img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(img_prompt)}?width={w}&height={h}&nologo=true"
-                    with open(f"{uid}_i.jpg", "wb") as f: f.write(requests.get(img_url).content)
+                    # 3. Cinematic Image
+                    img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(m_script[:60] + ' 3d disney pixar style animation')}?width={w}&height={h}&nologo=true"
+                    with open(f"{uid}.jpg", "wb") as f: f.write(requests.get(img_url).content)
                     
-                    # 4. Assembly (Safe PIL Handling)
-                    clip = ImageClip(f"{uid}_i.jpg").set_duration(audio.duration).set_fps(24).set_audio(audio)
-                    clip = clip.resize(newsize=(w, h)) # Correct scaling method
+                    # 4. Assembly (Correct scaling to avoid error)
+                    clip = ImageClip(f"{uid}.jpg").set_duration(audio.duration).set_fps(24).set_audio(audio)
+                    clip = clip.resize(newsize=(w, h))
                     
-                    output_name = f"es_movie_{uid}.mp4"
-                    clip.write_videofile(output_name, codec="libx264", audio_codec="aac")
-                    
-                    st.video(output_name)
-                    with open(output_name, "rb") as f:
-                        st.download_button("Download Movie ⬇️", f, file_name=f"es_ai_studio_{uid}.mp4")
-                    st.success("مبارک ہو! ویڈیو پروفیشنل رزلٹ کے ساتھ تیار ہے۔")
+                    out_name = f"video_{uid}.mp4"
+                    clip.write_videofile(out_name, codec="libx264", audio_codec="aac")
+                    st.video(out_name)
+                    st.success("ویڈیو تیار ہے!")
                 except Exception as e:
-                    st.error(f"تکنیکی خرابی: {str(e)}")
-        else: st.warning("پہلے کہانی لکھیں۔")
+                    st.error(f"تکنیکی خرابی: {e}")
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #555;'>© 2024 ES AI Master Studio | Production Engine v7.0</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #555;'>ES AI Studio v8.0 | Stable Production</p>", unsafe_allow_html=True)
