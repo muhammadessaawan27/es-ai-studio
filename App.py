@@ -7,6 +7,7 @@ import os
 import time
 import re
 import uuid
+import random  # Senior Engineer Fix: Added missing library
 from PIL import Image
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
 from streamlit_mic_recorder import mic_recorder
@@ -32,7 +33,7 @@ st.markdown("""
     }
     .stButton>button { 
         background: linear-gradient(45deg, #00d4ff, #ff007a); 
-        color: white; border-radius: 12px; height: 55px; width: 100%; 
+        color: white; border-radius: 12px; height: 50px; width: 100%; 
         font-size: 20px; font-weight: bold; border: none; transition: 0.3s;
     }
     .stButton>button:hover { transform: scale(1.02); box-shadow: 0px 5px 15px rgba(0, 212, 255, 0.4); }
@@ -71,7 +72,7 @@ def get_ai_response(query):
 # ==========================================
 def create_cinematic_movie(story, voice_gen, ratio):
     try:
-        # Unique User ID to prevent 100 users clash
+        # Unique User ID
         u_id = str(uuid.uuid4())[:8]
         
         # Step 1: Voice Generation
@@ -83,18 +84,20 @@ def create_cinematic_movie(story, voice_gen, ratio):
         audio = AudioFileClip(audio_file)
         full_duration = audio.duration
 
-        # Step 2: Split story into 4 Scenes for Variety
+        # Step 2: Split story into 4 Scenes
         words = story.split()
         num_scenes = 4
         chunk = max(1, len(words) // num_scenes)
         
-        # Dimensions setup
         res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
         w, h = res_map[ratio]
 
         clips = []
         for i in range(num_scenes):
-            scene_text = " ".join(words[i*chunk : (i+1)*chunk])
+            start_idx = i * chunk
+            end_idx = (i + 1) * chunk if i != 3 else len(words)
+            scene_text = " ".join(words[start_idx : end_idx])
+            
             # High-Quality Cinematic Prompt
             prompt = f"Cinematic 3D animation, {scene_text[:80]}, high detail, 8k, realistic lighting, masterpiece, no text"
             img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={random.randint(1,9999)}"
@@ -116,7 +119,6 @@ def create_cinematic_movie(story, voice_gen, ratio):
         output_name = f"ES_AI_Movie_{u_id}.mp4"
         final_video.write_videofile(output_name, codec="libx264", audio_codec="aac", fps=24)
         
-        # Cleanup temp files
         return output_name
     except Exception as e:
         return f"Error: {e}"
@@ -140,9 +142,10 @@ with tabs[0]:
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.write(prompt)
         with st.chat_message("assistant"):
-            res = get_ai_response(prompt)
-            st.write(res)
-            st.session_state.messages.append({"role": "assistant", "content": res})
+            with st.spinner("ES AI Souch raha hai..."):
+                res = get_ai_response(prompt)
+                st.write(res)
+                st.session_state.messages.append({"role": "assistant", "content": res})
 
 with tabs[1]:
     st.header("Voiceover Studio (M/F)")
@@ -159,14 +162,14 @@ with tabs[1]:
 
 with tabs[2]:
     st.header("Cinematic Movie Studio (Multi-Scene)")
-    m_script = st.text_area("Apni Movie ki Story Likhein:", height=150, placeholder="Example: Jungle mein sher aur hathi ki dosti...")
+    m_script = st.text_area("Apni Movie ki Story Likhein:", height=150)
     col_v, col_r = st.columns(2)
     with col_v: m_voice = st.selectbox("Voice Selection:", ["Female", "Male"], key="mv_gen")
     with col_r: m_ratio = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"], key="mr_sel")
 
     if st.button("Generate Master Movie 🚀", key="mv_btn"):
         if m_script:
-            with st.spinner("AI مناظر تیار کر رہا ہے۔۔۔ اس میں 1 سے 2 منٹ لگ سکتے ہیں۔"):
+            with st.spinner("AI مناظر تیار کر رہا ہے۔۔۔ اس میں تھوڑا وقت لگ سکتا ہے۔"):
                 video_file = create_cinematic_movie(m_script, m_voice, m_ratio)
                 if "mp4" in video_file:
                     st.video(video_file)
@@ -176,4 +179,4 @@ with tabs[2]:
                 else: st.error(video_file)
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: grey;'>ES AI Studio v9.0 | Multi-User Cinematic Engine</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #555;'>ES AI Studio v9.1 | Fixed Undefined Random Error</p>", unsafe_allow_html=True)
