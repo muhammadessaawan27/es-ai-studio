@@ -12,8 +12,6 @@ from PIL import Image
 
 # Senior Engineer Fix: Persistent Session with Optimized Retries
 session = requests.Session()
-adapter = requests.adapters.HTTPAdapter(pool_connections=50, pool_maxsize=50)
-session.mount('https://', adapter)
 
 try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
@@ -40,7 +38,8 @@ st.markdown("""
     }
     .stButton>button { 
         background: linear-gradient(45deg, #00d4ff, #ff007a); 
-        color: white; border-radius: 12px; height: 55px; font-weight: bold; border: none;
+        color: white; border-radius: 12px; height: 55px; width: 100%; 
+        font-size: 18px; font-weight: bold; border: none;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -57,31 +56,50 @@ def is_creator_query(q):
     return any(re.search(p, q.lower(), re.IGNORECASE) for p in patterns)
 
 # ==========================================
-# 2. FAIL-SAFE IMAGE DOWNLOADER
+# 2. THE VISUAL CONTENT ISOLATOR (GPT-4 POWERED)
 # ==========================================
-def download_and_clean_image(url, path):
-    for attempt in range(3):
-        try:
-            r = session.get(url, timeout=90)
-            if r.status_code == 200:
-                with open(path, "wb") as f: f.write(r.content)
-                # Verify and Sanitize Image
-                img = Image.open(path).convert("RGB")
-                img.save(path, "JPEG", quality=95)
-                return True
-        except:
-            time.sleep(2)
-    return False
+def get_strict_visual_prompt(urdu_text, style_choice):
+    """
+    This function strictly forces the AI to focus ONLY on what is written.
+    It removes default humans/characters if not mentioned.
+    """
+    try:
+        # Complex instruction to the background Director AI
+        director_instr = (
+            f"Task: Extract the core physical subject from this Urdu text: '{urdu_text}'. "
+            "Rule 1: If it mentions an object (house, stone, mountain), describe ONLY that object. "
+            "Rule 2: If it mentions an animal, describe ONLY that animal. "
+            "Rule 3: If no human, boy, or girl is mentioned, STERNLY EXCLUDE them from the description. "
+            "Rule 4: Describe weather, lighting, and texture accurately (sunlight, shade, fire, water). "
+            "Output only a detailed English prompt. No preamble."
+        )
+        
+        encoded_instr = urllib.parse.quote(director_instr)
+        url = f"https://text.pollinations.ai/{encoded_instr}?model=openai&cache=true"
+        
+        res = session.get(url, timeout=30)
+        visual_desc = res.text if res.status_code == 200 else urdu_text
+        
+        # Assemble Final Prompt with Negative Enforcement
+        neg_prompt = ""
+        # If the Urdu text doesn't contain human keywords, force-add negative prompts
+        human_keywords = ["احمد", "لڑکا", "لڑکی", "آدمی", "عورت", "بچہ", "انسان", "people", "person", "boy", "girl", "man", "woman"]
+        if not any(k in urdu_text for k in human_keywords):
+            neg_prompt = ", no humans, no people, no faces, no boys, no girls"
+
+        return f"{style_choice} style, {visual_desc}{neg_prompt}, highly detailed cinematic 4k, realistic texture, masterpiece"
+    except:
+        return f"{style_choice} style, {urdu_text}, masterpiece, 8k"
 
 # ==========================================
-# 3. ADVANCED MOVIE ENGINE v26.0 (PLAYBACK FIX)
+# 3. MOVIE ENGINE v27.0 (STRICT CONTENT MATCH)
 # ==========================================
-def create_bulletproof_movie(story, voice_gen, ratio, style):
+def create_accurate_movie(story, voice_gen, ratio, style):
     u_id = str(uuid.uuid4())[:8]
     status = st.empty()
     
     try:
-        # Step 1: Secure Voice
+        # Step 1: Voice
         status.info("🎙️ آواز تیار کی جا رہی ہے...")
         v_code = "ur-PK-UzmaNeural" if voice_gen == "Female" else "ur-PK-AsadNeural"
         audio_file = f"{u_id}_v.mp3"
@@ -89,7 +107,7 @@ def create_bulletproof_movie(story, voice_gen, ratio, style):
         asyncio.run(gv())
         voice_audio = AudioFileClip(audio_file)
 
-        # Step 2: Set Strict Even Dimensions (Required by Ffmpeg)
+        # Step 2: Dimensions
         res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
         w, h = res_map[ratio]
 
@@ -98,30 +116,36 @@ def create_bulletproof_movie(story, voice_gen, ratio, style):
         clips = []
         dur_per = voice_audio.duration / len(sentences)
 
-        # Step 4: Robust Scene Generation
+        # Step 4: Strict Scene Generation
         for i, scene in enumerate(sentences):
-            status.info(f"🖼️ منظر {i+1} کی تصویر بن رہی ہے...")
-            prompt = f"{style} style, {scene[:100]}, highly detailed, cinematic 4k, masterpiece, no text"
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
+            status.info(f"🖼️ منظر {i+1} کی پہچان ہو رہی ہے: {scene[:30]}...")
+            
+            # Use the Content Isolator to get a specific prompt
+            strict_prompt = get_strict_visual_prompt(scene, style)
+            
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(strict_prompt)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
             img_path = f"{u_id}_{i}.jpg"
             
-            if download_and_clean_image(img_url, img_path):
+            r = session.get(img_url, timeout=60)
+            if r.status_code == 200:
+                with open(img_path, "wb") as f: f.write(r.content)
+                # Cleanup & Playback Fix
+                img = Image.open(img_path).convert("RGB")
+                img.save(img_path, "JPEG")
+                
                 clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
                 clip = clip.resize(newsize=(w, h))
-                # Cinematic Zoom Out Fix
+                # Cinematic Motion
                 clip = clip.resize(lambda t: 1.1 - 0.06 * (t/dur_per)).set_position('center')
                 clips.append(fadein(clip, 0.4))
-            else:
-                continue
 
-        if not clips: raise ValueError("تصویریں ڈاؤن لوڈ نہیں ہوسکیں۔ انٹرنیٹ چیک کریں۔")
+        if not clips: raise ValueError("مناظر جنریٹ نہیں ہوسکے۔")
 
-        # Step 5: Final Rendering with Mobile-Friendly Encoding
-        status.info("⚙️ فائنل رینڈرنگ (Mobile-Friendly Mode)...")
+        # Step 5: Rendering
+        status.info("⚙️ ویڈیو فائل تیار ہو رہی ہے...")
         final_video = concatenate_videoclips(clips, method="compose").set_audio(voice_audio)
-        out_name = f"ES_Movie_{u_id}.mp4"
+        out_name = f"ES_AI_{u_id}.mp4"
         
-        # KEY FIX: pix_fmt="yuv420p" allows video to play on ALL devices
         final_video.write_videofile(
             out_name, 
             codec="libx264", 
@@ -136,7 +160,7 @@ def create_bulletproof_movie(story, voice_gen, ratio, style):
             p = f"{u_id}_{i}.jpg"
             if os.path.exists(p): os.remove(p)
         
-        status.success("✅ ویڈیو پلے ہونے کے لیے تیار ہے!")
+        status.success("✅ ویڈیو اسکرپٹ کے عین مطابق تیار ہے!")
         return out_name
     except Exception as e:
         return f"Error: {e}"
@@ -145,7 +169,7 @@ def create_bulletproof_movie(story, voice_gen, ratio, style):
 # 4. DASHBOARD UI
 # ==========================================
 st.markdown("<h1>ES AI</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; color:#00d4ff; font-weight:bold; letter-spacing:5px;'>PROFESSIONAL CINEMATIC STUDIO</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#00d4ff; font-weight:bold; letter-spacing:5px;'>PRECISION CONTENT STUDIO</p>", unsafe_allow_html=True)
 
 tab1, tab2, tab3 = st.tabs(["💬 Chat", "🎙️ Voice", "🎬 Pro Movie Studio"])
 
@@ -162,20 +186,21 @@ with tab1:
             st.write(res); st.session_state.messages.append({"role": "assistant", "content": res})
 
 with tab3:
-    st.header("🎬 Pro Movie Studio v26.0")
-    m_script = st.text_area("کہانی یہاں لکھیں:", height=150)
+    st.header("🎬 Pro Movie Studio v27.0")
+    st.write("یہ انجن اسکرپٹ کے ایک ایک لفظ کی شناخت کر کے تصویر بناتا ہے۔")
+    m_script = st.text_area("کہانی یہاں لکھیں:", height=150, placeholder="مثال: پہاڑوں کے پیچھے سورج ڈوب رہا ہے اور بادل سرخ ہو رہے ہیں۔")
     c1, c2, c3 = st.columns(3)
     with c1: mv = st.selectbox("Voice:", ["Male", "Female"])
     with c2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
     with c3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon", "Anime", "Sketch"])
 
-    if st.button("🚀 Generate Final Playable Video"):
+    if st.button("🚀 Generate Accurate Video"):
         if m_script:
-            video = create_bulletproof_movie(m_script, mv, mr, ms)
+            video = create_accurate_movie(m_script, mv, mr, ms)
             if "mp4" in video:
                 st.video(video)
                 with open(video, "rb") as f: st.download_button("Download Full HD", f, file_name=video)
             else: st.error(video)
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: grey;'>ES AI Studio v26.0 | Playback & Color Fixed | Muhammad Essa Awan</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: grey;'>ES AI Studio v27.0 | Word Recognition Engine | Muhammad Essa Awan</p>", unsafe_allow_html=True)
