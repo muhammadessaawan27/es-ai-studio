@@ -8,21 +8,22 @@ import time
 import re
 import uuid
 import random
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-# Senior Engineer Fix for PIL
+# Senior Engineer Fix for Image and MoviePy
 if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', 1)
 
 try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, CompositeVideoClip
+    from moviepy.video.fx.all import fadein
 except Exception as e:
-    st.error(f"Engine Load Error: {e}")
+    st.error(f"Critical Engine Error: {e}")
 
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 1. BRANDING & PREMIUM DESIGN
+# 1. CORE BRANDING & UI (Metallic Neon)
 # ==========================================
 st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="🎬")
 
@@ -34,7 +35,7 @@ st.markdown("""
         background: linear-gradient(90deg, #00d4ff, #ff007a); 
         -webkit-background-clip: text; 
         -webkit-text-fill-color: transparent; 
-        font-size: clamp(40px, 8vw, 80px); font-weight: 900;
+        font-size: 80px; font-weight: 900;
     }
     .stButton>button { 
         background: linear-gradient(45deg, #00d4ff, #ff007a); 
@@ -44,7 +45,9 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Creator Biography
+# ==========================================
+# 2. CREATOR IDENTITY (YOUR BIO)
+# ==========================================
 ESSA_BIO = """
 مجھے محمد عیسیٰ اعوان صاحب نے بنایا، ڈیزائن کیا اور کنفیگر کیا ہے۔
 محمد عیسیٰ اعوان صاحب، صوفی محمد انور رحمۃ اللہ علیہ کے صاحبزادے ہیں۔
@@ -54,185 +57,124 @@ ESSA_BIO = """
 انہوں نے مجھے ڈیزائن کیا اور بنایا، اور یہ محنت انہوں نے خود کی۔
 """
 
-# ==========================================
-# 2. THE VISUAL DIRECTOR (GOLDEN RULES + STYLES)
-# ==========================================
-def generate_visual_prompt(scene_text, style_choice, custom_style=""):
-    """
-    Combines Style Selection with 11 Character Recognition Rules.
-    """
-    # Define Styles (Requirement 1-8)
-    style_prompts = {
-        "Realistic": "high-end photorealistic photography, real life, 8k resolution, highly detailed skin textures, natural lighting",
-        "Cinematic": "professional movie scene, anamorphic lens, dramatic lighting, cinematic color grading, masterpiece, 8k",
-        "3D Cartoon": "3D Disney Pixar animation style, adorable features, smooth surfaces, vibrant cinematic colors",
-        "Anime": "modern high-quality anime style, hand-drawn aesthetic, vibrant colors, Makoto Shinkai style, expressive eyes",
-        "Illustration / Digital Art": "vibrant digital art, concept illustration, artistic brush strokes, detailed painting",
-        "Sketch": "detailed pencil sketch, charcoal drawing, hand-drawn on textured paper, black and white artistic",
-        "Kids Cartoon": "simple flat 2D cartoon style, bright primary colors, friendly characters, thick outlines, storybook style",
-        "Custom": custom_style
-    }
-    
-    active_style = style_prompts.get(style_choice, style_prompts["Realistic"])
-
-    # Character Logic (Rule 1-2)
-    subject = "a cinematic scene"
-    if any(k in scene_text for k in ["بچہ", "لڑکا", "احمد", "boy", "kid"]):
-        subject = "a young boy character"
-    elif any(k in scene_text for k in ["بچی", "لڑکی", "girl"]):
-        subject = "a little girl character"
-    elif any(k in scene_text for k in ["بوڑھا", "بزرگ", "old man"]):
-        subject = "a kind old man with white beard"
-    elif any(k in scene_text for k in ["عورت", "woman"]):
-        subject = "a woman character"
-
-    # Animals (Rule 3)
-    animals = ""
-    animal_list = {"شیر": "lion", "ہاتھی": "elephant", "چوہا": "mouse", "بلی": "cat", "کتا": "dog", "پرندہ": "bird", "بندر": "monkey"}
-    for k, v in animal_list.items():
-        if k in scene_text: animals += f", a {v}"
-
-    # Emotions (Rule 6)
-    emotion = ""
-    if any(k in scene_text for k in ["رو رہا", "اداس", "sad", "crying"]): emotion = ", crying emotional face"
-    elif any(k in scene_text for k in ["ہنس رہا", "خوش", "happy", "laughing"]): emotion = ", joyful smiling face"
-    elif any(k in scene_text for k in ["غصہ", "angry"]): emotion = ", angry aggressive face"
-
-    # Actions & Objects (Rule 4, 5, 7)
-    action_obj = ""
-    if any(k in scene_text for k in ["دوڑ", "running"]): action_obj += ", running"
-    elif any(k in scene_text for k in ["بیٹھا", "sitting"]): action_obj += ", sitting"
-    
-    obj_list = {"بٹوہ": "wallet", "کتاب": "book", "درخت": "lush trees", "گھر": "house"}
-    for k, v in obj_list.items():
-        if k in scene_text: action_obj += f", featuring a {v}"
-
-    # Assembly (Golden Rule)
-    final_prompt = f"{active_style}, {subject}{animals}{emotion}{action_obj}, highly detailed, {active_style}, no text, no blur, masterpiece"
-    return final_prompt
+def is_creator_query(q):
+    patterns = [r"kisne banaya", r"who made you", r"creator", r"owner", r"essa awan", r"muhammad essa", r"maker"]
+    return any(re.search(p, q.lower(), re.IGNORECASE) for p in patterns) if q else False
 
 # ==========================================
-# 3. MOVIE ENGINE (SCENE SYNC + ZOOM OUT)
+# 3. ADVANCED ENGINES (CHAT & VIDEO)
 # ==========================================
-def create_masterpiece_movie(story, voice_gen, ratio, style_choice, custom_style):
+
+def get_ai_brain_response(query):
+    if is_creator_query(query): return ESSA_BIO
+    encoded = urllib.parse.quote(query)
+    system_instr = urllib.parse.quote("You are ES AI created by Muhammad Essa Awan. Answer professionally and smartly.")
+    url = f"https://text.pollinations.ai/{encoded}?model=openai&cache=true&system={system_instr}"
+    try:
+        r = requests.get(url, timeout=30)
+        return r.text if r.status_code == 200 else "سرور مصروف ہے، دوبارہ کوشش کریں۔"
+    except: return "کنکشن سست ہے، انٹرنیٹ چیک کریں۔"
+
+def create_master_movie_v18(story, voice_gen, ratio, style):
     u_id = str(uuid.uuid4())[:8]
     try:
-        # Step 1: Voice
+        # 1. Voice
         v_code = "ur-PK-UzmaNeural" if voice_gen == "Female" else "ur-PK-AsadNeural"
         audio_file = f"{u_id}_v.mp3"
-        async def run_v(): await edge_tts.Communicate(story, v_code).save(audio_file)
-        asyncio.run(run_v())
-        voice_audio = AudioFileClip(audio_file)
+        async def gv(): await edge_tts.Communicate(story, v_code).save(audio_file)
+        asyncio.run(gv())
+        audio = AudioFileClip(audio_file)
         
-        # Step 2: Dimensions
-        res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
-        w, h = res_map[ratio]
+        # 2. Split by Sentences
+        sentences = re.split(r'[۔.!]', story)
+        sentences = [s.strip() for s in sentences if len(s) > 5]
+        
+        # 3. Dimension Setup
+        res = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
+        w, h = res[ratio]
 
-        # Step 3: Multi-Scene Generation
-        words = story.split()
-        num_scenes = 4 if len(words) > 10 else 1
-        chunk = max(1, len(words) // num_scenes)
         clips = []
+        dur_per_scene = audio.duration / len(sentences)
 
-        for i in range(num_scenes):
-            st_idx, end_idx = i*chunk, (i+1)*chunk if i != 3 else len(words)
-            scene_text = " ".join(words[st_idx:end_idx])
-            
-            # Apply Style + Golden Rules
-            refined_prompt = generate_visual_prompt(scene_text, style_choice, custom_style)
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_prompt)}?width={w}&height={h}&seed={random.randint(1,9999)}&nologo=true"
+        for i, scene in enumerate(sentences):
+            # Prompting for Natural Motion (Hair, blinking, wind)
+            prompt = f"{style} style, {scene[:80]}, high quality 3d animation, moving hair, blinking eyes, wind blowing, realistic motion, masterpiece, 8k, no text"
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={random.randint(1,9999)}&nologo=true"
             
             img_path = f"{u_id}_{i}.jpg"
-            img_data = requests.get(img_url).content
-            with open(img_path, "wb") as f: f.write(img_data)
+            with open(img_path, "wb") as f: f.write(requests.get(img_url).content)
             
-            # Subtitles & Zoom Out
-            img = Image.open(img_path)
-            draw = ImageDraw.Draw(img)
-            draw.rectangle([0, h-80, w, h], fill=(0,0,0,140))
-            draw.text((w/2, h-40), scene_text[-50:], fill="white", anchor="ms") 
-            img.save(img_path)
+            # Assembly + Zoom In (Image gets bigger to cover black bars)
+            clip = ImageClip(img_path).set_duration(dur_per_scene).set_fps(24)
+            clip = clip.resize(newsize=(w, h)) # Auto Fill Screen
+            # Gradually increase size from 1.0 to 1.15
+            clip = clip.resize(lambda t: 1.0 + 0.15 * (t / dur_per_scene)).set_position('center')
+            clips.append(fadein(clip, 0.4))
 
-            clip = ImageClip(img_path).set_duration(voice_audio.duration/num_scenes).set_fps(24)
-            # Professional ZOOM OUT (1.12 to 1.0)
-            clip = clip.resize(lambda t: 1.12 - 0.04 * t).set_position('center')
-            clips.append(clip)
-
-        final_video = concatenate_videoclips(clips, method="compose").set_audio(voice_audio)
-        final_video = final_video.resize(newsize=(w, h))
-        out_name = f"ES_AI_{u_id}.mp4"
+        final_video = concatenate_videoclips(clips, method="compose").set_audio(audio)
+        out_name = f"ES_Movie_{u_id}.mp4"
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24)
         return out_name
-    except Exception as e:
-        return f"Technical Error: {e}"
+    except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 4. MAIN UI DASHBOARD
+# 4. FINAL UNIFIED UI
 # ==========================================
 st.markdown("<h1>ES AI</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #00d4ff; font-weight: bold; letter-spacing: 5px;'>MUHAMMAD ESSA'S OFFICIAL STUDIO</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#00d4ff; font-weight:bold; letter-spacing:5px;'>MUHAMMAD ESSA'S OFFICIAL STUDIO</p>", unsafe_allow_html=True)
 
 tabs = st.tabs(["💬 Chat & Vision", "🎙️ Voice Studio", "🎬 Pro Movie Studio"])
 
+# TAB 1: SMART CHAT
 with tabs[0]:
     if "messages" not in st.session_state: st.session_state.messages = []
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): st.write(m["content"])
     
-    col1, col2 = st.columns([1, 4])
-    with col1: mic_recorder(start_prompt="🎙️ Speak", stop_prompt="🛑 Stop", key='recorder')
-    with col2: up_img = st.file_uploader("➕ Upload Image", type=["jpg", "png"])
+    st.write("---")
+    col_mic, col_up = st.columns([1, 4])
+    with col_mic: mic_recorder(start_prompt="🎙️", stop_prompt="🛑", key='mic')
+    with col_up: up_img = st.file_uploader("➕ Upload Image", type=["jpg", "png"])
 
     if prompt := st.chat_input("Hukum karein Essa bhai..."):
-        if any(k in prompt.lower() for k in ["kisne banaya", "creator", "essa"]):
-            res = ESSA_BIO
-        else:
-            encoded_q = urllib.parse.quote(prompt)
-            url = f"https://text.pollinations.ai/{encoded_q}?model=openai&cache=true"
-            try:
-                r = requests.get(url, timeout=30)
-                res = r.text if r.status_code == 200 else "AI سرور مصروف ہے۔"
-            except: res = "Connection Error."
-        
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.write(prompt)
         with st.chat_message("assistant"):
-            st.write(res)
-            st.session_state.messages.append({"role": "assistant", "content": res})
+            with st.spinner("ES AI Souch raha hai..."):
+                response = get_ai_brain_response(prompt)
+                st.write(response)
+                st.session_state.messages.append({"role": "assistant", "content": response})
 
+# TAB 2: VOICE STUDIO
 with tabs[1]:
-    st.header("🎙️ Voice Studio")
-    vt = st.text_area("Yahan wo likhein jo AI se bulwana hai:")
-    vl, vg = st.columns(2)
-    with vl: lang = st.selectbox("Language:", ["Urdu", "English", "Hindi"])
-    with vg: gender = st.selectbox("Gender:", ["Female", "Male"])
-    if st.button("Generate Voice 🚀", key="v_btn"):
-        if vt:
-            vc = "ur-PK-UzmaNeural" if gender == "Female" else "ur-PK-AsadNeural"
-            async def run_v(): await edge_tts.Communicate(vt, vc).save("temp.mp3")
-            asyncio.run(run_v()); st.audio("temp.mp3")
+    st.header("🎙️ Professional Voiceover")
+    v_text = st.text_area("Yahan wo likhein jo AI se bulwana hai:", height=100)
+    c1, c2 = st.columns(2)
+    with c1: lang = st.selectbox("Language:", ["Urdu", "English", "Hindi"])
+    with c2: gen = st.selectbox("Awaaz (Gender):", ["Female", "Male"])
+    if st.button("Generate Voice 🚀"):
+        if v_text:
+            v_code = "ur-PK-UzmaNeural" if gen == "Female" else "ur-PK-AsadNeural"
+            async def sv(): await edge_tts.Communicate(v_text, v_code).save("es_v.mp3")
+            asyncio.run(sv()); st.audio("es_v.mp3")
 
+# TAB 3: MOVIE STUDIO (v18.1)
 with tabs[2]:
-    st.header("🎬 Pro Movie Studio v17.0")
-    m_script = st.text_area("Movie Script:", height=150, placeholder="Example: Jungle mein sher aur hathi dost ban gaye...")
-    
-    col_v, col_r, col_s = st.columns(3)
-    with col_v: m_voice = st.selectbox("Voice:", ["Male", "Female"])
-    with col_r: m_ratio = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    with col_s: m_style = st.selectbox("Visual Style:", ["Realistic", "Cinematic", "3D Cartoon", "Anime", "Illustration / Digital Art", "Sketch", "Kids Cartoon", "Custom"])
+    st.header("🎬 Master Cinematic Studio")
+    m_script = st.text_area("Movie Script:", height=150, placeholder="Har jumlay par aik naya manzar banay ga...")
+    mv, mr, ms = st.columns(3)
+    with mv: m_voice = st.selectbox("Voice:", ["Male", "Female"])
+    with mr: m_ratio = st.selectbox("Ratio:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
+    with ms: m_style = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon", "Anime", "Sketch"])
 
-    custom_style_txt = ""
-    if m_style == "Custom":
-        custom_style_txt = st.text_input("Enter your custom style description:")
-
-    if st.button("Generate Master Movie 🚀"):
+    if st.button("🚀 Generate Professional Movie"):
         if m_script:
-            with st.spinner(f"AI {m_style} اسٹائل میں مووی تیار کر رہا ہے..."):
-                video = create_masterpiece_movie(m_script, m_voice, m_ratio, m_style, custom_style_txt)
+            with st.spinner("AI مناظر اور اینیمیشن تیار کر رہا ہے..."):
+                video = create_master_video_v18(m_script, m_voice, m_ratio, m_style)
                 if "mp4" in video:
                     st.video(video)
-                    with open(video, "rb") as f: st.download_button("Download HD Video", f, file_name=video)
+                    with open(video, "rb") as f: st.download_button("Download Movie ⬇️", f, file_name=video)
                 else: st.error(video)
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #555;'>ES AI Studio v17.0 | Advanced Style Selector Active</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: grey;'>ES AI Studio v18.1 | Full Feature Restoration | Muhammad Essa Awan</p>", unsafe_allow_html=True)
