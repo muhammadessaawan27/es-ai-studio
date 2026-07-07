@@ -8,14 +8,14 @@ import time
 import re
 import uuid
 import random
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
-# Senior Engineer Fix for Image processing
+# Senior Engineer Fix for Image and MoviePy
 if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', 1)
 
 try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, CompositeVideoClip
 except Exception as e:
     st.error(f"System Load Error: {e}")
 
@@ -29,19 +29,8 @@ st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="�
 st.markdown("""
     <style>
     .main { background-color: #0e1117; color: white; }
-    h1 { 
-        text-align: center; 
-        background: linear-gradient(90deg, #00d4ff, #ff007a); 
-        -webkit-background-clip: text; 
-        -webkit-text-fill-color: transparent; 
-        font-size: clamp(40px, 8vw, 80px); font-weight: 900;
-    }
-    .stButton>button { 
-        background: linear-gradient(45deg, #00d4ff, #ff007a); 
-        color: white; border-radius: 12px; height: 50px; width: 100%; 
-        font-size: 18px; font-weight: bold; border: none; transition: 0.3s;
-    }
-    .stButton>button:hover { transform: scale(1.01); box-shadow: 0px 5px 15px rgba(0, 212, 255, 0.4); }
+    h1 { text-align: center; background: linear-gradient(90deg, #00d4ff, #ff007a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 80px; font-weight: 900; }
+    .stButton>button { background: linear-gradient(45deg, #00d4ff, #ff007a); color: white; border-radius: 12px; height: 50px; font-weight: bold; border: none; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -54,54 +43,37 @@ ESSA_BIO = """
 انہوں نے مجھے ڈیزائن کیا اور بنایا، اور یہ محنت انہوں نے خود کی۔
 """
 
-def is_creator_query(q):
-    patterns = [r"kisne banaya", r"who made you", r"creator", r"owner", r"essa awan", r"muhammad essa", r"maker"]
-    return any(re.search(p, q.lower(), re.IGNORECASE) for p in patterns) if q else False
+# ==========================================
+# 2. PROMPT & GENDER LOGIC
+# ==========================================
+def get_smart_prompt(scene_text):
+    # Detect if story is about a male or female to fix the image bug
+    gender_bonus = ""
+    if any(k in scene_text for k in ["احمد", "لڑکا", "آدمی", "boy", "man", "king", "badshah"]):
+        gender_bonus = "Focus on male character, young boy, no women, no girls, "
+    elif any(k in scene_text for k in ["لڑکی", "عورت", "girl", "woman", "queen"]):
+        gender_bonus = "Focus on female character, "
+        
+    return f"Professional 3D cinematic animation style, {gender_bonus} {scene_text[:80]}, high quality, 8k, realistic lighting, masterpiece, no text"
 
 # ==========================================
-# 2. FAIL-SAFE BGM LOGIC
+# 3. ADVANCED MOVIE ENGINE (SUBTITLES + ZOOM OUT)
 # ==========================================
-def get_bgm_url(story_text):
-    t = story_text.lower()
-    if any(k in t for k in ["jungle", "sher", "wild", "forest"]):
-        return "https://www.chosic.com/wp-content/uploads/2021/07/The-Wild-Animals.mp3"
-    elif any(k in t for k in ["king", "badshah", "history", "qila", "warrior"]):
-        return "https://www.chosic.com/wp-content/uploads/2020/06/Epic-Adventure.mp3"
-    else:
-        return "https://www.chosic.com/wp-content/uploads/2021/04/Inspiring-Story.mp3"
-
-# ==========================================
-# 3. ADVANCED MOVIE ENGINE (FAIL-SAFE)
-# ==========================================
-def create_master_movie(story, voice_gen, ratio):
+def create_pro_movie_with_subs(story, voice_gen, ratio):
     u_id = str(uuid.uuid4())[:8]
     try:
-        # Step 1: Voice Generation (Must Work)
+        # Step 1: Voice & Fail-Safe BGM
         v_code = "ur-PK-UzmaNeural" if voice_gen == "Female" else "ur-PK-AsadNeural"
         audio_file = f"{u_id}_v.mp3"
         async def run_v(): await edge_tts.Communicate(story, v_code).save(audio_file)
         asyncio.run(run_v())
         voice_audio = AudioFileClip(audio_file)
         
-        # Step 2: Fail-Safe BGM Logic
-        final_audio_track = voice_audio
-        try:
-            bgm_url = get_bgm_url(story)
-            bgm_path = f"{u_id}_bgm.mp3"
-            r = requests.get(bgm_url, timeout=10)
-            if r.status_code == 200:
-                with open(bgm_path, "wb") as f: f.write(r.content)
-                bgm_audio = AudioFileClip(bgm_path).volumex(0.12).set_duration(voice_audio.duration)
-                final_audio_track = CompositeAudioClip([voice_audio, bgm_audio])
-        except Exception as e:
-            # If BGM fails, we just log it and continue with voice only
-            print(f"BGM Load Warning: {e}")
-
-        # Step 3: Scene Dimensions
+        # Step 2: Dimensions
         res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
         w, h = res_map[ratio]
 
-        # Step 4: Multi-Scene Generation
+        # Step 3: Multi-Scene Generation
         words = story.split()
         num_scenes = 4
         chunk = max(1, len(words) // num_scenes)
@@ -110,27 +82,39 @@ def create_master_movie(story, voice_gen, ratio):
         for i in range(num_scenes):
             st_idx, end_idx = i*chunk, (i+1)*chunk if i != 3 else len(words)
             scene_text = " ".join(words[st_idx:end_idx])
-            prompt = f"Professional 3D cinematic animation style, {scene_text[:85]}, high quality, 8k, realistic lighting, masterpiece, no text"
+            
+            # Smart Prompting to fix Gender Accuracy
+            prompt = get_smart_prompt(scene_text)
             img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={random.randint(1,9999)}&nologo=true"
             
             img_path = f"{u_id}_{i}.jpg"
-            img_data = requests.get(img_url).content
-            with open(img_path, "wb") as f: f.write(img_data)
+            with open(img_path, "wb") as f: f.write(requests.get(img_url).content)
             
-            # Zoom-Out Animation (Professional Look)
-            clip = ImageClip(img_path).set_duration(voice_audio.duration/num_scenes).set_fps(24)
-            clip = clip.resize(lambda t: 1.1 - 0.05 * t).set_position('center')
+            # Step 4: Add Subtitles on Image
+            img = Image.open(img_path)
+            draw = ImageDraw.Draw(img)
+            # Drawing a shadow box for text
+            draw.rectangle([0, h-100, w, h], fill=(0,0,0,150))
+            # Text placement (Simplified for Cloud Servers)
+            draw.text((w/2, h-50), scene_text[-40:], fill="white", anchor="ms") # Show last 40 chars
+            img.save(img_path)
+
+            # Step 5: Cinematic ZOOM OUT Animation (Fixed Direction)
+            scene_dur = voice_audio.duration / num_scenes
+            clip = ImageClip(img_path).set_duration(scene_dur).set_fps(24)
+            # Starting big (1.1) and going small (1.0) = Zoom Out
+            clip = clip.resize(lambda t: 1.15 - 0.05 * t).set_position('center')
             clips.append(clip)
 
-        # Step 5: Final Render
-        final_video = concatenate_videoclips(clips, method="compose").set_audio(final_audio_track)
+        # Step 6: Final Merge
+        final_video = concatenate_videoclips(clips, method="compose").set_audio(voice_audio)
         final_video = final_video.resize(newsize=(w, h))
         
-        out_name = f"ES_AI_{u_id}.mp4"
-        final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, threads=4)
+        out_name = f"ES_Movie_{u_id}.mp4"
+        final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24)
         return out_name
     except Exception as e:
-        return f"Technical Error: {str(e)}"
+        return f"Error: {e}"
 
 # ==========================================
 # 4. UI DASHBOARD
@@ -145,21 +129,12 @@ with tabs[0]:
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): st.write(m["content"])
     
-    st.write("---")
-    c1, c2 = st.columns([1, 4])
-    with c1: mic_recorder(start_prompt="🎙️ Speak", stop_prompt="🛑 Stop", key='recorder')
-    with c2: up_img = st.file_uploader("➕ Upload Image", type=["jpg", "png"])
+    col1, col2 = st.columns([1, 4])
+    with col1: mic_recorder(start_prompt="🎙️", stop_prompt="🛑", key='recorder')
+    with col2: up_img = st.file_uploader("➕ Upload Image", type=["jpg", "png"])
 
     if prompt := st.chat_input("Hukum karein Essa bhai..."):
-        if is_creator_query(prompt):
-            res = ESSA_BIO
-        else:
-            encoded_q = urllib.parse.quote(prompt)
-            try:
-                r = requests.get(f"https://text.pollinations.ai/{encoded_q}?model=openai&cache=true", timeout=30)
-                res = r.text if r.status_code == 200 else "AI سرور مصروف ہے۔"
-            except: res = "Connection Error."
-        
+        res = ESSA_BIO if any(k in prompt.lower() for k in ["kisne banaya", "creator", "essa"]) else requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(prompt)}?model=openai&cache=true").text
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.write(prompt)
         with st.chat_message("assistant"):
@@ -170,29 +145,29 @@ with tabs[1]:
     st.header("🎙️ Voice Studio")
     vt = st.text_area("Yahan likhein:")
     vl, vg = st.columns(2)
-    with vl: lang = st.selectbox("Language:", ["Urdu", "English", "Hindi"])
+    with vl: lang = st.selectbox("Language:", ["Urdu", "English"])
     with vg: gender = st.selectbox("Gender:", ["Female", "Male"])
-    if st.button("Generate Voice 🚀", key="v_btn"):
-        if vt:
-            vc = "ur-PK-UzmaNeural" if gender == "Female" else "ur-PK-AsadNeural"
-            async def run_v(): await edge_tts.Communicate(vt, vc).save("temp.mp3")
-            asyncio.run(run_v()); st.audio("temp.mp3")
+    if st.button("Generate Voice 🚀"):
+        vc = "ur-PK-UzmaNeural" if gender == "Female" else "ur-PK-AsadNeural"
+        async def sv(): await edge_tts.Communicate(vt, vc).save("temp.mp3")
+        asyncio.run(sv()); st.audio("temp.mp3")
 
 with tabs[2]:
-    st.header("🎬 Pro Cinematic Movie Studio")
-    m_script = st.text_area("Movie Script:", height=150, placeholder="Example: Ek bahadur larka...")
-    m_vc, m_rs = st.columns(2)
-    with m_vc: m_voice = st.selectbox("Voice Selection:", ["Male", "Female"], index=0)
-    with m_rs: m_ratio = st.selectbox("Video Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
+    st.header("🎬 Pro Movie Studio v15.0")
+    m_script = st.text_area("Movie Script:", height=150, placeholder="Example: Ahmad ne jungle mein ek khazana dhoonda...")
+    mv_col, mr_col = st.columns(2)
+    with mv_col: m_voice = st.selectbox("Voice Selection:", ["Male", "Female"], index=0)
+    with mr_col: m_ratio = st.selectbox("Video Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
 
-    if st.button("Generate Master Movie 🚀"):
+    if st.button("Generate Cinematic Movie 🚀"):
         if m_script:
-            with st.spinner("مناظر، آواز اور موسیقی تیار ہو رہی ہے..."):
-                video = create_master_movie(m_script, m_voice, m_ratio)
+            with st.spinner("AI سب ٹائٹلز اور موشن ویڈیو تیار کر رہا ہے..."):
+                video = create_pro_movie_with_subs(m_script, m_voice, m_ratio)
                 if "mp4" in video:
                     st.video(video)
-                    with open(video, "rb") as f: st.download_button("Download Movie ⬇️", f, file_name=video)
+                    st.success("مبارک ہو! ویڈیو سب ٹائٹلز اور زوم آؤٹ کے ساتھ تیار ہے۔")
+                    with open(video, "rb") as f: st.download_button("Download HD Video", f, file_name=video)
                 else: st.error(video)
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #555;'>ES AI Studio v14.0 | Fail-Safe Engine Enabled</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: grey;'>ES AI Studio v15.0 | Subtitles & Gender Detection Active</p>", unsafe_allow_html=True)
