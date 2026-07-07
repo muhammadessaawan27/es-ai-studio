@@ -22,7 +22,7 @@ except Exception as e:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 1. LUXURY UI (v29 LOGO + WHITE BACKGROUND)
+# 1. LUXURY UI (NEW ROTATING CHIP LOGO + WHITE BG)
 # ==========================================
 st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="🎬")
 
@@ -30,75 +30,85 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Orbitron:wght@900&display=swap');
 
-    /* Background: Professional White (v27 Style) */
+    /* Background: Professional White */
     .stApp {
         background-color: #F8FAFC;
         color: #111827;
         font-family: 'Inter', sans-serif;
     }
 
-    /* Modern Logo - v29 Luxury Animated Design */
+    /* 3D Rotating AI Chip Logo (Professional Choice) */
     .logo-container {
         display: flex;
         flex-direction: column;
         align-items: center;
         padding: 40px 0;
     }
-    .ai-logo {
+    .ai-chip {
         width: 100px;
         height: 100px;
-        background: linear-gradient(135deg, #2563EB, #7C3AED);
-        border-radius: 22px;
+        background: #0f172a;
+        border: 4px solid #3b82f6;
+        border-radius: 15px;
         display: flex;
         align-items: center;
         justify-content: center;
         font-family: 'Orbitron', sans-serif;
-        font-size: 42px;
+        font-size: 40px;
         font-weight: 900;
-        color: white;
-        box-shadow: 0 0 30px rgba(37, 99, 235, 0.6), inset 0 0 15px rgba(255, 255, 255, 0.3);
-        border: 2px solid rgba(255, 255, 255, 0.1);
-        animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-        0% { transform: scale(1); box-shadow: 0 0 20px rgba(37, 99, 235, 0.5); }
-        50% { transform: scale(1.05); box-shadow: 0 0 40px rgba(124, 58, 237, 0.7); }
-        100% { transform: scale(1); box-shadow: 0 0 20px rgba(37, 99, 235, 0.5); }
+        color: #3b82f6;
+        box-shadow: 0 0 20px #3b82f6, inset 0 0 10px #3b82f6;
+        position: relative;
+        transform-style: preserve-3d;
+        animation: rotate3D 5s linear infinite;
     }
     
+    @keyframes rotate3D {
+        0% { transform: perspective(1000px) rotateY(0deg); }
+        100% { transform: perspective(1000px) rotateY(360deg); }
+    }
+
+    .ai-chip::after {
+        content: 'ES';
+        position: absolute;
+        color: #ffffff;
+        text-shadow: 0 0 10px #3b82f6;
+    }
+
     .premium-header {
         font-size: 2.2rem;
-        font-weight: 700;
-        color: #111827;
+        font-weight: 800;
+        color: #0f172a;
         margin-top: 20px;
+        letter-spacing: -1px;
     }
     .premium-sub {
         font-size: 0.9rem;
-        color: #64748B;
+        color: #3b82f6;
         text-transform: uppercase;
-        letter-spacing: 4px;
-        margin-bottom: 20px;
+        letter-spacing: 5px;
+        font-weight: bold;
     }
 
-    /* Luxury Buttons */
+    /* Professional Buttons */
     .stButton>button {
-        background: linear-gradient(90deg, #2563EB, #7C3AED) !important;
+        background: #2563EB !important;
         color: white !important;
+        border-radius: 10px !important;
         border: none !important;
-        border-radius: 12px !important;
         padding: 12px 30px !important;
         font-weight: 600 !important;
-        transition: 0.4s all !important;
+        transition: 0.3s all;
     }
     .stButton>button:hover {
-        transform: translateY(-3px) !important;
-        box-shadow: 0 8px 25px rgba(37, 99, 235, 0.5) !important;
+        background: #1e40af !important;
+        box-shadow: 0 5px 15px rgba(37, 99, 235, 0.4) !important;
     }
 
-    /* Fixed Input Box for Readability */
+    /* Readable Inputs */
     .stTextInput>div>div>input, .stTextArea>div>div>textarea {
         background-color: #ffffff !important;
-        border: 1px solid #E2E8F0 !important;
+        border: 2px solid #E2E8F0 !important;
         border-radius: 12px !important;
         color: #111827 !important;
     }
@@ -107,9 +117,9 @@ st.markdown("""
 
 st.markdown("""
     <div class="logo-container">
-        <div class="ai-logo">ES</div>
+        <div class="ai-chip"></div>
         <div class="premium-header">ES AI Master Studio</div>
-        <div class="premium-sub">Create • Chat • Voice • Video</div>
+        <div class="premium-sub">MUHAMMAD ESSA AWAN</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -124,33 +134,35 @@ ESSA_BIO = """
 """
 
 def is_creator_query(q):
-    patterns = [r"kisne banaya", r"who made you", r"creator", r"essa", r"awan", r"owner"]
+    patterns = [r"kisne banaya", r"who made you", r"creator", r"essa", r"owner"]
     return any(re.search(p, q.lower(), re.IGNORECASE) for p in patterns)
 
 # ==========================================
-# 3. v27 ACCURATE VIDEO ENGINE (RESTORED)
+# 3. v31 PRECISION VIDEO ENGINE (OBJECT ISOLATION)
 # ==========================================
-def get_strict_visual_prompt_v27(urdu_text, style_choice):
+def get_isolated_visual_prompt(urdu_text, style_choice):
     try:
+        # STRONGER INSTRUCTIONS for accurate object detection
         director_instr = (
-            f"Task: Extract the core physical subject from this Urdu text: '{urdu_text}'. "
-            "Rule 1: If it mentions an object (house, stone, mountain), describe ONLY that object. "
-            "Rule 2: If it mentions an animal, describe ONLY that animal. "
-            "Rule 3: If no human is mentioned, STERNLY EXCLUDE them. "
-            "Output only a detailed English prompt. No preamble."
+            f"Strict Instruction: Analyze this Urdu text: '{urdu_text}'. "
+            "Identify the single most important object, animal, or building. "
+            "Describe ONLY that subject in detail. If no human is mentioned, DO NOT include any people. "
+            "Focus on textures and lighting. Output ONLY a clean English prompt."
         )
         encoded_instr = urllib.parse.quote(director_instr)
         res = session.get(f"https://text.pollinations.ai/{encoded_instr}?model=openai&cache=true", timeout=30)
         visual_desc = res.text if res.status_code == 200 else urdu_text
         
+        # Adding negative enforcement to avoid random humans
         neg = ""
-        if not any(k in urdu_text for k in ["احمد", "لڑکا", "لڑکی", "آدمی", "عورت", "بچہ", "انسان"]):
-            neg = ", no humans, no people, no faces"
+        human_indicators = ["احمد", "لڑکا", "لڑکی", "آدمی", "عورت", "بچہ", "انسان", "boy", "man", "girl", "person"]
+        if not any(k in urdu_text for k in human_indicators):
+            neg = ", no humans, no faces, no people"
 
-        return f"{style_choice} style, {visual_desc}{neg}, cinematic 4k, masterpiece"
+        return f"{style_choice} style, {visual_desc}{neg}, high resolution cinematic 4k, realistic, masterpiece"
     except: return urdu_text
 
-def create_v27_movie(story, voice_gen, ratio, style):
+def create_accurate_movie_v31(story, voice_gen, ratio, style):
     u_id = str(uuid.uuid4())[:8]
     status = st.empty()
     try:
@@ -166,15 +178,19 @@ def create_v27_movie(story, voice_gen, ratio, style):
         res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
         w, h = res_map[ratio]
 
-        # Step 3: Scene Generation
+        # Step 3: Sentence Split
         sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
         clips = []
         dur_per = voice_audio.duration / len(sentences)
 
+        # Step 4: Scene Generation (ISOLATED)
         for i, scene in enumerate(sentences):
-            status.info(f"🖼️ منظر {i+1} کی پہچان ہو رہی ہے...")
-            strict_prompt = get_strict_visual_prompt_v27(scene, style)
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(strict_prompt)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
+            status.info(f"🖼️ منظر {i+1} کا مشاہدہ ہو رہا ہے...")
+            strict_prompt = get_isolated_visual_prompt(scene, style)
+            
+            # UNIQUE SEED for every image to prevent repetition
+            seed = random.randint(1, 1000000)
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(strict_prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
             img_path = f"{u_id}_{i}.jpg"
             
             r = session.get(img_url, timeout=60)
@@ -185,31 +201,31 @@ def create_v27_movie(story, voice_gen, ratio, style):
                 
                 clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
                 clip = clip.resize(newsize=(w, h))
-                # v27 Cinematic Zoom Out
-                clip = clip.resize(lambda t: 1.1 - 0.06 * (t/dur_per)).set_position('center')
+                # Professional ZOOM OUT (v30 Fix)
+                clip = clip.resize(lambda t: 1.15 - 0.1 * (t/dur_per)).set_position('center')
                 clips.append(fadein(clip, 0.4))
 
-        # Step 4: Final Render
-        status.info("⚙️ ویڈیو رینڈر ہو رہی ہے...")
+        # Step 5: Render
+        status.info("⚙️ فائنل مووی تیار ہو رہی ہے...")
         final_video = concatenate_videoclips(clips, method="compose").set_audio(voice_audio)
         out_name = f"ES_AI_{u_id}.mp4"
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"])
         
-        status.success("✅ ویڈیو تیار ہے!")
+        status.success("✅ شاہکار تیار ہے!")
         return out_name
     except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 4. DASHBOARD TABS
+# 4. UI INTERFACE
 # ==========================================
-tabs = st.tabs(["💬 Intelligent Chat", "🎙️ Voice Studio", "🎬 Pro Movie Studio"])
+tabs = st.tabs(["💬 Chat", "🎙️ Voice", "🎬 Studio"])
 
 with tabs[0]:
     if "messages" not in st.session_state: st.session_state.messages = []
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): st.write(m["content"])
     
-    if p := st.chat_input("Ask ES AI anything..."):
+    if p := st.chat_input("Hukum karein Essa bhai..."):
         st.session_state.messages.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
         res = ESSA_BIO if is_creator_query(p) else session.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true").text
@@ -217,7 +233,7 @@ with tabs[0]:
             st.write(res); st.session_state.messages.append({"role": "assistant", "content": res})
 
 with tabs[1]:
-    st.markdown("### 🎙️ Voiceover Generator")
+    st.write("### 🎙️ Create Professional Voiceover")
     v_text = st.text_area("Yahan likhein:", key="v_input")
     v_col1, v_col2 = st.columns(2)
     with v_col1: gen = st.selectbox("Voice:", ["Female", "Male"])
@@ -229,21 +245,21 @@ with tabs[1]:
             asyncio.run(sv()); st.audio("es_v.mp3")
 
 with tabs[2]:
-    st.markdown("### 🎬 Movie Studio v27 Engine Restored")
-    m_script = st.text_area("Write your story:", height=150, placeholder="Paharon ke peeche suraj doob raha hai...")
+    st.write("### 🎬 Pro Studio v31.0")
+    m_script = st.text_area("Write your story:", height=150, placeholder="Example: Aik hathi nadi ke kinare pani pee raha hai...")
     c1, c2, c3 = st.columns(3)
     with c1: mv = st.selectbox("Narrator:", ["Male", "Female"])
     with c2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    with c3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon", "Anime", "Sketch"])
+    with c3: ms = st.selectbox("Visual Style:", ["Realistic", "Cinematic", "3D Cartoon", "Anime"])
 
-    if st.button("🚀 Generate Accurate Video"):
+    if st.button("🚀 Generate Precision Video"):
         if m_script:
-            with st.spinner("AI Director is crafting your scenes..."):
-                video = create_v27_movie(m_script, mv, mr, ms)
+            with st.spinner("Identifying objects and animating scenes..."):
+                video = create_accurate_movie_v31(m_script, mv, mr, ms)
                 if "mp4" in video:
                     st.video(video)
-                    with open(video, "rb") as f: st.download_button("Download Video", f, file_name=video)
+                    with open(video, "rb") as f: st.download_button("Download", f, file_name=video)
                 else: st.error(video)
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #475569;'>ES AI Premium Studio | Designed for Muhammad Essa Awan</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #64748B;'>ES AI Premium Studio | Designed for Muhammad Essa Awan</p>", unsafe_allow_html=True)
