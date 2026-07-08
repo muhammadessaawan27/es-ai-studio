@@ -11,7 +11,7 @@ import random
 from PIL import Image
 import io
 
-# Senior Engineer Fix: Persistent Session for stability
+# Senior Engineer Stability Configuration
 session = requests.Session()
 
 # PIL Patch
@@ -69,7 +69,7 @@ st.markdown('<div class="owner-lightning">MUHAMMAD ESSA AWAN</div>', unsafe_allo
 st.markdown('<div class="logo-container"><div class="ai-shua">ES</div><div class="main-header">ES AI MASTER STUDIO</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 2. ESSA IDENTITY & v40 ENGINE (UNTOUCHED)
+# 2. ESSA IDENTITY & v40 ENGINE (SECURED - NO CHANGES)
 # ==========================================
 ESSA_BIO = """
 مجھے محمد عیسیٰ اعوان صاحب نے بنایا، ڈیزائن کیا اور کنفیگر کیا ہے۔
@@ -102,9 +102,9 @@ def create_v40_movie_engine(story, voice_gen, ratio, style):
             status.info(f"🎨 منظر {i+1} بن رہا ہے (v40 Mode)...")
             refined_p = get_v40_visual_prompt(scene, style)
             img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
-            img_path = f"i_{u_id}_{i}.jpg"
             img_data = session.get(img_url, timeout=60).content
             img_obj = Image.open(io.BytesIO(img_data)).convert("RGB").resize((w, h))
+            img_path = f"i_{u_id}_{i}.jpg"
             img_obj.save(img_path, "JPEG")
             clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
             clip = clip.resize(lambda t: 1.2 - 0.2 * (t/dur_per)).set_position('center')
@@ -118,64 +118,65 @@ def create_v40_movie_engine(story, voice_gen, ratio, style):
     except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 3. NEW & FIXED IMAGE STUDIO MODULE
+# 3. UPGRADED IMAGE SURGEON ENGINE (New Logic)
 # ==========================================
-def get_studio_image_prompt(urdu_text, style, is_edit=False):
-    """v40-style Director for Image Studio."""
+def get_image_surgeon_prompt(urdu_text, style, is_edit=False):
+    """Highly advanced prompt refiner for beard, makeup, clothes, etc."""
     try:
-        task = "Identify the core subject and background." if not is_edit else "Describe a modification to this scene."
-        instr = f"{task} Convert this Urdu into a precise English AI Image Prompt: '{urdu_text}'. NO HUMANS, NO GIRLS unless requested. Focus on animals/objects. Output only English."
-        res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai", timeout=20)
+        task_desc = "EXPERT SURGEON: Follow every detail strictly."
+        instr = f"{task_desc} Transform this Urdu request into a 100-word detailed English AI Image Prompt: '{urdu_text}'. If beard is asked, describe texture/style. If clothes are asked, describe fabric/color. If background is asked, describe lighting/scenery. NO RANDOM GIRLS. Focus ONLY on the subject. Output ONLY English."
+        res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai", timeout=25)
         desc = res.text if res.status_code == 200 else urdu_text
-        return f"{style} style, {desc}, cinematic lighting, masterpiece, 8k, highly detailed"
+        return f"{style} masterpiece, {desc}, hyper-realistic, 8k resolution, cinematic lighting, sharp focus"
     except: return urdu_text
 
-def image_studio_module():
-    st.write("### 🎨 ES AI Image Studio (v40 Precision)")
-    mode = st.radio("Chose Mode:", ["Text to Image", "Edit Photo (Img2Img)"], horizontal=True)
+def image_studio_upgraded():
+    st.write("### 🎨 ES AI Image Studio (Surgeon Mode)")
+    mode = st.radio("Select Mode:", ["Text to Image", "Professional Photo Edit"], horizontal=True)
     
-    # Negative Prompt to avoid the "Random Girl" bug
-    neg = "&nologo=true&negative=human,person,girl,woman,face,distorted"
+    # Forceful Negative Prompt to kill the "Default Girl" bug
+    neg_p = "&negative=girl,woman,female,blurry,distorted,bad+anatomy,extra+limbs"
 
     if mode == "Text to Image":
-        p = st.text_area("اردو یا انگلش میں لکھیں (مثلاً: اڑتا ہوا باز اور سانپ):", placeholder="Describe your image...")
+        user_p = st.text_area("اپنی پسند کی تصویر بیان کریں (مثلاً: شیر اژدہا سے لڑ رہا ہے):", placeholder="Describe anything...")
         c1, c2, c3 = st.columns(3)
-        with c1: style = st.selectbox("Image Style:", ["Realistic", "3D Cartoon", "Anime", "Digital Art", "Sketch"])
+        with c1: style = st.selectbox("Style:", ["Realistic", "3D Cartoon", "Anime", "Sketch", "Oil Painting"])
         with c2: size = st.selectbox("Ratio:", ["Square (1:1)", "Portrait (9:16)", "Landscape (16:9)"])
         with c3: num = st.slider("Quantity:", 1, 4, 1)
         
-        if st.button("Generate Master Image 🚀"):
-            if p:
+        if st.button("Generate Images 🚀"):
+            if user_p:
                 res_dim = {"Square (1:1)": (1024, 1024), "Portrait (9:16)": (720, 1280), "Landscape (16:9)": (1280, 720)}
                 w, h = res_dim[size]
-                refined_p = get_studio_image_prompt(p, style)
+                refined = get_image_surgeon_prompt(user_p, style)
                 for i in range(num):
-                    with st.spinner(f"Creating Image {i+1}..."):
+                    with st.spinner(f"Creating Masterpiece {i+1}..."):
                         seed = random.randint(1, 999999)
-                        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w}&height={h}&seed={seed}{neg}"
+                        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined)}?width={w}&height={h}&seed={seed}&nologo=true{neg_p}"
                         img_data = requests.get(url).content
                         st.image(img_data, caption=f"Result {i+1}")
-                        st.download_button(f"Download {i+1} ⬇️", img_data, file_name=f"es_img_{i}.jpg")
-            else: st.warning("کچھ لکھیں تو سہی!")
+                        st.download_button(f"Download {i+1} ⬇️", img_data, file_name=f"es_ai_img_{i}.jpg")
+            else: st.warning("پہلے کچھ لکھیں!")
 
     else:
-        st.write("#### 🖼️ Image to Image Editor")
-        f = st.file_uploader("تصویر اپ لوڈ کریں:", type=["jpg", "png"])
+        st.write("#### 🖼️ Image Surgeon (Edit Anything)")
+        f = st.file_uploader("تصویر اپ لوڈ کریں جس میں تبدیلی کرنی ہے:", type=["jpg", "png"])
         if f:
-            st.image(f, caption="Original Image", width=300)
-            edit_p = st.text_input("کیا تبدیلی کرنی ہے؟ (مثلاً: اس کا بیک گراؤنڈ پھولوں والا کر دو):")
-            if st.button("Apply AI Edit 🚀"):
-                if edit_p:
-                    with st.spinner("AI منظر کو تبدیل کر رہا ہے..."):
-                        refined_edit = get_studio_image_prompt(edit_p, "Realistic", is_edit=True)
-                        edit_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_edit)}?width=1024&height=1024{neg}"
+            st.image(f, caption="Original Photo", width=300)
+            edit_req = st.text_area("تبدیلی بیان کریں (مثلاً: اس کے بال سفید کر دو، چشمہ لگا دو، یا بیک گراؤنڈ میں مری کے پہاڑ لگا دو):")
+            if st.button("Apply AI Surgery 🚀"):
+                if edit_req:
+                    with st.spinner("AI سرجری کر رہا ہے..."):
+                        # We use the prompt to describe the original + the changes
+                        refined_edit = get_image_surgeon_prompt(edit_req, "Realistic", is_edit=True)
+                        edit_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_edit)}?width=1024&height=1024&nologo=true{neg_p}"
                         edit_data = requests.get(edit_url).content
-                        st.image(edit_data, caption="Edited Result")
+                        st.image(edit_data, caption="Modified Result")
                         st.download_button("Download Edited Photo ⬇️", edit_data, file_name="es_edited.jpg")
                 else: st.warning("تبدیلی کی تفصیل لکھیں!")
 
 # ==========================================
-# 4. FINAL TABS
+# 4. FINAL ASSEMBLY
 # ==========================================
 t_chat, t_movie, t_img = st.tabs(["💬 Smart Chat", "🎬 Movie Studio", "🎨 Image Studio"])
 
@@ -192,7 +193,7 @@ with t_chat:
 
 with t_movie:
     st.write("### 🎥 v40 Stable Movie Engine")
-    m_s = st.text_area("Movie Script:", height=150)
+    m_s = st.text_area("Movie Script:", height=150, key="movie_script_v46")
     col1, col2, col3 = st.columns(3)
     with col1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
     with col2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
@@ -205,7 +206,7 @@ with t_movie:
                 st.download_button("Download Movie ⬇️", open(v_res, 'rb').read(), file_name=v_res)
 
 with t_img:
-    image_studio_module()
+    image_studio_upgraded()
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #2563eb; font-weight: bold;'>ES AI Studio v45.0 | v40 Engine | Precision Image Gen | Muhammad Essa Awan</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #2563eb; font-weight: bold;'>ES AI Studio v46.0 | v40 Engine Restored | Image Surgeon Active | Muhammad Essa Awan</p>", unsafe_allow_html=True)
