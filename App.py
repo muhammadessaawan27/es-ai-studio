@@ -25,14 +25,14 @@ try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
     import moviepy.video.fx.all as vfx
 except Exception as e:
-    st.error(f"Engine Failure: Please Reboot App via 'Manage app'. Detail: {e}")
+    st.error(f"Engine Failure: Please Reboot via 'Manage app'. Detail: {e}")
 
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
 # 2. ELECTRIC SGLOVINA UI & ANIMATED LOGO
 # ==========================================
-st.set_page_config(page_title="Sglovina AI - The Electric Titan", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglovina AI - Official Titan", layout="wide", page_icon="🎬")
 
 st.markdown("""
     <style>
@@ -98,19 +98,19 @@ def is_identity_call(q):
     return any(re.search(pat, q.lower(), re.IGNORECASE) for pat in p)
 
 # ==========================================
-# 4. v40 INDUSTRIAL ENGINE (FIXED)
+# 4. v40 INDUSTRIAL ENGINE (EXPANSION)
 # ==========================================
 def get_titan_prompt(urdu_text, mining_mode=False):
-    m_instr = "Include microscopic details, ultra-high precision, professional textures." if mining_mode else ""
+    m_instr = "Ultra-high precision, microscopic detail, masterpiece texture." if mining_mode else ""
     try:
-        instr = f"Act as a Director: '{urdu_text}'. Describe ONLY the core subject in English. No humans unless asked. {m_instr} Cinematic 8k."
+        instr = f"Act as a Director: '{urdu_text}'. Detailed English 3D animation prompt. No humans unless mentioned. {m_instr} Cinematic 8k."
         res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai&cache=true", timeout=25)
         return res.text if res.status_code == 200 else urdu_text
     except: return urdu_text
 
 def create_titan_movie_v72(story, voice_gen, ratio, style, mining):
     u_id = str(uuid.uuid4())[:8]
-    status = st.empty()
+    status_msg = st.empty()
     try:
         v_code = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
         audio_f = f"a_{u_id}.mp3"
@@ -127,7 +127,7 @@ def create_titan_movie_v72(story, voice_gen, ratio, style, mining):
         dur_per = audio.duration / len(sentences)
         
         for i, s in enumerate(sentences):
-            status.info(f"⚡ Sglovina Processing Scene {i+1}/{len(sentences)}...")
+            status_msg.info(f"⚡ Sglovina Engine Processing Scene {i+1}/{len(sentences)}...")
             refined = get_titan_prompt(s, mining)
             img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined + ' ' + style)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true&negative=girl,female,woman,human"
             
@@ -150,24 +150,24 @@ def create_titan_movie_v72(story, voice_gen, ratio, style, mining):
         audio.close()
         final_video.close()
         return out
-    except Exception as e:
-        return f"Error: {e}"
+    except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 5. IMAGE & LOGO STUDIO
+# 5. IMAGE & LOGO STUDIO (FIXED UNIQUE KEYS)
 # ==========================================
 def image_studio_titan():
     st.write("### 🎨 Sglovina Universal Image Studio")
-    mode = st.radio("Select Mode:", ["Text to Image", "Logo Design", "Professional Photo Edit"], horizontal=True)
+    mode = st.radio("Select Mode:", ["Text to Image", "Logo Design", "Professional Photo Edit"], horizontal=True, key="unique_mode_radio")
     
     size_map = {"Square (1:1)": (1024, 1024), "TikTok (9:16)": (720, 1280), "YouTube (16:9)": (1280, 720)}
-    p = st.text_area("جو تصویر یا لوگو بنوانا ہے بیان کریں:")
+    p = st.text_area("جو تصویر یا لوگو بنوانا ہے بیان کریں:", key="unique_img_p_area")
+    
     c1, c2, c3 = st.columns(3)
-    with c1: st_sel = st.selectbox("Style:", ["Realistic", "3D Cartoon", "Anime", "Logo Concept"], key="is")
-    with c2: sz_sel = st.selectbox("Size/Ratio:", list(size_map.keys()), key="ir")
-    with c3: mining = st.checkbox("Mining Mode (Ultra Precision)")
+    with c1: st_sel = st.selectbox("Style:", ["Realistic", "3D Cartoon", "Anime", "Logo Concept"], key="unique_img_style_sel")
+    with c2: sz_sel = st.selectbox("Size/Ratio:", list(size_map.keys()), key="unique_img_size_sel")
+    with c3: mining = st.checkbox("Precision Mining (Ultra Precision)", key="unique_mining_check")
 
-    if st.button("Generate Masterpiece 🚀", key="img_btn"):
+    if st.button("Generate Masterpiece 🚀", key="unique_img_btn"):
         if p:
             w, h = size_map[sz_sel]
             neg = "&negative=girl,female,woman,distorted" if "girl" not in p.lower() else ""
@@ -175,7 +175,7 @@ def image_studio_titan():
                 refined = get_titan_prompt(p, mining)
                 url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined + ' ' + st_sel)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true{neg}"
                 st.image(url, caption="Sglovina Precision Result")
-                st.download_button("Download ⬇️", requests.get(url).content, file_name="sglovina_img.jpg")
+                st.download_button("Download ⬇️", requests.get(url).content, file_name="sglovina_img.jpg", key="unique_dl_img")
 
 # ==========================================
 # 6. UI ASSEMBLY
@@ -186,7 +186,7 @@ with tab_chat:
     if "messages" not in st.session_state: st.session_state.messages = []
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): st.write(m["content"])
-    if p := st.chat_input("Hukum karein Essa bhai..."):
+    if p := st.chat_input("Hukum karein Essa bhai...", key="unique_chat_input"):
         st.session_state.messages.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
         res = SGLOVINA_BIO if is_identity_call(p) else session.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true").text
@@ -195,22 +195,22 @@ with tab_chat:
 
 with tab_movie:
     st.write("### 🎥 Industrial Video Production (v40 Power)")
-    m_s = st.text_area("Movie Script:", height=150, key="ms_v72")
+    m_s = st.text_area("Movie Script:", height=150, key="unique_movie_script_area")
     cm1, cm2, cm3 = st.columns(3)
-    with cm1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"], key="mv_v72")
-    with cm2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"], key="mr_v72")
-    with cm3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"], key="ms_v72")
-    mine_v = st.checkbox("Precision Mining (Industrial Quality)", key="mine_v")
-    if st.button("🚀 Generate Master Movie", key="btn_v72"):
+    with cm1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"], key="unique_voice_sel")
+    with cm2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"], key="unique_ratio_sel")
+    with cm3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"], key="unique_style_sel")
+    mine_v = st.checkbox("Precision Mining (Industrial Quality)", key="unique_mine_movie_check")
+    if st.button("🚀 Generate Titan Movie", key="unique_movie_btn"):
         if m_s:
             v_res = create_titan_movie_v72(m_s, mv, mr, ms, mine_v)
             if "mp4" in v_res:
                 st.video(v_res)
-                st.download_button("Download ⬇️", open(v_res, 'rb').read(), file_name=v_res)
+                st.download_button("Download ⬇️", open(v_res, 'rb').read(), file_name=v_res, key="unique_dl_movie")
             else: st.error(v_res)
 
 with tab_image:
     image_studio_titan()
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #ff007a; font-weight: bold;'>Sglovina AI v72.1 | THE ELECTRIC TITAN | Fixed Syntax | Admin: Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #ff007a; font-weight: bold;'>Sglovina AI v72.2 | THE ELECTRIC TITAN | Fixed Duplicate Keys | Admin: Saba Wahid</p>", unsafe_allow_html=True)
