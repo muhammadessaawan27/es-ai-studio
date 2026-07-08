@@ -1,3 +1,5 @@
+
+
 import streamlit as st
 import asyncio
 import edge_tts
@@ -14,19 +16,21 @@ import io
 # Senior Engineer Stability Configuration
 session = requests.Session()
 
-# PIL Patch
+# PIL Patch to prevent crashes
 if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', 1)
 
+# MOVIEPY ROBUST IMPORTS (FIXED FOR ALL VERSIONS)
 try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, fadein
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
+    import moviepy.video.fx.all as vfx
 except Exception as e:
     st.error(f"Engine Load Error: {e}")
 
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 1. PREMIUM UI (WHITE BG + NEON BRANDING)
+# 1. APPROVED DESIGN (WHITE BG + LIGHTNING NAME)
 # ==========================================
 st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="🎬")
 
@@ -76,12 +80,16 @@ ESSA_BIO = """
 وہ ایک انجینئر بھی ہیں، مکینیکل انجینئر بھی ہیں، فیبرکیٹر بھی ہیں، اور مختلف شعبہ جات میں دینی و اسلامی شعبہ جات میں بھی ماہر ہیں۔
 """
 
+def is_creator_query(q):
+    patterns = [r"kisne banaya", r"who made you", r"creator", r"essa", r"owner"]
+    return any(re.search(p, q.lower(), re.IGNORECASE) for p in patterns)
+
 def get_v40_visual_prompt(urdu_text, style):
     try:
-        instr = f"Act as a Film Director. Extract only the primary visual subject from Urdu: '{urdu_text}'. Describe it in detail in English for a 3D animation. Ensure accuracy of objects/animals/emotions. No humans unless mentioned. Output only the prompt."
+        instr = f"Act as a Film Director. Extract only the primary visual subject from Urdu: '{urdu_text}'. Describe it in detail in English for a 3D animation. Ensure accuracy. No humans unless mentioned. Output only prompt."
         res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai", timeout=25)
         desc = res.text if res.status_code == 200 else urdu_text
-        return f"{style} cinematic animation style, {desc}, highly detailed masterpiece, 8k, vibrant lighting"
+        return f"{style} cinematic style, {desc}, highly detailed masterpiece, 8k, vibrant lighting"
     except: return urdu_text
 
 def create_v40_movie_engine(story, voice_gen, ratio, style):
@@ -98,7 +106,7 @@ def create_v40_movie_engine(story, voice_gen, ratio, style):
         clips = []
         dur_per = voice_audio.duration / len(sentences)
         for i, scene in enumerate(sentences):
-            status.info(f"🎨 منظر {i+1} بن رہا ہے (v40 Core Mode)...")
+            status.info(f"🎨 منظر {i+1} بن رہا ہے (v40 Mode)...")
             refined_p = get_v40_visual_prompt(scene, style)
             img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
             img_data = session.get(img_url, timeout=60).content
@@ -107,7 +115,9 @@ def create_v40_movie_engine(story, voice_gen, ratio, style):
             img_obj.save(img_path, "JPEG")
             clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
             clip = clip.resize(lambda t: 1.2 - 0.2 * (t/dur_per)).set_position('center')
-            clips.append(fadein(clip, 0.4))
+            # SAFE FADEIN CALL
+            clip = vfx.fadein(clip, 0.4)
+            clips.append(clip)
         final_video = concatenate_videoclips(clips, method="compose").set_audio(voice_audio)
         out_name = f"ES_V40_{u_id}.mp4"
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
@@ -117,53 +127,47 @@ def create_v40_movie_engine(story, voice_gen, ratio, style):
     except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 3. ADVANCED IMAGE STUDIO (GENDER LOCK)
+# 3. UNIVERSAL IMAGE STUDIO (PRECISION FIXED)
 # ==========================================
 def get_image_director_prompt(urdu_req, style, gender="Male"):
-    """Fixed: Prevents changing gender in edits."""
     try:
         gender_instr = "KEEP GENDER AS MALE. NO WOMEN." if gender == "Male" else "KEEP GENDER AS FEMALE."
-        instr = f"AI Artist Director: {gender_instr} User wants: '{urdu_req}'. Create a highly detailed English prompt for AI Image. Include clothing, background, and lighting. NO RANDOM GIRLS unless specifically asked. Output ONLY English."
+        instr = f"AI Artist Director: {gender_instr} User wants: '{urdu_req}'. Create a highly detailed English prompt for AI Image. Output ONLY English."
         res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai", timeout=25)
         desc = res.text if res.status_code == 200 else urdu_req
-        return f"{style} style, {desc}, highly detailed masterpiece, 8k"
+        return f"{style} style, {desc}, masterpiece, 8k"
     except: return urdu_req
 
-def image_studio_module_v54():
-    st.write("### 🎨 ES AI Universal Image Studio (Precision Fixed)")
+def image_studio_module():
+    st.write("### 🎨 ES AI Universal Image Studio")
     mode = st.radio("Select Mode:", ["Text to Image", "Edit Uploaded Photo"], horizontal=True)
-    
     if mode == "Text to Image":
-        p = st.text_area("تصویر بیان کریں (مثلاً: اڑتا ہوا باز اور سانپ):", placeholder="Describe your image...")
+        p = st.text_area("تصویر بیان کریں:")
         c1, c2, c3 = st.columns(3)
         with c1: style = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon", "Anime", "Sketch", "Oil Painting"], key="img_s")
         with c2: size = st.selectbox("Size:", ["Square (1:1)", "Portrait (9:16)", "Landscape (16:9)"], key="img_r")
         with c3: num = st.slider("Quantity:", 1, 4, 1)
-        
         if st.button("Generate Masterpiece 🚀"):
             res_dim = {"Square (1:1)": (1024, 1024), "Portrait (9:16)": (720, 1280), "Landscape (16:9)": (1280, 720)}
             w, h = res_dim[size]
             refined = get_image_director_prompt(p, style)
             for i in range(num):
-                with st.spinner(f"AI is painting {i+1}..."):
-                    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true&negative=girl,woman,female"
-                    st.image(url, caption=f"Result {i+1}")
-
+                url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true&negative=girl,woman,female"
+                st.image(url, caption=f"Result {i+1}")
     else:
-        st.write("#### 🖼️ Professional Image Surgeon (No Gender Swapping)")
+        st.write("#### 🖼️ Professional Image Surgeon")
         f = st.file_uploader("تصویر اپ لوڈ کریں:", type=["jpg", "png"])
         if f:
             st.image(f, width=300)
-            edit_req = st.text_area("تبدیلی بیان کریں (مثلاً: بیک گراؤنڈ میں پھول لگا دو):")
-            gender_lock = st.radio("تصویر میں کون ہے؟ (Gender Lock):", ["Male", "Female"], horizontal=True)
-            if st.button("Apply Surgery 🚀"):
-                with st.spinner("AI سرجری کر رہا ہے..."):
-                    refined_edit = get_image_director_prompt(edit_req, "Realistic", gender=gender_lock)
-                    edit_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_edit)}?width=1024&height=1024&nologo=true&negative={'girl,woman' if gender_lock=='Male' else ''}"
-                    st.image(edit_url, caption="Modified Result")
+            edit_req = st.text_area("تبدیلی بیان کریں:")
+            gender_lock = st.radio("Gender Lock:", ["Male", "Female"], horizontal=True)
+            if st.button("Apply AI Edit 🚀"):
+                refined_edit = get_image_director_prompt(edit_req, "Realistic", gender=gender_lock)
+                edit_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_edit)}?width=1024&height=1024&nologo=true&negative={'girl,woman' if gender_lock=='Male' else ''}"
+                st.image(edit_url)
 
 # ==========================================
-# 4. ASSEMBLY
+# 4. FINAL TABS
 # ==========================================
 t_chat, t_movie, t_img = st.tabs(["💬 Smart Chat", "🎬 Movie Studio", "🎨 Image Studio"])
 
@@ -174,13 +178,13 @@ with t_chat:
     if p := st.chat_input("Hukum karein Essa bhai..."):
         st.session_state.messages.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
-        res = ESSA_BIO if any(k in p.lower() for k in ["kisne", "creator", "essa"]) else session.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai").text
+        res = ESSA_BIO if is_creator_query(p) else session.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai").text
         with st.chat_message("assistant"):
             st.write(res); st.session_state.messages.append({"role": "assistant", "content": res})
 
 with t_movie:
     st.write("### 🎥 v40 Stable Movie Engine")
-    m_s = st.text_area("Movie Script:", height=150, key="movie_v54")
+    m_s = st.text_area("Movie Script:", height=150, key="movie_v55")
     col1, col2, col3 = st.columns(3)
     with col1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
     with col2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
@@ -193,7 +197,7 @@ with t_movie:
                 st.download_button("Download Movie ⬇️", open(v_res, 'rb').read(), file_name=v_res)
 
 with t_img:
-    image_studio_module_v54()
+    image_studio_module()
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #2563eb; font-weight: bold;'>ES AI Studio v54.0 | v40 Engine | Gender Lock Enabled | Muhammad Essa Awan</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #2563eb; font-weight: bold;'>ES AI Studio v55.0 | v40 Engine | All Bug Fixes | Muhammad Essa Awan</p>", unsafe_allow_html=True)
