@@ -11,171 +11,195 @@ import random
 from PIL import Image
 import io
 
-# Senior Engineer Fix: Persistent Session
-session = requests.Session()
-
-# PIL Patch
-if not hasattr(Image, 'ANTIALIAS'):
-    Image.ANTIALIAS = getattr(Image, 'LANCZOS', 1)
-
-try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
-    import moviepy.video.fx.all as vfx
-except Exception as e:
-    st.error("Engine Backend Error: Please Reboot via 'Manage app'.")
-
 # ==========================================
-# 1. APPROVED ELECTRIC UI (CLEAN VERSION)
+# 1. SGLOWNINA BRANDING & LUXURY UI
 # ==========================================
-st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglownina - Powered by ES AI", layout="wide", page_icon="🎬")
 
+# Pink, Gold and Silver Theme for Sglownina
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;700&display=swap');
-    .stApp { background-color: #F8FAFC; color: #0f172a; font-family: 'Inter', sans-serif; }
+    .stApp { background-color: #ffffff; color: #0f172a; font-family: 'Inter', sans-serif; }
     
-    @keyframes lightningGlow {
-        0%, 100% { text-shadow: 0 0 15px #2563eb, 0 0 30px #00d4ff; color: #fff; }
-        50% { text-shadow: 0 0 25px #ff007a, 0 0 50px #ff007a; color: #fff; }
-    }
-    .owner-lightning {
-        font-family: 'Orbitron', sans-serif; font-size: 1.8rem; font-weight: 900;
-        text-align: center; letter-spacing: 10px; animation: lightningGlow 1.5s infinite;
-        background: #0f172a; padding: 15px; border-radius: 0 0 30px 30px;
+    .owner-header {
+        font-family: 'Orbitron', sans-serif; font-size: 1.2rem; font-weight: 900;
+        text-align: center; letter-spacing: 3px; color: #ff007a;
+        background: #fdf2f8; padding: 10px; border-bottom: 3px solid #ff007a;
     }
     
     .logo-container { display: flex; flex-direction: column; align-items: center; padding: 30px 0; }
-    .ai-shua {
-        width: 110px; height: 110px; background: linear-gradient(135deg, #ff007a, #2563eb, #00d4ff);
-        border-radius: 25px; display: flex; align-items: center; justify-content: center;
-        font-family: 'Orbitron', sans-serif; font-size: 40px; color: white;
-        box-shadow: 0 0 35px rgba(37, 99, 235, 0.6); animation: rotateShua 6s infinite linear; border: 4px solid #fff;
+    .s-logo {
+        width: 130px; height: 130px; 
+        background: linear-gradient(135deg, #ff007a, #f472b6);
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 15px 35px rgba(255, 0, 122, 0.3);
+        border: 5px solid #fff; animation: float 3s ease-in-out infinite;
     }
-    @keyframes rotateShua { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
-    .main-header { font-size: 2.5rem; font-weight: 900; color: #0f172a; text-align: center; margin-top: 10px; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
     
-    .stTabs [data-baseweb="tab-list"] { background: #1e293b; border-radius: 30px; padding: 10px; gap: 20px; justify-content: center; }
-    .stTabs [data-baseweb="tab"] { color: #ffffff !important; font-size: 16px; font-weight: bold; }
-    .stButton>button {
-        background: linear-gradient(90deg, #2563EB, #7C3AED) !important;
-        color: white !important; border-radius: 50px !important; height: 55px; width: 100%; font-weight: 900;
+    .brand-title { font-size: 3rem; font-weight: 900; color: #ff007a; text-align: center; margin-top: 10px; }
+    .powered-by { font-size: 1rem; color: #64748b; text-align: center; font-weight: bold; }
+
+    /* Buttons & Inputs */
+    .stButton>button { 
+        background: linear-gradient(90deg, #ff007a, #db2777) !important; 
+        color: white !important; border-radius: 50px !important; height: 50px; font-weight: bold; border: none;
     }
-    .stTextArea>div>div>textarea, .stTextInput>div>div>input {
-        background-color: #ffffff !important; color: #0f172a !important; border: 2px solid #e2e8f0 !important; border-radius: 15px !important;
-    }
+    .stTabs [data-baseweb="tab-list"] { background: #1e293b; border-radius: 50px; padding: 10px; gap: 15px; }
+    .stTabs [data-baseweb="tab"] { color: #ffffff !important; font-size: 15px; }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="owner-lightning">MUHAMMAD ESSA AWAN</div>', unsafe_allow_html=True)
-st.markdown('<div class="logo-container"><div class="ai-shua">ES</div><div class="main-header">ES AI MASTER STUDIO</div></div>', unsafe_allow_html=True)
+st.markdown('<div class="owner-header">SGLOWNINA - PRODUCT BY ES AI</div>', unsafe_allow_html=True)
+st.markdown("""
+    <div class="logo-container">
+        <div class="s-logo">
+            <span style="color:white; font-family:'Orbitron'; font-size:45px; font-weight:900;">S</span>
+        </div>
+        <div class="brand-title">Sglownina</div>
+        <div class="powered-by">Powered by Saba Wahid</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. BIO & v40 SUBJECT ENGINE
+# 2. BIO & IDENTITY (LOCKED)
 # ==========================================
-ESSA_BIO = """
-مجھے محمد عیسیٰ اعوان صاحب نے بنایا، ڈیزائن کیا اور کنفیگر کیا ہے۔
-محمد عیسیٰ اعوان صاحب، صوفی محمد انور رحمۃ اللہ علیہ کے صاحبزادے ہیں۔
-وہ ایک انجینئر بھی ہیں، مکینیکل انجینئر بھی ہیں، فیبرکیٹر بھی ہیں، اور مختلف شعبہ جات میں دینی و اسلامی شعبہ جات میں بھی ماہر ہیں۔
+SGLOWNINA_BIO = """
+مجھے **Sglownina** کی ٹیم نے بنایا، ڈیزائن کیا اور کنفیگر کیا ہے۔ 
+ہماری ایڈمن **صبا واحد** صاحبہ ہیں، جو محمد عیسیٰ اعوان کی وائف ہیں اور واحد بخش کی بیٹی ہیں۔ 
+اس سے زیادہ تفصیل ہم آپ کو نہیں بتا سکتے۔
 """
 
-def is_creator_query(q):
-    patterns = [r"kisne banaya", r"who made you", r"creator", r"essa", r"owner"]
-    return any(re.search(p, q.lower(), re.IGNORECASE) for p in patterns)
+def is_sglownina_query(q):
+    p = [r"kisne banaya", r"who made you", r"creator", r"owner", r"saba wahid", r"sglownina"]
+    return any(re.search(pat, q.lower(), re.IGNORECASE) for pat in p)
 
-def get_v40_prompt(text):
+# ==========================================
+# 3. v40 MOVIE ENGINE (LOCKED - NO CHANGES)
+# ==========================================
+session = requests.Session()
+def get_v40_prompt(urdu_text):
     try:
-        instr = f"Director: Extract core subject from Urdu: '{text}'. Detailed English 3D prompt. No humans unless asked."
+        instr = f"Act as a Film Director. Extract core visual from: '{urdu_text}'. Detailed English 3D prompt. No humans unless asked."
         res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai&cache=true", timeout=25)
-        return res.text if res.status_code == 200 else text
-    except: return text
+        return res.text if res.status_code == 200 else urdu_text
+    except: return urdu_text
 
-# ==========================================
-# 3. v40 CORE MOVIE ENGINE (LOCKED LOGIC)
-# ==========================================
-def create_v40_movie_v65(story, voice_gen, ratio, style):
+def create_v40_movie_engine(story, voice_gen, ratio, style):
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
+    import moviepy.video.fx.all as vfx
     u_id = str(uuid.uuid4())[:8]
-    status_bar = st.empty()
+    status = st.empty()
     try:
         v_code = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
-        audio_file = f"a_{u_id}.mp3"
-        asyncio.run(edge_tts.Communicate(story, v_code).save(audio_file))
-        voice_audio = AudioFileClip(audio_file)
+        audio_f = f"a_{u_id}.mp3"
+        asyncio.run(edge_tts.Communicate(story, v_code).save(audio_f))
+        audio = AudioFileClip(audio_f)
         
         res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
         w, h = res_map[ratio]
-
-        # v40 Splitting logic
-        sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 4]
-        if not sentences: sentences = [story]
         
+        sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 4]
         clips = []
-        dur_per = voice_audio.duration / len(sentences)
-
-        for i, scene in enumerate(sentences):
-            status_bar.info(f"🎬 Scene {i+1}/{len(sentences)} rendering...")
-            refined_p = get_v40_prompt(scene)
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p + ' ' + style)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
-            img_data = session.get(img_url, timeout=60).content
-            img_path = f"i_{u_id}_{i}.jpg"
-            with open(img_path, "wb") as f: f.write(img_data)
+        dur_per = audio.duration / len(sentences)
+        
+        for i, s in enumerate(sentences):
+            status.info(f"🎬 Scene {i+1}/{len(sentences)} rendering...")
+            refined = get_v40_prompt(s)
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined + ' ' + style)}?width={w}&height={h}&seed={random.randint(1,9999)}&nologo=true"
+            img_data = session.get(img_url).content
+            img_p = f"i_{u_id}_{i}.jpg"
+            with open(img_p, "wb") as f: f.write(img_data)
             
-            with Image.open(img_path) as im:
-                im.convert("RGB").resize((w, h)).save(img_path, "JPEG")
+            clean_im = Image.open(img_p).convert("RGB").resize((w, h))
+            clean_im.save(img_p, "JPEG")
             
-            clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
-            # v40 Zoom 1.2 -> 1.0
+            clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
             clip = clip.resize(lambda t: 1.2 - 0.15 * (t/dur_per)).set_position('center')
             clips.append(vfx.fadein(clip, 0.4))
-
-        final_video = concatenate_videoclips(clips, method="compose").set_audio(voice_audio)
-        out_name = f"ES_V65_{u_id}.mp4"
-        final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
-        
-        voice_audio.close()
-        final_video.close()
-        return out_name
+            
+        final_video = concatenate_videoclips(clips, method="compose").set_audio(audio)
+        out = f"Sglownina_V40_{u_id}.mp4"
+        final_video.write_videofile(out, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
+        return out
     except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 4. TABS UI (STRICT ISOLATION & NO DUPLICATE KEYS)
+# 4. IMAGE STUDIO (SURGEON & UNLIMITED RATIOS)
 # ==========================================
-tab_chat, tab_movie, tab_image = st.tabs(["💬 Chat Assistant", "🎬 Movie Studio", "🎨 Image Studio"])
+def image_studio_module():
+    st.write("### 🎨 Sglownina Artistic Surgeon")
+    mode = st.radio("Chose Mode:", ["Text to Image", "Professional Photo Edit"], horizontal=True)
+    
+    size_options = {
+        "YouTube Thumbnail (16:9)": (1280, 720),
+        "YouTube Banner (21:9)": (2560, 1080),
+        "TikTok/Reels (9:16)": (720, 1280),
+        "Instagram Post (1:1)": (1024, 1024),
+        "Facebook Cover": (1200, 444),
+        "Profile Pic": (512, 512)
+    }
+
+    if mode == "Text to Image":
+        p = st.text_area("جو تصویر بنوانی ہے بیان کریں:")
+        c1, c2, c3 = st.columns(3)
+        with c1: st_sel = st.selectbox("Style:", ["Realistic", "3D Cartoon", "Anime", "Sketch"], key="i_s")
+        with c2: sz_sel = st.selectbox("Size/Ratio:", list(size_options.keys()), key="i_r")
+        with c3: num = st.slider("Quantity:", 1, 4, 1)
+        
+        if st.button("Generate World-Class Images 🚀"):
+            w, h = size_options[sz_sel]
+            for i in range(num):
+                with st.spinner("Sglownina AI is painting..."):
+                    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(p + ' ' + st_sel)}?width={w}&height={h}&seed={random.randint(1,99999)}&nologo=true&negative=girl,female"
+                    st.image(url, caption=f"Sglownina Masterpiece {i+1}")
+
+    else:
+        st.write("#### 🖼️ Identity-Safe Image Surgeon")
+        f = st.file_uploader("تصویر اپ لوڈ کریں:", type=["jpg", "png"])
+        if f:
+            st.image(f, width=200)
+            edit_p = st.text_area("تبدیلی بیان کریں (کپڑے، بیک گراؤنڈ، بال، رنگ):")
+            sz_edit = st.selectbox("سائز کیا ہو؟", list(size_options.keys()), key="e_r")
+            if st.button("Apply Surgery 🚀"):
+                with st.spinner("AI is modifying..."):
+                    w, h = size_options[sz_edit]
+                    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(edit_p)}?width={w}&height={h}&nologo=true&negative=girl,female"
+                    st.image(url, caption="Modified Result")
+
+# ==========================================
+# 5. UI TABS (STRICT ISOLATION)
+# ==========================================
+tab_chat, tab_movie, tab_image = st.tabs(["💬 Smart Chat", "🎬 Movie Studio", "🎨 Image Studio"])
 
 with tab_chat:
     if "messages" not in st.session_state: st.session_state.messages = []
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): st.write(m["content"])
-    
-    if p := st.chat_input("Hukum karein Essa bhai...", key="chat_input_unique"):
+    if p := st.chat_input("Hukum karein Admin..."):
         st.session_state.messages.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
-        res = ESSA_BIO if is_creator_query(p) else requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true").text
+        res = SGLOWNINA_BIO if is_sglownina_query(p) else requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true").text
         with st.chat_message("assistant"):
             st.write(res); st.session_state.messages.append({"role": "assistant", "content": res})
 
 with tab_movie:
-    st.write("### 🎥 v40 Cinematic Engine")
-    m_s = st.text_area("Movie Script:", height=150, key="movie_script_unique")
+    st.write("### 🎥 v40 Cinematic Production")
+    m_s = st.text_area("Movie Script:", height=150, key="movie_script")
     c1, c2, c3 = st.columns(3)
-    with c1: mv = st.selectbox("Voice:", ["Urdu Male", "Urdu Female"], key="voice_sel_unique")
-    with c2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"], key="ratio_sel_unique")
-    with c3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon", "Anime"], key="style_sel_unique")
-    
-    if st.button("Generate Master Movie 🚀", key="movie_btn_unique"):
+    with c1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"], key="mv")
+    with c2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"], key="mr")
+    with c3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon", "Anime"], key="ms")
+    if st.button("Generate Sglownina Movie 🚀"):
         if m_s:
-            v_res = create_v40_movie_v65(m_s, mv, mr, ms)
+            v_res = create_v40_movie_engine(m_s, mv, mr, ms)
             if "mp4" in v_res:
                 st.video(v_res)
-                st.download_button("Download Movie ⬇️", open(v_res, 'rb').read(), file_name=v_res, key="dl_btn_unique")
-            else: st.error(v_res)
+                st.download_button("Download ⬇️", open(v_res, 'rb').read(), file_name=v_res)
 
 with tab_image:
-    st.write("### 🎨 ES AI Image Studio")
-    img_p = st.text_area("Describe Image:", key="img_prompt_unique")
-    if st.button("Generate Image 🚀", key="img_gen_btn_unique"):
-        if img_p:
-            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(img_p)}?width=1024&height=1024&nologo=true&negative=girl,female"
-            st.image(url)
+    image_studio_module()
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #2563eb; font-weight: bold;'>ES AI Studio v65.0 | Muhammad Essa Awan</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #ff007a; font-weight: bold;'>Sglownina v70.0 | Product by ES AI | Admin: Saba Wahid</p>", unsafe_allow_html=True)
