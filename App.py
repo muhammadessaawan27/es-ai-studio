@@ -11,10 +11,10 @@ import random
 from PIL import Image
 import io
 
-# Senior Engineer Stability Fixes
+# Senior Engineer Fix: Persistent Session for stability
 session = requests.Session()
 
-# PIL Patch to prevent crashes
+# PIL Patch
 if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', 1)
 
@@ -34,9 +34,7 @@ st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="�
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@700&display=swap');
-    
     .stApp { background-color: #F8FAFC; color: #0f172a; font-family: 'Inter', sans-serif; }
-    
     @keyframes lightningGlow {
         0%, 100% { text-shadow: 0 0 10px #2563eb, 0 0 25px #00d4ff; color: #fff; }
         50% { text-shadow: 0 0 20px #ff007a, 0 0 45px #ff007a; color: #fff; }
@@ -46,7 +44,6 @@ st.markdown("""
         text-align: center; letter-spacing: 8px; animation: lightningGlow 1.5s infinite;
         background: #1e293b; padding: 10px; border-radius: 0 0 20px 20px;
     }
-    
     .logo-container { display: flex; flex-direction: column; align-items: center; padding: 20px 0; }
     .ai-shua {
         width: 100px; height: 100px; background: linear-gradient(135deg, #ff007a, #2563eb);
@@ -55,20 +52,15 @@ st.markdown("""
         box-shadow: 0 0 30px rgba(37, 99, 235, 0.6); animation: rotateShua 6s infinite linear; border: 4px solid #fff;
     }
     @keyframes rotateShua { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
-    
     .main-header { font-size: 2.5rem; font-weight: 900; color: #0f172a; text-align: center; margin-top: 10px; }
-    
     .stTabs [data-baseweb="tab-list"] { background: #1e293b; border-radius: 30px; padding: 10px; gap: 20px; }
     .stTabs [data-baseweb="tab"] { color: #ffffff !important; font-size: 16px; font-weight: bold; }
-    
     .stButton>button {
         background: linear-gradient(90deg, #2563EB, #7C3AED) !important;
         color: white !important; border-radius: 50px !important; height: 55px; font-weight: 900;
     }
-    
     .stTextArea>div>div>textarea, .stTextInput>div>div>input {
-        background-color: #ffffff !important; color: #0f172a !important;
-        border: 2px solid #e2e8f0 !important; border-radius: 15px !important;
+        background-color: #ffffff !important; color: #0f172a !important; border: 2px solid #e2e8f0 !important; border-radius: 15px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -77,7 +69,7 @@ st.markdown('<div class="owner-lightning">MUHAMMAD ESSA AWAN</div>', unsafe_allo
 st.markdown('<div class="logo-container"><div class="ai-shua">ES</div><div class="main-header">ES AI MASTER STUDIO</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 2. ESSA IDENTITY & v40 ENGINE (NOT TOUCHED)
+# 2. ESSA IDENTITY & v40 ENGINE (UNTOUCHED)
 # ==========================================
 ESSA_BIO = """
 مجھے محمد عیسیٰ اعوان صاحب نے بنایا، ڈیزائن کیا اور کنفیگر کیا ہے۔
@@ -86,16 +78,14 @@ ESSA_BIO = """
 """
 
 def get_v40_visual_prompt(urdu_text, style):
-    """v40 logic for subject locking - EXACT COPIED."""
     try:
-        instr = f"Act as a Film Director. Extract only the primary visual subject from Urdu: '{urdu_text}'. Describe it in English for 3D animation, focus on objects/animals/emotions accurately. No humans unless mentioned. Output only the prompt."
+        instr = f"Act as a Film Director. Extract only the primary visual subject from Urdu: '{urdu_text}'. Describe it in detail in English for a 3D animation. Ensure accuracy of objects/animals/emotions. No humans unless mentioned. Output only the prompt."
         res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai", timeout=25)
         desc = res.text if res.status_code == 200 else urdu_text
         return f"{style} cinematic animation style, {desc}, highly detailed masterpiece, 8k, vibrant lighting"
     except: return urdu_text
 
 def create_v40_movie_engine(story, voice_gen, ratio, style):
-    """The successful v40 rendering engine - EXACT COPIED."""
     u_id = str(uuid.uuid4())[:8]
     status = st.empty()
     try:
@@ -103,77 +93,89 @@ def create_v40_movie_engine(story, voice_gen, ratio, style):
         audio_file = f"a_{u_id}.mp3"
         asyncio.run(edge_tts.Communicate(story, v_code).save(audio_file))
         voice_audio = AudioFileClip(audio_file)
-        
         res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
         w, h = res_map[ratio]
-
         sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
         clips = []
         dur_per = voice_audio.duration / len(sentences)
-
         for i, scene in enumerate(sentences):
-            status.info(f"🎨 منظر {i+1} بن رہا ہے (v40 Precision Mode)...")
+            status.info(f"🎨 منظر {i+1} بن رہا ہے (v40 Mode)...")
             refined_p = get_v40_visual_prompt(scene, style)
             img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
-            
             img_path = f"i_{u_id}_{i}.jpg"
             img_data = session.get(img_url, timeout=60).content
             img_obj = Image.open(io.BytesIO(img_data)).convert("RGB").resize((w, h))
             img_obj.save(img_path, "JPEG")
-            
-            # Zoom Out (1.2 to 1.0)
             clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
             clip = clip.resize(lambda t: 1.2 - 0.2 * (t/dur_per)).set_position('center')
             clips.append(fadein(clip, 0.4))
-
         final_video = concatenate_videoclips(clips, method="compose").set_audio(voice_audio)
         out_name = f"ES_V40_{u_id}.mp4"
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
-        
         voice_audio.close()
         final_video.close()
         return out_name
     except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 3. NEW IMAGE GENERATOR MODULE
+# 3. NEW & FIXED IMAGE STUDIO MODULE
 # ==========================================
+def get_studio_image_prompt(urdu_text, style, is_edit=False):
+    """v40-style Director for Image Studio."""
+    try:
+        task = "Identify the core subject and background." if not is_edit else "Describe a modification to this scene."
+        instr = f"{task} Convert this Urdu into a precise English AI Image Prompt: '{urdu_text}'. NO HUMANS, NO GIRLS unless requested. Focus on animals/objects. Output only English."
+        res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai", timeout=20)
+        desc = res.text if res.status_code == 200 else urdu_text
+        return f"{style} style, {desc}, cinematic lighting, masterpiece, 8k, highly detailed"
+    except: return urdu_text
+
 def image_studio_module():
-    st.write("### 🎨 ES AI Image Studio")
+    st.write("### 🎨 ES AI Image Studio (v40 Precision)")
     mode = st.radio("Chose Mode:", ["Text to Image", "Edit Photo (Img2Img)"], horizontal=True)
     
+    # Negative Prompt to avoid the "Random Girl" bug
+    neg = "&nologo=true&negative=human,person,girl,woman,face,distorted"
+
     if mode == "Text to Image":
-        p = st.text_area("What do you want to create?", placeholder="Example: A lion on a mountain...")
+        p = st.text_area("اردو یا انگلش میں لکھیں (مثلاً: اڑتا ہوا باز اور سانپ):", placeholder="Describe your image...")
         c1, c2, c3 = st.columns(3)
         with c1: style = st.selectbox("Image Style:", ["Realistic", "3D Cartoon", "Anime", "Digital Art", "Sketch"])
         with c2: size = st.selectbox("Ratio:", ["Square (1:1)", "Portrait (9:16)", "Landscape (16:9)"])
         with c3: num = st.slider("Quantity:", 1, 4, 1)
         
-        if st.button("Generate Now 🚀"):
-            res_dim = {"Square (1:1)": (1024, 1024), "Portrait (9:16)": (720, 1280), "Landscape (16:9)": (1280, 720)}
-            w, h = res_dim[size]
-            for i in range(num):
-                with st.spinner(f"Creating Image {i+1}..."):
-                    full_p = f"{style} style, {p}, masterpiece, 8k, detailed"
-                    img_data = requests.get(f"https://image.pollinations.ai/prompt/{urllib.parse.quote(full_p)}?width={w}&height={h}&seed={random.randint(1,99999)}").content
-                    st.image(img_data, caption=f"Result {i+1}")
-                    st.download_button(f"Download {i+1} ⬇️", img_data, file_name=f"es_img_{i}.jpg")
+        if st.button("Generate Master Image 🚀"):
+            if p:
+                res_dim = {"Square (1:1)": (1024, 1024), "Portrait (9:16)": (720, 1280), "Landscape (16:9)": (1280, 720)}
+                w, h = res_dim[size]
+                refined_p = get_studio_image_prompt(p, style)
+                for i in range(num):
+                    with st.spinner(f"Creating Image {i+1}..."):
+                        seed = random.randint(1, 999999)
+                        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w}&height={h}&seed={seed}{neg}"
+                        img_data = requests.get(url).content
+                        st.image(img_data, caption=f"Result {i+1}")
+                        st.download_button(f"Download {i+1} ⬇️", img_data, file_name=f"es_img_{i}.jpg")
+            else: st.warning("کچھ لکھیں تو سہی!")
 
     else:
         st.write("#### 🖼️ Image to Image Editor")
-        f = st.file_uploader("Upload Image:", type=["jpg", "png"])
+        f = st.file_uploader("تصویر اپ لوڈ کریں:", type=["jpg", "png"])
         if f:
             st.image(f, caption="Original Image", width=300)
-            edit_p = st.text_input("Describe the change (e.g. 'make background blue', 'make it a cartoon')")
-            if st.button("Apply Edit 🚀"):
-                with st.spinner("AI is editing..."):
-                    edit_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(edit_p)}?width=1024&height=1024&nologo=true"
-                    edit_data = requests.get(edit_url).content
-                    st.image(edit_data, caption="Edited Result")
-                    st.download_button("Download Edited Photo ⬇️", edit_data, file_name="es_edited.jpg")
+            edit_p = st.text_input("کیا تبدیلی کرنی ہے؟ (مثلاً: اس کا بیک گراؤنڈ پھولوں والا کر دو):")
+            if st.button("Apply AI Edit 🚀"):
+                if edit_p:
+                    with st.spinner("AI منظر کو تبدیل کر رہا ہے..."):
+                        refined_edit = get_studio_image_prompt(edit_p, "Realistic", is_edit=True)
+                        edit_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_edit)}?width=1024&height=1024{neg}"
+                        edit_data = requests.get(edit_url).content
+                        st.image(edit_data, caption="Edited Result")
+                        st.download_button("Download Edited Photo ⬇️", edit_data, file_name="es_edited.jpg")
+                else: st.warning("تبدیلی کی تفصیل لکھیں!")
 
 # ==========================================
-# 4. FINAL TABS ASSEMBLY
+# 4. FINAL TABS
 # ==========================================
 t_chat, t_movie, t_img = st.tabs(["💬 Smart Chat", "🎬 Movie Studio", "🎨 Image Studio"])
 
@@ -199,12 +201,11 @@ with t_movie:
         if m_s:
             v_res = create_v40_movie_engine(m_s, mv, mr, ms)
             if "mp4" in v_res:
-                with open(v_res, 'rb') as f:
-                    st.video(f.read())
+                with open(v_res, 'rb') as f: st.video(f.read())
                 st.download_button("Download Movie ⬇️", open(v_res, 'rb').read(), file_name=v_res)
 
 with t_img:
     image_studio_module()
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #2563eb; font-weight: bold;'>ES AI Studio v44.0 | v40 Movie Engine Restored | Multi-User Image Generator | Muhammad Essa Awan</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #2563eb; font-weight: bold;'>ES AI Studio v45.0 | v40 Engine | Precision Image Gen | Muhammad Essa Awan</p>", unsafe_allow_html=True)
