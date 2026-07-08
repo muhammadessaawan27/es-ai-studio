@@ -11,7 +11,7 @@ import random
 from PIL import Image
 import io
 
-# Senior Engineer Professional Setup
+# Senior Engineer Stability Setup
 session = requests.Session()
 
 # PIL Patch
@@ -27,7 +27,7 @@ except Exception as e:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 1. LUXURY UI (WHITE BG + LIGHTNING NAME)
+# 1. APPROVED DESIGN (WHITE BG + LIGHTNING NAME)
 # ==========================================
 st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="🎬")
 
@@ -69,7 +69,7 @@ st.markdown('<div class="owner-lightning">MUHAMMAD ESSA AWAN</div>', unsafe_allo
 st.markdown('<div class="logo-container"><div class="ai-shua">ES</div><div class="main-header">ES AI MASTER STUDIO</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 2. ESSA IDENTITY & v40 ENGINE (100% UNTOUCHED)
+# 2. ESSA IDENTITY (LOCKED)
 # ==========================================
 ESSA_BIO = """
 مجھے محمد عیسیٰ اعوان صاحب نے بنایا، ڈیزائن کیا اور کنفیگر کیا ہے۔
@@ -77,40 +77,57 @@ ESSA_BIO = """
 وہ ایک انجینئر بھی ہیں، مکینیکل انجینئر بھی ہیں، فیبرکیٹر بھی ہیں، اور مختلف شعبہ جات میں دینی و اسلامی شعبہ جات میں بھی ماہر ہیں۔
 """
 
+def is_creator_query(q):
+    patterns = [r"kisne banaya", r"who made you", r"creator", r"essa", r"owner"]
+    return any(re.search(p, q.lower(), re.IGNORECASE) for p in patterns)
+
+# ==========================================
+# 3. v40 MOVIE ENGINE (RESTORED MULTI-SCENE)
+# ==========================================
 def get_v40_visual_prompt(urdu_text, style):
     try:
-        instr = f"Act as a Film Director. Extract only the primary visual subject from Urdu: '{urdu_text}'. Describe it in detail in English for a 3D animation. Ensure accuracy of objects/animals/emotions. No humans unless mentioned. Output only the prompt."
+        instr = f"Director Instruction: Extract the primary visual subject from Urdu: '{urdu_text}'. Describe it in detail in English for a 3D animation. Accurate animals/objects. No humans unless mentioned. Output ONLY English prompt."
         res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai", timeout=25)
         desc = res.text if res.status_code == 200 else urdu_text
-        return f"{style} cinematic animation style, {desc}, highly detailed masterpiece, 8k, vibrant lighting"
+        return f"{style} style animation, {desc}, highly detailed masterpiece, 8k, vibrant colors"
     except: return urdu_text
 
-def create_v40_movie_engine(story, voice_gen, ratio, style):
+def create_v40_engine_final(story, voice_gen, ratio, style):
     u_id = str(uuid.uuid4())[:8]
     status = st.empty()
     try:
+        # Step 1: Voice
         v_code = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
         audio_file = f"a_{u_id}.mp3"
         asyncio.run(edge_tts.Communicate(story, v_code).save(audio_file))
         voice_audio = AudioFileClip(audio_file)
+        
+        # Dimensions
         res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
         w, h = res_map[ratio]
+
+        # Step 2: STRICT SENTENCE SPLITTING (Fix for static image bug)
         sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
         clips = []
         dur_per = voice_audio.duration / len(sentences)
+
         for i, scene in enumerate(sentences):
-            status.info(f"🎨 منظر {i+1} بن رہا ہے (v40 Stable Mode)...")
+            status.info(f"🎨 منظر {i+1} بن رہا ہے (v40 Logic)...")
             refined_p = get_v40_visual_prompt(scene, style)
             img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
+            
+            img_path = f"i_{u_id}_{i}.jpg"
             img_data = session.get(img_url, timeout=60).content
             img_obj = Image.open(io.BytesIO(img_data)).convert("RGB").resize((w, h))
-            img_path = f"i_{u_id}_{i}.jpg"
             img_obj.save(img_path, "JPEG")
+            
+            # THE ZOOM-OUT FIX (1.3 to 1.0)
             clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
-            clip = clip.resize(lambda t: 1.2 - 0.2 * (t/dur_per)).set_position('center')
+            clip = clip.resize(lambda t: 1.3 - 0.25 * (t/dur_per)).set_position('center')
             clips.append(fadein(clip, 0.4))
+
         final_video = concatenate_videoclips(clips, method="compose").set_audio(voice_audio)
-        out_name = f"ES_V40_{u_id}.mp4"
+        out_name = f"ES_V49_{u_id}.mp4"
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
         voice_audio.close()
         final_video.close()
@@ -118,64 +135,72 @@ def create_v40_movie_engine(story, voice_gen, ratio, style):
     except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 3. UNIVERSAL IMAGE STUDIO (FOR THE WHOLE WORLD)
+# 4. UNIVERSAL IMAGE STUDIO (SURGEON & AUTO-SIZE)
 # ==========================================
-def universal_director_ai(user_request, style, is_edit=False):
-    """Universal logic to understand ANY request from ANY user."""
+def smart_director_ai(user_request, style, is_edit=False):
+    """Detects size and ensures gender locking for edits."""
     try:
-        context = "New Image Request" if not is_edit else "Image Modification Request"
-        instr = (f"You are the Master AI Artist Director. A user requested: '{user_request}'. "
-                 f"Generate a highly detailed, professional English AI Image Prompt. "
-                 f"Cover everything: Subject, Clothing, Hair, Background, Lighting, and Style. "
-                 f"If user says 'beard', describe a realistic beard. If user says 'blue clothes', describe blue fabric. "
-                 f"If user says 'eagle and snake', describe the action. "
-                 f"Strictly follow the user's intent. Output ONLY the English prompt.")
+        instr = (f"Master Director: User wants: '{user_request}'. "
+                 "1. If 'edit' mode, KEEP ORIGINAL GENDER. No random girls. "
+                 "2. If user mentions 'banner', 'TikTok', 'logo', 'Instagram', describe the specific dimensions in the prompt. "
+                 "3. Convert Urdu to professional English prompt with lighting/details. "
+                 "Output ONLY English.")
         res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai", timeout=25)
         desc = res.text if res.status_code == 200 else user_request
-        return f"{style} style masterpiece, {desc}, 8k resolution, cinematic lighting, highly detailed"
+        return f"{style} masterpiece, {desc}, 8k, highly detailed"
     except: return user_request
 
-def image_studio_universal():
-    st.write("### 🎨 ES AI Image Studio (Global Master Mode)")
-    mode = st.radio("Select Mode:", ["Text to Image", "Professional Photo Edit"], horizontal=True)
+def get_auto_size(req):
+    """Detects requested size from text."""
+    r = req.lower()
+    if "banner" in r or "landscape" in r or "16:9" in r: return (1280, 720)
+    if "tiktok" in r or "reel" in r or "9:16" in r or "khari" in r: return (720, 1280)
+    if "logo" in r or "profile" in r or "square" in r or "1:1" in r: return (1024, 1024)
+    return None
+
+def image_studio_pro():
+    st.write("### 🎨 ES AI Universal Image Studio")
+    mode = st.radio("Chose Mode:", ["Text to Image", "Professional Photo Edit"], horizontal=True)
     
     if mode == "Text to Image":
-        user_p = st.text_area("کچھ بھی لکھیں (دنیا کا کوئی بھی جانور، چیز یا منظر):", placeholder="Describe your imagination...")
+        p = st.text_area("کچھ بھی لکھیں (سائز کے ساتھ، مثلاً یوٹیوب بینر بنائیں):", placeholder="Describe imagination...")
         c1, c2, c3 = st.columns(3)
-        with c1: style = st.selectbox("Style:", ["Realistic", "3D Cartoon", "Anime", "Cyberpunk", "Sketch"])
-        with c2: size = st.selectbox("Ratio:", ["Square (1:1)", "Portrait (9:16)", "Landscape (16:9)"])
-        with c3: num = st.slider("Quantity:", 1, 4, 1)
+        with c1: style = st.selectbox("Style:", ["Realistic", "3D Cartoon", "Anime", "Sketch"])
+        with c2: size_sel = st.selectbox("Ratio Selection:", ["Default", "Square (1:1)", "Portrait (9:16)", "Landscape (16:9)"])
+        with c3: num = st.slider("Qty:", 1, 4, 1)
         
-        if st.button("Generate World-Class Images 🚀"):
-            if user_p:
+        if st.button("Generate World-Class Image 🚀"):
+            if p:
+                # Auto detect size from text or use selection
+                auto_s = get_auto_size(p)
                 res_dim = {"Square (1:1)": (1024, 1024), "Portrait (9:16)": (720, 1280), "Landscape (16:9)": (1280, 720)}
-                w, h = res_dim[size]
-                refined = universal_director_ai(user_p, style)
+                w, h = auto_s if auto_s else res_dim.get(size_sel, (1024, 1024))
+                
+                refined = smart_director_ai(p, style)
                 for i in range(num):
-                    with st.spinner(f"AI is painting scene {i+1}..."):
-                        seed = random.randint(1, 999999)
-                        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined)}?width={w}&height={h}&seed={seed}&nologo=true"
-                        img_data = requests.get(url).content
-                        st.image(img_data, caption=f"ES AI Masterpiece {i+1}")
-                        st.download_button(f"Download {i+1} ⬇️", img_data, file_name=f"es_world_{i}.jpg")
+                    with st.spinner("AI Director is painting..."):
+                        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined)}?width={w}&height={h}&seed={random.randint(1,99999)}&nologo=true"
+                        st.image(url, caption=f"ES AI Masterpiece {i+1}")
+            else: st.warning("Kuch likhein!")
 
     else:
-        st.write("#### 🖼️ Universal Image Surgeon (Edit Anything)")
-        f = st.file_uploader("تصویر اپ لوڈ کریں جس میں تبدیلی کرنی ہے:", type=["jpg", "png"])
+        st.write("#### 🖼️ Professional Image Surgeon")
+        f = st.file_uploader("Upload Photo:", type=["jpg", "png"])
         if f:
             st.image(f, caption="Original Photo", width=300)
-            edit_req = st.text_area("تبدیلی بیان کریں (کچھ بھی: کپڑے، بال، داڑھی، بیک گراؤنڈ، میک اپ، وغیرہ):")
-            if st.button("Apply Universal AI Surgery 🚀"):
-                if edit_req:
-                    with st.spinner("AI is analyzing and modifying..."):
-                        refined_edit = universal_director_ai(edit_req, "Realistic", is_edit=True)
-                        edit_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_edit)}?width=1024&height=1024&nologo=true"
-                        edit_data = requests.get(edit_url).content
-                        st.image(edit_data, caption="Modified Result")
-                        st.download_button("Download Edited Photo ⬇️", edit_data, file_name="es_modified.jpg")
+            edit_p = st.text_area("تبدیلی لکھیں (کچھ بھی: کپڑے، داڑھی، رنگ گورا، بیک گراؤنڈ، سائز):")
+            if st.button("Apply AI Edit 🚀"):
+                if edit_p:
+                    with st.spinner("Analyzing & Modifying..."):
+                        auto_s = get_auto_size(edit_p)
+                        w, h = auto_s if auto_s else (1024, 1024)
+                        refined_edit = smart_director_ai(edit_p, "Realistic", is_edit=True)
+                        edit_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_edit)}?width={w}&height={h}&nologo=true&negative=girl,woman,female"
+                        st.image(edit_url, caption="Modified Result")
+                else: st.warning("تبدیلی بیان کریں!")
 
 # ==========================================
-# 4. FINAL ASSEMBLY
+# 5. MAIN TABS
 # ==========================================
 t_chat, t_movie, t_img = st.tabs(["💬 Smart Chat", "🎬 Movie Studio", "🎨 Image Studio"])
 
@@ -186,26 +211,26 @@ with t_chat:
     if p := st.chat_input("Hukum karein Essa bhai..."):
         st.session_state.messages.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
-        res = ESSA_BIO if any(k in p.lower() for k in ["kisne", "creator", "essa"]) else session.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai").text
+        res = ESSA_BIO if is_creator_query(p) else session.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai").text
         with st.chat_message("assistant"):
             st.write(res); st.session_state.messages.append({"role": "assistant", "content": res})
 
 with t_movie:
-    st.write("### 🎥 v40 Stable Movie Engine")
-    m_s = st.text_area("Movie Script:", height=150, key="v48_movie")
+    st.write("### 🎥 v40 Pro Movie Engine (Fixed)")
+    m_s = st.text_area("Movie Script:", height=150, key="v49_movie")
     col1, col2, col3 = st.columns(3)
     with col1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
     with col2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
     with col3: ms = st.selectbox("Visual Style:", ["3D Cartoon", "Realistic", "Cinematic"])
     if st.button("Generate Master Movie 🚀"):
         if m_s:
-            v_res = create_v40_movie_engine(m_s, mv, mr, ms)
+            v_res = create_v40_engine_final(m_s, mv, mr, ms)
             if "mp4" in v_res:
                 with open(v_res, 'rb') as f: st.video(f.read())
                 st.download_button("Download Movie ⬇️", open(v_res, 'rb').read(), file_name=v_res)
 
 with t_img:
-    image_studio_universal()
+    image_studio_pro()
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #2563eb; font-weight: bold;'>ES AI Studio v48.0 | v40 Video Engine Preserved | Universal AI Artist | Muhammad Essa Awan</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #2563eb; font-weight: bold;'>ES AI Studio v49.0 | v40 Engine Fixed | Universal Image Surgeon | Muhammad Essa Awan</p>", unsafe_allow_html=True)
