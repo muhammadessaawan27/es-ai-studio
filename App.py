@@ -14,7 +14,7 @@ import io
 # Senior Engineer Stability Configuration
 session = requests.Session()
 
-# PIL Patch
+# PIL Patch to prevent any image related crashes
 if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', 1)
 
@@ -22,12 +22,12 @@ try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
     import moviepy.video.fx.all as vfx
 except Exception as e:
-    st.error(f"Engine Load Error: {e}")
+    st.error(f"Engine Backend Error: {e}")
 
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 1. LUXURY UI & BRANDING (LOCKED)
+# 1. LUXURY UI & BRANDING
 # ==========================================
 st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="🎬")
 
@@ -41,62 +41,69 @@ st.markdown("""
     }
     .owner-lightning {
         font-family: 'Orbitron', sans-serif; font-size: 1.6rem; font-weight: 900;
-        text-align: center; letter-spacing: 8px; animation: lightningGlow 1.5s infinite;
+        text-align: center; letter-spacing: 5px; animation: lightningGlow 1.5s infinite;
         background: #1e293b; padding: 10px; border-radius: 0 0 20px 20px;
     }
-    .logo-container { display: flex; flex-direction: column; align-items: center; padding: 20px 0; }
+    .logo-container { display: flex; flex-direction: column; align-items: center; padding: 10px 0; }
     .ai-shua {
-        width: 100px; height: 100px; background: linear-gradient(135deg, #ff007a, #2563eb);
-        border-radius: 22px; display: flex; align-items: center; justify-content: center;
-        font-family: 'Orbitron', sans-serif; font-size: 40px; color: white;
-        box-shadow: 0 0 30px rgba(37, 99, 235, 0.6); animation: rotateShua 6s infinite linear; border: 4px solid #fff;
+        width: 80px; height: 80px; background: linear-gradient(135deg, #ff007a, #2563eb);
+        border-radius: 20px; display: flex; align-items: center; justify-content: center;
+        font-family: 'Orbitron', sans-serif; font-size: 30px; color: white;
+        box-shadow: 0 0 20px rgba(37, 99, 235, 0.6); animation: rotateShua 6s infinite linear; border: 3px solid #fff;
     }
     @keyframes rotateShua { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
-    .main-header { font-size: 2.5rem; font-weight: 900; color: #0f172a; text-align: center; margin-top: 10px; }
+    .main-header { font-size: 2rem; font-weight: 900; color: #0f172a; text-align: center; margin-bottom: 10px; }
     
-    /* Clean Tab Isolation */
-    .stTabs [data-baseweb="tab-list"] { background: #1e293b; border-radius: 30px; padding: 10px; gap: 20px; }
-    .stTabs [data-baseweb="tab"] { color: #ffffff !important; font-size: 16px; font-weight: bold; }
+    /* Sidebar Styling */
+    [data-testid="stSidebar"] { background-color: #1e293b !important; color: white; }
+    [data-testid="stSidebar"] * { color: white !important; font-weight: bold; }
     
     .stButton>button {
         background: linear-gradient(90deg, #2563EB, #7C3AED) !important;
-        color: white !important; border-radius: 50px !important; height: 55px; font-weight: 900;
+        color: white !important; border-radius: 12px !important; height: 50px; width: 100%; font-weight: 900;
     }
     </style>
     """, unsafe_allow_html=True)
 
+# Top Persistent Header
 st.markdown('<div class="owner-lightning">MUHAMMAD ESSA AWAN</div>', unsafe_allow_html=True)
 st.markdown('<div class="logo-container"><div class="ai-shua">ES</div><div class="main-header">ES AI MASTER STUDIO</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 2. ESSA IDENTITY & v40 ENGINE (SECURED)
+# 2. BIO & IDENTITY
 # ==========================================
 ESSA_BIO = """
 مجھے محمد عیسیٰ اعوان صاحب نے بنایا، ڈیزائن کیا اور کنفیگر کیا ہے۔
 محمد عیسیٰ اعوان صاحب، صوفی محمد انور رحمۃ اللہ علیہ کے صاحبزادے ہیں۔
 وہ ایک انجینئر بھی ہیں، مکینیکل انجینئر بھی ہیں، فیبرکیٹر بھی ہیں، اور مختلف شعبہ جات میں دینی و اسلامی شعبہ جات میں بھی ماہر ہیں۔
+وہ حضرت مولانا شیخ امیر محمد اکرم اعوان رحمۃ اللہ علیہ کے بیعت تھے اور اب حضرت مولانا شیخ امیر عبدالقدیر اعوان مدظلہ العالی کے بیعت ہیں۔
 """
 
 def is_creator_query(q):
-    patterns = [r"kisne banaya", r"who made you", r"creator", r"essa", r"owner"]
+    patterns = [r"kisne banaya", r"who made you", r"creator", r"essa", r"owner", r"maker"]
     return any(re.search(p, q.lower(), re.IGNORECASE) for p in patterns)
 
-def get_v40_visual_prompt(urdu_text):
+# ==========================================
+# 3. BULLETPROOF ENGINE LOGIC (FIXING AVCODEC ERRORS)
+# ==========================================
+def get_v40_prompt(text):
     try:
-        instr = f"Extract core subject from Urdu: '{urdu_text}'. Detailed English 3D animation prompt. Accurate animals/objects. No humans unless mentioned."
+        instr = f"Identify core subject in Urdu: '{text}'. Create a detailed English 3D animation prompt. No humans unless asked."
         res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai", timeout=25)
-        return res.text if res.status_code == 200 else urdu_text
-    except: return urdu_text
+        return res.text if res.status_code == 200 else text
+    except: return text
 
-def create_v40_movie_engine(story, voice_gen, ratio, style):
+def create_stable_v40_movie(story, voice_gen, ratio, style):
     u_id = str(uuid.uuid4())[:8]
-    status_container = st.empty()
+    status = st.empty()
     try:
+        # Step 1: Voice
         v_code = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
         audio_file = f"a_{u_id}.mp3"
         asyncio.run(edge_tts.Communicate(story, v_code).save(audio_file))
         voice_audio = AudioFileClip(audio_file)
         
+        # Dimensions
         res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
         w, h = res_map[ratio]
         
@@ -105,41 +112,48 @@ def create_v40_movie_engine(story, voice_gen, ratio, style):
         dur_per = voice_audio.duration / len(sentences)
         
         for i, scene in enumerate(sentences):
-            status_container.info(f"🎬 Scene {i+1}/{len(sentences)} rendering...")
-            refined_p = get_v40_visual_prompt(scene)
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p + ' ' + style)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
-            img_data = session.get(img_url, timeout=60).content
+            status.info(f"🎨 Rendering Scene {i+1}/{len(sentences)}...")
+            prompt = get_v40_prompt(scene)
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt + ' ' + style)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
+            
             img_path = f"i_{u_id}_{i}.jpg"
-            with open(img_path, "wb") as f: f.write(img_data)
-            clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize(newsize=(w, h))
-            clip = clip.resize(lambda t: 1.2 - 0.2 * (t/dur_per)).set_position('center')
-            clips.append(vfx.fadein(clip, 0.4))
+            img_res = session.get(img_url, timeout=60)
+            
+            # --- CRITICAL FIX FOR AVCODEC ERROR ---
+            if img_res.status_code == 200:
+                with open(img_path, "wb") as f: f.write(img_res.content)
+                # Re-opening and cleaning image with PIL ensures MoviePy doesn't crash on invalid data
+                clean_img = Image.open(img_path).convert("RGB")
+                clean_img.save(img_path, "JPEG", quality=95)
+                
+                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize(newsize=(w, h))
+                clip = clip.resize(lambda t: 1.2 - 0.2 * (t/dur_per)).set_position('center')
+                clips.append(vfx.fadein(clip, 0.4))
             
         final_video = concatenate_videoclips(clips, method="compose").set_audio(voice_audio)
-        out_name = f"ES_V40_{u_id}.mp4"
+        out_name = f"ES_V59_{u_id}.mp4"
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
         
         voice_audio.close()
         final_video.close()
         return out_name
-    except Exception as e:
-        return f"Error: {e}"
+    except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 3. UI ASSEMBLY (WITH STRICT ISOLATION)
+# 4. SIDEBAR NAVIGATION (TRUE ISOLATION)
 # ==========================================
-t_chat, t_movie, t_img = st.tabs(["💬 Chat & Information", "🎬 Movie Studio", "🎨 Image Studio"])
+st.sidebar.markdown("## 🛠️ Menu Selection")
+page = st.sidebar.radio("Go To:", ["💬 Chat & Info", "🎬 Movie Studio", "🎨 Image Studio"])
 
-# --- TAB 1: CHAT (Isolated) ---
-with t_chat:
-    st.write("### 💬 ES AI Smart Chat")
+# --- PAGE 1: CHAT ---
+if page == "💬 Chat & Info":
+    st.write("### 💬 ES AI Assistant")
     if "messages" not in st.session_state: st.session_state.messages = []
     
-    # Persistent Chat bubbles
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): st.write(m["content"])
         
-    if p := st.chat_input("Hukum karein Essa bhai...", key="chat_in"):
+    if p := st.chat_input("Hukum karein Essa bhai..."):
         st.session_state.messages.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
         res = ESSA_BIO if is_creator_query(p) else requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai").text
@@ -147,42 +161,40 @@ with t_chat:
             st.write(res)
             st.session_state.messages.append({"role": "assistant", "content": res})
 
-# --- TAB 2: MOVIE STUDIO (Isolated & Robust) ---
-with t_movie:
-    st.write("### 🎥 Pro Movie Engine (v40 Power)")
-    m_s = st.text_area("Movie Script:", height=150, placeholder="Write your story here...", key="movie_script")
-    c1, c2, c3 = st.columns(3)
-    with c1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"], key="mv")
-    with c2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"], key="mr")
-    with c3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon", "Anime"], key="ms")
+# --- PAGE 2: MOVIE STUDIO ---
+elif page == "🎬 Movie Studio":
+    st.write("### 🎥 v40 Cinematic Production")
+    m_script = st.text_area("Yahan apni کہانی لکھیں:", height=150)
+    mv_col, mr_col, ms_col = st.columns(3)
+    with mv_col: m_voice = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
+    with mr_col: m_ratio = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
+    with ms_col: m_style = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon", "Anime"])
     
-    if st.button("Generate Master Movie 🚀", key="movie_btn"):
-        if m_s:
-            v_res = create_v40_movie_engine(m_s, mv, mr, ms)
+    if st.button("Generate Master Movie 🚀"):
+        if m_script:
+            v_res = create_stable_v40_movie(m_script, m_voice, m_ratio, m_style)
             if "mp4" in v_res:
                 st.video(v_res)
                 st.download_button("Download Movie ⬇️", open(v_res, 'rb').read(), file_name=v_res)
-                st.success("✅ Movie Delivered!")
-            else:
-                st.error(f"Render Failed: {v_res}")
+            else: st.error(f"Render Failed: {v_res}")
 
-# --- TAB 3: IMAGE STUDIO (Isolated) ---
-with t_img:
+# --- PAGE 3: IMAGE STUDIO ---
+elif page == "🎨 Image Studio":
     st.write("### 🎨 ES AI Image Surgeon")
-    mode = st.radio("Mode:", ["Text to Image", "Professional Edit"], horizontal=True, key="img_mode")
+    mode = st.radio("Choose Mode:", ["Text to Image", "Edit Photo"], horizontal=True)
     if mode == "Text to Image":
-        p_img = st.text_area("Describe Image:", key="p_img")
-        if st.button("Generate Image 🚀", key="gen_img"):
+        p_img = st.text_area("Describe Image:")
+        if st.button("Generate 🚀"):
             url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(p_img)}?width=1024&height=1024&nologo=true"
             st.image(url)
     else:
-        f = st.file_uploader("Upload Image:", type=["jpg", "png"], key="up_img")
-        if f:
-            st.image(f, width=200)
-            edit_p = st.text_input("Change what?", key="edit_p")
-            if st.button("Apply Edit 🚀", key="apply_edit"):
-                url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(edit_p)}?width=1024&height=1024&nologo=true&negative=girl,female"
+        f_up = st.file_uploader("Upload Image:", type=["jpg", "png"])
+        if f_up:
+            st.image(f_up, width=300)
+            edit_req = st.text_input("Change what?")
+            if st.button("Apply Surgery 🚀"):
+                url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(edit_req)}?width=1024&height=1024&nologo=true&negative=girl,female"
                 st.image(url)
 
-st.markdown("---")
-st.markdown("<p style='text-align: center; color: #2563eb; font-weight: bold;'>ES AI Studio v58.0 | Isolated Architecture | v40 Engine Fixed | Muhammad Essa Awan</p>", unsafe_allow_html=True)
+st.sidebar.markdown("---")
+st.sidebar.info(f"Version: 59.0 | Muhammad Essa Awan")
