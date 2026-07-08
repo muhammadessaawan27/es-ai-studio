@@ -17,12 +17,12 @@ try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, CompositeVideoClip
     from moviepy.video.fx.all import fadein
 except Exception as e:
-    st.error(f"Critical Engine Error: {e}")
+    st.error(f"Engine Load Error: {e}")
 
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 1. LUXURY UI & ANIMATED HEART LOGO
+# 1. ORANGE & RED LUXURY UI (Master Design)
 # ==========================================
 st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="🎬")
 
@@ -30,44 +30,49 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Orbitron:wght@900&display=swap');
 
-    /* Background: Soft Luxury Gradient (Not pure white) */
+    /* Background: Deep Red to Dark Slate */
     .stApp {
-        background: linear-gradient(135deg, #f8f9ff 0%, #e0e7ff 100%);
-        color: #1e1b4b;
+        background: linear-gradient(135deg, #1a0505 0%, #000000 100%);
+        color: #ffffff;
         font-family: 'Inter', sans-serif;
     }
 
-    /* 3D Rotating Heart with Independent ES Inside (Requirement) */
+    /* Fixed Heart Logo (Perfect Size) */
     .logo-section {
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 40px 0;
-        background: rgba(255, 255, 255, 0.4);
-        border-radius: 0 0 50px 50px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-        margin-top: -60px;
+        padding: 20px 0;
+        margin-top: 10px;
+    }
+
+    .heart-container {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        margin-bottom: 20px;
     }
 
     .heart {
-        position: relative;
-        width: 100px;
-        height: 90px;
-        background: linear-gradient(45deg, #2563EB, #7C3AED);
+        position: absolute;
+        width: 80px;
+        height: 70px;
+        background: linear-gradient(45deg, #FF4B2B, #FF416C);
         transform: rotate(-45deg);
-        animation: heartRotate 6s infinite linear;
-        box-shadow: 0 0 30px rgba(37, 99, 235, 0.5);
+        animation: heartPulse 2s infinite ease-in-out;
+        box-shadow: 0 0 25px rgba(255, 75, 43, 0.6);
+        z-index: 1;
     }
     .heart::before, .heart::after {
         content: "";
         position: absolute;
-        width: 100px;
-        height: 100px;
+        width: 80px;
+        height: 80px;
         background: inherit;
         border-radius: 50%;
     }
-    .heart::before { top: -50px; left: 0; }
-    .heart::after { left: 50px; top: 0; }
+    .heart::before { top: -40px; left: 0; }
+    .heart::after { left: 40px; top: 0; }
 
     .logo-text {
         position: absolute;
@@ -76,185 +81,175 @@ st.markdown("""
         transform: translate(-50%, -50%) rotate(45deg);
         z-index: 10;
         font-family: 'Orbitron', sans-serif;
-        font-size: 30px;
+        font-size: 26px;
         font-weight: 900;
-        color: white;
-        text-shadow: 0 0 10px rgba(255,255,255,0.8);
-        animation: esRotate 4s infinite linear;
+        color: #ffffff;
+        text-shadow: 0 0 10px rgba(0,0,0,0.5);
+        animation: esSpin 4s infinite linear;
     }
 
-    @keyframes heartRotate {
-        0% { transform: scale(1) rotate(-45deg); }
-        50% { transform: scale(1.1) rotate(-45deg); }
-        100% { transform: scale(1) rotate(-45deg); }
+    @keyframes heartPulse {
+        0%, 100% { transform: scale(1) rotate(-45deg); }
+        50% { transform: scale(1.05) rotate(-45deg); }
     }
 
-    @keyframes esRotate {
+    @keyframes esSpin {
         0% { transform: translate(-50%, -50%) rotate(45deg) rotateY(0deg); }
         100% { transform: translate(-50%, -50%) rotate(45deg) rotateY(360deg); }
     }
     
-    .premium-header { font-size: 2.5rem; font-weight: 800; color: #1e1b4b; margin-top: 20px; text-align: center; }
-    .premium-sub { font-size: 1rem; color: #4338ca; text-transform: uppercase; letter-spacing: 6px; font-weight: 700; text-align: center; }
+    .owner-name { font-family: 'Orbitron', sans-serif; font-size: 1.2rem; color: #FF4B2B; letter-spacing: 3px; font-weight: bold; margin-bottom: 5px; }
+    .premium-header { font-size: 2.2rem; font-weight: 800; color: #ffffff; text-shadow: 0 0 15px rgba(255, 75, 43, 0.4); }
 
-    /* Custom Colored Tabs */
-    .stTabs [data-baseweb="tab-list"] { background: #312e81; padding: 10px; border-radius: 15px; }
-    .stTabs [data-baseweb="tab"] { color: white !important; }
+    /* Orange/Red Buttons */
+    .stButton>button {
+        background: linear-gradient(90deg, #FF4B2B, #FF416C) !important;
+        color: white !important; border: none !important; border-radius: 12px !important;
+        padding: 12px 30px !important; font-weight: 600 !important; transition: 0.3s;
+    }
+    .stButton>button:hover { transform: scale(1.03); box-shadow: 0 0 20px rgba(255, 75, 43, 0.6); }
+
+    /* Colored Tab Section */
+    .stTabs [data-baseweb="tab-list"] { background: #1a0505; border-bottom: 2px solid #FF4B2B; padding: 5px; }
+    .stTabs [data-baseweb="tab"] { color: #FF4B2B !important; }
     
-    /* Input Styling */
-    .stTextArea>div>div>textarea { background: white !important; border: 2px solid #e0e7ff !important; border-radius: 15px !important; }
+    /* Input Visibility Fix */
+    .stTextArea>div>div>textarea { background: #2d0a0a !important; color: white !important; border: 1px solid #FF4B2B !important; border-radius: 15px !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# Logo Display
-st.markdown("""
+# Logo & Branding Header
+st.markdown(f"""
     <div class="logo-section">
-        <div class="heart">
-            <div class="logo-text">ES</div>
+        <div class="owner-name">MUHAMMAD ESSA AWAN</div>
+        <div class="heart-container">
+            <div class="heart">
+                <div class="logo-text">ES</div>
+            </div>
         </div>
-        <div class="premium-header">ES AI Master Studio</div>
-        <div class="premium-sub">The Future is Here</div>
+        <div class="premium-header">ES AI MASTER STUDIO</div>
     </div>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. BIO & IDENTITY (THE TRUTH)
+# 2. FAIL-SAFE ENGINE LOGIC
 # ==========================================
-ESSA_BIO = """
-مجھے محمد عیسیٰ اعوان صاحب نے بنایا، ڈیزائن کیا اور کنفیگر کیا ہے۔
-محمد عیسیٰ اعوان صاحب، صوفی محمد انور رحمۃ اللہ علیہ کے صاحبزادے ہیں۔
-وہ ایک انجینئر بھی ہیں، مکینیکل انجینئر بھی ہیں، فیبرکیٹر بھی ہیں، اور مختلف شعبہ جات میں دینی و اسلامی شعبہ جات میں بھی ماہر ہیں۔
-وہ حضرت مولانا شیخ امیر محمد اکرم اعوان رحمۃ اللہ علیہ کے بیعت تھے اور اب حضرت مولانا شیخ امیر عبدالقدیر اعوان مدظلہ العالی کے بیعت ہیں۔
-انہوں نے مجھے ڈیزائن کیا اور بنایا، اور یہ محنت انہوں نے خود کی۔
-"""
+async def generate_v_safe(text, voice_code, path):
+    try:
+        communicate = edge_tts.Communicate(text, voice_code)
+        await communicate.save(path)
+        return os.path.exists(path) and os.path.getsize(path) > 100
+    except: return False
 
-def check_identity(query):
-    patterns = [r"kisne banaya", r"who (made|created) you", r"owner", r"essa", r"awan", r"maker"]
-    return any(re.search(p, query.lower(), re.IGNORECASE) for p in patterns)
-
-# ==========================================
-# 3. BULLETPROOF ENGINES (NO AUDIO ERROR FIX)
-# ==========================================
-async def generate_safe_audio(text, voice_code, output_path):
-    """Retries audio generation if server fails (Fixes: No audio was received)"""
-    for attempt in range(3):
-        try:
-            communicate = edge_tts.Communicate(text, voice_code)
-            await communicate.save(output_path)
-            if os.path.exists(output_path) and os.path.getsize(output_path) > 100:
-                return True
-        except:
-            await asyncio.sleep(2)
-    return False
-
-def create_stable_movie_v33(story, voice_gen, ratio, style):
+def create_pro_video_v34(story, voice_choice, ratio, style):
     u_id = str(uuid.uuid4())[:8]
     status = st.empty()
     try:
-        # Step 1: Secure Voice
-        status.info("🎙️ آواز تیار کی جا رہی ہے...")
-        v_code = "ur-PK-UzmaNeural" if voice_gen == "Female" else "ur-PK-AsadNeural"
-        audio_file = f"{u_id}_v.mp3"
+        # Step 1: Multiple Voices (Mapping)
+        voices = {
+            "Urdu Female (Uzma)": "ur-PK-UzmaNeural",
+            "Urdu Male (Asad)": "ur-PK-AsadNeural",
+            "English Male (Guy)": "en-US-GuyNeural",
+            "English Female (Aria)": "en-US-AriaNeural",
+            "Hindi Male (Madhur)": "hi-IN-MadhurNeural",
+            "Hindi Female (Swara)": "hi-IN-SwaraNeural"
+        }
+        v_code = voices.get(voice_choice, "ur-PK-UzmaNeural")
         
-        if not asyncio.run(generate_safe_audio(story, v_code, audio_file)):
-            raise ValueError("Audio Engine didn't respond. Please try a shorter script.")
+        status.info("🎙️ آواز اور مناظر کی تیاری شروع...")
+        audio_path = f"{u_id}_v.mp3"
+        if not asyncio.run(generate_v_safe(story, v_code, audio_path)):
+            raise ValueError("Audio Generation Failed.")
         
-        voice_audio = AudioFileClip(audio_file)
+        voice_audio = AudioFileClip(audio_path)
+        
+        # Dimensions Setup
+        res = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
+        w, h = res[ratio]
 
-        # Step 2: Set Dimensions
-        res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
-        w, h = res_map[ratio]
-
-        # Step 3: Sentence Split
+        # Multi-Scene Generation
         sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
         clips = []
         dur_per = voice_audio.duration / len(sentences)
 
-        # Step 4: Visual Generation
         for i, scene in enumerate(sentences):
             status.info(f"🖼️ منظر {i+1} کی تصویر بن رہی ہے...")
-            director_instr = f"Professional prompt for AI Image: '{scene}'. {style} style, cinematic, 8k, no text."
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(director_instr)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
+            prompt = f"{style} style, {scene[:100]}, high quality cinematic 4k, no text, realistic"
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={random.randint(1,99999)}&nologo=true"
             img_path = f"{u_id}_{i}.jpg"
             
             r = session.get(img_url, timeout=60)
-            if r.status_code == 200:
-                with open(img_path, "wb") as f: f.write(r.content)
-                # Cleanup Image Data
-                img = Image.open(img_path).convert("RGB")
-                img.save(img_path, "JPEG")
-                
-                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
-                clip = clip.resize(newsize=(w, h))
-                # Zoom Out Animation
-                clip = clip.resize(lambda t: 1.15 - 0.08 * (t/dur_per)).set_position('center')
-                clips.append(fadein(clip, 0.4))
+            with open(img_path, "wb") as f: f.write(r.content)
+            
+            # Sanitize Image Data
+            img = Image.open(img_path).convert("RGB")
+            img.save(img_path, "JPEG")
+            
+            clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
+            clip = clip.resize(newsize=(w, h))
+            clip = clip.resize(lambda t: 1.15 - 0.08 * (t/dur_per)).set_position('center')
+            clips.append(fadein(clip, 0.4))
 
-        # Step 5: High-Stability Render
-        status.info("⚙️ فائنل رینڈرنگ ہو رہی ہے...")
+        # Final Render with Storage Error Fix
+        status.info("⚙️ ویڈیو رینڈر ہو رہی ہے...")
         final_video = concatenate_videoclips(clips, method="compose").set_audio(voice_audio)
-        out_name = f"ES_Movie_{u_id}.mp4"
+        out_name = f"ES_{u_id}.mp4"
         
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
         
-        time.sleep(1) # Allow file release
+        # Release Files from RAM
+        voice_audio.close()
+        final_video.close()
+        
+        time.sleep(2) # Release Wait
         return out_name
     except Exception as e:
         return f"Error: {e}"
 
 # ==========================================
-# 4. DASHBOARD TABS
+# 3. TABS INTERFACE
 # ==========================================
-tabs = st.tabs(["💬 Intelligent Chat", "🎙️ Voice Studio", "🎬 Pro Movie Studio"])
+tabs = st.tabs(["💬 Chat", "🎙️ Standalone Voice", "🎬 Movie Studio"])
 
 with tabs[0]:
     if "messages" not in st.session_state: st.session_state.messages = []
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): st.write(m["content"])
-    
     if p := st.chat_input("Hukum karein Essa bhai..."):
         st.session_state.messages.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
-        
-        if check_identity(p): res = ESSA_BIO
-        else:
-            try:
-                sys = urllib.parse.quote("You are ES AI created by Muhammad Essa Awan. Answer intelligently.")
-                res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&system={sys}", timeout=30).text
-            except: res = "Server is slow. Please refresh."
-            
+        res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai").text
         with st.chat_message("assistant"):
             st.write(res); st.session_state.messages.append({"role": "assistant", "content": res})
 
 with tabs[1]:
-    st.write("### 🎙️ Voice Studio (M/F)")
-    v_text = st.text_area("Likhein:", key="v_input")
+    st.write("### 🎙️ Standalone Voiceovers")
+    v_t = st.text_area("Yahan likhein jo bulwana hai:", key="standalone_v")
     v_c1, v_c2 = st.columns(2)
-    with v_c1: gen = st.selectbox("Gender:", ["Female", "Male"])
-    with v_c2: st.selectbox("Language:", ["Urdu", "English"], index=0)
+    with v_c1: v_gen = st.selectbox("Narrator:", ["Urdu Female (Uzma)", "Urdu Male (Asad)", "English Male (Guy)", "English Female (Aria)"])
     if st.button("Generate Audio 🚀"):
-        if v_text:
-            vc = "ur-PK-UzmaNeural" if gen == "Female" else "ur-PK-AsadNeural"
-            if asyncio.run(generate_safe_audio(v_text, vc, "es_v.mp3")):
-                st.audio("es_v.mp3")
-            else: st.error("Audio generation failed.")
+        vc = "ur-PK-UzmaNeural" if "Uzma" in v_gen else "ur-PK-AsadNeural" if "Asad" in v_gen else "en-US-GuyNeural" if "Guy" in v_gen else "en-US-AriaNeural"
+        if asyncio.run(generate_v_safe(v_t, vc, "test.mp3")): st.audio("test.mp3")
 
 with tabs[2]:
-    st.write("### 🎬 Pro Studio v33.0")
-    m_script = st.text_area("Movie Script:", height=150)
+    st.write("### 🎬 Pro Movie Studio (Orange Theme)")
+    m_s = st.text_area("Write your script below:", height=200)
     c1, c2, c3 = st.columns(3)
-    with c1: mv = st.selectbox("Narrator:", ["Male", "Female"])
-    with c2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    with c3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon", "Anime"])
+    with c1: m_v = st.selectbox("Select Voice:", ["Urdu Female (Uzma)", "Urdu Male (Asad)", "Hindi Male (Madhur)", "English Male (Guy)"])
+    with c2: m_r = st.selectbox("Video Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
+    with c3: m_st = st.selectbox("Scene Style:", ["Realistic", "Cinematic", "3D Cartoon"])
 
-    if st.button("🚀 Generate Precision Video"):
-        if m_script:
-            with st.spinner("AI Director is crafting your masterpiece..."):
-                video = create_stable_movie_v33(m_script, mv, mr, ms)
+    if st.button("🚀 Generate Final Master Video"):
+        if m_s:
+            with st.spinner("Processing... Please wait."):
+                video = create_pro_video_v34(m_s, m_v, m_r, m_st)
                 if "mp4" in video:
-                    st.video(video)
-                    st.download_button("Download Full HD ⬇️", open(video, 'rb'), file_name=video)
+                    # THE STORAGE ERROR FIX: Reading as bytes
+                    with open(video, 'rb') as v_file:
+                        video_bytes = v_file.read()
+                    st.video(video_bytes)
+                    st.download_button("Download High Quality ⬇️", video_bytes, file_name=video)
                 else: st.error(video)
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #4338ca;'>© 2024 ES AI Master Studio | Production Engine v33.0 | Muhammad Essa Awan</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #FF4B2B;'>ES AI Master Studio v34.0 | Official Launch Edition</p>", unsafe_allow_html=True)
