@@ -22,7 +22,7 @@ except Exception as e:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 1. ELECTRIC LUXURY UI & LIGHTNING LOGO
+# 1. PREMIUM LIGHT UI & 3D AI CORE LOGO
 # ==========================================
 st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="🎬")
 
@@ -30,110 +30,83 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Orbitron:wght@900&display=swap');
 
-    /* Background: Professional Midnight Slate (Clear Readability) */
+    /* Background: Luxury Silver/Light Blue Gradient (Not Black) */
     .stApp {
-        background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
-        color: #f8fafc;
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+        color: #0f172a;
         font-family: 'Inter', sans-serif;
     }
 
-    /* Electric Rotating Heart Logo with Lightning Effect */
+    /* 3D Rotating Hexagonal AI Core Logo (Requirement) */
     .logo-container {
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 50px 0;
-        margin-top: -50px;
+        padding: 30px 0;
+        margin-top: 10px;
     }
 
-    .electric-heart {
-        position: relative;
-        width: 100px;
-        height: 90px;
-        background: #2563EB;
-        transform: rotate(-45deg);
-        animation: heartPulse 1.5s infinite ease-in-out, lightning 0.5s infinite;
-        box-shadow: 0 0 40px #2563EB;
-    }
-    .electric-heart::before, .electric-heart::after {
-        content: "";
-        position: absolute;
+    .ai-core {
         width: 100px;
         height: 100px;
-        background: inherit;
-        border-radius: 50%;
-    }
-    .electric-heart::before { top: -50px; left: 0; }
-    .electric-heart::after { left: 50px; top: 0; }
-
-    .logo-text {
-        position: absolute;
-        top: 30%;
-        left: 30%;
-        transform: translate(-50%, -50%) rotate(45deg);
-        z-index: 10;
+        background: linear-gradient(135deg, #2563EB, #FF4B2B);
+        clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
         font-family: 'Orbitron', sans-serif;
-        font-size: 35px;
+        font-size: 38px;
         font-weight: 900;
-        color: #ffffff;
-        text-shadow: 0 0 20px #00d4ff, 0 0 40px #ffffff;
-        animation: esRotate 3s infinite linear;
+        color: white;
+        box-shadow: 0 10px 30px rgba(37, 99, 235, 0.4);
+        animation: rotate3D 6s infinite linear;
+        border: 4px solid #ffffff;
     }
 
-    @keyframes heartPulse {
-        0%, 100% { transform: scale(1) rotate(-45deg); }
-        50% { transform: scale(1.1) rotate(-45deg); }
-    }
-
-    @keyframes esRotate {
-        0% { transform: translate(-50%, -50%) rotate(45deg) rotateY(0deg); }
-        100% { transform: translate(-50%, -50%) rotate(45deg) rotateY(360deg); }
-    }
-
-    @keyframes lightning {
-        0%, 100% { box-shadow: 0 0 30px #2563EB, 0 0 60px #00d4ff; }
-        50% { box-shadow: 0 0 50px #ffffff, 0 0 80px #2563EB; }
+    @keyframes rotate3D {
+        0% { transform: perspective(1000px) rotateY(0deg); }
+        100% { transform: perspective(1000px) rotateY(360deg); }
     }
     
-    .owner-tag { font-family: 'Orbitron', sans-serif; font-size: 1.1rem; color: #00d4ff; letter-spacing: 5px; margin-bottom: 10px; text-shadow: 0 0 10px #00d4ff; }
-    .main-title { font-size: 2.5rem; font-weight: 800; color: white; text-align: center; }
+    .owner-title { font-family: 'Orbitron', sans-serif; font-size: 1.2rem; color: #2563eb; letter-spacing: 4px; font-weight: bold; margin-bottom: 5px; }
+    .main-header { font-size: 2.5rem; font-weight: 800; color: #1e293b; text-align: center; border-bottom: 3px solid #FF4B2B; padding-bottom: 10px; }
 
-    /* Input Box Visibility Fix (Light background for typing) */
+    /* Input Box Visibility (High Contrast) */
     .stTextArea>div>div>textarea, .stTextInput>div>div>input {
-        background-color: #f1f5f9 !important;
+        background-color: #ffffff !important;
         color: #0f172a !important;
-        border: 2px solid #00d4ff !important;
+        border: 2px solid #cbd5e1 !important;
         border-radius: 15px !important;
         font-weight: 500 !important;
     }
 
-    /* Tab Styling */
-    .stTabs [data-baseweb="tab-list"] { background: #1e293b; border-radius: 20px; padding: 10px; }
-    .stTabs [data-baseweb="tab"] { color: #94a3b8 !important; font-weight: bold; }
-    .stTabs [data-baseweb="tab-highlight"] { background-color: #00d4ff !important; }
-
-    /* Buttons */
+    /* Professional Buttons (Orange/Blue) */
     .stButton>button {
-        background: linear-gradient(90deg, #2563EB, #00d4ff) !important;
-        color: white !important; border: none !important; border-radius: 15px !important;
+        background: linear-gradient(90deg, #2563EB, #FF4B2B) !important;
+        color: white !important; border: none !important; border-radius: 12px !important;
         height: 55px; width: 100%; font-size: 18px; font-weight: bold;
+        box-shadow: 0 5px 15px rgba(37, 99, 235, 0.3);
     }
+    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(255, 75, 43, 0.4); }
+
+    /* Tab Styling */
+    .stTabs [data-baseweb="tab-list"] { background: #cbd5e1; border-radius: 20px; padding: 5px; }
+    .stTabs [data-baseweb="tab"] { color: #1e293b !important; font-weight: bold; }
+    .stTabs [data-baseweb="tab-highlight"] { background-color: #FF4B2B !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# Logo & Branding
+# Logo & Branding Header
 st.markdown(f"""
     <div class="logo-container">
-        <div class="owner-tag">MUHAMMAD ESSA AWAN</div>
-        <div class="electric-heart">
-            <div class="logo-text">ES</div>
-        </div>
-        <div class="main-title">ES AI MASTER STUDIO</div>
+        <div class="owner-title">MUHAMMAD ESSA AWAN</div>
+        <div class="ai-core">ES</div>
+        <div class="main-header">ES AI MASTER STUDIO</div>
     </div>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. CREATOR BIO & IDENTITY (STRICT)
+# 2. BIO & IDENTITY (THE PERSISTENT PROMPT)
 # ==========================================
 ESSA_BIO = """
 مجھے محمد عیسیٰ اعوان صاحب نے بنایا، ڈیزائن کیا اور کنفیگر کیا ہے۔
@@ -148,16 +121,9 @@ def is_essa_query(q):
     return any(re.search(p, q.lower(), re.IGNORECASE) for p in patterns)
 
 # ==========================================
-# 3. MOVIE ENGINE (V35 BUG FIX)
+# 3. MOVIE ENGINE (FIXING DIVISIBLE BY 2 ERROR)
 # ==========================================
-async def generate_v_safe(text, v_code, path):
-    try:
-        communicate = edge_tts.Communicate(text, v_code)
-        await communicate.save(path)
-        return os.path.exists(path) and os.path.getsize(path) > 100
-    except: return False
-
-def create_pro_movie_v35(story, voice_choice, ratio, style):
+def create_master_movie_v36(story, voice_choice, ratio, style):
     u_id = str(uuid.uuid4())[:8]
     status = st.empty()
     try:
@@ -165,63 +131,63 @@ def create_pro_movie_v35(story, voice_choice, ratio, style):
         v_code = "ur-PK-UzmaNeural" if "Female" in voice_choice else "ur-PK-AsadNeural"
         audio_path = f"{u_id}_v.mp3"
         
-        status.info("🎙️ آواز تیار ہو رہی ہے...")
-        if not asyncio.run(generate_v_safe(story, v_code, audio_path)):
-            return "Error: Audio engine failed."
+        status.info("🎙️ آواز کی لہریں تیار ہو رہی ہیں...")
+        communicate = edge_tts.Communicate(story, v_code)
+        asyncio.run(communicate.save(audio_path))
         
         voice_audio = AudioFileClip(audio_path)
         
-        # Dimensions
-        res = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
-        w, h = res[ratio]
+        # Dimensions (Ensuring Even Numbers for H.264)
+        res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
+        w, h = res_map[ratio]
 
-        # Step 2: Scenes
+        # Step 2: Multi-Scene Recognition
         sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
         clips = []
         dur_per = voice_audio.duration / len(sentences)
 
         for i, scene in enumerate(sentences):
-            status.info(f"🖼️ منظر {i+1} بن رہا ہے...")
-            # Word Recognition Prompt
-            prompt = f"Professional 3D cinematic, {scene[:100]}, highly detailed, 4k, no text, realistic masterpiece"
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={random.randint(1,99999)}&nologo=true"
+            status.info(f"🖼️ منظر {i+1} کا مشاہدہ ہو رہا ہے...")
+            # Precision Word Recognition Prompt (v27 Style)
+            director_prompt = f"Professional 3D cinematic scene of {scene[:100]}, {style} style, accurate animals or objects, no text, 4k."
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(director_prompt)}?width={w}&height={h}&seed={random.randint(1,99999)}&nologo=true"
             img_path = f"{u_id}_{i}.jpg"
             
-            # Secure download
             r = session.get(img_url, timeout=60)
             with open(img_path, "wb") as f: f.write(r.content)
             
+            # Clean Image
             img_verify = Image.open(img_path).convert("RGB")
+            # Force size to even numbers
+            img_verify = img_verify.resize((w, h))
             img_verify.save(img_path, "JPEG")
             
             clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
-            clip = clip.resize(newsize=(w, h))
-            # Smooth Zoom Out
+            # ZOOM OUT FIX: Starting slightly bigger and shrinking, but keeping dimensions EVEN
             clip = clip.resize(lambda t: 1.15 - 0.08 * (t/dur_per)).set_position('center')
             clips.append(fadein(clip, 0.4))
 
         # Step 3: Final Render
-        status.info("⚙️ ویڈیو فائل تیار ہو رہی ہے...")
+        status.info("⚙️ سنیماٹک رینڈرنگ شروع ہو رہی ہے...")
         final_video = concatenate_videoclips(clips, method="compose").set_audio(voice_audio)
         out_name = f"ES_{u_id}.mp4"
+        
+        # Critical Fix: Ensuring all dimensions are divisible by 2
+        final_video = final_video.resize(newsize=(w, h))
+        
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
         
-        # Important: Close clips to free up file
         voice_audio.close()
         final_video.close()
         
-        if os.path.exists(out_name):
-            return out_name
-        else:
-            return "Error: Video file was not created."
-
+        return out_name
     except Exception as e:
         return f"Error: {e}"
 
 # ==========================================
-# 4. DASHBOARD (REFINED TABS)
+# 4. DASHBOARD UI
 # ==========================================
-tab_chat, tab_movie = st.tabs(["💬 Smart Chat Assistant", "🎬 Pro Movie Studio"])
+tab_chat, tab_movie = st.tabs(["💬 Smart AI Chat", "🎬 Pro Movie Studio"])
 
 with tab_chat:
     if "messages" not in st.session_state: st.session_state.messages = []
@@ -236,32 +202,32 @@ with tab_chat:
         else:
             try:
                 res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai").text
-            except: res = "Server is slow. Try refreshing."
+            except: res = "Connection slow. Try refreshing."
             
         with st.chat_message("assistant"):
             st.write(res); st.session_state.messages.append({"role": "assistant", "content": res})
 
 with tab_movie:
-    st.write("### 🎬 Create Cinematic Masterpiece")
-    m_script = st.text_area("Yahan apni kahani likhein:", height=200, placeholder="Example: Aik hathi aur choha darya ke kinare baithe thay...")
+    st.write("### 🎥 AI Cinematic Production")
+    m_script = st.text_area("Yahan apni script likhein (Har jumlay par scene badlay ga):", height=200)
     
     col1, col2, col3 = st.columns(3)
-    with col1: mv = st.selectbox("Select Narrator:", ["Urdu Female (Uzma)", "Urdu Male (Asad)"])
-    with col2: mr = st.selectbox("Video Size:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
+    with col1: mv = st.selectbox("Narrator:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
+    with col2: mr = st.selectbox("Ratio:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
     with col3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"])
 
-    if st.button("🚀 Launch Universal Video Rendering"):
+    if st.button("🚀 Generate Final Master Video"):
         if m_script:
-            with st.spinner("AI Director is processing files..."):
-                video_result = create_pro_movie_v35(m_script, mv, mr, ms)
+            with st.spinner("Creating your masterpiece..."):
+                video_result = create_master_movie_v36(m_script, mv, mr, ms)
                 if "mp4" in video_result and os.path.exists(video_result):
                     with open(video_result, 'rb') as vf:
-                        video_bytes = v_data = vf.read()
+                        v_data = vf.read()
                     st.video(v_data)
                     st.download_button("Download Full HD ⬇️", v_data, file_name=video_result)
-                    st.success("✅ Movie Delivered!")
+                    st.success("✅ Movie Successfully Rendered!")
                 else:
                     st.error(video_result)
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #00d4ff;'>ES AI Studio v35.0 | High-End Electric Edition | Muhammad Essa Awan</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #2563eb;'>ES AI Studio v36.0 | Master Multi-Modal System | Muhammad Essa Awan</p>", unsafe_allow_html=True)
