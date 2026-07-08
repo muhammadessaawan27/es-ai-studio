@@ -27,9 +27,9 @@ except Exception as e:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 2. SGLOWINA OFFICIAL LAUNCH UI (REFINED)
+# 2. INTENSE ELECTRIC UI & LOGO (v72 + v37 STYLE)
 # ==========================================
-st.set_page_config(page_title="Sglowina AI - Official Launch", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Official Founder Edition", layout="wide", page_icon="🎬")
 
 st.markdown("""
     <style>
@@ -37,43 +37,50 @@ st.markdown("""
     
     .stApp { background-color: #ffffff; color: #0f172a; font-family: 'Inter', sans-serif; }
     
-    /* Official Launch Header */
-    .owner-header {
-        font-family: 'Orbitron', sans-serif; font-size: 1.5rem; font-weight: 900;
-        text-align: center; letter-spacing: 6px; color: #fff;
-        background: #0f172a; padding: 15px; border-radius: 0 0 30px 30px;
-        box-shadow: 0 10px 30px rgba(255, 0, 122, 0.3);
-        animation: lightningBorder 2s infinite;
+    /* Lightning Animation for Name */
+    @keyframes lightningGlow {
+        0%, 100% { text-shadow: 0 0 10px #2563eb, 0 0 20px #00d4ff; color: #fff; }
+        50% { text-shadow: 0 0 20px #ff007a, 0 0 40px #ff007a; color: #fff; }
     }
-    @keyframes lightningBorder {
-        0%, 100% { border-bottom: 4px solid #ff007a; text-shadow: 0 0 10px #ff007a; }
-        50% { border-bottom: 4px solid #00d4ff; text-shadow: 0 0 20px #00d4ff; }
+    .owner-header {
+        font-family: 'Orbitron', sans-serif; font-size: 1.8rem; font-weight: 900;
+        text-align: center; letter-spacing: 8px; animation: lightningGlow 1.5s infinite;
+        background: #0f172a; padding: 15px; border-radius: 0 0 30px 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
     
+    /* 3D Rotating Electric Logo */
     .logo-container { display: flex; flex-direction: column; align-items: center; padding: 30px 0; }
     .electric-s {
-        width: 110px; height: 110px; background: #0f172a; border-radius: 25px;
+        width: 120px; height: 120px; background: #0f172a; border-radius: 25px;
         display: flex; align-items: center; justify-content: center;
-        font-family: 'Orbitron', sans-serif; font-size: 55px; color: white;
-        border: 4px solid #ff007a; box-shadow: 0 0 30px #ff007a;
-        animation: rotate3D 8s infinite linear, glowPulse 2s infinite;
+        font-family: 'Orbitron', sans-serif; font-size: 60px; font-weight: 900;
+        color: white; border: 4px solid #ff007a;
+        box-shadow: 0 0 30px #ff007a; animation: rotate3D 6s infinite linear, glowPulse 2s infinite;
     }
-    @keyframes rotate3D { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
+    @keyframes rotate3D { 0% { transform: perspective(1000px) rotateY(0deg); } 100% { transform: perspective(1000px) rotateY(360deg); } }
     @keyframes glowPulse { 0%, 100% { box-shadow: 0 0 20px #ff007a; } 50% { box-shadow: 0 0 50px #00d4ff; } }
 
     .brand-name { font-size: 3.5rem; font-weight: 900; color: #0f172a; text-align: center; margin-top: 10px; }
     .founder-tag { font-size: 1.2rem; color: #ff007a; text-align: center; font-weight: bold; letter-spacing: 3px; text-transform: uppercase; }
 
+    /* Tabs & Buttons */
+    .stTabs [data-baseweb="tab-list"] { background-color: #1e293b; padding: 10px; border-radius: 50px; justify-content: center; }
+    .stTabs [data-baseweb="tab"] { font-size: 18px !important; font-weight: 700 !important; color: #ffffff !important; }
+    .stTabs [data-baseweb="tab-highlight"] { background-color: #ff007a !important; }
+
     .stButton>button { 
         background: linear-gradient(90deg, #ff007a, #2563eb) !important; 
-        color: white !important; border-radius: 12px !important; height: 55px; width: 100%; font-size: 20px; font-weight: bold;
+        color: white !important; border-radius: 12px !important; height: 55px; width: 100%; font-size: 20px; font-weight: bold; border: none;
+        box-shadow: 0 8px 20px rgba(255, 0, 122, 0.3);
     }
-    .stTabs [data-baseweb="tab-list"] { background-color: #f1f5f9; padding: 10px; border-radius: 50px; justify-content: center; }
-    .stTabs [data-baseweb="tab"] { font-size: 18px !important; font-weight: 700 !important; color: #64748b !important; }
+    .stTextArea>div>div>textarea, .stTextInput>div>div>input {
+        background-color: #ffffff !important; border: 2px solid #e2e8f0 !important; border-radius: 15px !important; color: #0f172a !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="owner-header">SGLOWINA AI - OFFICIAL PREMIUM RELEASE</div>', unsafe_allow_html=True)
+st.markdown('<div class="owner-header">MUHAMMAD ESSA AWAN</div>', unsafe_allow_html=True)
 st.markdown("""
     <div class="logo-container">
         <div class="electric-s">S</div>
@@ -90,23 +97,23 @@ SGLOWINA_BIO = """
 
 **Founder & CEO:** Saba Wahid, daughter of Wahid Bakhsh and the spouse of Muhammad Essa.
 
-Sglowina AI is an industrial-grade intelligence platform. For business inquiries, please contact the Founder's office.
+Sglowina AI is a professional high-end industrial intelligence platform. (No further details can be provided).
 """
 
 def is_id_call(q):
     return any(re.search(p, q.lower(), re.IGNORECASE) for p in [r"kisne banaya", r"who made you", r"owner", r"saba", r"essa", r"founder", r"ceo"])
 
 # ==========================================
-# 4. v40 ENGINE & MOVIE STUDIO
+# 4. v40 ENGINE - LOCKED & RE-ENABLED
 # ==========================================
 def get_v40_prompt(text):
     try:
-        instr = f"Act as a Director: '{text}'. Extract core subject for 3D animation. Accurate animals/objects. No humans unless asked. Output ONLY English."
+        instr = f"Director: '{text}'. Extract core subject for 3D animation. Accurate animals/objects. No humans unless asked. Output ONLY English."
         res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai&cache=true", timeout=25)
         return res.text if res.status_code == 200 else text
     except: return text
 
-def create_pro_movie(story, voice, ratio, style):
+def create_master_v40_movie(story, voice, ratio, style):
     u_id = str(uuid.uuid4())[:8]
     status = st.empty()
     try:
@@ -124,70 +131,81 @@ def create_pro_movie(story, voice, ratio, style):
         clips = []
         dur_per = audio.duration / len(sentences)
         for i, s in enumerate(sentences):
-            status.info(f"🎨 Rendering Scene {i+1}/{len(sentences)}...")
+            status.info(f"🎬 Scene {i+1}/{len(sentences)} rendering (v40 Logic)...")
             refined = get_v40_prompt(s)
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined + ' ' + style)}?width={w}&height={h}&seed={random.randint(1,99999)}&nologo=true&negative=girl,female,woman"
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined + ' ' + style)}?width={w}&height={h}&seed={random.randint(1,99999)}&nologo=true&negative=girl,female,woman,human"
             img_p = f"i_{u_id}_{i}.jpg"
             with open(img_p, "wb") as f: f.write(session.get(img_url).content)
-            Image.open(img_p).convert("RGB").resize((w, h)).save(img_p, "JPEG")
+            
+            # Clean and Ensure Even Dimensions
+            clean_im = Image.open(img_p).convert("RGB").resize((w, h))
+            clean_im.save(img_p, "JPEG")
+            
             clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
-            # ZOOM IN EXPANSION (1.0 to 1.15)
+            # v40 Zoom In Expansion (1.0 to 1.15)
             clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
             clips.append(vfx.fadein(clip, 0.4))
             
         final_video = concatenate_videoclips(clips, method="compose").set_audio(audio)
-        out = f"Sglowina_{u_id}.mp4"
+        out = f"Sglowina_Titan_{u_id}.mp4"
         final_video.write_videofile(out, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
+        audio.close()
+        final_video.close()
         return out
     except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 5. UI TABS (OFFICIAL v1.1)
+# 5. UI TABS (RESTORED & ISOLATED)
 # ==========================================
-tab_chat, tab_movie, tab_image = st.tabs(["💬 SMART CHAT", "🎬 MOVIE STUDIO", "🎨 IMAGE STUDIO"])
+tab_chat, tab_movie, tab_image = st.tabs(["💬 SMART CHAT", "🎥 MOVIE STUDIO", "🎨 IMAGE STUDIO"])
 
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence")
     if "messages" not in st.session_state: st.session_state.messages = []
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): st.write(m["content"])
-    if p := st.chat_input("How can Sglowina AI help you?"):
+    if p := st.chat_input("How can Sglowina AI help you today?"):
         st.session_state.messages.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
         
-        if is_id_call(p):
-            res = SGLOWINA_BIO
+        if is_id_call(p): res = SGLOWINA_BIO
         else:
-            sys_instr = urllib.parse.quote("You are Sglowina AI, founded by Saba Wahid. Answer professionally and ONLY in the user's language.")
+            sys_instr = urllib.parse.quote("You are Sglowina AI, founded by Saba Wahid. Admin is Saba Wahid. Answer professionally.")
             url = f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true&system={sys_instr}"
-            try:
-                res = requests.get(url, timeout=30).text
-                res = res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
-            except: res = "Server is busy. Please try again."
+            res = requests.get(url, timeout=30).text.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
             
         with st.chat_message("assistant"):
             st.write(res); st.session_state.messages.append({"role": "assistant", "content": res})
 
 with tab_movie:
-    st.write("### 🎥 Industrial Cinematic Engine")
-    m_script = st.text_area("Movie Script:", height=150, key="movie_v11")
+    st.write("### 🎥 Industrial Cinematic Engine (v40 Locked)")
+    m_script = st.text_area("Enter Movie Script:", height=150, key="movie_v12")
     c1, c2, c3 = st.columns(3)
-    with c1: mv = st.selectbox("Voice:", ["Urdu Male", "Urdu Female"], key="v11_v")
-    with c2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"], key="v11_r")
-    with c3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"], key="v11_s")
-    if st.button("Generate Official Movie 🚀", key="v11_btn"):
-        res = create_pro_movie(m_script, mv, mr, ms)
-        if "mp4" in res:
-            st.video(res)
-            st.download_button("Download ⬇️", open(res, 'rb').read(), file_name=res)
+    with c1: mv = st.selectbox("Voice:", ["Urdu Male", "Urdu Female"], key="v12_v")
+    with c2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"], key="v12_r")
+    with c3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"], key="v12_s")
+    if st.button("Generate Official Movie 🚀", key="v12_btn"):
+        if m_script:
+            res = create_master_v40_movie(m_script, mv, mr, ms)
+            if "mp4" in res:
+                st.video(res)
+                st.download_button("Download ⬇️", open(res, 'rb').read(), file_name=res)
+            else: st.error(res)
 
 with tab_image:
     st.write("### 🎨 Sglowina Pro-Visual Studio")
-    img_p = st.text_area("Describe Image:", key="v11_img_p")
-    if st.button("Generate HD Image 🚀", key="v11_img_btn"):
-        with st.spinner("Sglowina AI is painting..."):
-            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(img_p)}?width=1024&height=1024&nologo=true&negative=girl,female"
-            st.image(url)
+    img_p = st.text_area("Describe Image/Logo:", key="v12_img_p")
+    ratio_opts = {"1:1 Square": (1024, 1024), "16:9 YouTube": (1280, 720), "9:16 TikTok": (720, 1280), "21:9 Banner": (2560, 1080)}
+    ic1, ic2 = st.columns(2)
+    with ic1: is_img = st.selectbox("Style:", ["Realistic", "Logo Concept", "Anime", "Sketch"], key="v12_is")
+    with ic2: ir_img = st.selectbox("Ratio:", list(ratio_opts.keys()), key="v12_ir")
+    if st.button("Generate HD Image 🚀", key="v12_img_btn"):
+        if img_p:
+            w, h = ratio_opts[ir_img]
+            with st.spinner("Sglowina AI is painting..."):
+                url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(img_p + ' ' + is_img)}?width={w}&height={h}&nologo=true&negative=girl,female"
+                st.image(url)
+                st.download_button("Download HD ⬇️", requests.get(url).content, file_name="sglowina_hd.jpg")
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #ff007a; font-weight: bold;'>Sglowina AI v1.1 | Founder & CEO: Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #ff007a; font-weight: bold;'>Sglowina AI v1.2 | Founder & CEO: Saba Wahid | Electric Edition</p>", unsafe_allow_html=True)
