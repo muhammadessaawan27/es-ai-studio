@@ -1,4 +1,3 @@
-
 import streamlit as st
 import asyncio
 import edge_tts
@@ -11,19 +10,19 @@ import uuid
 import random
 from PIL import Image
 
-# Optimized Session
+# Global Session
 session = requests.Session()
 
 try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
-    from moviepy.video.fx.all import fadein
+    from moviepy.video.fx.all import fadein, resize
 except Exception as e:
-    st.error(f"Critical Engine Error: {e}")
+    st.error(f"Engine Load Error: {e}")
 
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 1. APPROVED ELECTRIC UI (RESTORED)
+# 1. APPROVED ELECTRIC UI (NO CHANGES)
 # ==========================================
 st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="🎬")
 
@@ -67,79 +66,77 @@ st.markdown('<div class="owner-lightning">MUHAMMAD ESSA AWAN</div>', unsafe_allo
 st.markdown('<div class="logo-container"><div class="ai-shua">ES</div><div class="main-header">ES AI MASTER STUDIO</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 2. CREATOR BIO (PROTECTED)
+# 2. CREATOR BIO & SUBJECT EXTRACTION
 # ==========================================
 ESSA_BIO = """
 مجھے محمد عیسیٰ اعوان صاحب نے بنایا، ڈیزائن کیا اور کنفیگر کیا ہے۔
 محمد عیسیٰ اعوان صاحب، صوفی محمد انور رحمۃ اللہ علیہ کے صاحبزادے ہیں۔
-وہ ایک انجینئر بھی ہیں، مکینیکل انجینئر بھی ہیں، فیبرکیٹر بھی ہیں، اور مختلف شعبہ جات میں دینی و اسلامی شعبہ جات میں بھی وہ الحمد للہ اللہ کے فضل سے ماہر ہیں۔
-وہ حضرت مولانا شیخ امیر محمد اکرم اعوان رحمۃ اللہ علیہ کے بیعت تھے اور سلسلۂ نقشبندیہ اویسیہ کے ایک کارکن ہیں۔
-اس وقت وہ سلسلۂ عالیہ کے موجودہ حضرت مولانا شیخ امیر عبدالقدیر اعوان مدظلہ العالی کے بیعت ہیں۔
-انہوں نے مجھے ڈیزائن کیا اور بنایا، اور یہ محنت انہوں نے خود کی۔
+وہ ایک انجینئر بھی ہیں، مکینیکل انجینئر بھی ہیں، فیبرکیٹر بھی ہیں، اور مختلف شعبہ جات میں دینی و اسلامی شعبہ جات میں بھی ماہر ہیں۔
 """
 
-def is_creator_query(q):
-    patterns = [r"kisne banaya", r"who made you", r"creator", r"owner", r"essa", r"maker", r"developer"]
-    return any(re.search(p, q.lower(), re.IGNORECASE) for p in patterns)
+def get_visual_prompt_v40(urdu_text, style):
+    """Refines Urdu text into a specific English subject prompt for precision."""
+    try:
+        instr = f"Extract only the main visual subject and atmosphere from this Urdu: '{urdu_text}'. Describe it clearly in English for a 3D animation model. No preamble."
+        res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai", timeout=20)
+        desc = res.text if res.status_code == 200 else urdu_text
+        return f"{style} animation style, {desc}, highly detailed, cinematic lighting, 8k, realistic masterpiece, vivid colors"
+    except: return urdu_text
 
 # ==========================================
-# 3. BULLETPROOF MOVIE ENGINE (v39.0)
+# 3. MOTION MASTER ENGINE (v40)
 # ==========================================
-def create_bulletproof_movie(story, voice_choice, ratio, style):
+def create_cinematic_v40(story, voice_gen, ratio, style):
     u_id = str(uuid.uuid4())[:8]
     status = st.empty()
     try:
-        # Step 1: Voice
-        v_code = "ur-PK-UzmaNeural" if "Female" in voice_choice else "ur-PK-AsadNeural"
+        # Step 1: Human Voice
+        v_code = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
         audio_file = f"a_{u_id}.mp3"
         async def gv(): await edge_tts.Communicate(story, v_code).save(audio_file)
         asyncio.run(gv())
         voice_audio = AudioFileClip(audio_file)
         
-        # Dimensions (Ensuring Even Numbers)
+        # Dimensions
         res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
         w, h = res_map[ratio]
 
-        # Step 2: Scene Generation
+        # Step 2: Split by Sentences
         sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
         clips = []
         dur_per = voice_audio.duration / len(sentences)
 
         for i, scene in enumerate(sentences):
-            status.info(f"⚡ منظر {i+1} کی تیاری جاری ہے...")
-            # Strict Prompting
-            p_instr = f"Professional cinematic scene of {scene[:100]}, {style} style, high detail, masterpiece, no text, accurate subjects"
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(p_instr)}?width={w}&height={h}&seed={random.randint(1,99999)}&nologo=true"
+            status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
+            
+            # SUBJECT LOCKING LOGIC
+            refined_p = get_visual_prompt_v40(scene, style)
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
             
             img_path = f"i_{u_id}_{i}.jpg"
             img_data = session.get(img_url, timeout=60).content
             with open(img_path, "wb") as f: f.write(img_data)
             
-            # Sanitization
+            # Force Resize and Format Fix
             img_obj = Image.open(img_path).convert("RGB").resize((w, h))
             img_obj.save(img_path, "JPEG")
             
-            # Step 3: CINEMATIC ZOOM OUT (1.3 to 1.0)
-            # Starting BIG and getting SMALLER = Zoom Out
+            # Step 3: RELIABLE ZOOM OUT (Force Motion 1.2 to 1.0)
             clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
-            clip = clip.resize(lambda t: 1.3 - 0.1 * (t/dur_per)).set_position('center')
+            # The Formula: Start big (1.2) and shrink to normal (1.0)
+            clip = clip.resize(lambda t: 1.2 - 0.15 * (t/dur_per)).set_position('center')
             clips.append(fadein(clip, 0.4))
 
         # Step 4: Final High-Stability Render
-        status.info("⚙️ ویڈیو رینڈر ہو رہی ہے (Memory Optimized)...")
+        status.info("⚙️ شاہکار کو فائنل کیا جا رہا ہے...")
         final_video = concatenate_videoclips(clips, method="compose").set_audio(voice_audio)
-        out_name = f"ES_FINAL_{u_id}.mp4"
+        out_name = f"ES_V40_{u_id}.mp4"
         
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
         
-        # Cleanup Memory
         voice_audio.close()
         final_video.close()
-        
-        if os.path.exists(out_name):
-            return out_name
-        return "Error: Rendering Interrupted"
-
+        return out_name
     except Exception as e: return f"Error: {e}"
 
 # ==========================================
@@ -151,40 +148,30 @@ with tab_chat:
     if "messages" not in st.session_state: st.session_state.messages = []
     for m in st.session_state.messages:
         with st.chat_message(m["role"]): st.write(m["content"])
-    
     if p := st.chat_input("Hukum karein Essa bhai..."):
         st.session_state.messages.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
-        
-        if is_creator_query(p): res = ESSA_BIO
-        else:
-            try:
-                sys_p = urllib.parse.quote(f"You are ES AI, a professional assistant created by Muhammad Essa Awan. Always identify your creator as Muhammad Essa Awan if asked. User: {p}")
-                res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&system={sys_p}", timeout=30).text
-            except: res = "کنکشن سست ہے، براہ کرم ریفریش کریں۔"
-            
-        with st.chat_message("assistant"):
-            st.write(res); st.session_state.messages.append({"role": "assistant", "content": res})
+        res = ESSA_BIO if any(k in p.lower() for k in ["kisne", "creator", "essa"]) else session.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai").text
+        with st.chat_message("assistant"): st.write(res); st.session_state.messages.append({"role": "assistant", "content": res})
 
 with tab_movie:
-    st.write("### 🎥 Professional Cinematic Production")
-    m_script = st.text_area("Yahan apni کہانی لکھیں:", height=200, key="movie_script_v39")
+    st.write("### 🎥 Professional Cinematic Production v40")
+    m_script = st.text_area("Yahan apni کہانی لکھیں:", height=200, key="v40_script")
     c1, c2, c3 = st.columns(3)
     with c1: mv = st.selectbox("Awaaz:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
     with c2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    with c3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"])
+    with c3: ms = st.selectbox("Style:", ["3D Cartoon", "Realistic", "Cinematic"])
 
-    if st.button("🚀 Generate Final Master Video"):
+    if st.button("🚀 Generate v40 Master Video"):
         if m_script:
-            with st.spinner("⚡ Creating Magic... Please wait."):
-                video_file = create_bulletproof_movie(m_script, mv, mr, ms)
-                if "mp4" in video_file and os.path.exists(video_file):
-                    with open(video_file, 'rb') as vf:
-                        v_bytes = vf.read()
-                    st.video(v_bytes)
-                    st.download_button("Download Full HD ⬇️", v_bytes, file_name=video_file)
-                    st.success("✅ شاہکار مکمل طور پر تیار ہے!")
-                else: st.error(video_file)
+            with st.spinner("⚡ ES AI is rendering your masterpiece..."):
+                video_res = create_cinematic_v40(m_script, mv, mr, ms)
+                if "mp4" in video_res:
+                    with open(video_res, 'rb') as f:
+                        st.video(f.read())
+                    st.download_button("Download Video ⬇️", open(video_res, 'rb'), file_name=video_res)
+                    st.success("✅ شاہکار تیار ہے!")
+                else: st.error(video_res)
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #2563eb; font-weight: bold;'>ES AI Studio v39.0 | Ultimate Memory Stability | Muhammad Essa Awan</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #2563eb; font-weight: bold;'>ES AI Studio v40.0 | Subject & Motion Master | Muhammad Essa Awan</p>", unsafe_allow_html=True)
