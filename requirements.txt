@@ -4,5 +4,4 @@ moviepy==1.0.3
 requests
 streamlit-mic-recorder
 Pillow
-opencv-python-headless
-imageio[ffmpeg]
+pandas
