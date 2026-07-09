@@ -28,10 +28,12 @@ try:
 except Exception:
     pass
 
+from streamlit_mic_recorder import mic_recorder
+
 # ==========================================
 # 2. EXECUTIVE MINIMAL UI (WHITE & BLACK)
 # ==========================================
-st.set_page_config(page_title="Sglowina AI - Version 1.0", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Version 1.0 Official", layout="wide", page_icon="🎬")
 
 st.markdown("""
     <style>
@@ -51,7 +53,7 @@ st.markdown("""
     .title-tag { font-size: 0.9rem; font-weight: 500; color: #64748b; letter-spacing: 3px; }
 
     /* Circular Electric Logo */
-    .logo-container { display: flex; justify-content: center; padding: 15px 0; }
+    .logo-container { display: flex; justify-content: center; padding: 20px 0; }
     .circular-s {
         width: 100px; height: 100px; background: radial-gradient(circle, #0f172a 0%, #000000 100%); 
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
@@ -59,7 +61,7 @@ st.markdown("""
         border: 3px solid #00d4ff; box-shadow: 0 0 20px #00d4ff, inset 0 0 15px #ff007a;
         animation: spinGlow 8s infinite linear;
     }
-    @keyframes spinGlow { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
+    @keyframes spinGlow { 0% { transform: rotateY(0deg); box-shadow: 0 0 20px #00d4ff; } 50% { box-shadow: 0 0 40px #ff007a; } 100% { transform: rotateY(360deg); box-shadow: 0 0 20px #00d4ff; } }
 
     .stButton>button { 
         background: #000000 !important; color: #ffffff !important; border-radius: 12px !important; 
@@ -68,7 +70,9 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Persistent Identity Data
+# ==========================================
+# 3. IDENTITY FIREWALL (LOCKED BIO)
+# ==========================================
 SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
 Founders & CEOs: Muhammad Essa Awan & Saba Wahid.
@@ -76,12 +80,16 @@ Saba Wahid is the Founder and CEO. Muhammad Essa Awan is the COO and the lead vi
 Official Version 1.0 Premium Release.
 """
 
+def is_id_call(q):
+    patterns = [r"kisne banaya", r"who made you", r"owner", r"saba", r"essa", r"founder", r"ceo", r"sglowina", r"maker"]
+    return any(re.search(p, q.lower(), re.IGNORECASE) for p in patterns)
+
 # State Management for Character Consistency
 if "char_seed" not in st.session_state:
     st.session_state.char_seed = 786
 
 # ==========================================
-# 3. TITAN MOVIE ENGINE (v40 LOGIC)
+# 4. v40 TITAN MOVIE ENGINE (LOCKED NAME FIXED)
 # ==========================================
 def get_v40_prompt(text, style):
     try:
@@ -92,7 +100,8 @@ def get_v40_prompt(text, style):
 
 def fetch_img(url): return session.get(url, timeout=60).content
 
-def create_titan_movie(story, voice, ratio, style, part):
+# FUNCTION NAME FIXED TO MATCH THE CALL (create_titan_movie_v1)
+def create_titan_movie_v1(story, voice, ratio, style, part):
     u_id = f"v1_p{part}_{str(uuid.uuid4())[:6]}"
     status = st.empty()
     try:
@@ -120,7 +129,7 @@ def create_titan_movie(story, voice, ratio, style, part):
                 img_p = f"i_{u_id}_{i}.jpg"
                 with Image.open(io.BytesIO(img_data)) as im: im.convert("RGB").resize((w, h)).save(img_p, "JPEG")
                 clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
-                clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
+                clip = clip.resize(lambda t: 1.2 - 0.15 * (t/dur_per)).set_position('center')
                 clips.append(vfx.fadein(clip, 0.4))
             
         final_video = concatenate_videoclips(clips, method="compose").set_audio(audio)
@@ -131,31 +140,43 @@ def create_titan_movie(story, voice, ratio, style, part):
     except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 4. NAVIGATION & SIDEBAR
+# 5. NAVIGATION & PAGES (TRUE ISOLATION)
 # ==========================================
 st.sidebar.markdown(f"## ⚙️ SGLOWINA MENU")
-page = st.sidebar.radio("Navigate Studio:", ["🏠 Smart Chat", "🎥 Movie Studio (Parts)", "🎨 Image Studio (HD)"])
+page = st.sidebar.radio("Navigate Studio:", ["🏠 Smart Chat", "🎥 Movie Studio (Parts)", "🎨 Pro Image Studio"])
 
 # PERSISTENT HEADER
 st.markdown("""<div class="thin-header"><div class="main-names">Muhammad Essa Awan & Saba Wahid</div>
     <div class="title-tag">FOUNDERS & CEOs | SGLOWINA AI</div></div>""", unsafe_allow_html=True)
 st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
 
-# --- CHAT ---
+# --- PAGE 1: CHAT (HARD IDENTITY LOCK) ---
 if page == "🏠 Smart Chat":
     st.write("### 💬 Sglowina Intelligence")
     if "msgs" not in st.session_state: st.session_state.msgs = []
     for m in st.session_state.msgs:
         avatar = "https://via.placeholder.com/50/000000/ffffff?text=S" if m["role"]=="assistant" else None
         with st.chat_message(m["role"], avatar=avatar): st.write(m["content"])
+    
     if p := st.chat_input("How can Sglowina AI help you?"):
         st.session_state.msgs.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
-        res = SGLOWINA_BIO if any(k in p.lower() for k in ["kisne", "creator", "owner"]) else session.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true").text
+        
+        # --- THE IDENTITY FIREWALL ---
+        if is_id_call(p):
+            res = SGLOWINA_BIO
+        else:
+            with st.spinner("Sglowina AI searching..."):
+                try:
+                    url = f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true"
+                    res = session.get(url, timeout=25).text.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
+                except: res = "Server is busy. Please try again."
+        
         with st.chat_message("assistant", avatar="https://via.placeholder.com/50/000000/ffffff?text=S"):
-            st.write(res.replace("ChatGPT", "Sglowina AI")); st.session_state.msgs.append({"role": "assistant", "content": res})
+            st.write(res)
+            st.session_state.msgs.append({"role": "assistant", "content": res})
 
-# --- MOVIE STUDIO ---
+# --- PAGE 2: MOVIE STUDIO ---
 elif page == "🎥 Movie Studio (Parts)":
     st.write("### 🎥 Industrial Cinematic Production (10 min support)")
     p_num = st.number_input("Part Number:", min_value=1, value=1)
@@ -169,29 +190,26 @@ elif page == "🎥 Movie Studio (Parts)":
     with c3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"])
     
     if st.button("Generate Part 🚀"):
+        # FIXED CALL: create_titan_movie_v1
         v_res = create_titan_movie_v1(m_script, mv, mr, ms, p_num)
         if "mp4" in v_res: st.video(v_res); st.download_button("Download Part ⬇️", open(v_res, 'rb').read(), file_name=v_res)
+        else: st.error(v_res)
 
-# --- IMAGE STUDIO ---
+# --- PAGE 3: IMAGE STUDIO ---
 elif page == "🎨 Image Studio (HD)":
     st.write("### 🎨 Industrial Visual Studio")
     p_i = st.text_area("Describe images (One per line for batch):", height=150)
-    
-    ratio_opts = {"1:1 Square": (1024, 1024), "16:9 YouTube": (1280, 720), "9:16 TikTok": (720, 1280), "21:9 Banner": (2560, 1080)}
     ic1, ic2, ic3 = st.columns(3)
-    with ic1: is_style = st.selectbox("Art Style:", ["Realistic", "Anime", "Logo Design", "3D Cartoon"])
-    with ic2: is_size = st.selectbox("Resolution:", list(ratio_opts.keys()))
+    with ic1: i_style = st.selectbox("Art Style:", ["Realistic", "Anime", "Logo Design", "3D Cartoon"])
+    with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok"])
     with ic3: is_count = st.slider("Quantity:", 1, 10, 1)
-    
-    char_id = st.text_input("Consistency Lock (Seed):", value=str(st.session_state.char_seed))
-
     if st.button("Generate HD Visuals 🚀"):
-        w, h = ratio_opts[is_size]
+        dim = {"Square (1:1)": (1024, 1024), "YouTube HD": (1280, 720), "TikTok": (720, 1280)}
+        w, h = dim[i_size]
         prompt_list = [line.strip() for line in p_i.split('\n') if line.strip()]
         for idx, single_p in enumerate(prompt_list):
             for q in range(is_count):
-                with st.spinner(f"Painting image..."):
-                    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(single_p + ' ' + is_style)}?width={w}&height={h}&seed={char_id}&nologo=true&negative=girl,female"
-                    st.image(url)
+                url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(single_p + ' ' + i_style)}?width={w}&height={h}&seed={st.session_state.char_seed}&nologo=true&negative=girl,female"
+                st.image(url)
 
 st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #64748b;'>Sglowina AI Version 1.0 Premium Release | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
