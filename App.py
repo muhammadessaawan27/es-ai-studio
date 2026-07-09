@@ -13,7 +13,7 @@ import io
 from concurrent.futures import ThreadPoolExecutor
 
 # ==========================================
-# 1. INDUSTRIAL STABILITY & HYPER-SPEED
+# 1. INDUSTRIAL STABILITY & SPEED
 # ==========================================
 session = requests.Session()
 adapter = requests.adapters.HTTPAdapter(pool_connections=1000, pool_maxsize=1000)
@@ -28,148 +28,141 @@ try:
 except Exception:
     pass
 
-from streamlit_mic_recorder import mic_recorder
-
 # ==========================================
-# 2. EXECUTIVE DIAMOND UI (WHITE & ELECTRIC)
+# 2. EXECUTIVE MINIMAL UI (WHITE & BLACK)
 # ==========================================
-st.set_page_config(page_title="Sglowina AI - Diamond V1.2", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Official V1.0", layout="wide", page_icon="🎬")
 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700&display=swap');
+    
     .stApp { background-color: #ffffff; color: #000000; font-family: 'Inter', sans-serif; }
+    
+    /* Minimal Header (Black Text) */
+    .executive-header {
+        text-align: center; padding: 10px; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;
+    }
+    .name-primary { font-size: 1.6rem; font-weight: 800; color: #000000; margin-bottom: 2px; }
+    .name-secondary { font-size: 1.3rem; font-weight: 700; color: #475569; margin-bottom: 5px; }
+    .role-tag { font-size: 0.9rem; font-weight: bold; color: #64748b; letter-spacing: 3px; text-transform: uppercase; }
+
+    /* Small Circular Rotating Logo */
+    .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
+    .circular-s {
+        width: 80px; height: 80px; background: #0f172a; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-family: 'Orbitron', sans-serif; font-size: 35px; color: #ffffff;
+        border: 2px solid #00d4ff; box-shadow: 0 0 15px rgba(0,212,255,0.3);
+        animation: spin 8s infinite linear;
+    }
+    @keyframes spin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
+
+    /* Sidebar Fix */
     [data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
     [data-testid="stSidebar"] * { color: #000000 !important; font-weight: bold !important; }
 
-    @keyframes lightning {
-        0%, 100% { text-shadow: 0 0 10px #2563eb, 0 0 20px #00d4ff; color: #fff; }
-        50% { text-shadow: 0 0 20px #ff007a, 0 0 40px #ff007a; color: #fff; }
-    }
-    .brand-header {
-        font-family: 'Orbitron', sans-serif; font-size: clamp(1rem, 5vw, 1.8rem); font-weight: 900;
-        text-align: center; letter-spacing: 5px; color: #fff;
-        background: #0f172a; padding: 20px; border-radius: 0 0 40px 40px;
-        animation: lightning 2.5s infinite;
-    }
-    .footer-electric {
-        font-family: 'Orbitron', sans-serif; font-size: 1rem; font-weight: 900;
-        text-align: center; letter-spacing: 2px; animation: lightning 2s infinite;
-        background: #0f172a; padding: 15px; border-radius: 25px; margin-top: 50px;
-    }
-    .logo-container { display: flex; justify-content: center; padding: 20px 0; }
-    .circular-s {
-        width: 100px; height: 100px; background: #0f172a; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-family: 'Orbitron', sans-serif; font-size: 50px; color: #ffffff;
-        border: 3px solid #00d4ff; box-shadow: 0 0 20px #00d4ff;
-        animation: rotate3D 8s infinite linear;
-    }
-    @keyframes rotate3D { 0% { transform: perspective(1000px) rotateY(0deg); } 100% { transform: perspective(1000px) rotateY(360deg); } }
     .stButton>button { 
-        background: #000000 !important; color: #ffffff !important; border-radius: 12px !important; 
-        height: 55px; width: 100%; font-size: 20px; font-weight: bold; border: none;
+        background: #000000 !important; color: #ffffff !important; border-radius: 8px !important; 
+        height: 50px; width: 100%; font-size: 18px; font-weight: bold; border: none;
     }
     .stTextArea>div>div>textarea, .stTextInput>div>div>input {
-        background-color: #ffffff !important; border: 2px solid #cbd5e1 !important; border-radius: 12px !important; color: #000000 !important;
+        background-color: #ffffff !important; border: 1px solid #cbd5e1 !important; border-radius: 8px !important; color: #000000 !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="brand-header">SGLOWINA AI OFFICIAL STUDIO</div>', unsafe_allow_html=True)
-st.markdown(f"""
-    <div class="logo-container"><div class="circular-s">S</div></div>
-    <div style="text-align:center; margin-top:-10px;">
-        <h1 style="color:#0f172a; margin-bottom:0;">Sglowina AI</h1>
-        <p style="color:#ff007a; font-weight:bold; font-size:1.1rem; text-transform:uppercase;">Founder & CEO: Saba Wahid | COO: Muhammad Essa Awan</p>
+# Executive Top Header
+st.markdown("""
+    <div class="executive-header">
+        <div class="name-primary">Muhammad Essa Awan — Founder & CEO</div>
+        <div class="name-secondary">Saba Wahid — Co-Founder</div>
+        <div class="role-tag">Sglowina AI Official Studio</div>
     </div>
     """, unsafe_allow_html=True)
+
+st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
 
 # ==========================================
 # 3. IDENTITY FIREWALL (LOCKED BIO)
 # ==========================================
 SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
-Founder & CEO: Saba Wahid, daughter of Wahid Bakhsh and the spouse of Muhammad Essa Awan.
-Muhammad Essa Awan is the Chief Operations Officer (COO) and the lead visionary of this industrial-grade intelligence platform.
-Official Version 1.0 Premium Release.
+
+**Founder & CEO:** Muhammad Essa Awan.
+**Co-Founder:** Saba Wahid.
+
+Saba Wahid is the spouse of Muhammad Essa Awan (Mrs. Saba) and the daughter of Wahid Bakhsh. 
+Muhammad Essa Awan is a professional Mechanical Engineer, Fabricator, and the lead logical architect of this platform.
+
+This is the official Version 1.0 Premium Release.
 """
 
 def is_id_call(q):
-    return any(re.search(p, q.lower(), re.IGNORECASE) for p in [r"kisne banaya", r"who made you", r"owner", r"saba", r"essa", r"founder", r"ceo"])
+    patterns = [r"kisne banaya", r"who made you", r"owner", r"saba", r"essa", r"founder", r"ceo", r"coo"]
+    return any(re.search(p, q.lower(), re.IGNORECASE) for p in patterns)
 
 # ==========================================
-# 4. TITAN v40 ENGINE (IMAGE DENSITY & ZOOM FIX)
+# 4. v40 TITAN MOVIE ENGINE (LOCKED LOGIC)
 # ==========================================
-def get_v40_prompt(text):
-    # Rule: Detect Subject to avoid Melting/Wrong Gender
-    director_instr = f"Act as a Film Director: '{text}'. Professional 3D cinematic, symmetrical face, sharp eyes, high quality, accurate animals. No humans unless mentioned. Output English prompt."
+def get_v40_prompt(text, style):
     try:
-        url = f"https://text.pollinations.ai/{urllib.parse.quote(director_instr)}?model=openai&cache=true"
-        res = session.get(url, timeout=25)
+        # Strict subject recognition to avoid gender mixing
+        gender_lock = "Ensure the character is a WOMAN" if any(k in text for k in ["عورت", "لڑکی", "woman", "girl"]) else "Ensure character is a MAN" if any(k in text for k in ["آدمی", "لڑکا", "man", "boy"]) else ""
+        instr = f"Act as a Film Director: '{text}'. {gender_lock}. 3D animation, symmetrical features, high detail. Style: {style}. Output ONLY English prompt."
+        res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai&cache=true", timeout=25)
         return res.text if res.status_code == 200 else text
     except: return text
 
 def fetch_img(url): return session.get(url, timeout=60).content
 
-def create_diamond_movie(story, voice, ratio, style):
-    u_id = str(uuid.uuid4())[:8]
-    status_box = st.empty()
+def create_titan_movie_v1(story, voice, ratio, style, seed):
+    u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
+    status = st.empty()
     try:
-        # Step 1: Voice
-        v_codes = {"Asad (Male)": "ur-PK-AsadNeural", "Salman (Male)": "ur-PK-SalmanNeural", "Uzma (Female)": "ur-PK-UzmaNeural", "Gul (Female)": "ur-PK-GulNeural"}
-        v_code = v_codes.get(voice, "ur-PK-AsadNeural")
+        # Fixed 2 Voices only
+        v_code = "ur-PK-UzmaNeural" if voice == "Uzma (Female)" else "ur-PK-AsadNeural"
         audio_f = f"a_{u_id}.mp3"
         asyncio.run(edge_tts.Communicate(story, v_code).save(audio_f))
         audio = AudioFileClip(audio_f)
         
-        # Step 2: STRICT SCENE SPLITTING (Ensure Image Changes)
-        # Split by punctuation OR every 20 words to force density
-        raw_sentences = re.split(r'[۔.!]', story)
-        sentences = []
-        for s in raw_sentences:
-            if len(s.split()) > 25: # If sentence is too long, split it by word count
-                words = s.split()
-                for j in range(0, len(words), 20):
-                    sentences.append(" ".join(words[j:j+20]))
-            elif len(s.strip()) > 5:
-                sentences.append(s.strip())
-        
-        if not sentences: sentences = [story]
-
         res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (1024, 1024)}
         w, h = res_map[ratio]
+
+        # v40 Splitting logic - Force Image Change per line
+        sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 3]
+        if not sentences: sentences = [story]
+        
         clips = []
         dur_per = audio.duration / len(sentences)
-        char_seed = random.randint(1, 999999)
 
-        # Parallel Fetch
-        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_v40_prompt(s) + ' ' + style)}?width={w}&height={h}&seed={char_seed}&nologo=true&negative=distorted,melted,girl,female,deformed" for s in sentences]
+        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_v40_prompt(s, style))}?width={w}&height={h}&seed={seed}&nologo=true&negative=deformed,missing+limbs,wrong+gender" for s in sentences]
 
         with ThreadPoolExecutor(max_workers=20) as exe:
             for i, img_data in enumerate(exe.map(fetch_img, img_urls)):
-                status_box.info(f"💎 Rendering Scene {i+1}/{len(sentences)} (Diamond Mode)...")
+                status.info(f"⚡ Rendering Scene {i+1}/{len(sentences)} (v40 Power)...")
                 img_p = f"i_{u_id}_{i}.jpg"
                 with Image.open(io.BytesIO(img_data)) as im:
                     im.convert("RGB").resize((w, h)).save(img_p, "JPEG")
                 clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
-                
-                # FIXED ZOOM OUT (1.0 -> 1.25) - Image grows bigger (Expansion)
-                clip = clip.resize(lambda t: 1.0 + 0.04 * t).set_position('center')
+                # v40 LOCKED ZOOM-IN: 1.0 to 1.15
+                clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
                 clips.append(vfx.fadein(clip, 0.4))
             
         final_video = concatenate_videoclips(clips, method="compose").set_audio(audio)
-        out = f"Sglowina_Diamond_{u_id}.mp4"
+        out = f"Sglowina_Titan_{u_id}.mp4"
         final_video.write_videofile(out, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
+        audio.close(); final_video.close()
         return out
     except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 5. NAVIGATION
+# 5. UI NAVIGATION (TRUE ISOLATION)
 # ==========================================
 menu = st.sidebar.radio("SGLOWINA TITAN MENU", ["🏠 Smart Chat", "🎥 Movie Studio", "🎨 Pro Image Studio"])
 
 if menu == "🏠 Smart Chat":
+    st.write("### 💬 Sglowina Intelligence Dashboard")
     if "msgs" not in st.session_state: st.session_state.msgs = []
     for m in st.session_state.msgs:
         avatar = "https://via.placeholder.com/50/000000/ffffff?text=S" if m["role"]=="assistant" else None
@@ -187,31 +180,37 @@ if menu == "🏠 Smart Chat":
             st.write(res); st.session_state.msgs.append({"role": "assistant", "content": res})
 
 elif menu == "🎥 Movie Studio":
-    st.write("### 🎥 Industrial Cinematic Production")
+    st.write("### 🎥 Industrial Cinematic Engine (v40 Locked)")
     m_script = st.text_area("Enter Movie Script:", height=150)
-    mc1, mc2, mc3 = st.columns(3)
-    with mc1: mv = st.selectbox("Voice:", ["Asad (Male)", "Salman (Male)", "Uzma (Female)", "Gul (Female)"])
-    with mc2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    with mc3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"])
-    if st.button("Generate Diamond Masterpiece 🚀"):
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: mv = st.selectbox("Voice:", ["Asad (Male)", "Uzma (Female)"])
+    with c2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
+    with c3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"])
+    with c4: sd = st.number_input("Character ID (Seed):", value=786)
+    if st.button("Generate Master Movie 🚀"):
         if m_script:
-            v_res = create_diamond_movie(m_script, mv, mr, ms)
+            v_res = create_titan_movie_v1(m_script, mv, mr, ms, sd)
             if "mp4" in v_res:
                 st.video(v_res)
-                st.download_button("Download ⬇️", open(v_res, 'rb').read(), file_name=v_res)
+                st.download_button("Download", open(v_res, 'rb').read(), file_name=v_res)
 
 elif menu == "🎨 Pro Image Studio":
     st.write("### 🎨 Industrial HD Image Studio")
-    p_i = st.text_area("Describe Image (One per line):")
+    p_i = st.text_area("Describe Image (One per line for batch):", height=150)
     ic1, ic2, ic3 = st.columns(3)
-    with ic1: i_style = st.selectbox("Art Style:", ["Realistic", "Anime", "Logo Design", "3D Cartoon"], key="is")
-    with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok"], key="ir")
+    with ic1: i_style = st.selectbox("Art Style:", ["Realistic", "Anime", "Logo Design", "3D Cartoon"])
+    with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok"])
     with ic3: count = st.slider("Quantity:", 1, 10, 1)
+    
+    char_id = st.text_input("Consistency Lock ID:", value="786")
+
     if st.button("Generate Titan Visuals 🚀"):
         dim = {"Square (1:1)": (1024, 1024), "YouTube HD": (1280, 720), "TikTok": (720, 1280)}
         w, h = dim[i_size]
-        for i in range(count):
-            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(p_i + ' ' + i_style)}?width={w}&height={h}&nologo=true&negative=girl,female,deformed"
-            st.image(url)
+        prompt_list = [line.strip() for line in p_i.split('\n') if line.strip()]
+        for idx, single_p in enumerate(prompt_list):
+            for q in range(count):
+                url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(single_p + ' ' + i_style)}?width={w}&height={h}&seed={char_id}&nologo=true&negative=girl,female"
+                st.image(url, caption=f"Result (Seed: {char_id})")
 
-st.markdown('<div class="footer-electric">SGLOWINA AI v1.0 | CEO: SABA WAHID | COO: MUHAMMAD ESSA AWAN</div>', unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.0 | Founder & CEO: Muhammad Essa Awan | Co-Founder: Saba Wahid</p>", unsafe_allow_html=True)
