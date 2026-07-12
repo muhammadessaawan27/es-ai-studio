@@ -28,24 +28,23 @@ try:
 except Exception:
     pass
 
-# --- Step 1: Detect Islamic Content Keywords ---
+# --- Step 1 & 4: Islamic Policy Data ---
 ISLAMIC_KEYWORDS = [
     "allah", "islam", "muslim", "quran", "hadith", "masjid", "salah", "namaz",
     "qabr", "kafan", "janazah", "barzakh", "jannah", "jahannam", "prophet", 
     "nabi", "rasul", "sahabah", "history", "ولی اللہ", "صحابہ", "قبر", "کفن", "جنازہ", "اللہ"
 ]
 
-# --- Step 4: Strict Negative Prompt for Islamic Mode ---
 STRICT_ISLAMIC_NEGATIVE = (
     "western clothes, suit, tie, tuxedo, business man, office, modern city, "
     "random people, jeans, uncovered body, mini skirt, nightclub, western cemetery, "
-    "unrelated background, fashion model, european features, makeup, modern fashion"
+    "unrelated background, fashion model, european features, modern fashion"
 )
 
 # ==========================================
-# 2. UI BRANDING (SGLOWINA TITAN RELEASE)
+# 2. EXECUTIVE UI (WHITE THEME - MUHAMMAD ESSA AWAN)
 # ==========================================
-st.set_page_config(page_title="Sglowina AI - Official Launch", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglovina AI - Official Launch", layout="wide", page_icon="🎬")
 
 st.markdown("""
     <style>
@@ -65,23 +64,27 @@ st.markdown("""
     }
     
     .logo-container { display: flex; flex-direction: column; align-items: center; padding: 30px 0; }
-    .electric-s {
-        width: 110px; height: 110px; background: #0f172a; border-radius: 25px;
+    .circular-s {
+        width: 100px; height: 100px; background: #0f172a; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
-        font-family: 'Orbitron', sans-serif; font-size: 65px; color: white;
+        font-family: 'Orbitron', sans-serif; font-size: 55px; color: white;
         border: 4px solid #ff007a; box-shadow: 0 0 40px #ff007a;
-        animation: rotate3D 10s infinite linear;
+        animation: rotate3D 8s infinite linear;
     }
-    @keyframes rotate3D { 0% { transform: perspective(1000px) rotateY(0deg); } 100% { transform: perspective(1000px) rotateY(360deg); } }
+    @keyframes rotate3D { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
 
     .brand-name { font-size: 4rem; font-weight: 900; color: #0f172a; text-align: center; margin-top: 10px; }
-    .founder-tag { font-size: 1.2rem; color: #ff007a; text-align: center; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+    .founder-info { font-size: 1.3rem; color: #ff007a; text-align: center; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
 
-    [data-testid="stSidebar"] { background-color: #0f172a !important; }
-    [data-testid="stSidebar"] * { color: white !important; font-weight: bold !important; }
+    [data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
+    [data-testid="stSidebar"] * { color: #0f172a !important; font-weight: bold !important; }
+    
     .stButton>button { 
         background: linear-gradient(90deg, #ff007a, #2563eb) !important; 
         color: white !important; border-radius: 12px !important; height: 55px; width: 100%; font-size: 20px; font-weight: bold;
+    }
+    .stTextArea>div>div>textarea, .stTextInput>div>div>input {
+        background-color: #ffffff !important; border: 2px solid #e2e8f0 !important; border-radius: 12px !important; color: #0f172a !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -89,30 +92,30 @@ st.markdown("""
 st.markdown('<div class="brand-header">SGLOWINA AI OFFICIAL MASTER STUDIO</div>', unsafe_allow_html=True)
 st.markdown(f"""
     <div class="logo-container">
-        <div class="electric-s">S</div>
-        <div class="brand-name">Sglowina AI</div>
-        <div class="founder-tag">Founder & CEO: Saba Wahid | COO: Muhammad Essa Awan</div>
+        <div class="circular-s">S</div>
+        <div class="brand-name">Sglovina AI</div>
+        <div class="founder-info">Founder & CEO: Saba Wahid | COO: Muhammad Essa Awan</div>
     </div>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. IDENTITY & POLICY ENGINE (LOCKED)
+# 3. IDENTITY & ISLAMIC POLICY ENGINE
 # ==========================================
+# Step 6: Historical Accuracy & Step 5: Face Protection Bio
 SGLOWINA_BIO = """
-**Sglowina AI is proudly developed by the Sglowina Team.**
+Sglovina AI is proudly developed by the Sglovina Team.
 
 **Founder & CEO:** Saba Wahid, daughter of Wahid Bakhsh and the spouse of Muhammad Essa Awan.
 
-**Chief Operations Officer (COO):** Muhammad Essa Awan is the lead visionary behind the platform's core logic and industrial configuration.
+**Chief Operations Officer (COO):** Muhammad Essa Awan is the COO and the lead visionary behind the platform's core logic and industrial configuration.
 
-Sglowina AI is an industrial-grade multi-modal intelligence platform. Official Version 1.0.
+Sglovina AI is a professional industrial-grade multi-modal intelligence platform. This is the official Version 1.0.
 """
 
 def detect_islamic_mode(text):
     return any(word in text.lower() for word in ISLAMIC_KEYWORDS)
 
-# --- Step 2, 3, 5, 6: Visual Policy Logic ---
-def get_shariah_prompt(text):
+def get_titan_prompt(text):
     is_islamic = detect_islamic_mode(text)
     
     # Step 5: Face Protection Logic
@@ -121,32 +124,36 @@ def get_shariah_prompt(text):
     
     face_protection = ""
     if is_revered:
-        face_protection = "STRICTLY NO FACE. NO FACIAL FEATURES. SHOW BRIGHT WHITE NOOR (LIGHT) INSTEAD OF FACE. Back view only. Extremely respectful."
+        face_protection = "STRICTLY NO FACE. NO FACIAL FEATURES. SHOW BRIGHT WHITE NOOR (LIGHT) INSTEAD OF FACE. Back view only. Extremely respectful. No identifiable features."
 
     try:
-        # GPT-4 Director enforces Step 2 (Style) and Step 6 (Accuracy)
+        # Step 2 & 6: Historical Accuracy and Visual Style
         director_instr = (
-            f"Director Command: Analyze Urdu context: '{text}'. "
+            f"Act as a Shariah-Compliant Film Director. Story Segment: '{text}'. "
             f"{face_protection} "
-            f"Mode: {'Islamic Historical' if is_islamic else 'Cinematic'}. "
+            f"Visual Mode: {'Historical Islamic' if is_islamic else 'Cinematic'}. "
             "Requirement: Authentic Muslim cultural appearance, traditional modest clothing (robes, turbans, hijabs), "
-            "accurate historical architecture. If 'grave' show Islamic Qabr. If 'kafan' show white shroud. "
-            "Output ONLY a detailed English visual prompt."
+            "accurate historical architecture. If 'grave' mentioned, show Islamic Qabr. If 'kafan' mentioned, show white shroud. "
+            "Strictly avoid modern western elements and clothing. Output English visual prompt only."
         )
-        res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(director_instr)}?model=openai&cache=true", timeout=25)
+        res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(director_instr)}?model=openai&cache=true", timeout=30)
         return res.text if res.status_code == 200 else text
     except: return text
 
 # ==========================================
-# 4. v40 INDUSTRIAL MOVIE ENGINE (SAFE)
+# 4. v40 INDUSTRIAL MOVIE ENGINE (SAFE & ACCURATE)
 # ==========================================
 def create_titan_movie_v1(story, voice, ratio, style):
     u_id = str(uuid.uuid4())[:8]
     status_msg = st.empty()
     try:
+        # Step 1: Mode Detection (Islamic or General)
+        is_islamic = detect_islamic_mode(story)
+        
         v_code = "ur-PK-UzmaNeural" if "Female" in voice else "ur-PK-AsadNeural"
         audio_f = f"a_{u_id}.mp3"
         asyncio.run(edge_tts.Communicate(story, v_code).save(audio_f))
+        
         from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
         import moviepy.video.fx.all as vfx
         
@@ -163,10 +170,10 @@ def create_titan_movie_v1(story, voice, ratio, style):
 
         for i, s in enumerate(sentences):
             status_msg.info(f"🛡️ Policy Validation & Rendering Scene {i+1}/{len(sentences)}...")
-            # Step 7: Final Quality Check & Refinement
-            refined = get_shariah_prompt(s)
+            # Step 3 & 7: Final Quality & Accuracy Check
+            refined = get_titan_prompt(s)
             
-            is_islamic = detect_islamic_mode(s)
+            # Step 4: Negative Prompt Enforcement
             neg_p = STRICT_ISLAMIC_NEGATIVE if is_islamic else "deformed, blurry"
             
             url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined + ' ' + style)}?width={w}&height={h}&seed={seed}&nologo=true&negative={neg_p}"
@@ -175,11 +182,11 @@ def create_titan_movie_v1(story, voice, ratio, style):
             img_p = f"i_{u_id}_{i}.jpg"
             with open(img_p, "wb") as f: f.write(img_data)
             
-            with Image.open(img_p) as im:
-                im.convert("RGB").resize((w, h)).save(img_p, "JPEG")
+            # PIL Image Verification
+            Image.open(img_p).convert("RGB").resize((w, h)).save(img_p, "JPEG")
             
             clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
-            # v40 Zoom In Expansion (LOCKED)
+            # v40 Zoom In Expansion (1.0 to 1.15) - LOCKED
             clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
             clips.append(vfx.fadein(clip, 0.4))
             
@@ -191,35 +198,38 @@ def create_titan_movie_v1(story, voice, ratio, style):
     except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 5. UI NAVIGATION
+# 5. UI NAVIGATION (TRUE ISOLATION)
 # ==========================================
-st.sidebar.markdown(f"<h2 style='color:white; text-align:center;'>SGLOWINA COMMAND</h2>", unsafe_allow_html=True)
-menu = st.sidebar.radio("Navigate Studio:", ["🏠 Smart Chat", "🎬 Movie Studio", "🎨 Pro Image Studio"])
+st.sidebar.markdown(f"## ⚙️ SGLOWINA COMMAND")
+menu = st.sidebar.radio("Navigate Studio:", ["🏠 Smart Chat", "🎥 Movie Studio", "🎨 Pro Image Studio"])
 
 if menu == "🏠 Smart Chat":
-    st.write("### 💬 Sglowina Intelligence Dashboard")
+    st.write("### 💬 Sglovina Intelligence")
     if "msgs" not in st.session_state: st.session_state.msgs = []
     for m in st.session_state.msgs:
         with st.chat_message(m["role"]): st.write(m["content"])
-    if p := st.chat_input("How can Sglowina AI help you?"):
+    if p := st.chat_input("How can Sglovina AI help you?"):
         st.session_state.msgs.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
-        if any(k in p.lower() for k in ["kisne", "who made", "owner", "essa", "saba"]): res = SGLOWINA_BIO
+        
+        if any(k in p.lower() for k in ["kisne", "who made", "owner", "essa", "saba"]): 
+            res = SGLOWINA_BIO
         else:
-            sys_p = urllib.parse.quote("You are Sglowina AI. Founder Saba Wahid. COO Muhammad Essa Awan. Answer accurately.")
+            sys_p = urllib.parse.quote("You are Sglovina AI. Founder Saba Wahid. COO Muhammad Essa Awan. Answer accurately in user's language.")
             url = f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true&system={sys_p}"
-            res = session.get(url, timeout=20).text.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
+            res = session.get(url, timeout=25).text.replace("ChatGPT", "Sglovina AI").replace("OpenAI", "Sglovina Team")
+        
         with st.chat_message("assistant"):
             st.write(res); st.session_state.msgs.append({"role": "assistant", "content": res})
 
-elif menu == "🎬 Movie Studio":
+elif menu == "🎥 Movie Studio":
     st.write("### 🎥 Industrial Cinematic Engine (Policy-Protected)")
     m_script = st.text_area("Enter Movie Script:", height=150)
     mc1, mc2, mc3 = st.columns(3)
     with mc1: mv = st.selectbox("Voice:", ["Urdu Male", "Urdu Female"])
     with mc2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
     with mc3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"])
-    if st.button("Generate Official Titan Movie 🚀"):
+    if st.button("Generate Official Sglovina Movie 🚀"):
         if m_script:
             v_res = create_titan_movie_v1(m_script, mv, mr, ms)
             if "mp4" in v_res:
@@ -227,14 +237,13 @@ elif menu == "🎬 Movie Studio":
                 st.download_button("Download ⬇️", open(v_res, 'rb').read(), file_name=v_res)
 
 elif menu == "🎨 Pro Image Studio":
-    st.write("### 🎨 Sglowina Industrial Visual Studio")
+    st.write("### 🎨 Sglovina Industrial Visual Studio")
     p_i = st.text_area("Describe Image (Islamic rules apply automatically):")
     if st.button("Generate Official Visual 🚀"):
-        refined = get_shariah_prompt(p_i)
-        is_isl = detect_islamic_mode(p_i)
-        neg_final = STRICT_ISLAMIC_NEGATIVE if is_isl else "girl,female"
+        refined = get_shariah_prompt(p_i) if detect_islamic_mode(p_i) else p_i
+        neg_final = STRICT_ISLAMIC_NEGATIVE if detect_islamic_mode(p_i) else "girl,female"
         url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined)}?width=1024&height=1024&nologo=true&negative={neg_final}"
         st.image(url)
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #ff007a; font-weight: bold;'>Sglovina AI v1.0 | Official Shariah-Compliant Release | Admin: Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #ff007a; font-weight: bold;'>Sglovina AI v1.0 | Developed by Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
