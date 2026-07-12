@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import asyncio
 import edge_tts
 import requests
@@ -60,7 +60,7 @@ st.markdown("""
         font-family: 'Orbitron', sans-serif; font-size: 50px; color: #ffffff;
         border: 3px solid #00d4ff; box-shadow: 0 0 20px #00d4ff, inset 0 0 15px #ff007a;
         animation: spinGlow 8s infinite linear;
-    }
+   }
     @keyframes spinGlow { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
 
     .stButton>button { 
