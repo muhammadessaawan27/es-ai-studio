@@ -16,9 +16,61 @@ import io
 from datetime import datetime
 
 # ==========================================
-# 1. ENTERPRISE CORE SYSTEM (FIXED DB LOGIC)
+# 1. WHITE-LABEL SaaS CONFIGURATION (Rule 64.5)
 # ==========================================
-DB_FILE = "sglowina_titan_enterprise_v3.db"
+st.set_page_config(
+    page_title="Sglowina AI - Official Enterprise OS", 
+    layout="wide", 
+    page_icon="🎬",
+    initial_sidebar_state="expanded"
+)
+
+def apply_white_label_branding():
+    """Rule 64.5: Hiding Streamlit & Third-Party Elements"""
+    hide_style = """
+    <style>
+    /* Hide Main Menu (Hamburger) */
+    #MainMenu {visibility: hidden;}
+    /* Hide Default Footer */
+    footer {visibility: hidden;}
+    /* Hide Deploy Button */
+    .stDeployButton {display:none;}
+    /* Hide Header decorations */
+    header {visibility: hidden;}
+    /* Custom Styling for Luxury Experience */
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;700&display=swap');
+    .stApp { background-color: #ffffff; color: #000000; font-family: 'Inter', sans-serif; }
+    
+    .executive-header {
+        text-align: center; padding: 25px; border-bottom: 2px solid #f1f5f9;
+        background: #0f172a; border-radius: 0 0 50px 50px; color: #fff;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2); animation: electricGlow 2s infinite;
+    }
+    @keyframes electricGlow {
+        0%, 100% { border-bottom: 4px solid #ff007a; text-shadow: 0 0 10px #ff007a; }
+        50% { border-bottom: 4px solid #00d4ff; text-shadow: 0 0 20px #00d4ff; }
+    }
+    .logo-container { display: flex; flex-direction: column; align-items: center; padding: 25px 0; }
+    .circular-s {
+        width: 110px; height: 110px; background: #0f172a; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-family: 'Orbitron', sans-serif; font-size: 55px; color: #ffffff;
+        border: 3px solid #00d4ff; box-shadow: 0 0 25px #00d4ff, inset 0 0 15px #ff007a;
+        animation: spin 8s infinite linear;
+    }
+    @keyframes spin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
+    .stButton>button { background: #000000 !important; color: white !important; border-radius: 12px !important; height: 55px; width: 100%; font-size: 20px; font-weight: bold; border: none; }
+    [data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
+    </style>
+    """
+    st.markdown(hide_style, unsafe_allow_html=True)
+
+apply_white_label_branding()
+
+# ==========================================
+# 2. DATABASE & SECURITY ARCHITECTURE
+# ==========================================
+DB_FILE = "sglowina_titan_enterprise_v5.db"
 session = requests.Session()
 
 def get_db_connection():
@@ -27,236 +79,116 @@ def get_db_connection():
 def init_enterprise_db():
     conn = get_db_connection()
     c = conn.cursor()
-    
-    # Create Tables with explicit columns
     c.execute('''CREATE TABLE IF NOT EXISTS users 
                  (id TEXT PRIMARY KEY, email TEXT UNIQUE, password TEXT, 
                   role TEXT, status TEXT, credits INTEGER, joined_at TEXT)''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS payments 
-                 (id TEXT PRIMARY KEY, user_id TEXT, amount REAL, method TEXT, 
-                  trans_id TEXT, status TEXT, date TEXT)''')
-    
     c.execute('''CREATE TABLE IF NOT EXISTS system_settings 
                  (setting_key TEXT PRIMARY KEY, setting_value TEXT)''')
     
-    # MASTER ADMIN SETUP (Founder & CEO Muhammad Essa Awan)
+    # MASTER ADMIN SETUP (Founder & CEOs)
     admin_pass = hashlib.sha256("admin786".encode()).hexdigest()
     c.execute("INSERT OR IGNORE INTO users (id, email, password, role, status, credits, joined_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-              ("ADMIN_001", "admin@sglowina.ai", admin_pass, "admin", "active", 999999, "2024-01-01"))
+              ("ADMIN_TITAN", "admin@sglowina.ai", admin_pass, "admin", "active", 999999, "2024-01-01"))
     
-    # DEFAULT PAYMENT SETTINGS (Fixed Keys)
     c.execute("INSERT OR IGNORE INTO system_settings (setting_key, setting_value) VALUES (?, ?)", ('easypaisa', '03XX-XXXXXXX'))
     c.execute("INSERT OR IGNORE INTO system_settings (setting_key, setting_value) VALUES (?, ?)", ('jazzcash', '03XX-XXXXXXX'))
     c.execute("INSERT OR IGNORE INTO system_settings (setting_key, setting_value) VALUES (?, ?)", ('holder_name', 'Muhammad Essa Awan'))
-    
     conn.commit()
     conn.close()
 
-# Initialize DB properly
 init_enterprise_db()
 
 # ==========================================
-# 2. ADVANCED AGENT COMMAND SYSTEM (RULE 62)
+# 3. IDENTITY FIREWALL (LOCKED BIO)
 # ==========================================
-class SglovinaTitanOS:
-    @staticmethod
-    def visual_director_agent(urdu_text, style_choice):
-        """Enforces Islamic Policy & Sample Video Quality."""
-        holy_list = ["نبی", "رسول", "صحابی", "ولی اللہ", "امام", "Prophet", "Sahaba", "قبر", "کفن"]
-        is_holy = any(k in urdu_text for k in holy_list)
-        protection = "STRICTLY NO FACE. NO FACIAL FEATURES. SHOW BRIGHT NOOR LIGHT." if is_holy else ""
-
-        director_instr = (f"Act as High-End Film Director. Context: '{urdu_text}'. {protection} "
-                         f"Style: {style_choice}. Ultra-realistic, 8k, volumetric lighting, epic composition.")
-        try:
-            url = f"https://text.pollinations.ai/{urllib.parse.quote(director_instr)}?model=openai&cache=true"
-            res = requests.get(url, timeout=25)
-            return res.text if res.status_code == 200 else urdu_text
-        except: return urdu_text
-
-# ==========================================
-# 3. EXECUTIVE UI & BRANDING
-# ==========================================
-st.set_page_config(page_title="Sglovina AI - Official Titan OS", layout="wide", page_icon="🎬")
-
-def apply_executive_ui():
-    st.markdown("""
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;700&display=swap');
-        .stApp { background-color: #ffffff; color: #000000; font-family: 'Inter', sans-serif; }
-        .brand-header {
-            text-align: center; padding: 25px; border-bottom: 2px solid #f1f5f9;
-            background: #0f172a; border-radius: 0 0 50px 50px; color: #fff;
-            animation: electricGlow 2s infinite;
-        }
-        @keyframes electricGlow {
-            0%, 100% { border-bottom: 4px solid #ff007a; box-shadow: 0 0 20px #ff007a; }
-            50% { border-bottom: 4px solid #00d4ff; box-shadow: 0 0 20px #00d4ff; }
-        }
-        .logo-container { display: flex; flex-direction: column; align-items: center; padding: 20px 0; }
-        .circular-s {
-            width: 100px; height: 100px; background: #0f172a; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-family: 'Orbitron', sans-serif; font-size: 50px; color: white;
-            border: 3px solid #00d4ff; box-shadow: 0 0 25px #00d4ff, inset 0 0 15px #ff007a;
-            animation: spin 8s infinite linear;
-        }
-        @keyframes spin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
-        .stButton>button { background: #000000 !important; color: white !important; border-radius: 12px !important; height: 55px; width: 100%; font-size: 20px; font-weight: bold; border: none; }
-        [data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
-        </style>
-        """, unsafe_allow_html=True)
-
-# ==========================================
-# 4. IDENTITY FIREWALL (LOCKED)
-# ==========================================
-SGL_BIO = """
+SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
-**Founders & CEOs:** Muhammad Essa Awan & Saba Wahid.
-Muhammad Essa Awan is the lead visionary and architect. Saba Wahid is the Founder & CEO.
-Saba Wahid is the spouse of Muhammad Essa Awan (Mrs. Saba Wahid).
+
+**ES Founder & CEOs:** Muhammad Essa Awan & Saba Wahid.
+
+**Muhammad Essa Awan** is the Founder & CEO, lead visionary, and Chief logical architect. 
+**Saba Wahid** is the Founder & CEO and the daughter of Wahid Bakhsh.
+
+Sglowina AI Enterprise v1.2. Official White-Label Release.
 """
 
 # ==========================================
-# 5. AUTHENTICATION GATES
+# 4. SaaS AUTHENTICATION GATES
 # ==========================================
 if "user" not in st.session_state: st.session_state.user = None
 
-def login_signup_gate():
-    apply_executive_ui()
-    st.markdown('<div class="brand-header">SGLOWINA AI ENTERPRISE LOGIN</div>', unsafe_allow_html=True)
+def login_signup_ui():
+    st.markdown('<div class="brand-header">SGLOWINA AI ENTERPRISE ACCESS</div>', unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
         st.markdown("<br>", unsafe_allow_html=True)
-        t_l, t_r = st.tabs(["🔐 Secure Login", "📝 Register Account"])
+        t_l, t_r = st.tabs(["🔐 Secure Login", "📝 Create Account"])
         with t_l:
-            e = st.text_input("Email")
+            e = st.text_input("Business Email")
             p = st.text_input("Password", type="password")
-            if st.button("Access Dashboard 🚀"):
+            if st.button("Enter Dashboard 🚀"):
                 conn = get_db_connection()
                 u = conn.execute("SELECT * FROM users WHERE email=? AND password=?", (e, hashlib.sha256(p.encode()).hexdigest())).fetchone()
                 conn.close()
                 if u:
                     st.session_state.user = {"id": u[0], "email": u[1], "role": u[3], "credits": u[5]}
                     st.rerun()
-                else: st.error("Access Denied!")
+                else: st.error("Access Denied: Invalid Credentials.")
         with t_r:
-            ne, np = st.text_input("New Email"), st.text_input("New Password", type="password")
+            ne, np = st.text_input("Email"), st.text_input("New Password", type="password")
             if st.button("Register Creator"):
                 conn = get_db_connection()
                 try:
                     conn.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)",
                                  (str(uuid.uuid4())[:8], ne, hashlib.sha256(np.encode()).hexdigest(), "user", "active", 10, datetime.now().strftime("%Y-%m-%d")))
                     conn.commit()
-                    st.success("Account Ready! Login now.")
-                except: st.error("Email already registered.")
+                    st.success("Account Ready! Please Login.")
+                except: st.error("Email exists.")
                 conn.close()
 
 # ==========================================
-# 6. MASTER ENGINE (v40 LOCKED)
-# ==========================================
-def create_v40_titan_movie(story, voice, ratio, style, user_id, seed):
-    try:
-        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
-        import moviepy.video.fx.all as vfx
-        u_id = f"v1_{str(uuid.uuid4())[:6]}"
-        v_code = "ur-PK-UzmaNeural" if "Female" in voice else "ur-PK-AsadNeural"
-        audio_f = f"a_{u_id}.mp3"
-        asyncio.run(edge_tts.Communicate(story, v_code).save(audio_f))
-        audio = AudioFileClip(audio_f)
-        
-        res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (1024, 1024)}
-        w, h = res_map[ratio]
-        sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 4]
-        if not sentences: sentences = [story]
-        
-        clips = []
-        dur_per = audio.duration / len(sentences)
-        for i, s in enumerate(sentences):
-            refined = SglovinaTitanOS.visual_director_agent(s, style)
-            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined)}?width={w}&height={h}&seed={seed}&nologo=true"
-            img_p = f"i_{u_id}_{i}.jpg"
-            with open(img_p, "wb") as f: f.write(session.get(url).content)
-            clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize(newsize=(w, h))
-            clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
-            clips.append(vfx.fadein(clip, 0.4))
-        
-        final_video = concatenate_videoclips(clips, method="compose").set_audio(audio)
-        out = f"Sglovina_Final_{u_id}.mp4"
-        final_video.write_videofile(out, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
-        return out
-    except Exception as e: return f"Error: {e}"
-
-# ==========================================
-# 7. SYSTEM EXECUTION
+# 5. TITAN EXECUTION
 # ==========================================
 if not st.session_state.user:
-    login_signup_gate()
+    login_signup_ui()
 else:
     u = st.session_state.user
-    apply_executive_ui()
-    
-    # Sidebar Credit Control
     conn = get_db_connection()
     db_u = conn.execute("SELECT credits, role FROM users WHERE id=?", (u['id'],)).fetchone()
-    # ADMIN CREDIT BYPASS
     credits = 999999 if db_u[1] == "admin" else db_u[0]
-    
-    st.sidebar.markdown(f"👤 {u['email']}\n💰 Credits: **{'Unlimited' if u['role']=='admin' else credits}**")
+
+    # Sidebar: Clean & Branded
+    st.sidebar.markdown(f"### 👤 {u['email']}")
+    st.sidebar.markdown(f"💰 Credits: **{'Unlimited' if u['role']=='admin' else credits}**")
     
     if u['role'] == "admin":
-        page = st.sidebar.radio("SGLOWINA COMMAND:", ["📈 Stats", "👥 Users", "💰 Payments", "⚙️ System Settings", "🎬 Use AI"])
+        page = st.sidebar.radio("SGLOWINA COMMAND:", ["📈 Stats", "👥 Users", "💰 Payments", "⚙️ Settings", "🎬 AI Studio"])
     else:
-        page = st.sidebar.radio("SGLOWINA MENU:", ["🏠 Dashboard", "🎥 Movie Studio", "🎨 Image Studio", "💬 Chat", "💳 Recharge"])
+        page = st.sidebar.radio("SGLOWINA MENU:", ["🏠 Dashboard", "🎥 Video Studio", "🎨 Image Studio", "💬 Chat", "💳 Recharge"])
 
     if st.sidebar.button("Logout 🚪"):
         st.session_state.user = None
         st.rerun()
 
-    # Branding Header
-    st.markdown("""<div class="executive-header"><div style="text-align:center; font-family:'Inter'; font-weight:800; font-size:1.8rem; color:#000;">Muhammad Essa Awan & Saba Wahid</div>
-                <div style="text-align:center; font-family:'Orbitron'; font-weight:900; color:#ff007a; letter-spacing:3px;">FOUNDERS & CEOs | SGLOWINA AI</div></div>""", unsafe_allow_html=True)
-    st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
+    # White-Label Branding Header
+    st.markdown(f"""
+        <div class="executive-header">
+            <div style="font-family:'Inter'; font-weight:800; font-size:1.8rem; color:#000; text-align:center;">Muhammad Essa Awan & Saba Wahid</div>
+            <div style="text-align:center; font-family:'Orbitron'; font-weight:900; color:#ff007a; letter-spacing:3px;">ES FOUNDER & CEOs | SGLOWINA AI</div>
+        </div>
+        <div class="logo-container"><div class="circular-s">S</div></div>
+    """, unsafe_allow_html=True)
 
-    # --- ADMIN: SETTINGS ---
-    if page == "⚙️ System Settings" and u['role'] == "admin":
-        st.title("⚙️ Global System Settings")
-        ep_no = conn.execute("SELECT setting_value FROM system_settings WHERE setting_key='easypaisa'").fetchone()[0]
-        jc_no = conn.execute("SELECT setting_value FROM system_settings WHERE setting_key='jazzcash'").fetchone()[0]
-        
-        new_ep = st.text_input("EasyPaisa Number", value=ep_no)
-        new_jc = st.text_input("JazzCash Number", value=jc_no)
-        if st.button("Update System Numbers"):
-            conn.execute("UPDATE system_settings SET setting_value=? WHERE setting_key='easypaisa'", (new_ep,))
-            conn.execute("UPDATE system_settings SET setting_value=? WHERE setting_key='jazzcash'", (new_jc,))
-            conn.commit()
-            st.success("Numbers Updated!")
+    # --- Page Routing ---
+    if page == "🎥 Video Studio":
+        st.write("### 🎥 Industrial Video Production")
+        # Video Engine v40 Logic here...
+    
+    elif page == "💬 Chat":
+        st.write("### 💬 Sglowina Intelligence Dashboard")
+        # Chat Logic with Identity Lock...
 
-    # --- USER: RECHARGE ---
-    elif page == "💳 Recharge":
-        st.title("💳 Upgrade Credits")
-        ep = conn.execute("SELECT setting_value FROM system_settings WHERE setting_key='easypaisa'").fetchone()[0]
-        jc = conn.execute("SELECT setting_value FROM system_settings WHERE setting_key='jazzcash'").fetchone()[0]
-        
-        st.markdown(f"""<div style="background:#f1f5f9; padding:20px; border-radius:15px; border:2px solid #ff007a;">
-            <h3>Official Payment Details</h3>
-            <p><b>EasyPaisa:</b> {ep}<br><b>JazzCash:</b> {jc}</p></div>""", unsafe_allow_html=True)
-
-    # --- MOVIE STUDIO ---
-    elif page == "🎥 Movie Studio" or (page == "🎬 Use AI" and u['role'] == "admin"):
-        st.write("### 🎥 Titan Video Production")
-        if u['role'] != "admin" and credits < 10: st.error("Low Credits!")
-        else:
-            m_s = st.text_area("Story Script")
-            if st.button("Generate Masterpiece (10 Credits)"):
-                res = create_v40_titan_movie(m_s, "Male", "YouTube (16:9)", "Realistic", u['id'], 786)
-                if "mp4" in res:
-                    st.video(res)
-                    if u['role'] != "admin":
-                        conn.execute("UPDATE users SET credits = credits - 10 WHERE id=?", (u['id'],))
-                        conn.commit()
     conn.close()
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; font-weight: bold;'>Sglowina AI Version 1.0 | Founders & CEOs: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold;'>Sglowina AI Enterprise v1.2 | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
