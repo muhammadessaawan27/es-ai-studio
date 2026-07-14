@@ -1,7 +1,9 @@
 streamlit
 edge-tts
-moviepy==1.0.3
+moviepy
 requests
-streamlit-mic-recorder
-Pillow
+bcrypt
 pandas
+qrcode
+Pillow
+streamlit-mic-recorder
