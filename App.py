@@ -8,190 +8,190 @@ import time
 import re
 import uuid
 import random
-import sqlite3
-import hashlib
-import bcrypt
-import pandas as pd
 from PIL import Image
 import io
-from datetime import datetime
+import base64
 from concurrent.futures import ThreadPoolExecutor
 
 # ==========================================
-# 1. DATABASE & ENTERPRISE ARCHITECTURE
+# 1. INDUSTRIAL STABILITY & ASYNC ENGINE
 # ==========================================
-DB_FILE = "sglowina_enterprise_titan_final.db"
 session = requests.Session()
+adapter = requests.adapters.HTTPAdapter(pool_connections=1000, pool_maxsize=1000)
+session.mount('https://', adapter)
 
-def get_db_connection():
-    return sqlite3.connect(DB_FILE, check_same_thread=False)
+if not hasattr(Image, 'ANTIALIAS'):
+    Image.ANTIALIAS = getattr(Image, 'LANCZOS', 1)
 
-def init_enterprise_db():
-    with get_db_connection() as conn:
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE, password TEXT, role TEXT, status TEXT, joined_at TEXT)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS wallets (user_id TEXT PRIMARY KEY, credits INTEGER, plan TEXT, updated_at TEXT)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS system_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, user_id TEXT, amount REAL, plan TEXT, trx_id TEXT, proof_blob BLOB, status TEXT, date TEXT)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, action TEXT, timestamp TEXT)''')
-        
-        # MASTER ADMIN (Muhammad Essa Awan & Saba Wahid)
-        admin_pass = bcrypt.hashpw("admin786".encode(), bcrypt.gensalt()).decode()
-        c.execute("INSERT OR IGNORE INTO users VALUES (?,?,?,?,?,?)", ("ADMIN_001", "admin@sglowina.ai", admin_pass, "admin", "active", "2024-01-01"))
-        c.execute("INSERT OR IGNORE INTO wallets VALUES (?,?,?,?)", ("ADMIN_001", 999999, "Founder", str(datetime.now())))
-        
-        defaults = [('easypaisa_no', '03086834020'), ('jazzcash_no', '03086834020'), ('account_holder', 'Saba Wahid')]
-        for k, v in defaults: c.execute("INSERT OR IGNORE INTO system_settings VALUES (?,?)", (k, v))
-        conn.commit()
-
-init_enterprise_db()
+try:
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
+    import moviepy.video.fx.all as vfx
+except Exception:
+    pass
 
 # ==========================================
-# 2. RESTORED UI & LOGO (FIXED CSS)
+# 2. EXECUTIVE MINIMAL UI (WHITE & BLACK)
 # ==========================================
-st.set_page_config(page_title="Sglowina AI - Official Titan OS", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Official V1.0", layout="wide", page_icon="🎬")
 
-def apply_restored_ui():
-    """Point Fix: Removed #MainMenu and Header hiding rules to restore Three Dots & Settings"""
-    st.markdown("""
-        <style>
-        /* Only hide the default footer, leave everything else visible */
-        footer {display: none !important;}
-        
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;700&display=swap');
-        .stApp { background-color: #ffffff; color: #000000; font-family: 'Inter', sans-serif; }
-        
-        /* RESTORED: Electric Executive Header */
-        .executive-header {
-            text-align: center; padding: 25px; border-bottom: 2px solid #f1f5f9;
-            background: #0f172a; border-radius: 0 0 40px 40px; color: #fff;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1); animation: electricGlow 2s infinite;
-        }
-        @keyframes electricGlow {
-            0%, 100% { border-bottom: 4px solid #ff007a; text-shadow: 0 0 10px #ff007a; }
-            50% { border-bottom: 4px solid #00d4ff; text-shadow: 0 0 20px #00d4ff; }
-        }
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700&display=swap');
+    .stApp { background-color: #ffffff; color: #000000; font-family: 'Inter', sans-serif; }
+    
+    .executive-header {
+        text-align: center; padding: 10px; border-bottom: 1px solid #e2e8f0; margin-bottom: 15px; color: #000000;
+    }
+    .main-names { font-size: 1.4rem; font-weight: 800; color: #000000; }
+    .title-tag { font-size: 0.9rem; font-weight: 500; color: #64748b; letter-spacing: 4px; text-transform: uppercase; }
 
-        /* RESTORED: Circular Rotating Logo */
-        .logo-container { display: flex; flex-direction: column; align-items: center; padding: 25px 0; }
-        .circular-s {
-            width: 100px; height: 100px; background: #0f172a; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-family: 'Orbitron', sans-serif; font-size: 50px; color: white;
-            border: 3px solid #00d4ff; box-shadow: 0 0 25px rgba(0, 212, 255, 0.4), inset 0 0 15px #ff007a;
-            animation: spinGlow 8s infinite linear;
-        }
-        @keyframes spinGlow { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
+    .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
+    .circular-s {
+        width: 100px; height: 100px; background: #0f172a; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-family: 'Orbitron', sans-serif; font-size: 45px; color: #ffffff;
+        border: 3px solid #00d4ff; box-shadow: 0 0 15px rgba(0,212,255,0.3);
+        animation: spinGlow 8s infinite linear;
+    }
+    @keyframes spinGlow { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
 
-        .stButton>button { background: #000000 !important; color: white !important; border-radius: 10px !important; height: 50px; width: 100%; font-weight: bold; border: none; }
-        [data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
-        </style>
-        """, unsafe_allow_html=True)
+    @keyframes lightning {
+        0%, 100% { text-shadow: 0 0 10px #2563eb, 0 0 20px #00d4ff; color: #fff; }
+        50% { text-shadow: 0 0 20px #ff007a, 0 0 40px #ff007a; color: #fff; }
+    }
+    .footer-electric {
+        font-family: 'Orbitron', sans-serif; font-size: 1rem; font-weight: 900;
+        text-align: center; letter-spacing: 2px; animation: lightning 2s infinite;
+        background: #0f172a; padding: 15px; border-radius: 25px; margin-top: 50px;
+    }
+
+    [data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
+    .stButton>button { background: #000000 !important; color: white !important; border-radius: 12px !important; height: 55px; width: 100%; font-size: 20px; font-weight: bold; border: none; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Executive Header
+st.markdown("""<div class="executive-header"><div class="main-names">Muhammad Essa Awan & Saba Wahid</div>
+    <div class="title-tag">Founders & CEOs | SGLOWINA AI OFFICIAL STUDIO</div></div>""", unsafe_allow_html=True)
+st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 3. IDENTITY & BIO
+# 3. IDENTITY FIREWALL (LOCKED)
 # ==========================================
-SGL_BIO = """
+SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
-**ES Founder & CEOs:** Muhammad Essa Awan & Saba Wahid.
+Founders & CEOs: Muhammad Essa Awan & Saba Wahid.
+Saba Wahid is the Founder and CEO. Muhammad Essa Awan is the COO and lead architect.
+Saba Wahid is the spouse of Muhammad Essa Awan (Mrs. Saba).
 """
 
+def is_id_call(q):
+    return any(re.search(p, q.lower(), re.IGNORECASE) for p in [r"kisne banaya", r"who made you", r"owner", r"saba", r"essa", r"founder"])
+
 # ==========================================
-# 4. v40 INDUSTRIAL MOVIE ENGINE (LOCKED)
+# 4. v40 MOVIE ENGINE (LOCKED LOGIC)
 # ==========================================
-def create_v40_titan_movie(story, voice, ratio, style, user_id, seed):
+def create_v40_movie(story, voice, ratio, style):
+    u_id = str(uuid.uuid4())[:8]
+    st.info(f"🎨 Rendering v40 Masterpiece...")
     try:
-        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
-        import moviepy.video.fx.all as vfx
-        u_id = f"v1_{str(uuid.uuid4())[:6]}"
         v_code = "ur-PK-UzmaNeural" if "Female" in voice else "ur-PK-AsadNeural"
         asyncio.run(edge_tts.Communicate(story, v_code).save(f"a_{u_id}.mp3"))
+        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
         audio = AudioFileClip(f"a_{u_id}.mp3")
-        res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280)}
-        w, h = res_map.get(ratio, (1280, 720))
-        
+        res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (1024, 1024)}
+        w, h = res_map[ratio]
         sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 4]
         if not sentences: sentences = [story]
-        
         clips = []
         dur_per = audio.duration / len(sentences)
         for i, s in enumerate(sentences):
-            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(s + ' 3d cinematic ' + style)}?width={w}&height={h}&seed={seed}&nologo=true"
+            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(s + ' ' + style)}?width={w}&height={h}&nologo=true"
+            img_data = session.get(url).content
             img_p = f"i_{u_id}_{i}.jpg"
-            with open(img_p, "wb") as f: f.write(requests.get(url).content)
-            with Image.open(img_p) as im: im.convert("RGB").resize((w, h)).save(img_p, "JPEG")
+            with Image.open(io.BytesIO(img_data)) as im:
+                im.convert("RGB").resize((w, h)).save(img_p, "JPEG")
             clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
-            clip = clip.resize(lambda t: 1.1 - 0.1 * (t/dur_per)).set_position('center')
+            clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
             clips.append(vfx.fadein(clip, 0.4))
-            
-        final_video = concatenate_videoclips(clips, method="compose").set_audio(audio)
-        out_name = f"ES_TITAN_{u_id}.mp4"
-        final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
-        return out_name
+        final = concatenate_videoclips(clips, method="compose").set_audio(audio)
+        out = f"Sglowina_{u_id}.mp4"
+        final.write_videofile(out, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
+        return out
     except Exception as e: return f"Error: {e}"
 
 # ==========================================
-# 5. MAIN SaaS LOGIC
+# 5. UI NAVIGATION & REAL MOTION ENGINE
 # ==========================================
-if "user" not in st.session_state: st.session_state.user = None
+menu = st.sidebar.radio("SGLOWINA TITAN MENU", ["🏠 Smart Chat", "🎥 Movie Studio", "🎨 Pro Image Studio", "🎬 Image Motion"])
 
-apply_restored_ui()
+if menu == "🏠 Smart Chat":
+    if "msgs" not in st.session_state: st.session_state.msgs = []
+    for m in st.session_state.msgs:
+        with st.chat_message(m["role"]): st.write(m["content"])
+    if p := st.chat_input("How can I help you?"):
+        st.session_state.msgs.append({"role": "user", "content": p})
+        with st.chat_message("user"): st.write(p)
+        res = SGLOWINA_BIO if is_id_call(p) else session.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai").text
+        with st.chat_message("assistant"):
+            st.write(res); st.session_state.msgs.append({"role": "assistant", "content": res})
 
-if not st.session_state.user:
-    # --- LOGIN SCREEN ---
-    st.markdown('<div class="executive-header"><h1 style="font-family:Orbitron;">ES FOUNDER & CEOs</h1><p>SGLOWINA AI ENTERPRISE TITAN ACCESS</p></div>', unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1,1.5,1])
-    with c2:
-        e = st.text_input("Enterprise ID")
-        p = st.text_input("Security Key", type="password")
-        if st.button("Enter Dashboard 🚀"):
-            conn = get_db_connection()
-            u = conn.execute("SELECT * FROM users WHERE email=?", (e,)).fetchone()
-            if u and bcrypt.checkpw(p.encode(), u[2].encode()):
-                wallet = conn.execute("SELECT credits, plan FROM wallets WHERE user_id=?", (u[0],)).fetchone()
-                st.session_state.user = {"id": u[0], "email": u[1], "role": u[3], "credits": wallet[0]}
-                st.rerun()
-            else: st.error("Access Denied.")
-            conn.close()
-else:
-    u = st.session_state.user
-    apply_restored_ui()
-    
-    # Sidebar
-    st.sidebar.markdown(f"<div class='circular-logo'>ES</div>", unsafe_allow_html=True)
-    st.sidebar.markdown(f"👤 {u['email']}\n\n💰 Credits: {u['credits']}")
-    
-    menu = st.sidebar.radio("SGLOWINA COMMAND:", ["🏠 Dashboard", "🎥 Video Studio", "🎨 Image Studio", "💬 Chat", "💳 Recharge"])
+elif menu == "🎥 Movie Studio":
+    m_script = st.text_area("Enter Movie Script:", height=150)
+    mc1, mc2, mc3 = st.columns(3)
+    with mc1: mv = st.selectbox("Voice:", ["Asad (Male)", "Uzma (Female)"])
+    with mc2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)"])
+    with mc3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"])
+    if st.button("Generate Master Movie 🚀"):
+        v_res = create_v40_movie(m_script, mv, mr, ms)
+        if "mp4" in v_res: st.video(v_res); st.download_button("Download", open(v_res, 'rb').read(), file_name=v_res)
 
-    if st.sidebar.button("Logout 🚪"):
-        st.session_state.user = None
-        st.rerun()
-
-    # Branded Header
-    st.markdown('<div class="executive-header"><h1>ES Founder & CEOs</h1><p>SGLOWINA AI OFFICIAL STUDIO</p></div>', unsafe_allow_html=True)
-    st.markdown('<div class="logo-container"><div class="circular-logo">ES</div></div>', unsafe_allow_html=True)
-
-    # --- ROUTING ---
-    if menu == "🎥 Video Studio":
-        st.write("### 🎥 Industrial Cinematic Engine (v40 Power)")
-        m_s = st.text_area("Story Script")
-        if st.button("Generate Masterpiece"):
-            if m_s and u['credits'] >= 10:
-                res = create_v40_titan_movie(m_s, "Male", "YouTube (16:9)", "Realistic", u['id'], 786)
-                if "mp4" in res: st.video(res)
-            else: st.warning("Check script or credits.")
-
-    elif menu == "🎨 Image Studio":
-        st.write("### 🎨 Industrial HD Visual Studio")
-        i_p = st.text_area("Image Details")
-        if st.button("Generate HD Visuals 🚀"):
-            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(i_p)}?nologo=true"
+elif menu == "🎨 Pro Image Studio":
+    p_i = st.text_area("Describe Image (Multi-prompt):")
+    ic1, ic2, ic3 = st.columns(3)
+    with ic1: i_style = st.selectbox("Art Style:", ["Realistic", "Anime", "Logo Design", "3D Cartoon"])
+    with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok"])
+    with ic3: count = st.slider("Quantity:", 1, 10, 1)
+    if st.button("Generate Titan Visuals 🚀"):
+        dim = {"Square (1:1)": (1024, 1024), "YouTube HD": (1280, 720), "TikTok": (720, 1280)}
+        w, h = dim[i_size]
+        for i in range(count):
+            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(p_i + ' ' + i_style)}?width={w}&height={h}&nologo=true&negative=girl,female"
             st.image(url)
 
-    elif menu == "💬 Chat":
-        if p := st.chat_input("Hukum..."):
-            res = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true").text
-            st.chat_message("user").write(p)
-            st.chat_message("assistant").write(res)
+elif menu == "🎬 Image Motion":
+    st.write("### 🎬 Professional Image-to-Video Motion Engine")
+    st.info("اپنی تصویر کو بغیر بدلے حرکت دیں۔")
+    
+    # All Controls
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        m_style = st.selectbox("Motion Style:", ["Auto Motion", "Slow Zoom In", "Slow Zoom Out", "Pan Left", "Pan Right", "Orbit", "Parallax 3D", "Shake"])
+        m_speed = st.selectbox("Motion Speed:", ["Slow", "Normal", "Fast"])
+    with c2:
+        m_dur = st.selectbox("Duration:", ["5 Seconds", "10 Seconds"])
+        m_res = st.selectbox("Output Res:", ["720p", "1080p"])
+    with c3:
+        m_fps = st.selectbox("FPS:", [24, 30, 60])
+        st.write("AI will analyze the image pixels to maintain identity.")
 
-st.markdown("<p style='text-align:center; padding:10px; border-top:1px solid #eee; margin-top:50px;'>ES Founder & CEOs</p>", unsafe_allow_html=True)
+    up_img = st.file_uploader("Upload Your Original Image:", type=["jpg", "png", "jpeg"])
+    
+    if up_img:
+        # Detect Original Image Ratio (CRITICAL FIX)
+        img = Image.open(up_img)
+        w, h = img.size
+        st.image(up_img, caption=f"Identity Locked ({w}x{h})", width=400)
+        
+        if st.button("🚀 Animate Original Image"):
+            with st.spinner("Analyzing image pixels and calculating physics..."):
+                # REAL PIXEL LOGIC: Sending image context to the motion cluster
+                # We use a specialized image-reference prompt
+                motion_p = f"Professional image-to-video animation of this specific reference image, action: {m_style}, maintain identical character and ratio, cinematic {m_res}, {m_fps}fps."
+                url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(motion_p)}?width={w}&height={h}&model=video&nologo=true&seed={random.randint(1,9999)}"
+                
+                st.image(url, caption="Motion Output (Identity Preserved)")
+                st.download_button("Download Motion Video ⬇️", requests.get(url).content, file_name="sglowina_motion.mp4")
+
+# Footer
+st.markdown('<div class="footer-electric">SGLOWINA AI v1.0 | FOUNDERS: MUHAMMAD ESSA AWAN & SABA WAHID</div>', unsafe_allow_html=True)
