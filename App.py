@@ -10,7 +10,7 @@ import uuid
 import random
 from PIL import Image
 import io
-import threading  # تھریڈنگ لائبریری کا امپورٹ واپس شامل کر دیا گیا ہے
+import threading
 
 # ==========================================
 # 1. INDUSTRIAL STABILITY & LOAD BALANCING
@@ -38,31 +38,87 @@ st.set_page_config(page_title="Sglowina AI - Official V1.2", layout="wide", page
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700&display=swap');
-    .stApp { background-color: #ffffff; color: #000000; font-family: 'Inter', sans-serif; }
+    
+    .stApp { 
+        background: radial-gradient(circle, #0f172a 0%, #020617 100%) !important; 
+        color: #f8fafc !important; 
+        font-family: 'Inter', sans-serif; 
+    }
     
     .executive-header {
-        text-align: center; padding: 10px; border-bottom: 1px solid #e2e8f0; margin-bottom: 15px; color: #000000;
+        text-align: center; 
+        padding: 15px; 
+        border-bottom: 2px solid #00f2fe; 
+        margin-bottom: 25px; 
+        background: rgba(30, 41, 59, 0.4);
+        border-radius: 12px;
+        box-shadow: 0 0 15px rgba(0, 242, 254, 0.15);
     }
-    .main-names { font-size: 1.5rem; font-weight: 800; color: #000000; }
-    .title-tag { font-size: 0.9rem; font-weight: bold; color: #64748b; letter-spacing: 4px; text-transform: uppercase; }
+    
+    .main-names { 
+        font-size: 1.8rem; 
+        font-weight: 800; 
+        color: #ffffff; 
+        text-shadow: 0 0 10px #00f2fe, 0 0 20px #00f2fe;
+        animation: lightning-flash 3s infinite alternate;
+    }
+    
+    @keyframes lightning-flash {
+        0%, 100% { text-shadow: 0 0 5px #00f2fe, 0 0 10px #00f2fe; }
+        50% { text-shadow: 0 0 15px #00f2fe, 0 0 25px #00d4ff, 0 0 35px #00d4ff; }
+    }
+    
+    .title-tag { 
+        font-size: 0.9rem; 
+        font-weight: bold; 
+        color: #94a3b8; 
+        letter-spacing: 4px; 
+        text-transform: uppercase; 
+    }
 
     .logo-container { display: flex; justify-content: center; align-items: center; padding: 20px 0; }
     .circular-s {
-        width: 100px; height: 100px; background: #0f172a; border-radius: 50%;
+        width: 100px; height: 100px; background: #020617; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         font-family: 'Orbitron', sans-serif; font-size: 45px; color: #ffffff;
-        border: 3px solid #00d4ff; box-shadow: 0 0 15px rgba(0,212,255,0.3);
-        animation: spin 10s infinite linear;
+        border: 3px solid #00f2fe; 
+        box-shadow: 0 0 25px rgba(0,242,254,0.5);
+        animation: spin 10s infinite linear, glow-pulse 3s infinite alternate;
+    }
+    
+    @keyframes glow-pulse {
+        0% { box-shadow: 0 0 15px rgba(0,242,254,0.3); }
+        100% { box-shadow: 0 0 35px rgba(0,242,254,0.7); }
     }
     @keyframes spin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
 
-    .stButton>button { background: #000000 !important; color: white !important; border-radius: 12px !important; height: 55px; width: 100%; font-size: 20px; font-weight: bold; border: none; }
-    [data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
-    [data-testid="stSidebar"] * { color: #000000 !important; font-weight: bold !important; }
+    [data-testid="stSidebar"] { 
+        background-color: #020617 !important; 
+        border-right: 1px solid #1e293b; 
+    }
+    [data-testid="stSidebar"] * { 
+        color: #f8fafc !important; 
+    }
+    
+    .stButton>button { 
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important; 
+        color: #ffffff !important; 
+        border-radius: 12px !important; 
+        height: 55px; 
+        width: 100%; 
+        font-size: 20px; 
+        font-weight: bold; 
+        border: 2px solid #00f2fe !important; 
+        box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        box-shadow: 0 0 20px rgba(0, 242, 254, 0.5);
+        background: #020617 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# Executive Header
 st.markdown("""<div class="executive-header"><div class="main-names">Muhammad Essa Awan & Saba Wahid</div>
     <div class="title-tag">Founders & CEOs | SGLOWINA AI OFFICIAL STUDIO</div></div>""", unsafe_allow_html=True)
 st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
@@ -77,7 +133,6 @@ Saba Wahid is the Founder and CEO. Muhammad Essa Awan is the COO and the lead vi
 Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.2 Release).
 """
 
-# اسلامی اور دیہاتی بصری فلٹرز کا انجن
 def apply_islamic_visual_logic(text):
     holy_keywords = ["نبی", "صحابی", "ولی اللہ", "امام", "Prophet", "Sahaba", "Wali Allah", "Buzurg"]
     islamic_keywords = ["مسلم", "اسلام", "تاریخ", "Muslim", "Islamic", "قبر", "عذاب", "آخرت", "نماز", "دعا", "مسجد", "موت", "Grave", "Punishment of Grave", "Deen"]
@@ -100,7 +155,6 @@ def apply_islamic_visual_logic(text):
 def get_titan_prompt(text, style, char_desc=""):
     shariah = apply_islamic_visual_logic(text)
     
-    # ریفرنس ویڈیو جیسی ہائی اینڈ لائٹنگ اور سحر انگیز کوالٹی کے بصری کی ورڈز
     style_details = {
         "Realistic HD": "hyperrealistic photograph, highly detailed 8k resolution, sharp focus, realistic textures, natural volumetric lighting, cinematic photography style",
         "Cinematic Film": "epic cinematic lighting, highly detailed fantasy masterpiece, majestic atmosphere, octane render, volumetric god rays, detailed beautiful environment, realistic fine textures, cinematic look",
@@ -112,17 +166,15 @@ def get_titan_prompt(text, style, char_desc=""):
     
     style_prompt = style_details.get(style, "epic cinematic lighting, highly detailed masterpiece")
     
-    # کریکٹر کو مستقل رکھنے کا فلٹر
     full_subject = text
     if char_desc.strip():
         full_subject = f"The main character must be exactly depicted as: {char_desc.strip()} (keep the exact same face and clothing in this scene). Scene action: {text}"
         
     try:
-        instr = f"Act as a Film Director: Extract core subject from Urdu: '{full_subject}'. {shariah}. {style_prompt}. Output ONLY English prompt."
+        instr = f"Act as a Film Director: Translate/Extract core subject from Urdu: '{full_subject}'. All characters must be human beings. Do NOT translate historical human names like 'Sher Shah' or metaphors like 'Sher' into literal animals (no tigers, no lions, no beasts). They must be depicted as dignified human kings/people wearing traditional historical attire. {shariah}. {style_prompt}. Output ONLY English prompt."
         res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai&cache=true", timeout=25)
         translated_text = res.text if res.status_code == 200 else ""
         
-        # اگر ٹرانسلیشن سرور پر لوڈ کی وجہ سے سیکیورٹی پیج (HTML/Cloudflare) آئے تو اسے خارج کر دیں
         if "<html" in translated_text.lower() or "cloudflare" in translated_text.lower() or "error" in translated_text.lower() or len(translated_text) > 1000:
             translated_text = ""
             
@@ -131,18 +183,16 @@ def get_titan_prompt(text, style, char_desc=""):
     except: 
         pass
         
-    # سیف فال بیک
     return f"{full_subject}. {style_prompt}"
 
 # ==========================================
 # 4. TITAN PARALLEL MOVIE ENGINE (v40 LOGIC)
 # ==========================================
-# سنگل ڈاؤنلوڈ فارمیٹ تاکہ آئی پی بلاک نہ ہو
 def fetch_img(url):
     for attempt in range(3):
         try:
             res = session.get(url, timeout=30)
-            if res.status_code == 200 and len(res.content) > 3000: # درست تصویری فائل کی توثیق
+            if res.status_code == 200 and len(res.content) > 3000:
                 return res.content
         except Exception:
             pass
@@ -154,7 +204,6 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            # پچ اور اسپیڈ کے ساتھ آڈیو فائل بنانا
             loop.run_until_complete(edge_tts.Communicate(story, v_code, rate=rate, pitch=pitch).save(audio_f))
         finally:
             loop.close()
@@ -175,7 +224,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         save_audio_safe(story, v_code, rate, pitch, audio_f)
         audio = AudioFileClip(audio_f)
         
-        # ویڈیو ریشوز
         res_map = {
             "YouTube (16:9)": (1280, 720), 
             "TikTok/Reels (9:16)": (720, 1280), 
@@ -191,9 +239,8 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         clips = []
         dur_per = audio.duration / len(sentences)
         
-        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&nologo=true&negative=girl,female,deformed,bad_hands,blurry,bad_eyes,bad_face,double_heads,modern_western_clothing,t_shirt,jeans,suit,low_quality,worst_quality,animal,dog,cat,captcha" for s in sentences]
+        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&nologo=true&negative=girl,female,deformed,bad_hands,blurry,bad_eyes,bad_face,double_heads,modern_western_clothing,t_shirt,jeans,suit,low_quality,worst_quality,animal,dog,cat,captcha,blood,bloody,wounded,scary,horror,mutilated_face,decaying_skin,tiger_head,lion_head,half_animal" for s in sentences]
 
-        # آئی پی بلاک ہونے اور بلیک اسکرین سے بچنے کے لیے سلسلہ وار ڈاؤن لوڈنگ
         for i, url in enumerate(img_urls):
             status.info(f"🎨 Generating & Downloading Scene {i+1}/{len(sentences)}...")
             img_data = fetch_img(url)
@@ -209,7 +256,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                 except Exception:
                     pass
             
-            # اگر سرور جواب نہ دے تو متبادل عارضی امیج
             if not image_saved:
                 try:
                     im = Image.new("RGB", (w, h), color=(15, 23, 42))
@@ -221,7 +267,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
             clips.append(vfx.fadein(clip, 0.4))
             
-            # سرور کو ریلیف دینے کے لیے ہلکا سا وقفہ تاکہ اگلی تصویر بلاک نہ ہو
             time.sleep(0.5)
             
         status.info("🎞️ Compiling and Rendering HD Video (ویڈیو تیار ہو رہی ہے)...")
@@ -273,11 +318,9 @@ elif menu == "🎬 Movie Studio":
     char_desc = st.text_input("Consistent Character (کریکٹر کا حلیہ - مثلاً لباس، عمر، ڈکھیل):", 
                               placeholder="Example: A 30-year-old brave warrior, short black beard, wearing a traditional dark green turban and grey robe")
     
-    # کالمز کو بڑھا کر پچ (بھاری پن) کا آپشن دیا گیا ہے
     mc1, mc2, mc3, mc4, mc5, mc6 = st.columns(6)
     with mc1: mv = st.selectbox("Voice:", ["Asad (Male)", "Uzma (Female)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
-    # پچ کا نیا آپشن (موٹی اور بھاری آواز کے لیے)
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
@@ -286,7 +329,6 @@ elif menu == "🎬 Movie Studio":
     if st.button("Generate Master Movie 🚀"):
         rate_val = mv_rate.split(" ")[0]
         
-        # پچ ویلیو کا نقشہ (Edge-TTS سپورٹڈ فارمیٹ)
         pitch_map = {
             "Normal (نارمل)": "+0Hz",
             "Deep (بھاری آواز)": "-15Hz",
@@ -294,7 +336,6 @@ elif menu == "🎬 Movie Studio":
         }
         pitch_val = pitch_map[mv_pitch]
         
-        # اسٹریم لٹ کے باقاعدہ رننگ چرخے (Spinner) کی واپسی
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
             v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc)
             
