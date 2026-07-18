@@ -10,8 +10,6 @@ import uuid
 import random
 from PIL import Image
 import io
-import threading
-from concurrent.futures import ThreadPoolExecutor
 
 # ==========================================
 # 1. INDUSTRIAL STABILITY & LOAD BALANCING
@@ -78,7 +76,7 @@ Saba Wahid is the Founder and CEO. Muhammad Essa Awan is the COO and the lead vi
 Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.2 Release).
 """
 
-# نئے اسلامی اور دیہاتی بصری فلٹرز کا انجن
+# اسلامی اور دیہاتی بصری فلٹرز کا انجن
 def apply_islamic_visual_logic(text):
     holy_keywords = ["نبی", "صحابی", "ولی اللہ", "امام", "Prophet", "Sahaba", "Wali Allah", "Buzurg"]
     islamic_keywords = ["مسلم", "اسلام", "تاریخ", "Muslim", "Islamic", "قبر", "عذاب", "آخرت", "نماز", "دعا", "مسجد", "موت", "Grave", "Punishment of Grave", "Deen"]
@@ -132,20 +130,22 @@ def get_titan_prompt(text, style, char_desc=""):
     except: 
         pass
         
-    # سیف فال بیک: اگر ٹرانسلیشن فیل ہو تو اردو الفاظ اور سٹائل کو یکجا کر کے تصویر بنائی جائے گی تاکہ جانور نہ بنیں
+    # سیف فال بیک
     return f"{full_subject}. {style_prompt}"
 
 # ==========================================
 # 4. TITAN PARALLEL MOVIE ENGINE (v40 LOGIC)
 # ==========================================
-# تیز رفتاری کے لیے ڈاؤن لوڈنگ کا محفوظ نظام
+# سنگل ڈاؤنلوڈ فارمیٹ تاکہ آئی پی بلاک نہ ہو
 def fetch_img(url):
-    try:
-        res = session.get(url, timeout=30)
-        if res.status_code == 200:
-            return res.content
-    except Exception:
-        pass
+    for attempt in range(3):
+        try:
+            res = session.get(url, timeout=30)
+            if res.status_code == 200 and len(res.content) > 3000: # درست تصویری فائل کی توثیق
+                return res.content
+        except Exception:
+            pass
+        time.sleep(1.0)
     return None
 
 def save_audio_safe(story, v_code, rate, audio_f):
@@ -189,36 +189,38 @@ def create_titan_movie_v1(story, voice, rate, ratio, style, seed, char_desc=""):
         clips = []
         dur_per = audio.duration / len(sentences)
         
-        status.info("🎨 Rendering Cinematic Scenes in Parallel (تصویریں بن رہی ہیں)...")
         img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&nologo=true&negative=girl,female,deformed,bad_hands,blurry,bad_eyes,bad_face,double_heads,modern_western_clothing,t_shirt,jeans,suit,low_quality,worst_quality,animal,dog,cat,captcha" for s in sentences]
 
-        # رفتار کو دوبارہ تیز کرنے کے لیے max_workers=15 کر دیا گیا ہے
-        with ThreadPoolExecutor(max_workers=15) as exe:
-            for i, img_data in enumerate(exe.map(fetch_img, img_urls)):
-                status.info(f"⚡ Processing Scene {i+1}/{len(sentences)}...")
-                img_p = f"i_{u_id}_{i}.jpg"
-                generated_images.append(img_p)
-                
-                image_saved = False
-                if img_data:
-                    try:
-                        with Image.open(io.BytesIO(img_data)) as im:
-                            im.convert("RGB").resize((w, h)).save(img_p, "JPEG")
-                        image_saved = True
-                    except Exception:
-                        pass
-                
-                # اگر تصویر ڈاؤن لوڈ نہ ہو پائے تو عارضی ڈارک بیک گراؤنڈ بنانا
-                if not image_saved:
-                    try:
-                        im = Image.new("RGB", (w, h), color=(15, 23, 42))
-                        im.save(img_p, "JPEG")
-                    except Exception:
-                        pass
-                
-                clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
-                clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
-                clips.append(vfx.fadein(clip, 0.4))
+        # آئی پی بلاک ہونے اور بلیک اسکرین سے بچنے کے لیے سلسلہ وار ڈاؤن لوڈنگ
+        for i, url in enumerate(img_urls):
+            status.info(f"🎨 Generating & Downloading Scene {i+1}/{len(sentences)}...")
+            img_data = fetch_img(url)
+            img_p = f"i_{u_id}_{i}.jpg"
+            generated_images.append(img_p)
+            
+            image_saved = False
+            if img_data:
+                try:
+                    with Image.open(io.BytesIO(img_data)) as im:
+                        im.convert("RGB").resize((w, h)).save(img_p, "JPEG")
+                    image_saved = True
+                except Exception:
+                    pass
+            
+            # اگر سرور جواب نہ دے تو متبادل عارضی امیج
+            if not image_saved:
+                try:
+                    im = Image.new("RGB", (w, h), color=(15, 23, 42))
+                    im.save(img_p, "JPEG")
+                except Exception:
+                    pass
+            
+            clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
+            clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
+            clips.append(vfx.fadein(clip, 0.4))
+            
+            # سرور کو ریلیف دینے کے لیے ہلکا سا وقفہ تاکہ اگلی تصویر بلاک نہ ہو
+            time.sleep(0.5)
             
         status.info("🎞️ Compiling and Rendering HD Video (ویڈیو تیار ہو رہی ہے)...")
         final_video = concatenate_videoclips(clips, method="compose").set_audio(audio)
