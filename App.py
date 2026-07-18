@@ -78,7 +78,7 @@ Saba Wahid is the Founder and CEO. Muhammad Essa Awan is the COO and the lead vi
 Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.2 Release).
 """
 
-# اسلامی اور دیہاتی بصری فلٹرز کا انجن
+# نئے اسلامی اور دیہاتی بصری فلٹرز کا انجن
 def apply_islamic_visual_logic(text):
     holy_keywords = ["نبی", "صحابی", "ولی اللہ", "امام", "Prophet", "Sahaba", "Wali Allah", "Buzurg"]
     islamic_keywords = ["مسلم", "اسلام", "تاریخ", "Muslim", "Islamic", "قبر", "عذاب", "آخرت", "نماز", "دعا", "مسجد", "موت", "Grave", "Punishment of Grave", "Deen"]
@@ -121,22 +121,31 @@ def get_titan_prompt(text, style, char_desc=""):
     try:
         instr = f"Act as a Film Director: Extract core subject from Urdu: '{full_subject}'. {shariah}. {style_prompt}. Output ONLY English prompt."
         res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai&cache=true", timeout=25)
-        return res.text if res.status_code == 200 else text
-    except: return text
+        translated_text = res.text if res.status_code == 200 else ""
+        
+        # اگر ٹرانسلیشن سرور پر لوڈ کی وجہ سے سیکیورٹی پیج (HTML/Cloudflare) آئے تو اسے خارج کر دیں
+        if "<html" in translated_text.lower() or "cloudflare" in translated_text.lower() or "error" in translated_text.lower() or len(translated_text) > 1000:
+            translated_text = ""
+            
+        if translated_text.strip():
+            return translated_text.strip()
+    except: 
+        pass
+        
+    # سیف فال بیک: اگر ٹرانسلیشن فیل ہو تو اردو الفاظ اور سٹائل کو یکجا کر کے تصویر بنائی جائے گی تاکہ جانور نہ بنیں
+    return f"{full_subject}. {style_prompt}"
 
 # ==========================================
 # 4. TITAN PARALLEL MOVIE ENGINE (v40 LOGIC)
 # ==========================================
-# نیٹ ورک اور یو آر ایل کے مسائل سے بچنے کا محفوظ نظام
+# تیز رفتاری کے لیے ڈاؤن لوڈنگ کا محفوظ نظام
 def fetch_img(url):
-    for attempt in range(3):
-        try:
-            res = session.get(url, timeout=40)
-            if res.status_code == 200:
-                return res.content
-        except Exception:
-            pass
-        time.sleep(1.0)
+    try:
+        res = session.get(url, timeout=30)
+        if res.status_code == 200:
+            return res.content
+    except Exception:
+        pass
     return None
 
 def save_audio_safe(story, v_code, rate, audio_f):
@@ -159,12 +168,12 @@ def create_titan_movie_v1(story, voice, rate, ratio, style, seed, char_desc=""):
     generated_images = []
     
     try:
+        status.info("🎙️ Generating Voiceover Track (آڈیو جنریٹ ہو رہی ہے)...")
         v_code = "ur-PK-UzmaNeural" if voice == "Uzma (Female)" else "ur-PK-AsadNeural"
-        
         save_audio_safe(story, v_code, rate, audio_f)
         audio = AudioFileClip(audio_f)
         
-        # ویڈیو ریشوز کا نقشہ
+        # ویڈیو ریشوز
         res_map = {
             "YouTube (16:9)": (1280, 720), 
             "TikTok/Reels (9:16)": (720, 1280), 
@@ -180,12 +189,13 @@ def create_titan_movie_v1(story, voice, rate, ratio, style, seed, char_desc=""):
         clips = []
         dur_per = audio.duration / len(sentences)
         
-        # نیگیٹو پرامپٹ کے تمام اسپیسز (spaces) کو انڈر اسکور (_) سے بدل دیا گیا ہے تاکہ یو آر ایل کریش نہ ہو
-        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&nologo=true&negative=girl,female,deformed,bad_hands,blurry,bad_eyes,bad_face,double_heads,modern_western_clothing,t_shirt,jeans,suit,low_quality,worst_quality" for s in sentences]
+        status.info("🎨 Rendering Cinematic Scenes in Parallel (تصویریں بن رہی ہیں)...")
+        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&nologo=true&negative=girl,female,deformed,bad_hands,blurry,bad_eyes,bad_face,double_heads,modern_western_clothing,t_shirt,jeans,suit,low_quality,worst_quality,animal,dog,cat,captcha" for s in sentences]
 
-        with ThreadPoolExecutor(max_workers=4) as exe:
+        # رفتار کو دوبارہ تیز کرنے کے لیے max_workers=15 کر دیا گیا ہے
+        with ThreadPoolExecutor(max_workers=15) as exe:
             for i, img_data in enumerate(exe.map(fetch_img, img_urls)):
-                status.info(f"⚡ Rendering Scene {i+1}/{len(sentences)}...")
+                status.info(f"⚡ Processing Scene {i+1}/{len(sentences)}...")
                 img_p = f"i_{u_id}_{i}.jpg"
                 generated_images.append(img_p)
                 
@@ -210,6 +220,7 @@ def create_titan_movie_v1(story, voice, rate, ratio, style, seed, char_desc=""):
                 clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
                 clips.append(vfx.fadein(clip, 0.4))
             
+        status.info("🎞️ Compiling and Rendering HD Video (ویڈیو تیار ہو رہی ہے)...")
         final_video = concatenate_videoclips(clips, method="compose").set_audio(audio)
         out = f"Sglowina_{u_id}.mp4"
         final_video.write_videofile(out, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
@@ -224,6 +235,7 @@ def create_titan_movie_v1(story, voice, rate, ratio, style, seed, char_desc=""):
         except Exception:
             pass
             
+        status.success("🚀 Video Generated Successfully (ویڈیو بن چکی ہے)!")
         return out
     except Exception as e: 
         try:
