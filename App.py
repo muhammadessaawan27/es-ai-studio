@@ -101,13 +101,25 @@ def apply_islamic_visual_logic(text):
 def get_titan_prompt(text, style, char_desc=""):
     shariah = apply_islamic_visual_logic(text)
     
-    # کریکٹر کو مستقل رکھنے کا مضبوط فلٹر
+    # ریفرنس ویڈیو جیسی ہائی اینڈ لائٹنگ اور سحر انگیز کوالٹی کے بصری کی ورڈز
+    style_details = {
+        "Realistic HD": "hyperrealistic photograph, highly detailed 8k resolution, sharp focus, realistic textures, natural volumetric lighting, cinematic photography style",
+        "Cinematic Film": "epic cinematic lighting, highly detailed fantasy masterpiece, majestic atmosphere, octane render, volumetric god rays, detailed beautiful environment, realistic fine textures, cinematic look",
+        "3D Cartoon": "professional 3D animated character, Pixar style, highly detailed, vibrant colors, clean rendering, smooth textures",
+        "Historical Epic": "historical authentic scene, epic detail, ancient historical painting style, dramatic historical atmosphere, highly detailed oil painting, fine details",
+        "Rustic Village Life": "rustic rural setting, highly detailed, natural lighting, authentic organic village environment, earthy tones, mud houses, natural textures",
+        "Dark Gothic / Mystery": "dark gothic fantasy, mysterious foggy atmosphere, dramatic moody lighting, highly detailed, masterpiece, dark mist"
+    }
+    
+    style_prompt = style_details.get(style, "epic cinematic lighting, highly detailed masterpiece")
+    
+    # کریکٹر کو مستقل رکھنے کا فلٹر
     full_subject = text
     if char_desc.strip():
         full_subject = f"The main character must be exactly depicted as: {char_desc.strip()} (keep the exact same face and clothing in this scene). Scene action: {text}"
         
     try:
-        instr = f"Act as a Film Director: Extract core subject from Urdu: '{full_subject}'. {shariah}. Professional 3D character animation, high detail, masterpiece. Style: {style}. Output ONLY English prompt."
+        instr = f"Act as a Film Director: Extract core subject from Urdu: '{full_subject}'. {shariah}. {style_prompt}. Output ONLY English prompt."
         res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai&cache=true", timeout=25)
         return res.text if res.status_code == 200 else text
     except: return text
@@ -115,13 +127,16 @@ def get_titan_prompt(text, style, char_desc=""):
 # ==========================================
 # 4. TITAN PARALLEL MOVIE ENGINE (v40 LOGIC)
 # ==========================================
+# نیٹ ورک کے مسائل اور بلیک اسکرین کے فالٹ کو 100٪ دور کرنے کے لیے تھریڈ اور ری ٹرائے کا نیا محفوظ نظام
 def fetch_img(url):
-    try:
-        res = session.get(url, timeout=60)
-        if res.status_code == 200:
-            return res.content
-    except Exception:
-        pass
+    for attempt in range(3):
+        try:
+            res = session.get(url, timeout=30)
+            if res.status_code == 200 and len(res.content) > 2000:
+                return res.content
+        except Exception:
+            pass
+        time.sleep(1.2) # بلاک ہونے سے بچنے کے لیے معمولی وقفہ
     return None
 
 def save_audio_safe(story, v_code, rate, audio_f):
@@ -165,9 +180,10 @@ def create_titan_movie_v1(story, voice, rate, ratio, style, seed, char_desc=""):
         clips = []
         dur_per = audio.duration / len(sentences)
         
-        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&nologo=true&negative=girl,female,deformed,bad hands,blurry,bad eyes,bad face,double heads,modern western clothing,t-shirt,jeans,suit" for s in sentences]
+        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&nologo=true&negative=girl,female,deformed,bad hands,blurry,bad eyes,bad face,double heads,modern western clothing,t-shirt,jeans,suit,low quality,worst quality" for s in sentences]
 
-        with ThreadPoolExecutor(max_workers=20) as exe:
+        # تھریڈز کو 20 سے کم کر کے 4 کر دیا گیا ہے تاکہ سرور آئی پی بلاک نہ کرے اور بلیک اسکرین نہ آئے
+        with ThreadPoolExecutor(max_workers=4) as exe:
             for i, img_data in enumerate(exe.map(fetch_img, img_urls)):
                 status.info(f"⚡ Rendering Scene {i+1}/{len(sentences)}...")
                 img_p = f"i_{u_id}_{i}.jpg"
@@ -182,6 +198,7 @@ def create_titan_movie_v1(story, voice, rate, ratio, style, seed, char_desc=""):
                     except Exception:
                         pass
                 
+                # اگر تصویر ڈاؤن لوڈ نہ ہو پائے تو عارضی ڈارک بیک گراؤنڈ بنانا تاکہ پروجیکٹ رکے نہیں
                 if not image_saved:
                     try:
                         im = Image.new("RGB", (w, h), color=(15, 23, 42))
