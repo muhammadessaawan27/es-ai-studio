@@ -11,6 +11,7 @@ import random
 from PIL import Image, ImageDraw, ImageFont
 import io
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 # ==========================================
 # 1. INDUSTRIAL STABILITY & LOAD BALANCING
@@ -40,95 +41,79 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700&display=swap');
     
     .stApp { 
-        background: radial-gradient(circle, #0f172a 0%, #020617 100%) !important; 
-        color: #f8fafc !important; 
+        background-color: #ffffff !important; 
+        color: #000000 !important; 
         font-family: 'Inter', sans-serif; 
     }
     
     .executive-header {
         text-align: center; 
-        padding: 15px; 
-        border-bottom: 2px solid #00f2fe; 
-        margin-bottom: 25px; 
-        background: rgba(30, 41, 59, 0.4);
-        border-radius: 12px;
-        box-shadow: 0 0 15px rgba(0, 242, 254, 0.15);
+        padding: 10px; 
+        border-bottom: 1px solid #e2e8f0; 
+        margin-bottom: 15px; 
+        color: #000000 !important;
     }
     
     .main-names { 
-        font-size: 1.8rem; 
+        font-size: 1.5rem; 
         font-weight: 800; 
-        color: #ffffff; 
-        text-shadow: 0 0 10px #00f2fe, 0 0 20px #00f2fe;
-        animation: lightning-flash 3s infinite alternate;
-    }
-    
-    @keyframes lightning-flash {
-        0%, 100% { text-shadow: 0 0 5px #00f2fe, 0 0 10px #00f2fe; }
-        50% { text-shadow: 0 0 15px #00f2fe, 0 0 25px #00d4ff, 0 0 35px #00d4ff; }
+        color: #000000 !important; 
     }
     
     .title-tag { 
         font-size: 0.9rem; 
         font-weight: bold; 
-        color: #94a3b8; 
+        color: #64748b !important; 
         letter-spacing: 4px; 
         text-transform: uppercase; 
     }
 
     .logo-container { display: flex; justify-content: center; align-items: center; padding: 20px 0; }
     .circular-s {
-        width: 100px; height: 100px; background: #020617; border-radius: 50%;
+        width: 100px; height: 100px; background: #0f172a; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
-        font-family: 'Orbitron', sans-serif; font-size: 45px; color: #ffffff;
-        border: 3px solid #00f2fe; 
-        box-shadow: 0 0 25px rgba(0,242,254,0.5);
-        animation: spin 10s infinite linear, glow-pulse 3s infinite alternate;
-    }
-    
-    @keyframes glow-pulse {
-        0% { box-shadow: 0 0 15px rgba(0,242,254,0.3); }
-        100% { box-shadow: 0 0 35px rgba(0,242,254,0.7); }
+        font-family: 'Orbitron', sans-serif; font-size: 45px; color: #ffffff !important;
+        border: 3px solid #00d4ff; box-shadow: 0 0 15px rgba(0,212,255,0.3);
+        animation: spin 10s infinite linear;
     }
     @keyframes spin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
 
-    [data-testid="stSidebar"] { 
-        background-color: #020617 !important; 
-        border-right: 1px solid #1e293b; 
-    }
-    [data-testid="stSidebar"] * { 
-        color: #f8fafc !important; 
-    }
-    
     .stButton>button { 
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important; 
-        color: #ffffff !important; 
+        background: #000000 !important; 
+        color: white !important; 
         border-radius: 12px !important; 
         height: 55px; 
         width: 100%; 
         font-size: 20px; 
         font-weight: bold; 
-        border: 2px solid #00f2fe !important; 
-        box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
-        transition: all 0.3s ease;
-    }
-    .stButton>button:hover {
-        box-shadow: 0 0 20px rgba(0, 242, 254, 0.5);
-        background: #020617 !important;
+        border: none; 
     }
     
-    textarea, input, select, div[role="textbox"] {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
-        border: 1.5px solid #00f2fe !important;
+    [data-testid="stSidebar"] { 
+        background-color: #ffffff !important; 
+        border-right: 1px solid #e2e8f0; 
     }
+    [data-testid="stSidebar"] * { 
+        color: #000000 !important; 
+        font-weight: bold !important; 
+    }
+    
     div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
-        border-radius: 8px !important;
+        background-color: #f8fafc !important;
+        color: #0f172a !important;
+        border: 2px solid #cbd5e1 !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+        transition: all 0.3s ease !important;
     }
-    div[data-testid="stMarkdownContainer"] p, label, span {
-        color: #f8fafc !important;
+    div[data-baseweb="textarea"] textarea:focus, div[data-baseweb="input"] input:focus {
+        border-color: #00d4ff !important;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.2) !important;
+        background-color: #ffffff !important;
+    }
+    div[data-baseweb="textarea"] textarea::placeholder, div[data-baseweb="input"] input::placeholder {
+        color: #64748b !important;
+        opacity: 1 !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -149,7 +134,7 @@ Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.2 Release).
 
 def apply_islamic_visual_logic(text):
     holy_keywords = ["نبی", "صحابی", "ولی اللہ", "امام", "Prophet", "Sahaba", "Wali Allah", "Buzurg"]
-    islamic_keywords = ["مسلم", "اسلا", "تاریخ", "Muslim", "Islamic", "قبر", "عذاب", "آخرت", "نماز", "دعا", "مسجد", "موت", "Grave", "Punishment of Grave", "Deen"]
+    islamic_keywords = ["مسلم", "اسلام", "تاریخ", "Muslim", "Islamic", "قبر", "عذاب", "آخرت", "نماز", "دعا", "مسجد", "موت", "Grave", "Punishment of Grave", "Deen"]
     village_keywords = ["دیہات", "دیہاتی", "پنڈ", "گاؤں", "Village", "Rural", "Fields", "Desi"]
     
     is_holy = any(k in text for k in holy_keywords)
