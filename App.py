@@ -10,6 +10,7 @@ import uuid
 import random
 from PIL import Image
 import io
+import threading  # تھریڈنگ لائبریری کا امپورٹ واپس شامل کر دیا گیا ہے
 
 # ==========================================
 # 1. INDUSTRIAL STABILITY & LOAD BALANCING
@@ -148,12 +149,13 @@ def fetch_img(url):
         time.sleep(1.0)
     return None
 
-def save_audio_safe(story, v_code, rate, audio_f):
+def save_audio_safe(story, v_code, rate, pitch, audio_f):
     def _run():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(edge_tts.Communicate(story, v_code, rate=rate).save(audio_f))
+            # پچ اور اسپیڈ کے ساتھ آڈیو فائل بنانا
+            loop.run_until_complete(edge_tts.Communicate(story, v_code, rate=rate, pitch=pitch).save(audio_f))
         finally:
             loop.close()
 
@@ -161,7 +163,7 @@ def save_audio_safe(story, v_code, rate, audio_f):
     thread.start()
     thread.join()
 
-def create_titan_movie_v1(story, voice, rate, ratio, style, seed, char_desc=""):
+def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc=""):
     u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
     status = st.empty()
     audio_f = f"a_{u_id}.mp3"
@@ -170,7 +172,7 @@ def create_titan_movie_v1(story, voice, rate, ratio, style, seed, char_desc=""):
     try:
         status.info("🎙️ Generating Voiceover Track (آڈیو جنریٹ ہو رہی ہے)...")
         v_code = "ur-PK-UzmaNeural" if voice == "Uzma (Female)" else "ur-PK-AsadNeural"
-        save_audio_safe(story, v_code, rate, audio_f)
+        save_audio_safe(story, v_code, rate, pitch, audio_f)
         audio = AudioFileClip(audio_f)
         
         # ویڈیو ریشوز
@@ -271,16 +273,31 @@ elif menu == "🎬 Movie Studio":
     char_desc = st.text_input("Consistent Character (کریکٹر کا حلیہ - مثلاً لباس، عمر، ڈکھیل):", 
                               placeholder="Example: A 30-year-old brave warrior, short black beard, wearing a traditional dark green turban and grey robe")
     
-    mc1, mc2, mc3, mc4, mc5 = st.columns(5)
+    # کالمز کو بڑھا کر پچ (بھاری پن) کا آپشن دیا گیا ہے
+    mc1, mc2, mc3, mc4, mc5, mc6 = st.columns(6)
     with mc1: mv = st.selectbox("Voice:", ["Asad (Male)", "Uzma (Female)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
-    with mc3: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
-    with mc4: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    with mc5: sd = st.number_input("Character Seed:", value=786)
+    # پچ کا نیا آپشن (موٹی اور بھاری آواز کے لیے)
+    with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
+    with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
+    with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
+    with mc6: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
         rate_val = mv_rate.split(" ")[0]
-        v_res = create_titan_movie_v1(m_script, mv, rate_val, mr, ms, sd, char_desc)
+        
+        # پچ ویلیو کا نقشہ (Edge-TTS سپورٹڈ فارمیٹ)
+        pitch_map = {
+            "Normal (نارمل)": "+0Hz",
+            "Deep (بھاری آواز)": "-15Hz",
+            "Very Deep (موٹی آواز)": "-28Hz"
+        }
+        pitch_val = pitch_map[mv_pitch]
+        
+        # اسٹریم لٹ کے باقاعدہ رننگ چرخے (Spinner) کی واپسی
+        with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
+            v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc)
+            
         if "mp4" in str(v_res): st.video(v_res); st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
         else: st.error(v_res)
 
