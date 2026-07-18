@@ -97,9 +97,15 @@ def get_titan_prompt(text, style):
 # ==========================================
 # 4. TITAN PARALLEL MOVIE ENGINE (v40 LOGIC)
 # ==========================================
-# یہاں فنکشن کا نام درست کر کے 'fetch_img' کر دیا گیا ہے
+# نیٹ ورک کے مسائل اور ٹائم آؤٹ ہینڈل کرنے کے لیے فنکشن میں بہتری
 def fetch_img(url):
-    return session.get(url, timeout=60).content
+    try:
+        res = session.get(url, timeout=60)
+        if res.status_code == 200:
+            return res.content
+    except Exception:
+        pass
+    return None
 
 def create_titan_movie_v1(story, voice, ratio, style, seed):
     u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
@@ -126,8 +132,24 @@ def create_titan_movie_v1(story, voice, ratio, style, seed):
             for i, img_data in enumerate(exe.map(fetch_img, img_urls)):
                 status.info(f"⚡ Rendering Scene {i+1}/{len(sentences)}...")
                 img_p = f"i_{u_id}_{i}.jpg"
-                with Image.open(io.BytesIO(img_data)) as im:
-                    im.convert("RGB").resize((w, h)).save(img_p, "JPEG")
+                
+                image_saved = False
+                if img_data:
+                    try:
+                        with Image.open(io.BytesIO(img_data)) as im:
+                            im.convert("RGB").resize((w, h)).save(img_p, "JPEG")
+                        image_saved = True
+                    except Exception:
+                        pass
+                
+                # اگر تصویر ڈاؤن لوڈ نہیں ہو سکی یا خراب ہے تو عارضی ڈارک امیج خودکار طور پر بن جائے گی
+                if not image_saved:
+                    try:
+                        im = Image.new("RGB", (w, h), color=(15, 23, 42)) # Sglowina Dark Theme Color
+                        im.save(img_p, "JPEG")
+                    except Exception:
+                        pass
+                
                 clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
                 # v40 Locked Zoom-In: 1.0 to 1.15
                 clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
