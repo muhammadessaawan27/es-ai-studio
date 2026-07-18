@@ -8,7 +8,7 @@ import time
 import re
 import uuid
 import random
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import io
 import threading
 
@@ -116,6 +116,20 @@ st.markdown("""
         box-shadow: 0 0 20px rgba(0, 242, 254, 0.5);
         background: #020617 !important;
     }
+    
+    textarea, input, select, div[role="textbox"] {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+        border: 1.5px solid #00f2fe !important;
+    }
+    div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+    }
+    div[data-testid="stMarkdownContainer"] p, label, span {
+        color: #f8fafc !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -135,7 +149,7 @@ Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.2 Release).
 
 def apply_islamic_visual_logic(text):
     holy_keywords = ["نبی", "صحابی", "ولی اللہ", "امام", "Prophet", "Sahaba", "Wali Allah", "Buzurg"]
-    islamic_keywords = ["مسلم", "اسلام", "تاریخ", "Muslim", "Islamic", "قبر", "عذاب", "آخرت", "نماز", "دعا", "مسجد", "موت", "Grave", "Punishment of Grave", "Deen"]
+    islamic_keywords = ["مسلم", "اسلا", "تاریخ", "Muslim", "Islamic", "قبر", "عذاب", "آخرت", "نماز", "دعا", "مسجد", "موت", "Grave", "Punishment of Grave", "Deen"]
     village_keywords = ["دیہات", "دیہاتی", "پنڈ", "گاؤں", "Village", "Rural", "Fields", "Desi"]
     
     is_holy = any(k in text for k in holy_keywords)
@@ -170,12 +184,26 @@ def get_titan_prompt(text, style, char_desc=""):
     if char_desc.strip():
         full_subject = f"The main character must be exactly depicted as: {char_desc.strip()} (keep the exact same face and clothing in this scene). Scene action: {text}"
         
+    system_instruction = (
+        "Act as an expert AI prompt engineer for image generation. "
+        "Translate and expand the following Urdu scene description into a highly detailed English prompt. "
+        "The output MUST strictly follow this structure: "
+        "Subject: [Dignified, detailed description of main characters] | "
+        "Action: [What they are doing] | "
+        "Environment: [Detailed backdrop, location, and atmosphere] | "
+        "Camera Angle: [Cinematic angle, e.g., wide shot, close-up, or medium shot] | "
+        "Lighting: [Dramatic volumetric lighting, atmospheric rays] | "
+        "Facial Expression: [Dignified and emotional expression] | "
+        "Clothing: [Traditional historical robes and attire, no modern wear] | "
+        "Style & Quality: [8k, photorealistic masterpiece, smooth details, highly detailed human face and proportional anatomy] "
+    )
+    
     try:
-        instr = f"Act as a Film Director: Translate/Extract core subject from Urdu: '{full_subject}'. All characters must be human beings. Do NOT translate historical human names like 'Sher Shah' or metaphors like 'Sher' into literal animals (no tigers, no lions, no beasts). They must be depicted as dignified human kings/people wearing traditional historical attire. {shariah}. {style_prompt}. Output ONLY English prompt."
-        res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai&cache=true", timeout=25)
+        instr = f"{system_instruction}. Translate Urdu scene: '{full_subject}'. Style: {style_prompt}. {shariah}. Output ONLY the English structured prompt."
+        res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai&cache=true", timeout=15)
         translated_text = res.text if res.status_code == 200 else ""
         
-        if "<html" in translated_text.lower() or "cloudflare" in translated_text.lower() or "error" in translated_text.lower() or len(translated_text) > 1000:
+        if "<html" in translated_text.lower() or "cloudflare" in translated_text.lower() or "error" in translated_text.lower() or len(translated_text) > 1500:
             translated_text = ""
             
         if translated_text.strip():
@@ -183,7 +211,7 @@ def get_titan_prompt(text, style, char_desc=""):
     except: 
         pass
         
-    return f"{full_subject}. {style_prompt}"
+    return f"Subject: {full_subject} | Style: {style_prompt} | Quality: highly detailed human face, perfect proportional hands and fingers, masterpiece, 8k"
 
 # ==========================================
 # 4. TITAN PARALLEL MOVIE ENGINE (v40 LOGIC)
@@ -212,7 +240,7 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
     thread.start()
     thread.join()
 
-def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc=""):
+def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc="", enable_watermark=True):
     u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
     status = st.empty()
     audio_f = f"a_{u_id}.mp3"
@@ -239,35 +267,42 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         clips = []
         dur_per = audio.duration / len(sentences)
         
-        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&nologo=true&negative=girl,female,deformed,bad_hands,blurry,bad_eyes,bad_face,double_heads,modern_western_clothing,t_shirt,jeans,suit,low_quality,worst_quality,animal,dog,cat,captcha,blood,bloody,wounded,scary,horror,mutilated_face,decaying_skin,tiger_head,lion_head,half_animal" for s in sentences]
+        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&nologo=true&negative=girl,female,deformed,bad_hands,blurry,bad_eyes,bad_face,double_heads,modern_western_clothing,t_shirt,jeans,suit,low_quality,worst_quality,animal,dog,cat,captcha,blood,bloody,wounded,scary,horror,mutilated_face,decaying_skin,tiger_head,lion_head,half_animal,extra_limbs,deformed_fingers,mutated_hands,extra_fingers,malformed_limbs" for s in sentences]
 
-        for i, url in enumerate(img_urls):
-            status.info(f"🎨 Generating & Downloading Scene {i+1}/{len(sentences)}...")
-            img_data = fetch_img(url)
-            img_p = f"i_{u_id}_{i}.jpg"
-            generated_images.append(img_p)
-            
-            image_saved = False
-            if img_data:
-                try:
-                    with Image.open(io.BytesIO(img_data)) as im:
-                        im.convert("RGB").resize((w, h)).save(img_p, "JPEG")
-                    image_saved = True
-                except Exception:
-                    pass
-            
-            if not image_saved:
-                try:
-                    im = Image.new("RGB", (w, h), color=(15, 23, 42))
-                    im.save(img_p, "JPEG")
-                except Exception:
-                    pass
-            
-            clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
-            clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
-            clips.append(vfx.fadein(clip, 0.4))
-            
-            time.sleep(0.5)
+        with ThreadPoolExecutor(max_workers=5) as exe:
+            for i, img_data in enumerate(exe.map(fetch_img, img_urls)):
+                status.info(f"🎨 Generating & Downloading Scene {i+1}/{len(sentences)}...")
+                img_p = f"i_{u_id}_{i}.jpg"
+                generated_images.append(img_p)
+                
+                image_saved = False
+                if img_data:
+                    try:
+                        with Image.open(io.BytesIO(img_data)) as im:
+                            im = im.convert("RGB").resize((w, h))
+                            
+                            if enable_watermark:
+                                draw = ImageDraw.Draw(im)
+                                draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                                
+                            im.save(img_p, "JPEG")
+                        image_saved = True
+                    except Exception:
+                        pass
+                
+                if not image_saved:
+                    try:
+                        im = Image.new("RGB", (w, h), color=(15, 23, 42))
+                        if enable_watermark:
+                            draw = ImageDraw.Draw(im)
+                            draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                        im.save(img_p, "JPEG")
+                    except Exception:
+                        pass
+                
+                clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
+                clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
+                clips.append(vfx.fadein(clip, 0.4))
             
         status.info("🎞️ Compiling and Rendering HD Video (ویڈیو تیار ہو رہی ہے)...")
         final_video = concatenate_videoclips(clips, method="compose").set_audio(audio)
@@ -298,6 +333,10 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
 # 5. UI NAVIGATION & TOOLS
 # ==========================================
 menu = st.sidebar.radio("SGLOWINA COMMAND MENU", ["🏠 Smart Chat", "🎬 Movie Studio", "🎨 Pro Image Studio"])
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎬 Video Settings")
+enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
 
 if menu == "🏠 Smart Chat":
     st.write("### 💬 Sglowina Intelligence Dashboard")
@@ -337,7 +376,7 @@ elif menu == "🎬 Movie Studio":
         pitch_val = pitch_map[mv_pitch]
         
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
-            v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc)
+            v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, enable_watermark)
             
         if "mp4" in str(v_res): st.video(v_res); st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
         else: st.error(v_res)
