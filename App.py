@@ -97,7 +97,7 @@ def get_titan_prompt(text, style):
 # ==========================================
 # 4. TITAN PARALLEL MOVIE ENGINE (v40 LOGIC)
 # ==========================================
-# یہاں نام کو fetch_img_v1 سے بدل کر fetch_img کر دیا گیا ہے
+# یہاں فنکشن کا نام درست کر کے 'fetch_img' کر دیا گیا ہے
 def fetch_img(url):
     return session.get(url, timeout=60).content
 
