@@ -10,6 +10,7 @@ import uuid
 import random
 from PIL import Image
 import io
+import threading
 from concurrent.futures import ThreadPoolExecutor
 
 # ==========================================
@@ -33,7 +34,7 @@ from streamlit_mic_recorder import mic_recorder
 # ==========================================
 # 2. EXECUTIVE UI (MUHAMMAD ESSA AWAN & SABA WAHID)
 # ==========================================
-st.set_page_config(page_title="Sglowina AI - Official V1.0", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Official V1.2", layout="wide", page_icon="🎬")
 
 st.markdown("""
     <style>
@@ -74,7 +75,7 @@ SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
 Founders & CEOs: Muhammad Essa Awan & Saba Wahid.
 Saba Wahid is the Founder and CEO. Muhammad Essa Awan is the COO and the lead visionary.
-Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.0 Release).
+Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.2 Release).
 """
 
 def apply_islamic_visual_logic(text):
@@ -86,10 +87,17 @@ def apply_islamic_visual_logic(text):
         return ", traditional modest Muslim clothing, robes and turbans, historical environment"
     return ""
 
-def get_titan_prompt(text, style):
+# کریکٹر کی مستقل مزاجی کو پرامپٹ میں شامل کرنے کے لیے اپ ڈیٹ
+def get_titan_prompt(text, style, char_desc=""):
     shariah = apply_islamic_visual_logic(text)
+    
+    # اگر مستقل کریکٹر کی تفصیل دی گئی ہو تو اسے پرامپٹ کے شروع میں جوڑ دیں
+    full_subject = text
+    if char_desc.strip():
+        full_subject = f"The main character is {char_desc.strip()}. The scene shows: {text}"
+        
     try:
-        instr = f"Act as a Film Director: Extract core subject from Urdu: '{text}'. {shariah}. Professional 3D character animation, high detail, masterpiece. Style: {style}. Output ONLY English prompt."
+        instr = f"Act as a Film Director: Extract core subject from Urdu: '{full_subject}'. {shariah}. Professional 3D character animation, high detail, masterpiece. Style: {style}. Output ONLY English prompt."
         res = session.get(f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model=openai&cache=true", timeout=25)
         return res.text if res.status_code == 200 else text
     except: return text
@@ -97,7 +105,6 @@ def get_titan_prompt(text, style):
 # ==========================================
 # 4. TITAN PARALLEL MOVIE ENGINE (v40 LOGIC)
 # ==========================================
-# نیٹ ورک کے مسائل اور ٹائم آؤٹ ہینڈل کرنے کے لیے فنکشن میں بہتری
 def fetch_img(url):
     try:
         res = session.get(url, timeout=60)
@@ -107,13 +114,32 @@ def fetch_img(url):
         pass
     return None
 
-def create_titan_movie_v1(story, voice, ratio, style, seed):
+# محفوظ آڈیو جنریشن بشمول آواز کی رفتار (Voice Rate Control)
+def save_audio_safe(story, v_code, rate, audio_f):
+    def _run():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            # edge_tts میں آواز کی رفتار (rate) کو شامل کیا گیا ہے
+            loop.run_until_complete(edge_tts.Communicate(story, v_code, rate=rate).save(audio_f))
+        finally:
+            loop.close()
+
+    thread = threading.Thread(target=_run)
+    thread.start()
+    thread.join()
+
+def create_titan_movie_v1(story, voice, rate, ratio, style, seed, char_desc=""):
     u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
     status = st.empty()
+    audio_f = f"a_{u_id}.mp3"
+    generated_images = []
+    
     try:
         v_code = "ur-PK-UzmaNeural" if voice == "Uzma (Female)" else "ur-PK-AsadNeural"
-        audio_f = f"a_{u_id}.mp3"
-        asyncio.run(edge_tts.Communicate(story, v_code).save(audio_f))
+        
+        # آواز کی رفتار کے ساتھ آڈیو فائل بنانا
+        save_audio_safe(story, v_code, rate, audio_f)
         audio = AudioFileClip(audio_f)
         
         # Dimensions Fix: Ensuring even numbers
@@ -126,12 +152,14 @@ def create_titan_movie_v1(story, voice, ratio, style, seed):
         clips = []
         dur_per = audio.duration / len(sentences)
         
-        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style))}?width={w}&height={h}&seed={seed}&nologo=true&negative=girl,female,deformed" for s in sentences]
+        # ہر منظر کے پرامپٹ میں کریکٹر کا مستقل حلیہ (char_desc) بھیجا جا رہا ہے
+        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&nologo=true&negative=girl,female,deformed,bad hands,blurry,bad eyes,bad face,double heads" for s in sentences]
 
         with ThreadPoolExecutor(max_workers=20) as exe:
             for i, img_data in enumerate(exe.map(fetch_img, img_urls)):
                 status.info(f"⚡ Rendering Scene {i+1}/{len(sentences)}...")
                 img_p = f"i_{u_id}_{i}.jpg"
+                generated_images.append(img_p)
                 
                 image_saved = False
                 if img_data:
@@ -142,10 +170,10 @@ def create_titan_movie_v1(story, voice, ratio, style, seed):
                     except Exception:
                         pass
                 
-                # اگر تصویر ڈاؤن لوڈ نہیں ہو سکی یا خراب ہے تو عارضی ڈارک امیج خودکار طور پر بن جائے گی
+                # اگر تصویر ڈاؤن لوڈ نہ ہو پائے تو عارضی ڈارک بیک گراؤنڈ بنانا تاکہ پروجیکٹ رکے نہیں
                 if not image_saved:
                     try:
-                        im = Image.new("RGB", (w, h), color=(15, 23, 42)) # Sglowina Dark Theme Color
+                        im = Image.new("RGB", (w, h), color=(15, 23, 42))
                         im.save(img_p, "JPEG")
                     except Exception:
                         pass
@@ -158,9 +186,28 @@ def create_titan_movie_v1(story, voice, ratio, style, seed):
         final_video = concatenate_videoclips(clips, method="compose").set_audio(audio)
         out = f"Sglowina_{u_id}.mp4"
         final_video.write_videofile(out, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
-        audio.close(); final_video.close()
+        
+        # فائل ہینڈلز بند کرنا
+        audio.close()
+        final_video.close()
+        
+        # عارضی فائلز کی آٹو صفائی (Auto-cleanup)
+        try:
+            if os.path.exists(audio_f): os.remove(audio_f)
+            for img_p in generated_images:
+                if os.path.exists(img_p): os.remove(img_p)
+        except Exception:
+            pass
+            
         return out
-    except Exception as e: return f"Error: {e}"
+    except Exception as e: 
+        # ایرر کی صورت میں بھی عارضی فائلز ڈیلیٹ کرنا
+        try:
+            if os.path.exists(audio_f): os.remove(audio_f)
+            for img_p in generated_images:
+                if os.path.exists(img_p): os.remove(img_p)
+        except: pass
+        return f"Error: {e}"
 
 # ==========================================
 # 5. UI NAVIGATION & TOOLS
@@ -181,31 +228,52 @@ if menu == "🏠 Smart Chat":
 
 elif menu == "🎬 Movie Studio":
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
-    m_script = st.text_area("Enter Movie Script:", height=150)
-    mc1, mc2, mc3, mc4 = st.columns(4)
+    m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
+    
+    # نیا فیچر: مستقل کریکٹر کی تفصیل
+    char_desc = st.text_input("Consistent Character (کریکٹر کا حلیہ - مثلاً لباس، عمر، ڈکھیل):", 
+                              placeholder="Example: A 30-year-old brave warrior, short black beard, wearing a traditional dark green turban and grey robe")
+    
+    mc1, mc2, mc3, mc4, mc5 = st.columns(5)
     with mc1: mv = st.selectbox("Voice:", ["Asad (Male)", "Uzma (Female)"])
-    with mc2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)"])
-    with mc3: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"])
-    with mc4: sd = st.number_input("Character Seed:", value=786)
+    # نیا فیچر: آواز کی رفتار کا کنٹرول
+    with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
+    with mc3: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
+    with mc4: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"])
+    with mc5: sd = st.number_input("Character Seed:", value=786)
+    
     if st.button("Generate Master Movie 🚀"):
-        v_res = create_titan_movie_v1(m_script, mv, mr, ms, sd)
+        # فیصد کی ویلیو کو درست فارمیٹ میں نکالنا
+        rate_val = mv_rate.split(" ")[0]
+        v_res = create_titan_movie_v1(m_script, mv, rate_val, mr, ms, sd, char_desc)
         if "mp4" in str(v_res): st.video(v_res); st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
         else: st.error(v_res)
 
 elif menu == "🎨 Pro Image Studio":
     st.write("### 🎨 Industrial HD Visual Studio")
     p_i = st.text_area("Describe Image (One per line for batch):", height=150)
+    
+    # نیا فیچر: مستقل کریکٹر کی تفصیل امیجز کے لیے بھی
+    char_desc_img = st.text_input("Consistent Character (کریکٹر کا مستقل حلیہ):", 
+                                  placeholder="Example: A young girl, blue eyes, brown braided hair, red scarf")
+    
     ic1, ic2, ic3 = st.columns(3)
     with ic1: i_style = st.selectbox("Art Style:", ["Realistic", "Anime", "Logo Design", "3D Cartoon"])
     with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok"])
     with ic3: count = st.slider("Quantity:", 1, 10, 1)
+    
     if st.button("Generate Titan Visuals 🚀"):
         dim = {"Square (1:1)": (1024, 1024), "YouTube HD": (1280, 720), "TikTok": (720, 1280)}
         w, h = dim[i_size]
         prompt_list = [line.strip() for line in p_i.split('\n') if line.strip()]
         for idx, single_p in enumerate(prompt_list):
             for q in range(count):
-                url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(single_p + ' ' + i_style)}?width={w}&height={h}&seed={random.randint(1,9999)}&nologo=true&negative=girl,female"
+                # کریکٹر کی تفصیل کو پرامپٹ میں شامل کرنا
+                final_p = single_p
+                if char_desc_img.strip():
+                    final_p = f"Character is {char_desc_img.strip()}. Action/Scene: {single_p}"
+                    
+                url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(final_p + ' ' + i_style)}?width={w}&height={h}&seed={random.randint(1,9999)}&nologo=true&negative=girl,female,deformed,bad eyes,bad hands,blurry"
                 st.image(url, caption=f"Prompt: {single_p[:30]}...")
 
-st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.0 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.2 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
