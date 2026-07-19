@@ -27,8 +27,8 @@ if not hasattr(Image, 'ANTIALIAS'):
 try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
     import moviepy.video.fx.all as vfx
-except Exception:
-    pass
+except Exception as e:
+    st.warning(f"Dependency Load Warning: {e}")
 
 from streamlit_mic_recorder import mic_recorder
 
@@ -170,8 +170,8 @@ def translate_ur_to_en(text):
             translated = "".join([part[0] for part in json_data[0] if part and part[0]])
             if translated.strip():
                 return translated.strip()
-    except Exception:
-        pass
+    except Exception as e:
+        st.warning(f"Translation API warning: {e}")
     return text
 
 def get_titan_prompt(text, style, char_desc="", scene_desc=""):
@@ -190,7 +190,7 @@ def get_titan_prompt(text, style, char_desc="", scene_desc=""):
     
     anatomy_helper = "highly detailed face, proportional body, anatomically correct hands and fingers, perfect detailed eyes, realistic human proportions"
     
-    subject_part = f"Subject: A person depicted EXACTLY as {char_desc.strip()} (depict this exact same person, face, and clothes)" if char_desc.strip() else f"Subject: {english_translation}"
+    subject_part = f"Subject: A person depicted EXACTLY as {char_desc.strip()} (depict this exact same person, face, features, and clothes)" if char_desc.strip() else f"Subject: {english_translation}"
     action_part = f"Action: {english_translation}" if char_desc.strip() else ""
     environment_part = f"Environment: {scene_desc.strip()}" if scene_desc.strip() else ""
     
@@ -211,8 +211,8 @@ def fetch_img(url):
             res = session.get(url, timeout=30)
             if res.status_code == 200 and len(res.content) > 5000:
                 return res.content
-        except Exception:
-            pass
+        except Exception as e:
+            st.warning(f"Image fetch attempt {attempt+1} warning: {e}")
         time.sleep(1.0)
     return None
 
@@ -226,34 +226,42 @@ def fetch_img_failover(prompt, w, h, seed):
                 res_img = session.get(img_url, timeout=25)
                 if res_img.status_code == 200 and len(res_img.content) > 5000:
                     return res_img.content
-    except Exception:
-        pass
+    except Exception as e:
+        st.warning(f"Failover primary fetch warning: {e}")
 
     try:
         poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
         res = session.get(poll_url, timeout=25)
         if res.status_code == 200 and len(res.content) > 5000:
             return res.content
-    except Exception:
-        pass
+    except Exception as e:
+        st.warning(f"Failover backup fetch warning: {e}")
 
     return None
 
+# ریاضیاتی طور پر باؤنڈڈ کیمرہ موشن پائپ لائن (تصویر کبھی فریم سے باہر نہیں جائے گی)
 def apply_camera_motion(clip, motion_type, duration, w, h):
-    if motion_type == "Ken Burns":
-        clip = clip.resize(lambda t: 1.15 + 0.10 * (t / duration)).set_position(lambda t: (int(-40 * (t / duration)), 'center'))
-    elif motion_type == "Pan Left":
-        clip = clip.set_position(lambda t: (int(-80 * (t / duration)), 'center'))
-    elif motion_type == "Pan Right":
-        clip = clip.set_position(lambda t: (int(-80 * (1.0 - (t / duration))), 'center'))
-    elif motion_type == "Tilt":
-        clip = clip.set_position(lambda t: ('center', int(-60 * (t / duration))))
-    elif motion_type == "Dolly In":
-        clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
-    elif motion_type == "Dolly Out":
-        clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
-    else:
-        clip = clip.resize(lambda t: 1.0 + 0.10 * (t / duration)).set_position('center')
+    try:
+        x_max = int(w * 0.15)
+        y_max = int(h * 0.15)
+        
+        if motion_type == "Ken Burns":
+            clip = clip.resize(lambda t: 1.15 + 0.10 * (t / duration)).set_position('center')
+        elif motion_type == "Pan Left":
+            clip = clip.set_position(lambda t: (-int(x_max * (t / duration)), 'center'))
+        elif motion_type == "Pan Right":
+            clip = clip.set_position(lambda t: (-int(x_max * (1.0 - (t / duration))), 'center'))
+        elif motion_type == "Tilt":
+            clip = clip.set_position(lambda t: ('center', -int(y_max * (t / duration))))
+        elif motion_type == "Dolly In":
+            clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
+        elif motion_type == "Dolly Out":
+            clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
+        else:
+            clip = clip.resize(lambda t: 1.0 + 0.10 * (t / duration)).set_position('center')
+    except Exception as e:
+        st.warning(f"Error applying camera motion: {e}")
+        clip = clip.set_position('center')
     return clip
 
 def save_audio_safe(story, v_code, rate, pitch, audio_f):
@@ -264,6 +272,8 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
                 asyncio.set_event_loop(loop)
                 try:
                     loop.run_until_complete(edge_tts.Communicate(story, v_code, rate=rate, pitch=pitch).save(audio_f))
+                except Exception as e:
+                    st.warning(f"Inner edge_tts execution warning: {e}")
                 finally:
                     loop.close()
 
@@ -272,8 +282,8 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
             thread.join()
             if os.path.exists(audio_f) and os.path.getsize(audio_f) > 1000:
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            st.warning(f"Audio save attempt {attempt+1} warning: {e}")
         time.sleep(1.0)
     return False
 
@@ -295,7 +305,7 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         
         audio_success = save_audio_safe(story, v_code, rate, pitch, audio_f)
         if not audio_success:
-            raise Exception("Voice generation failed. Please try again.")
+            raise Exception("Voice generation failed after multiple retries. Please check internet connection.")
             
         audio = AudioFileClip(audio_f)
         progress_bar.progress(0.15)
@@ -322,8 +332,8 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                     with open(bg_music_f, 'wb') as f:
                         f.write(res_bg.content)
                     has_bg_music = True
-            except:
-                pass
+            except Exception as bg_err:
+                st.warning(f"Warning downloading background track: {bg_err}")
                 
         progress_bar.progress(0.20)
         
@@ -343,63 +353,99 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         dur_per = audio.duration / len(sentences)
         generated_prompts = []
         
+        # لائیو امیج رینڈرنگ، تصدیق اور ری جنریٹ لوپ
         for i, s in enumerate(sentences):
             img_progress = 0.20 + ((i / len(sentences)) * 0.60)
             progress_bar.progress(img_progress)
             
-            status.info(f"🎨 Generating & Downloading Scene {i+1}/{len(sentences)}...")
             prompt = get_titan_prompt(s, style, char_desc, scene_desc)
             generated_prompts.append(prompt)
             
-            img_data = fetch_img_failover(prompt, w, h, seed)
             img_p = f"i_{u_id}_{i}.jpg"
             generated_images.append(img_p)
             
-            image_saved = False
-            if img_data:
-                try:
-                    with Image.open(io.BytesIO(img_data)) as im:
-                        im = im.convert("RGB")
-                        
-                        if camera_motion in ["Pan Left", "Pan Right", "Tilt", "Ken Burns"]:
-                            im = im.resize((int(w * 1.15), int(h * 1.15)))
-                        else:
-                            im = im.resize((w, h))
+            clip_verified = False
+            
+            # ٹیسٹ فریم اور بلیک سکرین کا حتمی سیکیورٹی لوپ (درست ہونے تک 4 بار دوبارہ کوشش کرے گا)
+            for attempt in range(4):
+                status.info(f"🎨 Rendering & Verifying Scene {i+1}/{len(sentences)} (Attempt {attempt+1}/4)...")
+                
+                current_prompt = prompt if attempt < 2 else prompt.split("Style:")[0].strip()
+                current_seed = seed if attempt == 0 else random.randint(1, 999999)
+                
+                img_data = fetch_img_failover(current_prompt, w, h, current_seed)
+                
+                if img_data:
+                    try:
+                        with Image.open(io.BytesIO(img_data)) as im:
+                            im_conv = im.convert("RGB")
                             
+                            if camera_motion in ["Pan Left", "Pan Right", "Tilt", "Ken Burns"]:
+                                im_conv = im_conv.resize((int(w * 1.15), int(h * 1.15)))
+                            else:
+                                im_conv = im_conv.resize((w, h))
+                                
+                            if enable_watermark:
+                                draw = ImageDraw.Draw(im_conv)
+                                draw.text((im_conv.width - 140, im_conv.height - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                                
+                            im_conv.save(img_p, "JPEG")
+                    except Exception as save_err:
+                        st.warning(f"Scene {i+1} saving warning on attempt {attempt+1}: {save_err}")
+                
+                if not os.path.exists(img_p):
+                    try:
+                        im = Image.new("RGB", (w, h), color=(15, 23, 42))
                         if enable_watermark:
                             draw = ImageDraw.Draw(im)
-                            draw.text((im.width - 140, im.height - 45), "Sglowina AI [S]", fill=(200, 200, 200))
-                            
+                            draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                         im.save(img_p, "JPEG")
-                    image_saved = True
-                except Exception:
-                    pass
-            
-            if not image_saved:
+                    except Exception as place_err:
+                        st.warning(f"Placeholder image saving warning: {place_err}")
+                
+                # فریم اور امیج کی مکمل سیکیورٹی توثیق
                 try:
-                    im = Image.new("RGB", (w, h), color=(15, 23, 42))
+                    with Image.open(img_p) as test_img:
+                        test_img.verify()
+                        
+                    if camera_motion in ["Pan Left", "Pan Right", "Tilt", "Ken Burns"]:
+                        clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
+                    else:
+                        clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((w, h))
+                    
+                    clip = apply_camera_motion(clip, camera_motion, dur_per, w, h)
+                    
+                    # ٹیسٹ فریم رینڈرنگ (کالی اسکرین ڈیٹیکٹر)
+                    test_frame = clip.get_frame(0)
+                    if test_frame is not None and test_frame.mean() > 1.5:
+                        clip_verified = True
+                        break
+                except Exception as verify_err:
+                    st.warning(f"Scene {i+1} frame verification warning on attempt {attempt+1}: {verify_err}")
+                
+                time.sleep(1.0)
+                
+            if not clip_verified:
+                st.warning(f"Warning: Scene {i+1} could not generate properly. Creating high-contrast safe fallback frame.")
+                try:
+                    im = Image.new("RGB", (w, h), color=(30, 41, 59))
                     if enable_watermark:
                         draw = ImageDraw.Draw(im)
                         draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                     im.save(img_p, "JPEG")
-                except Exception:
-                    pass
+                    clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((w, h))
+                except Exception as fallback_err:
+                    st.warning(f"Fallback generation error: {fallback_err}")
             
-            if camera_motion in ["Pan Left", "Pan Right", "Tilt", "Ken Burns"]:
-                clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
-            else:
-                clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((w, h))
-                
-            clip = apply_camera_motion(clip, camera_motion, dur_per, w, h)
-            
+            # ٹرانزیشن پائپ لائن
             if transition_type == "Cross Fade":
                 clip = clip.crossfadein(0.5)
             elif transition_type == "Blur Transition":
-                clip = clip.fadein(0.4)
+                clip = clip.fadein(0.4).fadeout(0.4)
             elif transition_type == "Flash Transition":
-                clip = clip.fadein(0.3)
+                clip = clip.fadein(0.3).fadeout(0.3)
             elif transition_type == "Smooth Fade":
-                clip = clip.fadein(0.5)
+                clip = clip.fadein(0.5).fadeout(0.5)
                 
             clips.append(clip)
             time.sleep(0.5)
@@ -414,10 +460,11 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                 bg_audio = AudioFileClip(bg_music_f).volumex(0.10)
                 bg_audio = bg_audio.subclip(0, audio.duration)
                 final_audio = CompositeAudioClip([audio, bg_audio])
-            except:
-                pass
+            except Exception as mix_err:
+                st.warning(f"Audio mixing warning: {mix_err}")
                 
-        final_video = concatenate_videoclips(clips, method="compose").set_audio(final_audio)
+        # محفوظ ویڈیو رینڈرنگ بذریعہ method="chain" (بلیک فریمز کے خاتمے کے لیے)
+        final_video = concatenate_videoclips(clips, method="chain").set_audio(final_audio)
         out = f"Sglowina_{u_id}.mp4"
         final_video.write_videofile(out, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
         
@@ -431,8 +478,8 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             if os.path.exists(bg_music_f): os.remove(bg_music_f)
             for img_p in generated_images:
                 if os.path.exists(img_p): os.remove(img_p)
-        except Exception:
-            pass
+        except Exception as cleanup_err:
+            st.warning(f"Cleanup warning: {cleanup_err}")
             
         progress_bar.progress(1.0)
         status.success("🚀 Video Generated Successfully (ویڈیو بن چکی ہے)!")
@@ -510,7 +557,6 @@ elif menu == "🎬 Movie Studio":
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
             v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, transition_type, enable_watermark, enable_bg_music)
             
-        # کلاؤڈ کو کریش سے بچانے کے لیے فائل کے وجود اور درستگی کی سخت تصدیق
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
             st.video(v_res)
             st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
