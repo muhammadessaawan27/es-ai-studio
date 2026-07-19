@@ -27,8 +27,8 @@ if not hasattr(Image, 'ANTIALIAS'):
 try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
     import moviepy.video.fx.all as vfx
-except Exception as e:
-    st.warning(f"Dependency Load Warning: {e}")
+except Exception:
+    pass
 
 from streamlit_mic_recorder import mic_recorder
 
@@ -170,8 +170,8 @@ def translate_ur_to_en(text):
             translated = "".join([part[0] for part in json_data[0] if part and part[0]])
             if translated.strip():
                 return translated.strip()
-    except Exception as e:
-        st.warning(f"Translation API warning: {e}")
+    except Exception:
+        pass
     return text
 
 def get_titan_prompt(text, style, char_desc="", scene_desc=""):
@@ -190,7 +190,7 @@ def get_titan_prompt(text, style, char_desc="", scene_desc=""):
     
     anatomy_helper = "highly detailed face, proportional body, anatomically correct hands and fingers, perfect detailed eyes, realistic human proportions"
     
-    subject_part = f"Subject: A person depicted EXACTLY as {char_desc.strip()} (depict this exact same person, face, features, and clothes)" if char_desc.strip() else f"Subject: {english_translation}"
+    subject_part = f"Subject: A person depicted EXACTLY as {char_desc.strip()} (depict this exact same person, face, and clothes)" if char_desc.strip() else f"Subject: {english_translation}"
     action_part = f"Action: {english_translation}" if char_desc.strip() else ""
     environment_part = f"Environment: {scene_desc.strip()}" if scene_desc.strip() else ""
     
@@ -205,41 +205,41 @@ def get_titan_prompt(text, style, char_desc="", scene_desc=""):
 # ==========================================
 # 4. TITAN PARALLEL MOVIE ENGINE (v40 LOGIC)
 # ==========================================
-# امیج سرورز پر ریڈ ٹائم آؤٹ بڑھا کر 60 سیکنڈ اور ری ٹرائے بڑھا کر 5 بار کر دیا گیا ہے
+# ٹائم آؤٹ کم کر کے 20 سیکنڈ اور ری ٹرائے کم کر کے 2 بار کر دیا گیا ہے
 def fetch_img_failover(prompt, w, h, seed):
-    for attempt in range(5):
+    for attempt in range(2):
         try:
             herc_url = f"https://hercai.onrender.com/v3/text2image?prompt={urllib.parse.quote(prompt)}"
-            res = session.get(herc_url, timeout=60)
+            res = session.get(herc_url, timeout=20)
             if res.status_code == 200:
                 img_url = res.json().get("url")
                 if img_url:
-                    res_img = session.get(img_url, timeout=60)
+                    res_img = session.get(img_url, timeout=20)
                     if res_img.status_code == 200 and len(res_img.content) > 5000:
                         try:
                             with Image.open(io.BytesIO(res_img.content)) as test_img:
                                 test_img.verify()
                             return res_img.content
-                        except Exception as e:
-                            st.warning(f"Hercai image verify warning on attempt {attempt+1}/5: {e}")
-        except Exception as e:
-            st.warning(f"Hercai fetch warning on attempt {attempt+1}/5: {e}")
-        time.sleep(1.5)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+        time.sleep(0.2)
 
-    for attempt in range(5):
+    for attempt in range(2):
         try:
             poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
-            res = session.get(poll_url, timeout=60)
+            res = session.get(poll_url, timeout=20)
             if res.status_code == 200 and len(res.content) > 5000:
                 try:
                     with Image.open(io.BytesIO(res.content)) as test_img:
                         test_img.verify()
                     return res.content
-                except Exception as e:
-                    st.warning(f"Pollinations image verify warning on attempt {attempt+1}/5: {e}")
-        except Exception as e:
-            st.warning(f"Pollinations fetch warning on attempt {attempt+1}/5: {e}")
-        time.sleep(1.5)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        time.sleep(0.2)
 
     return None
 
@@ -262,21 +262,20 @@ def apply_camera_motion(clip, motion_type, duration, w, h):
             clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
         else:
             clip = clip.resize(lambda t: 1.0 + 0.10 * (t / duration)).set_position('center')
-    except Exception as e:
-        st.warning(f"Error applying camera motion: {e}")
+    except Exception:
         clip = clip.set_position('center')
     return clip
 
 def save_audio_safe(story, v_code, rate, pitch, audio_f):
-    for attempt in range(5):
+    for attempt in range(2):
         try:
             def _run():
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 try:
                     loop.run_until_complete(edge_tts.Communicate(story, v_code, rate=rate, pitch=pitch).save(audio_f))
-                except Exception as e:
-                    st.warning(f"Inner edge_tts execution warning: {e}")
+                except Exception:
+                    pass
                 finally:
                     loop.close()
 
@@ -285,16 +284,15 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
             thread.join()
             if os.path.exists(audio_f) and os.path.getsize(audio_f) > 1000:
                 return True
-        except Exception as e:
-            st.warning(f"Audio save attempt {attempt+1}/5 warning: {e}")
-        time.sleep(1.5)
+        except Exception:
+            pass
+        time.sleep(0.2)
     return False
 
 def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Smooth Camera", transition_type="Cinematic Cut", enable_watermark=True, enable_bg_music=True):
     u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
     
     progress_bar = st.progress(0.0)
-    status = st.empty()
     
     audio_f = f"a_{u_id}.mp3"
     bg_music_f = f"bg_{u_id}.mp3"
@@ -303,18 +301,16 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
     
     try:
         progress_bar.progress(0.05)
-        status.info("🎙️ Generating Voiceover Track (آڈیو جنریٹ ہو رہی ہے)...")
         v_code = "ur-PK-UzmaNeural" if voice == "Uzma (Female)" else "ur-PK-AsadNeural"
         
         audio_success = save_audio_safe(story, v_code, rate, pitch, audio_f)
         if not audio_success:
-            raise Exception("Voice generation failed. Please try again.")
+            raise Exception("Voice generation failed.")
             
         audio = AudioFileClip(audio_f)
         progress_bar.progress(0.15)
         
         if enable_bg_music:
-            status.info("🎵 Downloading Atmospheric Classical Background Track...")
             story_lower = story.lower()
             is_horror = any(k in story_lower or k in story for k in ["قبر", "عذاب", "موت", "خوفناک", "خوف", "جن", "بھوت", "تاریک", "ڈراؤنی", "grave", "torment", "punishment", "scary", "ghost", "dark", "death", "screaming", "blood", "bloody", "horror"])
             is_epic = any(k in story_lower or k in story for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "شاہی", "تاریخ", "بہادر", "king", "queen", "throne", "palace", "empire", "warrior", "brave", "history", "castle"])
@@ -330,13 +326,13 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                 bg_url = "https://upload.wikimedia.org/wikipedia/commons/e/e6/Chopin_-_Nocturne_op._9_no._2.mp3"
                 
             try:
-                res_bg = session.get(bg_url, timeout=45)
+                res_bg = session.get(bg_url, timeout=20)
                 if res_bg.status_code == 200:
                     with open(bg_music_f, 'wb') as f:
                         f.write(res_bg.content)
                     has_bg_music = True
-            except Exception as bg_err:
-                st.warning(f"Warning downloading background track: {bg_err}")
+            except:
+                pass
                 
         progress_bar.progress(0.20)
         
@@ -356,7 +352,7 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         dur_per = audio.duration / len(sentences)
         generated_prompts = []
         
-        # لائیو امیج رینڈرنگ، سخت ترین تصدیق اور ری جنریٹ لوپ (نو پلے ہولڈر پالیسی)
+        # لائیو امیج رینڈرنگ - صرف 2 کوششیں اور خراب تصویر اسکیپ ہو جائے گی
         for i, s in enumerate(sentences):
             img_progress = 0.20 + ((i / len(sentences)) * 0.60)
             progress_bar.progress(img_progress)
@@ -367,21 +363,10 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             img_p = f"i_{u_id}_{i}.jpg"
             generated_images.append(img_p)
             
-            clip_verified = False
-            attempt_round = 0
-            current_seed = seed
-            current_prompt = prompt
-            
-            # جب تک تصویر درست نہیں بنے گی، کوڈ ری جنریٹ کرتا رہے گا (بلیک اسکرین کا حتمی خاتمہ)
-            while not clip_verified:
-                attempt_round += 1
-                status.info(f"🎨 Rendering Scene {i+1}/{len(sentences)} (Attempt Round {attempt_round})...")
+            for retry in range(2):
+                current_prompt = prompt
+                current_seed = seed if retry == 0 else random.randint(1, 999999)
                 
-                if attempt_round > 1:
-                    current_seed = random.randint(1, 999999)
-                if attempt_round > 2:
-                    current_prompt = prompt.split("Style:")[0].strip()
-                    
                 img_data = fetch_img_failover(current_prompt, w, h, current_seed)
                 
                 if img_data:
@@ -399,47 +384,49 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                                 draw.text((im_conv.width - 140, im_conv.height - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                                 
                             im_conv.save(img_p, "JPEG")
-                    except Exception as save_err:
-                        st.warning(f"Scene {i+1} saving warning on round {attempt_round}: {save_err}")
+                    except Exception:
+                        pass
                 
-                # فریم اور امیج کی حتمی سیکیورٹی توثیق
-                try:
-                    if os.path.exists(img_p):
+                # توثیق
+                if os.path.exists(img_p) and os.path.getsize(img_p) > 10000:
+                    try:
                         with Image.open(img_p) as test_img:
                             test_img.verify()
-                            
-                        if camera_motion in ["Pan Left", "Pan Right", "Tilt", "Ken Burns"]:
-                            clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
-                        else:
-                            clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((w, h))
+                        break
+                    except Exception:
+                        pass
+                
+                time.sleep(0.2)
+            
+            # امیج کلپ بنانے کی سخت توثیق اور خراب فریم کو اسکیپ (Skip) کرنے کا عمل
+            if os.path.exists(img_p) and os.path.getsize(img_p) > 10000:
+                try:
+                    if camera_motion in ["Pan Left", "Pan Right", "Tilt", "Ken Burns"]:
+                        clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
+                    else:
+                        clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((w, h))
+                    
+                    clip = apply_camera_motion(clip, camera_motion, dur_per, w, h)
+                    
+                    if transition_type == "Cross Fade":
+                        clip = clip.crossfadein(0.5)
+                    elif transition_type == "Blur Transition":
+                        clip = clip.fadein(0.4).fadeout(0.4)
+                    elif transition_type == "Flash Transition":
+                        clip = clip.fadein(0.3).fadeout(0.3)
+                    elif transition_type == "Smooth Fade":
+                        clip = clip.fadein(0.5).fadeout(0.5)
                         
-                        clip = apply_camera_motion(clip, camera_motion, dur_per, w, h)
-                        
-                        # کالی اسکرین چیکر
-                        test_frame = clip.get_frame(0)
-                        if test_frame is not None and test_frame.mean() > 1.5:
-                            clip_verified = True
-                            break
-                except Exception as verify_err:
-                    st.warning(f"Scene {i+1} verify failed on round {attempt_round}: {verify_err}. Regenerating...")
-                
-                time.sleep(2.0)
-                
-            # ٹرانزیشن پائپ لائن
-            if transition_type == "Cross Fade":
-                clip = clip.crossfadein(0.5)
-            elif transition_type == "Blur Transition":
-                clip = clip.fadein(0.4).fadeout(0.4)
-            elif transition_type == "Flash Transition":
-                clip = clip.fadein(0.3).fadeout(0.3)
-            elif transition_type == "Smooth Fade":
-                clip = clip.fadein(0.5).fadeout(0.5)
-                
-            clips.append(clip)
-            time.sleep(0.5)
+                    clips.append(clip)
+                except Exception:
+                    continue
+            else:
+                continue
+            
+        if not clips:
+            raise Exception("No scenes were successfully generated. Please check internet connection.")
             
         progress_bar.progress(0.85)
-        status.info("🎞️ Mixing Audio & Rendering HD Video (ویڈیو تیار ہو رہی ہے)...")
         
         final_audio = audio
         bg_audio = None
@@ -448,11 +435,11 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                 bg_audio = AudioFileClip(bg_music_f).volumex(0.10)
                 bg_audio = bg_audio.subclip(0, audio.duration)
                 final_audio = CompositeAudioClip([audio, bg_audio])
-            except Exception as mix_err:
-                st.warning(f"Audio mixing warning: {mix_err}")
+            except Exception:
+                pass
                 
-        # محفوظ ویڈیو رینڈرنگ بذریعہ method="chain" (بلیک فریمز کے خاتمے کے لیے)
-        final_video = concatenate_videoclips(clips, method="chain").set_audio(final_audio)
+        # رینڈرنگ کے لیے method="compose" لاگو کر دیا گیا ہے
+        final_video = concatenate_videoclips(clips, method="compose").set_audio(final_audio)
         out = f"Sglowina_{u_id}.mp4"
         final_video.write_videofile(out, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
         
@@ -466,11 +453,10 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             if os.path.exists(bg_music_f): os.remove(bg_music_f)
             for img_p in generated_images:
                 if os.path.exists(img_p): os.remove(img_p)
-        except Exception as cleanup_err:
-            st.warning(f"Cleanup warning: {cleanup_err}")
+        except Exception:
+            pass
             
         progress_bar.progress(1.0)
-        status.success("🚀 Video Generated Successfully (ویڈیو بن چکی ہے)!")
         
         st.markdown("### 📝 Generated Prompts with Copy Button")
         for idx, prompt_text in enumerate(generated_prompts):
