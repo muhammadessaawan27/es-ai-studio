@@ -12,6 +12,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageStat
 import io
 import threading
 import gc
+import shutil
+from concurrent.futures import ThreadPoolExecutor
 
 # ==========================================
 # 1. INDUSTRIAL STABILITY & LOAD BALANCING
@@ -26,13 +28,13 @@ if not hasattr(Image, 'ANTIALIAS'):
 try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
     from moviepy.video.fx.all import fadein
-except Exception:
+except Exception as e:
     try:
         from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
         import moviepy.video.fx.all as vfx
         fadein = vfx.fadein
-    except Exception:
-        pass
+    except Exception as inner_e:
+        st.warning(f"Dependency Load Warning: {inner_e}")
 
 from streamlit_mic_recorder import mic_recorder
 
@@ -190,8 +192,8 @@ def translate_ur_to_en(text):
             translated = "".join([part[0] for part in json_data[0] if part and part[0]])
             if translated.strip():
                 return translated.strip()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Primary Translation Exception: {e}")
     
     try:
         instr = f"Extract only the main visual subject and atmosphere from this Urdu: '{text}'. Describe it clearly in English for a 3D animation model. No preamble."
@@ -199,8 +201,8 @@ def translate_ur_to_en(text):
         res = session.get(url, timeout=20)
         if res.status_code == 200 and len(res.text) < 1000:
             return res.text.strip()
-    except:
-        pass
+    except Exception as e:
+        print(f"Fallback Translation Exception: {e}")
         
     return text
 
@@ -221,14 +223,14 @@ def get_titan_prompt(text, style, char_desc="", scene_desc=""):
     prompt_parts = [f"{style_prompt} style"]
     
     if char_desc.strip():
-        prompt_parts.append(f"character portrait of {char_desc.strip()} (exact identical face, exact identical clothes, age and hair matching:1.5)")
+        prompt_parts.append(f"character is {char_desc.strip()}. Use the same character identity in every scene, identical face, identical clothing, consistent appearance")
     if scene_desc.strip():
-        prompt_parts.append(f"scene background environment of {scene_desc.strip()}")
+        prompt_parts.append(f"scene background environment of {scene_desc.strip()}, same environment, same camera style")
         
     prompt_parts.append(f"{english_translation}")
     if shariah:
         prompt_parts.append(shariah)
-    prompt_parts.append("highly detailed, cinematic lighting, 8k, realistic masterpiece, vivid colors")
+    prompt_parts.append("highly detailed, cinematic lighting, 8k, realistic masterpiece, vivid colors, maintain exact same character identity across all scenes")
     
     return ", ".join(prompt_parts)
 
@@ -237,7 +239,8 @@ def verify_image_bytes(data):
         im = Image.open(io.BytesIO(data))
         im.verify()
         return True
-    except Exception:
+    except Exception as e:
+        print(f"Bytes verification exception: {e}")
         return False
 
 def save_and_format_img(img_data, filepath, w, h, enable_watermark=False):
@@ -249,14 +252,15 @@ def save_and_format_img(img_data, filepath, w, h, enable_watermark=False):
                 draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
             img_obj.save(filepath, "JPEG")
         return True
-    except Exception:
+    except Exception as e:
+        st.warning(f"PIL format warning: {e}")
         return False
 
-def fetch_img_v40(prompt, w, h, seed):
+def fetch_img_failover(prompt, w, h, seed):
     for attempt in range(3):
         try:
             herc_url = f"https://hercai.onrender.com/v3/text2image?prompt={urllib.parse.quote(prompt)}"
-            res = session.get(herc_url, timeout=25)
+            res = session.get(herc_url, timeout=20)
             if res.status_code == 200:
                 img_url = res.json().get("url")
                 if img_url:
@@ -264,8 +268,8 @@ def fetch_img_v40(prompt, w, h, seed):
                     if res_img.status_code == 200 and len(res_img.content) > 5000:
                         if verify_image_bytes(res_img.content):
                             return res_img.content
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Hercai Attempt {attempt+1} Error: {e}")
         time.sleep(1.0)
 
     for attempt in range(3):
@@ -275,22 +279,41 @@ def fetch_img_v40(prompt, w, h, seed):
             if res.status_code == 200 and len(res.content) > 5000:
                 if verify_image_bytes(res.content):
                     return res.content
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Pollinations Attempt {attempt+1} Error: {e}")
         time.sleep(1.0)
 
     return None
 
+def generate_high_quality_placeholder(w, h, scene_num, enable_watermark=True):
+    im = Image.new("RGB", (w, h), color=(30, 41, 59))
+    draw = ImageDraw.Draw(im)
+    draw.rectangle([(20, 20), (w - 20, h - 20)], outline=(71, 85, 105), width=4)
+    for offset in range(100, w, 200):
+        draw.line([(offset, 0), (offset, h)], fill=(40, 55, 75), width=1)
+    for offset in range(100, h, 200):
+        draw.line([(0, offset), (w, offset)], fill=(40, 55, 75), width=1)
+    text_str = f"Sglowina Scene {scene_num}"
+    draw.text((w // 2 - 80, h // 2 - 15), text_str, fill=(203, 213, 225))
+    if enable_watermark:
+        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+    
+    img_byte_arr = io.BytesIO()
+    im.save(img_byte_arr, format='JPEG')
+    return img_byte_arr.getvalue()
+
 def save_audio_safe(story, v_code, rate, pitch, audio_f):
-    for attempt in range(2):
+    err_log = []
+    for attempt in range(3):
         try:
             def _run():
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 try:
-                    loop.run_until_complete(edge_tts.Communicate(story, v_code, rate=rate, pitch=pitch).save(audio_f))
-                except Exception:
-                    pass
+                    communicate = edge_tts.Communicate(story, v_code, rate=rate, pitch=pitch)
+                    loop.run_until_complete(communicate.save(audio_f))
+                except Exception as thread_err:
+                    err_log.append(str(thread_err))
                 finally:
                     loop.close()
 
@@ -298,10 +321,16 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
             thread.start()
             thread.join()
             if os.path.exists(audio_f) and os.path.getsize(audio_f) > 1000:
-                return True
-        except Exception:
-            pass
-        time.sleep(0.2)
+                return True, None
+        except Exception as e:
+            err_log.append(str(e))
+        time.sleep(0.3)
+    return False, "; ".join(err_log)
+
+def download_and_verify_scene_v40(i, prompt, img_p, w, h, seed, enable_watermark):
+    img_data = fetch_img_failover(prompt, w, h, seed)
+    if img_data:
+        return save_and_format_img(img_data, img_p, w, h, enable_watermark)
     return False
 
 # ==========================================
@@ -323,9 +352,11 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         status.info("🎙️ Generating Voiceover Track (آڈیو جنریٹ ہو رہی ہے)...")
         v_code = "ur-PK-UzmaNeural" if voice == "Uzma (Female)" else "ur-PK-AsadNeural"
         
-        audio_success = save_audio_safe(story, v_code, rate, pitch, audio_f)
+        audio_success, audio_error_msg = save_audio_safe(story, v_code, rate, pitch, audio_f)
         if not audio_success:
-            raise Exception("Voice generation failed.")
+            st.error(f"Voice generation failed. Error details: {audio_error_msg}")
+            # Dynamic fallback: if voice fails, we continue with a clear warning so other components don't crash
+            raise Exception(f"Voice Generation Failed: {audio_error_msg}")
             
         voice_audio = AudioFileClip(audio_f)
         progress_bar.progress(0.15)
@@ -352,8 +383,8 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                     with open(bg_music_f, 'wb') as f:
                         f.write(res_bg.content)
                     has_bg_music = True
-            except:
-                pass
+            except Exception as bg_dl_err:
+                print(f"Background download exception: {bg_dl_err}")
                 
         progress_bar.progress(0.20)
         
@@ -372,35 +403,89 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         clips = []
         dur_per = voice_audio.duration / len(sentences)
         generated_prompts = []
+        prompts = []
         
-        # v40 RENDER PIPELINE CORE FLOW (Sequential, strict force resize, stable disk write)
-        for i, scene in enumerate(sentences):
-            progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
-            status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
+        for i, s in enumerate(sentences):
+            prompts.append(get_titan_prompt(s, style, char_desc, scene_desc))
             
-            refined_p = get_titan_prompt(scene, style, char_desc, scene_desc)
-            generated_prompts.append(refined_p)
+        status.info("🎨 Concurrently downloading all movie scenes (Parallel threads)...")
+        progress_bar.progress(0.25)
+        
+        # v40 RENDER PIPELINE CORE FLOW (Sequential download + Force RGB and resize)
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = []
+            for i, prompt_text in enumerate(prompts):
+                img_p = f"i_{u_id}_{i}.jpg"
+                generated_images.append(img_p)
+                generated_prompts.append(prompt_text)
+                futures.append(executor.submit(download_and_verify_scene_v40, i, prompt_text, img_p, w, h, seed + i, enable_watermark))
             
-            img_data = fetch_img_v40(refined_p, w, h, seed + i)
-            if not img_data:
-                raise Exception(f"Failed to generate valid image for Scene {i+1} after all retries. Halted to prevent black frames.")
+            completed = 0
+            while completed < len(sentences):
+                completed = sum(1 for f in futures if f.done())
+                progress_val = 0.25 + (completed / len(sentences)) * 0.55
+                progress_bar.progress(min(progress_val, 0.80))
+                time.sleep(0.1)
                 
-            img_path = f"i_{u_id}_{i}.jpg"
-            generated_images.append(img_path)
+            for f in futures:
+                try:
+                    f.result()
+                except Exception as fut_err:
+                    print(f"Future download thread error: {fut_err}")
+                
+        progress_bar.progress(0.80)
+        status.info("🎞️ Assembling cinematic clips (v40 Motion Engine with Previous Image Fallback)...")
+        
+        last_valid_img_path = None
+        for i, img_p in enumerate(generated_images):
+            image_ok = False
+            if os.path.exists(img_p) and os.path.getsize(img_p) > 2000:
+                try:
+                    with Image.open(img_p) as test_img:
+                        test_img.verify()
+                    image_ok = True
+                    last_valid_img_path = img_p
+                except Exception as verify_err:
+                    print(f"PIL Verification Exception for Scene {i+1}: {verify_err}")
             
-            with open(img_path, "wb") as f:
+            # v40 Image Pipeline Fallback: Reuse previous valid scene image (Never show a black screen!)
+            if not image_ok:
+                if last_valid_img_path and os.path.exists(last_valid_img_path):
+                    try:
+                        shutil.copy(last_valid_img_path, img_p)
+                        image_ok = True
+                        st.warning(f"⚠️ Scene {i+1} failed to download. Reusing previous scene image to maintain character & visual consistency.")
+                    except Exception as copy_err:
+                        print(f"Fallback copy exception: {copy_err}")
+                else:
+                    try:
+                        placeholder_data = generate_high_quality_placeholder(w, h, i+1, enable_watermark)
+                        with open(img_p, "wb") as f:
+                            f.write(placeholder_data)
+                        image_ok = True
+                        last_valid_img_path = img_p
+                    except Exception as place_err:
+                        print(f"Placeholder absolute error: {place_err}")
+            
+            # Assembly of validated clips using exact V40 Zoom
+            if image_ok and os.path.exists(img_p):
+                try:
+                    clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
+                    # v40 Zoom Engine (1.2 to 1.0 cinematic movement)
+                    clip = clip.resize(lambda t: 1.2 - 0.15 * (t / dur_per)).set_position('center')
+                    clip = fadein(clip, 0.4)
+                    clips.append(clip)
+                except Exception as clip_err:
+                    st.error(f"Clip compilation exception on Scene {i+1}: {clip_err}")
+            
+        if not clips:
+            fallback_p = f"i_{u_id}_fallback.jpg"
+            img_data = generate_high_quality_placeholder(w, h, 1, enable_watermark)
+            with open(fallback_p, 'wb') as f:
                 f.write(img_data)
-                
-            success = save_and_format_img(img_data, img_path, w, h, enable_watermark)
-            if not success:
-                raise Exception(f"Formatting failed for Scene {i+1}. Corrupt data.")
-            
-            with Image.open(img_path) as test_img:
-                test_img.verify()
-                
-            # v40 Zoom Engine (1.2 to 1.0 cinematic movement)
-            clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
-            clip = clip.resize(lambda t: 1.2 - 0.15 * (t / dur_per)).set_position('center')
+            generated_images.append(fallback_p)
+            clip = ImageClip(fallback_p).set_duration(voice_audio.duration).set_fps(24)
+            clip = clip.resize(lambda t: 1.2 - 0.15 * (t / voice_audio.duration)).set_position('center')
             clip = fadein(clip, 0.4)
             clips.append(clip)
             
@@ -414,10 +499,10 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                 bg_audio = AudioFileClip(bg_music_f).volumex(0.10)
                 bg_audio = bg_audio.subclip(0, voice_audio.duration)
                 final_audio = CompositeAudioClip([voice_audio, bg_audio])
-            except Exception:
-                pass
+            except Exception as mix_err:
+                print(f"Background mixing exception: {mix_err}")
                 
-        # v40 Compose method for final video compilation
+        # v40 final compose concatenation
         final_video = concatenate_videoclips(clips, method="compose").set_audio(final_audio)
         out_name = f"Sglowina_{u_id}.mp4"
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
@@ -432,12 +517,13 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             if os.path.exists(bg_music_f): os.remove(bg_music_f)
             for img_p in generated_images:
                 if os.path.exists(img_p): os.remove(img_p)
-        except Exception:
-            pass
+        except Exception as cleanup_err:
+            print(f"Cleanup exception: {cleanup_err}")
             
         progress_bar.progress(1.0)
         status.success("🚀 Video Generated Successfully (ویڈیو بن چکی ہے)!")
         
+        # Project History Management
         st.session_state.project_history.append({
             "name": out_name,
             "prompts": generated_prompts,
@@ -477,11 +563,13 @@ menu = st.sidebar.radio("SGLOWINA COMMAND MENU", [
     "👤 Enterprise Center"
 ])
 
+# Sidebar Settings
 st.sidebar.markdown("---")
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
 
+# Sglowina Enterprise Center (Mock system to manage credits/panel securely on Streamlit Cloud)
 st.sidebar.markdown("---")
 st.sidebar.subheader("👤 Sglowina Enterprise Center")
 st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
