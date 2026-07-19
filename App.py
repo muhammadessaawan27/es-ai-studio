@@ -216,7 +216,6 @@ def fetch_img(url):
         time.sleep(1.0)
     return None
 
-# ڈوئل انجن پائپ لائن: پہلے Hercai سے ڈاؤن لوڈ کرے گا، فیل ہونے پر متبادل طور پر Pollinations استعمال کرے گا
 def fetch_img_failover(prompt, w, h, seed):
     try:
         herc_url = f"https://hercai.onrender.com/v3/text2image?prompt={urllib.parse.quote(prompt)}"
@@ -301,7 +300,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         audio = AudioFileClip(audio_f)
         progress_bar.progress(0.15)
         
-        # لائیو مووی کلاسک میوزک فلٹرز کا استعمال (الیکٹرانک شور کو دور کرنے کے لیے)
         if enable_bg_music:
             status.info("🎵 Downloading Atmospheric Classical Background Track...")
             story_lower = story.lower()
@@ -309,7 +307,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             is_epic = any(k in story_lower or k in story for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "شاہی", "تاریخ", "بہادر", "king", "queen", "throne", "palace", "empire", "warrior", "brave", "history", "castle"])
             is_peaceful = any(k in story_lower or k in story for k in ["نماز", "دعا", "مسجد", "ولی", "صبر", "سکون", "اللہ", "pray", "prayer", "mosque", "peace", "peaceful", "sad", "crying", "tears"])
             
-            # پریمیم لائیو آرکسٹرا ٹریکس (سچے پیانو اور وائلن کی لائیو دھنیں)
             if is_horror:
                 bg_url = "https://upload.wikimedia.org/wikipedia/commons/1/18/Beethoven_-_Moonlight_Sonata_-_1st_movement.mp3"
             elif is_epic:
@@ -346,7 +343,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         dur_per = audio.duration / len(sentences)
         generated_prompts = []
         
-        # سلسلہ وار فیل اوور ڈاؤن لوڈنگ
         for i, s in enumerate(sentences):
             img_progress = 0.20 + ((i / len(sentences)) * 0.60)
             progress_bar.progress(img_progress)
@@ -415,7 +411,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         bg_audio = None
         if has_bg_music and os.path.exists(bg_music_f):
             try:
-                # کلاسک میوزک کو انتہائی دھیما (صرف 10 فیصد والیوم) پر مکس کیا گیا ہے
                 bg_audio = AudioFileClip(bg_music_f).volumex(0.10)
                 bg_audio = bg_audio.subclip(0, audio.duration)
                 final_audio = CompositeAudioClip([audio, bg_audio])
@@ -515,8 +510,12 @@ elif menu == "🎬 Movie Studio":
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
             v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, transition_type, enable_watermark, enable_bg_music)
             
-        if "mp4" in str(v_res): st.video(v_res); st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
-        else: st.error(v_res)
+        # کلاؤڈ کو کریش سے بچانے کے لیے فائل کے وجود اور درستگی کی سخت تصدیق
+        if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
+            st.video(v_res)
+            st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
+        else: 
+            st.error(v_res)
 
 elif menu == "🎨 Pro Image Studio":
     st.write("### 🎨 Industrial HD Visual Studio")
