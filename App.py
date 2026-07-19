@@ -205,41 +205,44 @@ def get_titan_prompt(text, style, char_desc="", scene_desc=""):
 # ==========================================
 # 4. TITAN PARALLEL MOVIE ENGINE (v40 LOGIC)
 # ==========================================
-def fetch_img(url):
-    for attempt in range(3):
-        try:
-            res = session.get(url, timeout=30)
-            if res.status_code == 200 and len(res.content) > 5000:
-                return res.content
-        except Exception as e:
-            st.warning(f"Image fetch attempt {attempt+1} warning: {e}")
-        time.sleep(1.0)
-    return None
-
+# امیج سرورز پر ریڈ ٹائم آؤٹ بڑھا کر 60 سیکنڈ اور ری ٹرائے بڑھا کر 5 بار کر دیا گیا ہے
 def fetch_img_failover(prompt, w, h, seed):
-    try:
-        herc_url = f"https://hercai.onrender.com/v3/text2image?prompt={urllib.parse.quote(prompt)}"
-        res = session.get(herc_url, timeout=20)
-        if res.status_code == 200:
-            img_url = res.json().get("url")
-            if img_url:
-                res_img = session.get(img_url, timeout=25)
-                if res_img.status_code == 200 and len(res_img.content) > 5000:
-                    return res_img.content
-    except Exception as e:
-        st.warning(f"Failover primary fetch warning: {e}")
+    for attempt in range(5):
+        try:
+            herc_url = f"https://hercai.onrender.com/v3/text2image?prompt={urllib.parse.quote(prompt)}"
+            res = session.get(herc_url, timeout=60)
+            if res.status_code == 200:
+                img_url = res.json().get("url")
+                if img_url:
+                    res_img = session.get(img_url, timeout=60)
+                    if res_img.status_code == 200 and len(res_img.content) > 5000:
+                        try:
+                            with Image.open(io.BytesIO(res_img.content)) as test_img:
+                                test_img.verify()
+                            return res_img.content
+                        except Exception as e:
+                            st.warning(f"Hercai image verify warning on attempt {attempt+1}/5: {e}")
+        except Exception as e:
+            st.warning(f"Hercai fetch warning on attempt {attempt+1}/5: {e}")
+        time.sleep(1.5)
 
-    try:
-        poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
-        res = session.get(poll_url, timeout=25)
-        if res.status_code == 200 and len(res.content) > 5000:
-            return res.content
-    except Exception as e:
-        st.warning(f"Failover backup fetch warning: {e}")
+    for attempt in range(5):
+        try:
+            poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
+            res = session.get(poll_url, timeout=60)
+            if res.status_code == 200 and len(res.content) > 5000:
+                try:
+                    with Image.open(io.BytesIO(res.content)) as test_img:
+                        test_img.verify()
+                    return res.content
+                except Exception as e:
+                    st.warning(f"Pollinations image verify warning on attempt {attempt+1}/5: {e}")
+        except Exception as e:
+            st.warning(f"Pollinations fetch warning on attempt {attempt+1}/5: {e}")
+        time.sleep(1.5)
 
     return None
 
-# ریاضیاتی طور پر باؤنڈڈ کیمرہ موشن پائپ لائن (تصویر کبھی فریم سے باہر نہیں جائے گی)
 def apply_camera_motion(clip, motion_type, duration, w, h):
     try:
         x_max = int(w * 0.15)
@@ -265,7 +268,7 @@ def apply_camera_motion(clip, motion_type, duration, w, h):
     return clip
 
 def save_audio_safe(story, v_code, rate, pitch, audio_f):
-    for attempt in range(3):
+    for attempt in range(5):
         try:
             def _run():
                 loop = asyncio.new_event_loop()
@@ -283,8 +286,8 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
             if os.path.exists(audio_f) and os.path.getsize(audio_f) > 1000:
                 return True
         except Exception as e:
-            st.warning(f"Audio save attempt {attempt+1} warning: {e}")
-        time.sleep(1.0)
+            st.warning(f"Audio save attempt {attempt+1}/5 warning: {e}")
+        time.sleep(1.5)
     return False
 
 def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Smooth Camera", transition_type="Cinematic Cut", enable_watermark=True, enable_bg_music=True):
@@ -305,7 +308,7 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         
         audio_success = save_audio_safe(story, v_code, rate, pitch, audio_f)
         if not audio_success:
-            raise Exception("Voice generation failed after multiple retries. Please check internet connection.")
+            raise Exception("Voice generation failed. Please try again.")
             
         audio = AudioFileClip(audio_f)
         progress_bar.progress(0.15)
@@ -327,7 +330,7 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                 bg_url = "https://upload.wikimedia.org/wikipedia/commons/e/e6/Chopin_-_Nocturne_op._9_no._2.mp3"
                 
             try:
-                res_bg = session.get(bg_url, timeout=35)
+                res_bg = session.get(bg_url, timeout=45)
                 if res_bg.status_code == 200:
                     with open(bg_music_f, 'wb') as f:
                         f.write(res_bg.content)
@@ -353,7 +356,7 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         dur_per = audio.duration / len(sentences)
         generated_prompts = []
         
-        # لائیو امیج رینڈرنگ، تصدیق اور ری جنریٹ لوپ
+        # لائیو امیج رینڈرنگ، سخت ترین تصدیق اور ری جنریٹ لوپ (نو پلے ہولڈر پالیسی)
         for i, s in enumerate(sentences):
             img_progress = 0.20 + ((i / len(sentences)) * 0.60)
             progress_bar.progress(img_progress)
@@ -365,14 +368,20 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             generated_images.append(img_p)
             
             clip_verified = False
+            attempt_round = 0
+            current_seed = seed
+            current_prompt = prompt
             
-            # ٹیسٹ فریم اور بلیک سکرین کا حتمی سیکیورٹی لوپ (درست ہونے تک 4 بار دوبارہ کوشش کرے گا)
-            for attempt in range(4):
-                status.info(f"🎨 Rendering & Verifying Scene {i+1}/{len(sentences)} (Attempt {attempt+1}/4)...")
+            # جب تک تصویر درست نہیں بنے گی، کوڈ ری جنریٹ کرتا رہے گا (بلیک اسکرین کا حتمی خاتمہ)
+            while not clip_verified:
+                attempt_round += 1
+                status.info(f"🎨 Rendering Scene {i+1}/{len(sentences)} (Attempt Round {attempt_round})...")
                 
-                current_prompt = prompt if attempt < 2 else prompt.split("Style:")[0].strip()
-                current_seed = seed if attempt == 0 else random.randint(1, 999999)
-                
+                if attempt_round > 1:
+                    current_seed = random.randint(1, 999999)
+                if attempt_round > 2:
+                    current_prompt = prompt.split("Style:")[0].strip()
+                    
                 img_data = fetch_img_failover(current_prompt, w, h, current_seed)
                 
                 if img_data:
@@ -391,52 +400,31 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                                 
                             im_conv.save(img_p, "JPEG")
                     except Exception as save_err:
-                        st.warning(f"Scene {i+1} saving warning on attempt {attempt+1}: {save_err}")
+                        st.warning(f"Scene {i+1} saving warning on round {attempt_round}: {save_err}")
                 
-                if not os.path.exists(img_p):
-                    try:
-                        im = Image.new("RGB", (w, h), color=(15, 23, 42))
-                        if enable_watermark:
-                            draw = ImageDraw.Draw(im)
-                            draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
-                        im.save(img_p, "JPEG")
-                    except Exception as place_err:
-                        st.warning(f"Placeholder image saving warning: {place_err}")
-                
-                # فریم اور امیج کی مکمل سیکیورٹی توثیق
+                # فریم اور امیج کی حتمی سیکیورٹی توثیق
                 try:
-                    with Image.open(img_p) as test_img:
-                        test_img.verify()
+                    if os.path.exists(img_p):
+                        with Image.open(img_p) as test_img:
+                            test_img.verify()
+                            
+                        if camera_motion in ["Pan Left", "Pan Right", "Tilt", "Ken Burns"]:
+                            clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
+                        else:
+                            clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((w, h))
                         
-                    if camera_motion in ["Pan Left", "Pan Right", "Tilt", "Ken Burns"]:
-                        clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
-                    else:
-                        clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((w, h))
-                    
-                    clip = apply_camera_motion(clip, camera_motion, dur_per, w, h)
-                    
-                    # ٹیسٹ فریم رینڈرنگ (کالی اسکرین ڈیٹیکٹر)
-                    test_frame = clip.get_frame(0)
-                    if test_frame is not None and test_frame.mean() > 1.5:
-                        clip_verified = True
-                        break
+                        clip = apply_camera_motion(clip, camera_motion, dur_per, w, h)
+                        
+                        # کالی اسکرین چیکر
+                        test_frame = clip.get_frame(0)
+                        if test_frame is not None and test_frame.mean() > 1.5:
+                            clip_verified = True
+                            break
                 except Exception as verify_err:
-                    st.warning(f"Scene {i+1} frame verification warning on attempt {attempt+1}: {verify_err}")
+                    st.warning(f"Scene {i+1} verify failed on round {attempt_round}: {verify_err}. Regenerating...")
                 
-                time.sleep(1.0)
+                time.sleep(2.0)
                 
-            if not clip_verified:
-                st.warning(f"Warning: Scene {i+1} could not generate properly. Creating high-contrast safe fallback frame.")
-                try:
-                    im = Image.new("RGB", (w, h), color=(30, 41, 59))
-                    if enable_watermark:
-                        draw = ImageDraw.Draw(im)
-                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
-                    im.save(img_p, "JPEG")
-                    clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((w, h))
-                except Exception as fallback_err:
-                    st.warning(f"Fallback generation error: {fallback_err}")
-            
             # ٹرانزیشن پائپ لائن
             if transition_type == "Cross Fade":
                 clip = clip.crossfadein(0.5)
@@ -451,7 +439,7 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             time.sleep(0.5)
             
         progress_bar.progress(0.85)
-        status.info("🎞️ Mixing Audio & Rendering HD Video (ویڈیو رینڈر ہو رہی ہے)...")
+        status.info("🎞️ Mixing Audio & Rendering HD Video (ویڈیو تیار ہو رہی ہے)...")
         
         final_audio = audio
         bg_audio = None
