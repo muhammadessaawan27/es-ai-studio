@@ -209,25 +209,35 @@ def fetch_img(url):
     for attempt in range(3):
         try:
             res = session.get(url, timeout=30)
-            if res.status_code == 200 and len(res.content) > 3000:
+            if res.status_code == 200 and len(res.content) > 5000:
                 return res.content
         except Exception:
             pass
         time.sleep(1.0)
     return None
 
-def fetch_img_with_fallback(prompt, w, h, seed):
-    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true&enhance=false"
-    data = fetch_img(url)
-    if data:
-        return data
-        
-    simple_prompt = prompt.split("Style:")[0].strip()
-    url_simple = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(simple_prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
-    data_simple = fetch_img(url_simple)
-    if data_simple:
-        return data_simple
-        
+# ڈوئل انجن پائپ لائن: پہلے Hercai سے ڈاؤن لوڈ کرے گا، فیل ہونے پر متبادل طور پر Pollinations استعمال کرے گا
+def fetch_img_failover(prompt, w, h, seed):
+    try:
+        herc_url = f"https://hercai.onrender.com/v3/text2image?prompt={urllib.parse.quote(prompt)}"
+        res = session.get(herc_url, timeout=20)
+        if res.status_code == 200:
+            img_url = res.json().get("url")
+            if img_url:
+                res_img = session.get(img_url, timeout=25)
+                if res_img.status_code == 200 and len(res_img.content) > 5000:
+                    return res_img.content
+    except Exception:
+        pass
+
+    try:
+        poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
+        res = session.get(poll_url, timeout=25)
+        if res.status_code == 200 and len(res.content) > 5000:
+            return res.content
+    except Exception:
+        pass
+
     return None
 
 def apply_camera_motion(clip, motion_type, duration, w, h):
@@ -271,7 +281,6 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
 def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Smooth Camera", transition_type="Cinematic Cut", enable_watermark=True, enable_bg_music=True):
     u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
     
-    # پروگریس بار کا قیام
     progress_bar = st.progress(0.0)
     status = st.empty()
     
@@ -285,32 +294,33 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         status.info("🎙️ Generating Voiceover Track (آڈیو جنریٹ ہو رہی ہے)...")
         v_code = "ur-PK-UzmaNeural" if voice == "Uzma (Female)" else "ur-PK-AsadNeural"
         
-        # آڈیو آٹو ری ٹرائے سسٹم
         audio_success = save_audio_safe(story, v_code, rate, pitch, audio_f)
         if not audio_success:
-            raise Exception("Voice generation failed after multiple retries. Please check server load.")
+            raise Exception("Voice generation failed. Please try again.")
             
         audio = AudioFileClip(audio_f)
         progress_bar.progress(0.15)
         
+        # لائیو مووی کلاسک میوزک فلٹرز کا استعمال (الیکٹرانک شور کو دور کرنے کے لیے)
         if enable_bg_music:
-            status.info("🎵 Downloading Background Atmosphere Music...")
+            status.info("🎵 Downloading Atmospheric Classical Background Track...")
             story_lower = story.lower()
             is_horror = any(k in story_lower or k in story for k in ["قبر", "عذاب", "موت", "خوفناک", "خوف", "جن", "بھوت", "تاریک", "ڈراؤنی", "grave", "torment", "punishment", "scary", "ghost", "dark", "death", "screaming", "blood", "bloody", "horror"])
             is_epic = any(k in story_lower or k in story for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "شاہی", "تاریخ", "بہادر", "king", "queen", "throne", "palace", "empire", "warrior", "brave", "history", "castle"])
             is_peaceful = any(k in story_lower or k in story for k in ["نماز", "دعا", "مسجد", "ولی", "صبر", "سکون", "اللہ", "pray", "prayer", "mosque", "peace", "peaceful", "sad", "crying", "tears"])
             
+            # پریمیم لائیو آرکسٹرا ٹریکس (سچے پیانو اور وائلن کی لائیو دھنیں)
             if is_horror:
-                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
+                bg_url = "https://upload.wikimedia.org/wikipedia/commons/1/18/Beethoven_-_Moonlight_Sonata_-_1st_movement.mp3"
             elif is_epic:
-                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
+                bg_url = "https://upload.wikimedia.org/wikipedia/commons/d/df/Johann_Sebastian_Bach_-_Air_on_the_G_String_-_arranged_for_piano_and_violin.mp3"
             elif is_peaceful:
-                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
+                bg_url = "https://upload.wikimedia.org/wikipedia/commons/e/e6/Chopin_-_Nocturne_op._9_no._2.mp3"
             else:
-                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+                bg_url = "https://upload.wikimedia.org/wikipedia/commons/e/e6/Chopin_-_Nocturne_op._9_no._2.mp3"
                 
             try:
-                res_bg = session.get(bg_url, timeout=30)
+                res_bg = session.get(bg_url, timeout=35)
                 if res_bg.status_code == 200:
                     with open(bg_music_f, 'wb') as f:
                         f.write(res_bg.content)
@@ -334,20 +344,18 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         
         clips = []
         dur_per = audio.duration / len(sentences)
-        
         generated_prompts = []
         
+        # سلسلہ وار فیل اوور ڈاؤن لوڈنگ
         for i, s in enumerate(sentences):
-            # پروگریس بار کا متحرک حساب کتاب
             img_progress = 0.20 + ((i / len(sentences)) * 0.60)
             progress_bar.progress(img_progress)
             
-            status.info(f"🎨 Generating Scene {i+1}/{len(sentences)}...")
+            status.info(f"🎨 Generating & Downloading Scene {i+1}/{len(sentences)}...")
             prompt = get_titan_prompt(s, style, char_desc, scene_desc)
             generated_prompts.append(prompt)
             
-            # ڈبل لیئرڈ ری ٹرائے سسٹم
-            img_data = fetch_img_with_fallback(prompt, w, h, seed)
+            img_data = fetch_img_failover(prompt, w, h, seed)
             img_p = f"i_{u_id}_{i}.jpg"
             generated_images.append(img_p)
             
@@ -357,7 +365,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                     with Image.open(io.BytesIO(img_data)) as im:
                         im = im.convert("RGB")
                         
-                        # اگر کیمرہ پین یا ٹیلٹ ہے تو امیج کو قدرے بڑا کر کے پین کیا جائے گا تاکہ بلیک بارز نہ آئیں
                         if camera_motion in ["Pan Left", "Pan Right", "Tilt", "Ken Burns"]:
                             im = im.resize((int(w * 1.15), int(h * 1.15)))
                         else:
@@ -382,7 +389,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                 except Exception:
                     pass
             
-            # کیمرہ موشن پائپ لائن
             if camera_motion in ["Pan Left", "Pan Right", "Tilt", "Ken Burns"]:
                 clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
             else:
@@ -390,7 +396,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                 
             clip = apply_camera_motion(clip, camera_motion, dur_per, w, h)
             
-            # سین ٹرانزیشن پائپ لائن
             if transition_type == "Cross Fade":
                 clip = clip.crossfadein(0.5)
             elif transition_type == "Blur Transition":
@@ -410,7 +415,8 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         bg_audio = None
         if has_bg_music and os.path.exists(bg_music_f):
             try:
-                bg_audio = AudioFileClip(bg_music_f).volumex(0.12)
+                # کلاسک میوزک کو انتہائی دھیما (صرف 10 فیصد والیوم) پر مکس کیا گیا ہے
+                bg_audio = AudioFileClip(bg_music_f).volumex(0.10)
                 bg_audio = bg_audio.subclip(0, audio.duration)
                 final_audio = CompositeAudioClip([audio, bg_audio])
             except:
@@ -436,7 +442,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         progress_bar.progress(1.0)
         status.success("🚀 Video Generated Successfully (ویڈیو بن چکی ہے)!")
         
-        # تیار کردہ پرامپٹس کو کاپی بٹن کے ساتھ ظاہر کرنا
         st.markdown("### 📝 Generated Prompts with Copy Button")
         for idx, prompt_text in enumerate(generated_prompts):
             st.text(f"Prompt {idx+1}:")
@@ -453,7 +458,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         progress_bar.empty()
         return f"Error Details: {e}"
     finally:
-        # کلاؤڈ سرور کو کریش سے بچانے کے لیے ریم پروسیس کا صفایا
         gc.collect()
 
 # ==========================================
@@ -508,7 +512,8 @@ elif menu == "🎬 Movie Studio":
         }
         pitch_val = pitch_map[mv_pitch]
         
-        v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, transition_type, enable_watermark, enable_bg_music)
+        with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
+            v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, transition_type, enable_watermark, enable_bg_music)
             
         if "mp4" in str(v_res): st.video(v_res); st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
         else: st.error(v_res)
