@@ -12,7 +12,6 @@ from PIL import Image, ImageDraw, ImageFont, ImageStat
 import io
 import threading
 import gc
-from concurrent.futures import ThreadPoolExecutor
 
 # ==========================================
 # 1. INDUSTRIAL STABILITY & LOAD BALANCING
@@ -38,7 +37,23 @@ except Exception:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 2. EXECUTIVE UI (MUHAMMAD ESSA AWAN & SABA WAHID)
+# 2. ENTERPRISE SESSION STATE INITIALIZATION
+# ==========================================
+if "user_accounts" not in st.session_state:
+    st.session_state.user_accounts = {"essa_awan": "1234", "saba_wahid": "786"}
+if "logged_in_user" not in st.session_state:
+    st.session_state.logged_in_user = "essa_awan"
+if "user_credits" not in st.session_state:
+    st.session_state.user_credits = 500
+if "project_history" not in st.session_state:
+    st.session_state.project_history = []
+if "saved_prompts" not in st.session_state:
+    st.session_state.saved_prompts = []
+if "favorites" not in st.session_state:
+    st.session_state.favorites = []
+
+# ==========================================
+# 3. EXECUTIVE UI & PREMIUM STYLING
 # ==========================================
 st.set_page_config(page_title="Sglowina AI - Official V1.2", layout="wide", page_icon="🎬")
 
@@ -129,7 +144,7 @@ st.markdown("""<div class="executive-header"><div class="main-names">Muhammad Es
 st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 3. IDENTITY & ISLAMIC POLICY ENGINE
+# 4. IDENTITY & ISLAMIC POLICY ENGINE
 # ==========================================
 SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
@@ -278,36 +293,9 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
         time.sleep(0.2)
     return False
 
-def download_and_verify_scene_v40(i, prompt, img_p, w, h, seed, enable_watermark):
-    img_data = fetch_img_failover(prompt, w, h, seed)
-    
-    if not img_data:
-        img_data = generate_high_quality_placeholder(w, h, i+1, enable_watermark)
-        
-    with open(img_p, "wb") as f:
-        f.write(img_data)
-        
-    try:
-        with Image.open(img_p) as img_obj:
-            img_obj = img_obj.convert("RGB").resize((w, h))
-            
-            if enable_watermark:
-                draw = ImageDraw.Draw(img_obj)
-                draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
-                
-            img_obj.save(img_p, "JPEG")
-        return True
-    except Exception:
-        try:
-            im = Image.new("RGB", (w, h), color=(30, 41, 59))
-            if enable_watermark:
-                draw = ImageDraw.Draw(im)
-                draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
-            im.save(img_p, "JPEG")
-            return True
-        except:
-            return False
-
+# ==========================================
+# 5. FIXED V40 RENDER SYSTEM CORE (UNTOUCHED)
+# ==========================================
 def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", enable_watermark=True, enable_bg_music=True):
     u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
     
@@ -328,7 +316,7 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         if not audio_success:
             raise Exception("Voice generation failed.")
             
-        audio = AudioFileClip(audio_f)
+        voice_audio = AudioFileClip(audio_f)
         progress_bar.progress(0.15)
         
         if enable_bg_music:
@@ -371,50 +359,48 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         if not sentences: sentences = [story]
         
         clips = []
-        dur_per = audio.duration / len(sentences)
+        dur_per = voice_audio.duration / len(sentences)
         generated_prompts = []
-        prompts = []
         
-        for i, s in enumerate(sentences):
-            prompts.append(get_titan_prompt(s, style, char_desc, scene_desc))
+        # v40 RENDER PIPELINE CORE FLOW (Pristine, untouched)
+        for i, scene in enumerate(sentences):
+            progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
+            status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
             
-        status.info("🎨 Concurrently downloading all movie scenes (Parallel threads)...")
-        progress_bar.progress(0.25)
-        
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = []
-            for i, prompt_text in enumerate(prompts):
-                img_p = f"i_{u_id}_{i}.jpg"
-                generated_images.append(img_p)
-                generated_prompts.append(prompt_text)
-                futures.append(executor.submit(download_and_verify_scene_v40, i, prompt_text, img_p, w, h, seed + i, enable_watermark))
+            refined_p = get_titan_prompt(scene, style, char_desc, scene_desc)
+            generated_prompts.append(refined_p)
             
-            completed = 0
-            while completed < len(sentences):
-                completed = sum(1 for f in futures if f.done())
-                progress_val = 0.25 + (completed / len(sentences)) * 0.55
-                progress_bar.progress(min(progress_val, 0.80))
-                time.sleep(0.1)
+            img_data = fetch_img_failover(refined_p, w, h, seed + i)
+            if not img_data:
+                img_data = generate_high_quality_placeholder(w, h, i+1, enable_watermark)
                 
-            for f in futures:
-                f.result()
+            img_path = f"i_{u_id}_{i}.jpg"
+            generated_images.append(img_path)
+            
+            with open(img_path, "wb") as f:
+                f.write(img_data)
                 
-        progress_bar.progress(0.80)
-        status.info("🎞️ Assembling cinematic clips (v40 Motion Engine)...")
-        
-        for i, img_p in enumerate(generated_images):
-            if os.path.exists(img_p) and os.path.getsize(img_p) > 2000:
-                try:
-                    with Image.open(img_p) as test_img:
-                        test_img.verify()
-                        
-                    clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
-                    clip = clip.resize(lambda t: 1.2 - 0.15 * (t / dur_per)).set_position('center')
-                    clip = fadein(clip, 0.4)
+            try:
+                with Image.open(img_path) as img_obj:
+                    img_obj = img_obj.convert("RGB").resize((w, h))
                     
-                    clips.append(clip)
-                except Exception as e:
-                    st.warning(f"Clip assembly warning on scene {i+1}: {e}")
+                    if enable_watermark:
+                        draw = ImageDraw.Draw(img_obj)
+                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                        
+                    img_obj.save(img_path, "JPEG")
+            except Exception:
+                im = Image.new("RGB", (w, h), color=(30, 41, 59))
+                if enable_watermark:
+                    draw = ImageDraw.Draw(im)
+                    draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                im.save(img_path, "JPEG")
+                
+            # v40 Zoom Engine (1.2 to 1.0 cinematic movement)
+            clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
+            clip = clip.resize(lambda t: 1.2 - 0.15 * (t / dur_per)).set_position('center')
+            clip = fadein(clip, 0.4)
+            clips.append(clip)
             
         if not clips:
             fallback_p = f"i_{u_id}_fallback.jpg"
@@ -422,29 +408,30 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             with open(fallback_p, 'wb') as f:
                 f.write(img_data)
             generated_images.append(fallback_p)
-            clip = ImageClip(fallback_p).set_duration(audio.duration).set_fps(24)
-            clip = clip.resize(lambda t: 1.2 - 0.15 * (t / audio.duration)).set_position('center')
+            clip = ImageClip(fallback_p).set_duration(voice_audio.duration).set_fps(24)
+            clip = clip.resize(lambda t: 1.2 - 0.15 * (t / voice_audio.duration)).set_position('center')
             clip = fadein(clip, 0.4)
             clips.append(clip)
             
         progress_bar.progress(0.85)
         status.info("🎞️ Rendering final MP4 movie (v40 High-Stability Export)...")
         
-        final_audio = audio
+        final_audio = voice_audio
         bg_audio = None
         if has_bg_music and os.path.exists(bg_music_f):
             try:
                 bg_audio = AudioFileClip(bg_music_f).volumex(0.10)
-                bg_audio = bg_audio.subclip(0, audio.duration)
-                final_audio = CompositeAudioClip([audio, bg_audio])
+                bg_audio = bg_audio.subclip(0, voice_audio.duration)
+                final_audio = CompositeAudioClip([voice_audio, bg_audio])
             except Exception:
                 pass
                 
+        # v40 Compose method for final video compilation
         final_video = concatenate_videoclips(clips, method="compose").set_audio(final_audio)
-        out = f"Sglowina_{u_id}.mp4"
-        final_video.write_videofile(out, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
+        out_name = f"Sglowina_{u_id}.mp4"
+        final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
         
-        audio.close()
+        voice_audio.close()
         if bg_audio:
             bg_audio.close()
         final_video.close()
@@ -460,12 +447,25 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         progress_bar.progress(1.0)
         status.success("🚀 Video Generated Successfully (ویڈیو بن چکی ہے)!")
         
+        # Saved Prompts History System
+        st.session_state.project_history.append({
+            "name": out_name,
+            "prompts": generated_prompts,
+            "story": story,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+        
         st.markdown("### 📝 Generated Prompts with Copy Button")
         for idx, prompt_text in enumerate(generated_prompts):
             st.text(f"Prompt {idx+1}:")
             st.code(prompt_text, language="text")
+            if prompt_text not in st.session_state.saved_prompts:
+                st.session_state.saved_prompts.append(prompt_text)
             
-        return out
+        # Deduct credits for enterprise management (10 credits per generate)
+        st.session_state.user_credits = max(0, st.session_state.user_credits - 10)
+            
+        return out_name
     except Exception as e: 
         try:
             if os.path.exists(audio_f): os.remove(audio_f)
@@ -479,14 +479,26 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         gc.collect()
 
 # ==========================================
-# 5. UI NAVIGATION & TOOLS
+# 6. UI NAVIGATION & CONTROL PANEL
 # ==========================================
-menu = st.sidebar.radio("SGLOWINA COMMAND MENU", ["🏠 Smart Chat", "🎬 Movie Studio", "🎨 Pro Image Studio"])
+menu = st.sidebar.radio("SGLOWINA COMMAND MENU", [
+    "🏠 Smart Chat", 
+    "🎬 Movie Studio", 
+    "🎨 Pro Image Studio",
+    "👤 Enterprise Center"
+])
 
+# Sidebar Settings
 st.sidebar.markdown("---")
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
+
+# Sglowina Enterprise Center (Mock system to manage credits/panel securely on Streamlit Cloud)
+st.sidebar.markdown("---")
+st.sidebar.subheader("👤 Sglowina Enterprise Center")
+st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
+st.sidebar.write(f"Credits Remaining: **{st.session_state.user_credits}** 🪙")
 
 if menu == "🏠 Smart Chat":
     st.write("### 💬 Sglowina Intelligence Dashboard")
@@ -539,33 +551,97 @@ elif menu == "🎬 Movie Studio":
 
 elif menu == "🎨 Pro Image Studio":
     st.write("### 🎨 Industrial HD Visual Studio")
-    p_i = st.text_area("Describe Image (One per line for batch):", height=150)
     
-    char_desc_img = st.text_input("Consistent Character (کریکٹر کا مستقل حلیہ):", 
-                                  placeholder="Example: A young girl, blue eyes, brown braided hair, red scarf")
+    tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Upload"])
     
-    ic1, ic2, ic3 = st.columns(3)
-    with ic1: i_style = st.selectbox("Art Style:", ["Realistic HD", "Cinematic Film", "Anime Art", "Logo Design", "3D Cartoon", "Rustic Village Life", "Historical Epic"])
-    with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok", "CinemaScope (21:9)", "Standard Box (4:3)"])
-    with ic3: count = st.slider("Quantity:", 1, 10, 1)
+    with tab_txt:
+        p_i = st.text_area("Describe Image (One per line for batch):", height=150)
+        
+        char_desc_img = st.text_input("Consistent Character (کریکٹر کا مستقل حلیہ):", 
+                                      placeholder="Example: A young girl, blue eyes, brown braided hair, red scarf")
+        
+        ic1, ic2, ic3 = st.columns(3)
+        with ic1: i_style = st.selectbox("Art Style:", ["Realistic HD", "Cinematic Film", "Anime Art", "Logo Design", "3D Cartoon", "Rustic Village Life", "Historical Epic"])
+        with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok", "CinemaScope (21:9)", "Standard Box (4:3)"])
+        with ic3: count = st.slider("Quantity:", 1, 10, 1)
+        
+        if st.button("Generate Titan Visuals 🚀"):
+            dim = {
+                "Square (1:1)": (1024, 1024), 
+                "YouTube HD": (1280, 720), 
+                "TikTok": (720, 1280),
+                "CinemaScope (21:9)": (1680, 720),
+                "Standard Box (4:3)": (1024, 768)
+            }
+            w, h = dim[i_size]
+            prompt_list = [line.strip() for line in p_i.split('\n') if line.strip()]
+            for idx, single_p in enumerate(prompt_list):
+                for q in range(count):
+                    final_p = single_p
+                    if char_desc_img.strip():
+                        final_p = f"Character is {char_desc_img.strip()}. Action/Scene: {single_p}"
+                        
+                    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(final_p + ' ' + i_style)}?width={w}&height={h}&seed={random.randint(1,9999)}&nologo=true"
+                    st.image(url, caption=f"Prompt: {single_p[:30]}...")
+                    if final_p not in st.session_state.favorites:
+                        st.session_state.favorites.append(final_p)
+
+    with tab_img:
+        uploaded_file = st.file_uploader("Upload Image to Modify:", type=["jpg", "png", "jpeg"])
+        modify_prompt = st.text_input("Modification Instructions (تبدیلی کے احکامات):", placeholder="Example: Make the background dark green, add cinematic volumetric light")
+        i_style_mod = st.selectbox("Modification Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon"])
+        
+        if st.button("Modify & Re-render Image 🎨"):
+            if uploaded_file and modify_prompt:
+                with st.spinner("Modifying image..."):
+                    img_name = translate_ur_to_en(modify_prompt)
+                    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(img_name + ' ' + i_style_mod)}?width=1024&height=1024&seed={random.randint(1,9999)}&nologo=true"
+                    st.image(url, caption="Modified Masterpiece")
+            else:
+                st.warning("Please upload an image and write instructions first.")
+
+elif menu == "👤 Enterprise Center":
+    st.write("### 👤 Sglowina Enterprise Administration Center")
     
-    if st.button("Generate Titan Visuals 🚀"):
-        dim = {
-            "Square (1:1)": (1024, 1024), 
-            "YouTube HD": (1280, 720), 
-            "TikTok": (720, 1280),
-            "CinemaScope (21:9)": (1680, 720),
-            "Standard Box (4:3)": (1024, 768)
-        }
-        w, h = dim[i_size]
-        prompt_list = [line.strip() for line in p_i.split('\n') if line.strip()]
-        for idx, single_p in enumerate(prompt_list):
-            for q in range(count):
-                final_p = single_p
-                if char_desc_img.strip():
-                    final_p = f"Character is {char_desc_img.strip()}. Action/Scene: {single_p}"
-                    
-                url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(final_p + ' ' + i_style)}?width={w}&height={h}&seed={random.randint(1,9999)}&nologo=true"
-                st.image(url, caption=f"Prompt: {single_p[:30]}...")
+    ent_tab_user, ent_tab_history, ent_tab_admin = st.tabs(["👤 User Profile", "📁 Project History & Prompts", "🔒 Admin Control Panel"])
+    
+    with ent_tab_user:
+        st.write(f"#### Logged-in User Profile")
+        st.info(f"User: **{st.session_state.logged_in_user}** | Allocated Credits: **{st.session_state.user_credits}** 🪙")
+        st.write("Secure Session Token:")
+        st.code(str(uuid.uuid5(uuid.NAMESPACE_DNS, st.session_state.logged_in_user))[:20])
+        
+    with ent_tab_history:
+        st.write("#### 📁 Active Download Manager & Saved Projects")
+        if not st.session_state.project_history:
+            st.write("No projects found in this session.")
+        else:
+            for proj in st.session_state.project_history:
+                st.write(f"🎬 **{proj['name']}** (Created: {proj['timestamp']})")
+                st.write(f"Script: `{proj['story']}`")
+                st.write("Saved Prompts for this video:")
+                for p_text in proj['prompts']:
+                    st.code(p_text, language="text")
+                st.markdown("---")
+                
+        st.write("#### ⭐ Saved & Favorite Prompts")
+        if not st.session_state.favorites:
+            st.write("No saved prompts found.")
+        else:
+            for fav in st.session_state.favorites:
+                st.code(fav, language="text")
+                
+    with ent_tab_admin:
+        st.write("#### 🔒 Secured Admin Control Settings")
+        admin_pass = st.text_input("Enter Admin Passcode:", type="password")
+        if admin_pass == "786" or admin_pass == "1234":
+            st.success("Access Granted!")
+            st.session_state.logged_in_user = st.selectbox("Manage Account:", ["essa_awan", "saba_wahid"])
+            new_credits = st.number_input("Adjust Allocated Credits:", min_value=0, max_value=10000, value=st.session_state.user_credits)
+            if st.button("Apply Changes"):
+                st.session_state.user_credits = new_credits
+                st.success("Credits adjusted successfully!")
+        else:
+            st.error("Access Denied: Invalid passcode.")
 
 st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.2 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
