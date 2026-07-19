@@ -144,7 +144,7 @@ st.markdown("""<div class="executive-header"><div class="main-names">Muhammad Es
 st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 4. IDENTITY & ISLAMIC POLICY ENGINE
+# 3. IDENTITY & ISLAMIC POLICY ENGINE
 # ==========================================
 SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
@@ -219,10 +219,12 @@ def get_titan_prompt(text, style, char_desc="", scene_desc=""):
     style_prompt = style_details.get(style, "epic cinematic lighting, highly detailed masterpiece")
     
     prompt_parts = [f"{style_prompt} style"]
+    
     if char_desc.strip():
-        prompt_parts.append(f"character is {char_desc.strip()}")
+        prompt_parts.append(f"character portrait of {char_desc.strip()} (exact identical face, exact identical clothes, age and hair matching:1.5)")
     if scene_desc.strip():
-        prompt_parts.append(f"scene background is {scene_desc.strip()}")
+        prompt_parts.append(f"scene background environment of {scene_desc.strip()}")
+        
     prompt_parts.append(f"{english_translation}")
     if shariah:
         prompt_parts.append(shariah)
@@ -230,45 +232,54 @@ def get_titan_prompt(text, style, char_desc="", scene_desc=""):
     
     return ", ".join(prompt_parts)
 
-def fetch_img_failover(prompt, w, h, seed):
+def verify_image_bytes(data):
     try:
-        herc_url = f"https://hercai.onrender.com/v3/text2image?prompt={urllib.parse.quote(prompt)}"
-        res = session.get(herc_url, timeout=20)
-        if res.status_code == 200:
-            img_url = res.json().get("url")
-            if img_url:
-                res_img = session.get(img_url, timeout=25)
-                if res_img.status_code == 200 and len(res_img.content) > 5000:
-                    return res_img.content
+        im = Image.open(io.BytesIO(data))
+        im.verify()
+        return True
     except Exception:
-        pass
+        return False
 
+def save_and_format_img(img_data, filepath, w, h, enable_watermark=False):
     try:
-        poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
-        res = session.get(poll_url, timeout=25)
-        if res.status_code == 200 and len(res.content) > 5000:
-            return res.content
+        with Image.open(io.BytesIO(img_data)) as img_obj:
+            img_obj = img_obj.convert("RGB").resize((w, h))
+            if enable_watermark:
+                draw = ImageDraw.Draw(img_obj)
+                draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+            img_obj.save(filepath, "JPEG")
+        return True
     except Exception:
-        pass
+        return False
+
+def fetch_img_v40(prompt, w, h, seed):
+    for attempt in range(3):
+        try:
+            herc_url = f"https://hercai.onrender.com/v3/text2image?prompt={urllib.parse.quote(prompt)}"
+            res = session.get(herc_url, timeout=25)
+            if res.status_code == 200:
+                img_url = res.json().get("url")
+                if img_url:
+                    res_img = session.get(img_url, timeout=25)
+                    if res_img.status_code == 200 and len(res_img.content) > 5000:
+                        if verify_image_bytes(res_img.content):
+                            return res_img.content
+        except Exception:
+            pass
+        time.sleep(1.0)
+
+    for attempt in range(3):
+        try:
+            poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
+            res = session.get(poll_url, timeout=25)
+            if res.status_code == 200 and len(res.content) > 5000:
+                if verify_image_bytes(res.content):
+                    return res.content
+        except Exception:
+            pass
+        time.sleep(1.0)
 
     return None
-
-def generate_high_quality_placeholder(w, h, scene_num, enable_watermark=True):
-    im = Image.new("RGB", (w, h), color=(30, 41, 59))
-    draw = ImageDraw.Draw(im)
-    draw.rectangle([(20, 20), (w - 20, h - 20)], outline=(71, 85, 105), width=4)
-    for offset in range(100, w, 200):
-        draw.line([(offset, 0), (offset, h)], fill=(40, 55, 75), width=1)
-    for offset in range(100, h, 200):
-        draw.line([(0, offset), (w, offset)], fill=(40, 55, 75), width=1)
-    text_str = f"Sglowina Scene {scene_num}"
-    draw.text((w // 2 - 80, h // 2 - 15), text_str, fill=(203, 213, 225))
-    if enable_watermark:
-        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
-    
-    img_byte_arr = io.BytesIO()
-    im.save(img_byte_arr, format='JPEG')
-    return img_byte_arr.getvalue()
 
 def save_audio_safe(story, v_code, rate, pitch, audio_f):
     for attempt in range(2):
@@ -294,7 +305,7 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
     return False
 
 # ==========================================
-# 5. FIXED V40 RENDER SYSTEM CORE (UNTOUCHED)
+# 5. FIXED V40 RENDER SYSTEM CORE (RESTORED)
 # ==========================================
 def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", enable_watermark=True, enable_bg_music=True):
     u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
@@ -362,7 +373,7 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         dur_per = voice_audio.duration / len(sentences)
         generated_prompts = []
         
-        # v40 RENDER PIPELINE CORE FLOW (Pristine, untouched)
+        # v40 RENDER PIPELINE CORE FLOW (Sequential, strict force resize, stable disk write)
         for i, scene in enumerate(sentences):
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
             status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
@@ -370,9 +381,9 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             refined_p = get_titan_prompt(scene, style, char_desc, scene_desc)
             generated_prompts.append(refined_p)
             
-            img_data = fetch_img_failover(refined_p, w, h, seed + i)
+            img_data = fetch_img_v40(refined_p, w, h, seed + i)
             if not img_data:
-                img_data = generate_high_quality_placeholder(w, h, i+1, enable_watermark)
+                raise Exception(f"Failed to generate valid image for Scene {i+1} after all retries. Halted to prevent black frames.")
                 
             img_path = f"i_{u_id}_{i}.jpg"
             generated_images.append(img_path)
@@ -380,36 +391,16 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             with open(img_path, "wb") as f:
                 f.write(img_data)
                 
-            try:
-                with Image.open(img_path) as img_obj:
-                    img_obj = img_obj.convert("RGB").resize((w, h))
-                    
-                    if enable_watermark:
-                        draw = ImageDraw.Draw(img_obj)
-                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
-                        
-                    img_obj.save(img_path, "JPEG")
-            except Exception:
-                im = Image.new("RGB", (w, h), color=(30, 41, 59))
-                if enable_watermark:
-                    draw = ImageDraw.Draw(im)
-                    draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
-                im.save(img_path, "JPEG")
+            success = save_and_format_img(img_data, img_path, w, h, enable_watermark)
+            if not success:
+                raise Exception(f"Formatting failed for Scene {i+1}. Corrupt data.")
+            
+            with Image.open(img_path) as test_img:
+                test_img.verify()
                 
             # v40 Zoom Engine (1.2 to 1.0 cinematic movement)
             clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
             clip = clip.resize(lambda t: 1.2 - 0.15 * (t / dur_per)).set_position('center')
-            clip = fadein(clip, 0.4)
-            clips.append(clip)
-            
-        if not clips:
-            fallback_p = f"i_{u_id}_fallback.jpg"
-            img_data = generate_high_quality_placeholder(w, h, 1, enable_watermark)
-            with open(fallback_p, 'wb') as f:
-                f.write(img_data)
-            generated_images.append(fallback_p)
-            clip = ImageClip(fallback_p).set_duration(voice_audio.duration).set_fps(24)
-            clip = clip.resize(lambda t: 1.2 - 0.15 * (t / voice_audio.duration)).set_position('center')
             clip = fadein(clip, 0.4)
             clips.append(clip)
             
@@ -447,7 +438,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         progress_bar.progress(1.0)
         status.success("🚀 Video Generated Successfully (ویڈیو بن چکی ہے)!")
         
-        # Saved Prompts History System
         st.session_state.project_history.append({
             "name": out_name,
             "prompts": generated_prompts,
@@ -462,7 +452,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             if prompt_text not in st.session_state.saved_prompts:
                 st.session_state.saved_prompts.append(prompt_text)
             
-        # Deduct credits for enterprise management (10 credits per generate)
         st.session_state.user_credits = max(0, st.session_state.user_credits - 10)
             
         return out_name
@@ -488,13 +477,11 @@ menu = st.sidebar.radio("SGLOWINA COMMAND MENU", [
     "👤 Enterprise Center"
 ])
 
-# Sidebar Settings
 st.sidebar.markdown("---")
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
 
-# Sglowina Enterprise Center (Mock system to manage credits/panel securely on Streamlit Cloud)
 st.sidebar.markdown("---")
 st.sidebar.subheader("👤 Sglowina Enterprise Center")
 st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
@@ -581,13 +568,20 @@ elif menu == "🎨 Pro Image Studio":
                     if char_desc_img.strip():
                         final_p = f"Character is {char_desc_img.strip()}. Action/Scene: {single_p}"
                         
-                    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(final_p + ' ' + i_style)}?width={w}&height={h}&seed={random.randint(1,9999)}&nologo=true"
-                    st.image(url, caption=f"Prompt: {single_p[:30]}...")
-                    if final_p not in st.session_state.favorites:
-                        st.session_state.favorites.append(final_p)
+                    img_data = fetch_img_failover(final_p, w, h, random.randint(1,999999))
+                    if img_data:
+                        with Image.open(io.BytesIO(img_data)) as im:
+                            st.image(im, caption=f"Prompt: {single_p[:30]}...")
+                            if final_p not in st.session_state.favorites:
+                                st.session_state.favorites.append(final_p)
+                    else:
+                        st.error(f"Image generation failed for prompt: {single_p}")
 
     with tab_img:
         uploaded_file = st.file_uploader("Upload Image to Modify:", type=["jpg", "png", "jpeg"])
+        if uploaded_file:
+            st.image(uploaded_file, caption="Uploaded Original Image", use_container_width=True)
+            
         modify_prompt = st.text_input("Modification Instructions (تبدیلی کے احکامات):", placeholder="Example: Make the background dark green, add cinematic volumetric light")
         i_style_mod = st.selectbox("Modification Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon"])
         
@@ -595,8 +589,12 @@ elif menu == "🎨 Pro Image Studio":
             if uploaded_file and modify_prompt:
                 with st.spinner("Modifying image..."):
                     img_name = translate_ur_to_en(modify_prompt)
-                    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(img_name + ' ' + i_style_mod)}?width=1024&height=1024&seed={random.randint(1,9999)}&nologo=true"
-                    st.image(url, caption="Modified Masterpiece")
+                    img_data = fetch_img_failover(img_name, 1024, 1024, random.randint(1,999999))
+                    if img_data:
+                        with Image.open(io.BytesIO(img_data)) as im:
+                            st.image(im, caption="Modified Masterpiece")
+                    else:
+                        st.error("Modification failed.")
             else:
                 st.warning("Please upload an image and write instructions first.")
 
