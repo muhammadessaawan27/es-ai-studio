@@ -41,32 +41,23 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700&display=swap');
     
     .stApp { 
-        background-color: #f8fafc !important; 
-        color: #0f172a !important; 
+        background-color: #ffffff !important; 
+        color: #000000 !important; 
         font-family: 'Inter', sans-serif; 
     }
     
     .executive-header {
         text-align: center; 
-        padding: 12px; 
-        border-bottom: 3px solid #10b981; 
-        margin-bottom: 20px; 
-        background: #ffffff;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.1);
+        padding: 10px; 
+        border-bottom: 1px solid #e2e8f0; 
+        margin-bottom: 15px; 
+        color: #000000 !important;
     }
     
     .main-names { 
-        font-size: 1.6rem; 
+        font-size: 1.5rem; 
         font-weight: 800; 
-        color: #0f172a !important; 
-        text-shadow: 0 0 5px rgba(16, 185, 129, 0.1);
-        animation: text-pulse 2.5s infinite alternate;
-    }
-    
-    @keyframes text-pulse {
-        0% { text-shadow: 0 0 5px rgba(16, 185, 129, 0.1); }
-        100% { text-shadow: 0 0 15px rgba(16, 185, 129, 0.4), 0 0 25px rgba(16, 185, 129, 0.2); }
+        color: #000000 !important; 
     }
     
     .title-tag { 
@@ -81,34 +72,21 @@ st.markdown("""
     .circular-s {
         width: 100px; height: 100px; background: #0f172a; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
-        font-family: 'Orbitron', sans-serif; font-size: 45px; color: #10b981 !important;
-        border: 3px solid #10b981; 
-        box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
-        animation: spin 10s infinite linear, glow-pulse 3s infinite alternate;
-    }
-    
-    @keyframes glow-pulse {
-        0% { box-shadow: 0 0 10px rgba(16, 185, 129, 0.3); }
-        100% { box-shadow: 0 0 25px rgba(16, 185, 129, 0.6); }
+        font-family: 'Orbitron', sans-serif; font-size: 45px; color: #ffffff !important;
+        border: 3px solid #00d4ff; box-shadow: 0 0 15px rgba(0,212,255,0.3);
+        animation: spin 10s infinite linear;
     }
     @keyframes spin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
 
     .stButton>button { 
-        background: #0f172a !important; 
-        color: #ffffff !important; 
+        background: #000000 !important; 
+        color: white !important; 
         border-radius: 12px !important; 
         height: 55px; 
         width: 100%; 
         font-size: 20px; 
         font-weight: bold; 
-        border: 2px solid #10b981 !important; 
-        box-shadow: 0 4px 10px rgba(16, 185, 129, 0.1);
-        transition: all 0.3s ease;
-    }
-    .stButton>button:hover {
-        box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
-        background: #10b981 !important;
-        color: #ffffff !important;
+        border: none; 
     }
     
     [data-testid="stSidebar"] { 
@@ -116,12 +94,12 @@ st.markdown("""
         border-right: 1px solid #e2e8f0; 
     }
     [data-testid="stSidebar"] * { 
-        color: #0f172a !important; 
+        color: #000000 !important; 
         font-weight: bold !important; 
     }
     
     div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input {
-        background-color: #ffffff !important;
+        background-color: #f8fafc !important;
         color: #0f172a !important;
         border: 2px solid #cbd5e1 !important;
         border-radius: 12px !important;
@@ -129,8 +107,8 @@ st.markdown("""
         transition: all 0.3s ease !important;
     }
     div[data-baseweb="textarea"] textarea:focus, div[data-baseweb="input"] input:focus {
-        border-color: #10b981 !important;
-        box-shadow: 0 0 12px rgba(16, 185, 129, 0.35) !important;
+        border-color: #00d4ff !important;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.2) !important;
         background-color: #ffffff !important;
     }
     div[data-baseweb="textarea"] textarea::placeholder, div[data-baseweb="input"] input::placeholder {
@@ -174,13 +152,23 @@ def apply_islamic_visual_logic(text):
     return ""
 
 def translate_ur_to_en(text):
+    if not text or not text.strip():
+        return text
     try:
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=ur&tl=en&dt=t&q={urllib.parse.quote(text)}"
-        res = session.get(url, timeout=10)
+        url = "https://translate.googleapis.com/translate_a/single"
+        params = {
+            'client': 'gtx',
+            'sl': 'ur',
+            'tl': 'en',
+            'dt': 't',
+            'q': text
+        }
+        res = session.get(url, params=params, timeout=10)
         if res.status_code == 200:
             json_data = res.json()
-            translated = "".join([part[0] for part in json_data[0] if part[0]])
-            return translated
+            translated = "".join([part[0] for part in json_data[0] if part and part[0]])
+            if translated.strip():
+                return translated.strip()
     except Exception:
         pass
     return text
@@ -288,7 +276,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         clips = []
         dur_per = audio.duration / len(sentences)
         
-        # ماڈل کو ٹربو (model=turbo) پر فکس کیا گیا ہے تاکہ کلاؤڈ ریٹ لمٹ بائی پاس ہو اور کالی اسکرین کا مسئلہ نہ آئے
         img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&model=turbo&nologo=true&enhance=false&negative=deformed,bad_anatomy,blurry,bad_hands,extra_limbs,disfigured,poor_details,extra_fingers,mutated_hands,animal,dog,cat,captcha,blood,bloody,wounded,scary,horror,mutilated_face,decaying_skin,tiger_head,lion_head" for s in sentences]
 
         with ThreadPoolExecutor(max_workers=5) as exe:
