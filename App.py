@@ -13,7 +13,6 @@ import io
 import threading
 import gc
 import shutil
-from concurrent.futures import ThreadPoolExecutor
 
 # ==========================================
 # 1. INDUSTRIAL STABILITY & LOAD BALANCING
@@ -28,13 +27,13 @@ if not hasattr(Image, 'ANTIALIAS'):
 try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
     from moviepy.video.fx.all import fadein
-except Exception as e:
+except Exception:
     try:
         from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
         import moviepy.video.fx.all as vfx
         fadein = vfx.fadein
-    except Exception as inner_e:
-        st.warning(f"Dependency Load Warning: {inner_e}")
+    except Exception:
+        pass
 
 from streamlit_mic_recorder import mic_recorder
 
@@ -42,7 +41,7 @@ from streamlit_mic_recorder import mic_recorder
 # 2. ENTERPRISE SESSION STATE INITIALIZATION
 # ==========================================
 if "user_accounts" not in st.session_state:
-    st.session_state.user_accounts = {"essa_awan": "1234", "saba_wahid": "786"}
+    st.session_state.user_accounts = {"essa_awan": "786", "saba_wahid": "1234"}
 if "logged_in_user" not in st.session_state:
     st.session_state.logged_in_user = "essa_awan"
 if "user_credits" not in st.session_state:
@@ -145,9 +144,6 @@ st.markdown("""<div class="executive-header"><div class="main-names">Muhammad Es
     <div class="title-tag">Founders & CEOs | SGLOWINA AI OFFICIAL STUDIO</div></div>""", unsafe_allow_html=True)
 st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
 
-# ==========================================
-# 3. IDENTITY & ISLAMIC POLICY ENGINE
-# ==========================================
 SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
 Founders & CEOs: Muhammad Essa Awan & Saba Wahid.
@@ -193,7 +189,7 @@ def translate_ur_to_en(text):
             if translated.strip():
                 return translated.strip()
     except Exception as e:
-        print(f"Primary Translation Exception: {e}")
+        print(f"Translation primary engine exception: {e}")
     
     try:
         instr = f"Extract only the main visual subject and atmosphere from this Urdu: '{text}'. Describe it clearly in English for a 3D animation model. No preamble."
@@ -202,17 +198,17 @@ def translate_ur_to_en(text):
         if res.status_code == 200 and len(res.text) < 1000:
             return res.text.strip()
     except Exception as e:
-        print(f"Fallback Translation Exception: {e}")
+        print(f"Translation backup engine exception: {e}")
         
     return text
 
-def get_titan_prompt(text, style, char_desc="", scene_desc=""):
-    shariah = apply_islamic_visual_logic(text)
-    english_translation = translate_ur_to_en(text)
+def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc=""):
+    shariah = apply_islamic_visual_logic(urdu_text)
+    english_translation = translate_ur_to_en(urdu_text)
     
     style_details = {
-        "Realistic HD": "hyperrealistic photograph, highly detailed 8k resolution, sharp focus, realistic textures, natural volumetric lighting, cinematic photography style",
-        "Cinematic Film": "epic cinematic lighting, highly detailed fantasy masterpiece, majestic atmosphere, octane render, volumetric god rays, detailed beautiful environment, realistic fine textures, cinematic look",
+        "Realistic": "hyperrealistic photograph, highly detailed 8k resolution, sharp focus, realistic textures, natural volumetric lighting, cinematic photography style",
+        "Cinematic": "epic cinematic lighting, highly detailed fantasy masterpiece, majestic atmosphere, octane render, volumetric god rays, detailed beautiful environment, realistic fine textures, cinematic look",
         "3D Cartoon": "professional 3D animated character, Pixar style, highly detailed, vibrant colors, clean rendering, smooth textures",
         "Historical Epic": "historical authentic scene, epic detail, ancient historical painting style, dramatic historical atmosphere, highly detailed oil painting, fine details",
         "Rustic Village Life": "rustic rural setting, highly detailed, natural lighting, authentic organic village environment, earthy tones, mud houses, natural textures",
@@ -221,18 +217,236 @@ def get_titan_prompt(text, style, char_desc="", scene_desc=""):
     style_prompt = style_details.get(style, "epic cinematic lighting, highly detailed masterpiece")
     
     prompt_parts = [f"{style_prompt} style"]
-    
     if char_desc.strip():
-        prompt_parts.append(f"character is {char_desc.strip()}. Use the same character identity in every scene, identical face, identical clothing, consistent appearance")
+        prompt_parts.append(f"character is {char_desc.strip()}, identical face, consistent clothing, same look")
     if scene_desc.strip():
-        prompt_parts.append(f"scene background environment of {scene_desc.strip()}, same environment, same camera style")
-        
-    prompt_parts.append(f"{english_translation}")
+        prompt_parts.append(f"scene background is {scene_desc.strip()}, same environment")
+    prompt_parts.append(english_translation)
     if shariah:
         prompt_parts.append(shariah)
-    prompt_parts.append("highly detailed, cinematic lighting, 8k, realistic masterpiece, vivid colors, maintain exact same character identity across all scenes")
+    prompt_parts.append("highly detailed, cinematic lighting, 8k, realistic masterpiece, vivid colors")
     
     return ", ".join(prompt_parts)
+
+def fetch_img_failover(prompt, w, h, seed):
+    try:
+        herc_url = f"https://hercai.onrender.com/v3/text2image?prompt={urllib.parse.quote(prompt)}"
+        res = session.get(herc_url, timeout=20)
+        if res.status_code == 200:
+            img_url = res.json().get("url")
+            if img_url:
+                res_img = session.get(img_url, timeout=25)
+                if res_img.status_code == 200 and len(res_img.content) > 5000:
+                    return res_img.content
+    except Exception as e:
+        print(f"Hercai fetch exception: {e}")
+
+    try:
+        poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
+        res = session.get(poll_url, timeout=25)
+        if res.status_code == 200 and len(res.content) > 5000:
+            return res.content
+    except Exception as e:
+        print(f"Pollinations fetch exception: {e}")
+
+    return None
+
+def generate_high_quality_placeholder(w, h, scene_num, enable_watermark=True):
+    im = Image.new("RGB", (w, h), color=(30, 41, 59))
+    draw = ImageDraw.Draw(im)
+    draw.rectangle([(20, 20), (w - 20, h - 20)], outline=(71, 85, 105), width=4)
+    for offset in range(100, w, 200):
+        draw.line([(offset, 0), (offset, h)], fill=(40, 55, 75), width=1)
+    for offset in range(100, h, 200):
+        draw.line([(0, offset), (w, offset)], fill=(40, 55, 75), width=1)
+    text_str = f"Sglowina Scene {scene_num}"
+    draw.text((w // 2 - 80, h // 2 - 15), text_str, fill=(203, 213, 225))
+    if enable_watermark:
+        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+    
+    img_byte_arr = io.BytesIO()
+    im.save(img_byte_arr, format='JPEG')
+    return img_byte_arr.getvalue()
+
+def save_audio_safe(story, v_code, rate, pitch, audio_f):
+    for attempt in range(2):
+        try:
+            def _run():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(edge_tts.Communicate(story, v_code, rate=rate, pitch=pitch).save(audio_f))
+                except Exception as e:
+                    print(f"Inner edge_tts exception: {e}")
+                finally:
+                    loop.close()
+
+            thread = threading.Thread(target=_run)
+            thread.start()
+            thread.join()
+            if os.path.exists(audio_f) and os.path.getsize(audio_f) > 1000:
+                return True
+        except Exception as e:
+            print(f"Audio save attempt {attempt+1} exception: {e}")
+        time.sleep(0.2)
+    return False
+
+# ==========================================
+# 5. FIXED V40 RENDER SYSTEM CORE (UNTOUCHED)
+# ==========================================
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", enable_watermark=True, enable_bg_music=True):
+    u_id = str(uuid.uuid4())[:8]
+    progress_bar = st.progress(0.0)
+    status = st.empty()
+    
+    audio_file = f"a_{u_id}.mp3"
+    bg_music_f = f"bg_{u_id}.mp3"
+    generated_images = []
+    has_bg_music = False
+    
+    try:
+        # Step 1: Human Voice (v40 Core voice initialization)
+        progress_bar.progress(0.05)
+        status.info("🎙️ Generating Voiceover Track (آڈیو جنریٹ ہو رہی ہے)...")
+        v_code = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
+        
+        save_audio_success = save_audio_safe(story, v_code, rate, pitch, audio_file)
+        if not save_audio_success:
+            raise Exception("Voice generation failed.")
+            
+        voice_audio = AudioFileClip(audio_file)
+        progress_bar.progress(0.15)
+        
+        # Layer Sglowina background music safely on top of v40 base
+        if enable_bg_music:
+            status.info("🎵 Downloading Atmospheric Classical Background Track...")
+            story_lower = story.lower()
+            is_horror = any(k in story_lower or k in story for k in ["قبر", "عذاب", "موت", "خوفناک", "خوف", "جن", "بھوت", "تاریک", "ڈراؤنی", "grave", "torment", "punishment", "scary", "ghost", "dark", "death", "screaming", "blood", "bloody", "horror"])
+            is_epic = any(k in story_lower or k in story for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "شاہی", "تاریخ", "بہادر", "king", "queen", "throne", "palace", "empire", "warrior", "brave", "history", "castle"])
+            is_peaceful = any(k in story_lower or k in story for k in ["نماز", "دعا", "مسجد", "ولی", "صبر", "سکون", "اللہ", "pray", "prayer", "mosque", "peace", "peaceful", "sad", "crying", "tears"])
+            
+            if is_horror:
+                bg_url = "https://upload.wikimedia.org/wikipedia/commons/1/18/Beethoven_-_Moonlight_Sonata_-_1st_movement.mp3"
+            elif is_epic:
+                bg_url = "https://upload.wikimedia.org/wikipedia/commons/d/df/Johann_Sebastian_Bach_-_Air_on_the_G_String_-_arranged_for_piano_and_violin.mp3"
+            elif is_peaceful:
+                bg_url = "https://upload.wikimedia.org/wikipedia/commons/e/e6/Chopin_-_Nocturne_op._9_no._2.mp3"
+            else:
+                bg_url = "https://upload.wikimedia.org/wikipedia/commons/e/e6/Chopin_-_Nocturne_op._9_no._2.mp3"
+                
+            try:
+                res_bg = session.get(bg_url, timeout=20)
+                if res_bg.status_code == 200:
+                    with open(bg_music_f, 'wb') as f:
+                        f.write(res_bg.content)
+                    has_bg_music = True
+            except Exception as e:
+                print(f"Background music load error: {e}")
+                
+        progress_bar.progress(0.20)
+        
+        # v40 Dimensions Mapping & Aspect Ratio Logic
+        res_map = {
+            "YouTube (16:9)": (1280, 720), 
+            "TikTok/Reels (9:16)": (720, 1280), 
+            "Instagram (1:1)": (720, 720),
+            "CinemaScope (21:9)": (1680, 720),
+            "Standard Box (4:3)": (1024, 768)
+        }
+        w, h = res_map[ratio]
+        
+        # v40 Split by Sentences
+        sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
+        if not sentences: sentences = [story]
+        
+        clips = []
+        dur_per = voice_audio.duration / len(sentences)
+        generated_prompts = []
+        
+        # v40 Sequential Image download, Force Resize & Save Pipeline
+        for i, scene in enumerate(sentences):
+            progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
+            status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
+            
+            # Sglowina prompt translation & generation layered on v40 prompt engine
+            refined_p = get_visual_prompt_v40(scene, style, char_desc, scene_desc)
+            generated_prompts.append(refined_p)
+            
+            # Image Failover fetch logic layered
+            img_data = fetch_img_failover(refined_p, w, h, seed + i)
+            if not img_data:
+                st.warning(f"⚠️ Scene {i+1} image generation failed. Using high-quality stylized placeholder to prevent black screens.")
+                img_data = generate_high_quality_placeholder(w, h, i+1, enable_watermark)
+                
+            img_path = f"i_{u_id}_{i}.jpg"
+            generated_images.append(img_path)
+            
+            # v40 Write directly to disk first
+            with open(img_path, "wb") as f:
+                f.write(img_data)
+                
+            # v40 Force Resize & Format conversion (Sglowina Watermark layered inside)
+            try:
+                with Image.open(img_path) as img_obj:
+                    img_obj = img_obj.convert("RGB").resize((w, h))
+                    
+                    if enable_watermark:
+                        draw = ImageDraw.Draw(img_obj)
+                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                        
+                    img_obj.save(img_path, "JPEG")
+            except Exception as e:
+                print(f"PIL Image Processing Error on scene {i+1}: {e}")
+                im = Image.new("RGB", (w, h), color=(30, 41, 59))
+                if enable_watermark:
+                    draw = ImageDraw.Draw(im)
+                    draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                im.save(img_path, "JPEG")
+                
+            # v40 RELIABLE ZOOM OUT (Force Motion 1.2 to 1.0)
+            clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
+            clip = clip.resize(lambda t: 1.2 - 0.15 * (t / dur_per)).set_position('center')
+            clip = fadein(clip, 0.4)
+            clips.append(clip)
+            
+        if not clips:
+            fallback_p = f"i_{u_id}_fallback.jpg"
+            img_data = generate_high_quality_placeholder(w, h, 1, enable_watermark)
+            with open(fallback_p, 'wb') as f:
+                f.write(img_data)
+            generated_images.append(fallback_p)
+            clip = ImageClip(fallback_p).set_duration(voice_audio.duration).set_fps(24)
+            clip = clip.resize(lambda t: 1.2 - 0.15 * (t / voice_audio.duration)).set_position('center')
+            clip = fadein(clip, 0.4)
+            clips.append(clip)
+            
+        progress_bar.progress(0.85)
+        status.info("🎞️ Rendering final MP4 movie (v40 High-Stability Export)...")
+        
+        final_audio = voice_audio
+        bg_audio = None
+        if has_bg_music and os.path.exists(bg_music_f):
+            try:
+                bg_audio = AudioFileClip(bg_music_f).volumex(0.10)
+                bg_audio = bg_audio.subclip(0, voice_audio.duration)
+                final_audio = CompositeAudioClip([voice_audio, bg_audio])
+            except Exception as e:
+                print(f"Background mixing exception: {e}")
+                
+        # v40 final compose concatenation
+        final_video = concatenate_videoclips(clips, method="compose").set_audio(final_audio)
+        out_name = f"Sglowina_{u_id}.mp4"
+        final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
+        
+        voice_audio.close()
+        if bg_audio:
+            bg_audio.close()
+        final_video.close()
+        
+        # Sglowina Automatic Cleanup (Temporary Files Delete)
+        try:
+            if os.path.exists(audio_file): os.remove(audio_file)
+            if os.pts)
 
 def verify_image_bytes(data):
     try:
