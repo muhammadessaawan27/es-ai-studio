@@ -151,48 +151,40 @@ def apply_islamic_visual_logic(text):
         
     return ""
 
+def translate_ur_to_en(text):
+    try:
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=ur&tl=en&dt=t&q={urllib.parse.quote(text)}"
+        res = session.get(url, timeout=10)
+        if res.status_code == 200:
+            json_data = res.json()
+            translated = "".join([part[0] for part in json_data[0] if part[0]])
+            return translated
+    except Exception:
+        pass
+    return text
+
 def get_titan_prompt(text, style, char_desc=""):
     shariah = apply_islamic_visual_logic(text)
+    english_translation = translate_ur_to_en(text)
     
     style_details = {
-        "Realistic HD": "photorealistic, highly detailed 8k, sharp focus, natural volumetric lighting",
-        "Cinematic Film": "epic cinematic lighting, detailed fantasy, majestic atmosphere, octane render, volumetric rays",
-        "3D Cartoon": "professional 3D animated character, Pixar style, highly detailed, vibrant colors",
-        "Historical Epic": "historical authentic scene, epic detail, ancient historical style, highly detailed",
-        "Rustic Village Life": "rustic village setting, natural lighting, authentic organic environment",
-        "Dark Gothic / Mystery": "dark gothic mystery, foggy atmosphere, moody lighting, highly detailed"
+        "Realistic HD": "hyperrealistic photograph, highly detailed 8k resolution, sharp focus, realistic textures, natural volumetric lighting, cinematic photography style",
+        "Cinematic Film": "epic cinematic lighting, highly detailed fantasy masterpiece, majestic atmosphere, octane render, volumetric god rays, detailed beautiful environment, realistic fine textures, cinematic look",
+        "3D Cartoon": "professional 3D animated character, Pixar style, highly detailed, vibrant colors, clean rendering, smooth textures",
+        "Historical Epic": "historical authentic scene, epic detail, ancient historical painting style, dramatic historical atmosphere, highly detailed oil painting, fine details",
+        "Rustic Village Life": "rustic rural setting, highly detailed, natural lighting, authentic organic village environment, earthy tones, mud houses, natural textures",
+        "Dark Gothic / Mystery": "dark gothic fantasy, mysterious foggy atmosphere, dramatic moody lighting, highly detailed, masterpiece, dark mist"
     }
-    style_prompt = style_details.get(style, "highly detailed, masterpiece")
+    style_prompt = style_details.get(style, "epic cinematic lighting, highly detailed masterpiece")
     
-    full_subject = text
+    anatomy_helper = "highly detailed face, proportional body, anatomically correct hands and fingers, perfect detailed eyes, realistic human proportions"
+    
     if char_desc.strip():
-        full_subject = (
-            f"Subject: A person with EXACTLY this appearance: {char_desc.strip()} (Depict this exact same person, face, features, and clothes in every frame). "
-            f"Action/Scene: {text}"
-        )
+        final_prompt = f"Subject: A person depicted EXACTLY as {char_desc.strip()} (depict this exact same person, face, features, and clothes). Action: {english_translation}. Style: {style_prompt}. Details: {anatomy_helper}."
+    else:
+        final_prompt = f"Subject: {english_translation}. Style: {style_prompt}. Details: {anatomy_helper}."
         
-    system_instruction = (
-        "Act as an expert AI prompt engineer for image generation. "
-        "Translate Urdu scene description into a highly detailed English prompt. "
-        "Ensure prompt depicts: subject, action, environment, lighting. "
-        "Strictly block modern clothing. If text mentions a king, depict a human king, not an animal. "
-        "Output ONLY the English prompt."
-    )
-    
-    models = ["openai", "mistral", "llama"]
-    for model in models:
-        try:
-            instr = f"{system_instruction}. Urdu: '{full_subject}'. Style: {style_prompt}. {shariah}."
-            url = f"https://text.pollinations.ai/{urllib.parse.quote(instr)}?model={model}&cache=true"
-            res = session.get(url, timeout=12)
-            if res.status_code == 200:
-                translated = res.text.strip()
-                if translated and "<html" not in translated.lower() and "cloudflare" not in translated.lower() and len(translated) < 1000:
-                    return translated
-        except Exception:
-            pass
-            
-    return f"Subject: {full_subject} | Style: {style_prompt} | Quality: highly detailed human face, correct proportional hands and fingers, masterpiece, 8k"
+    return final_prompt
 
 # ==========================================
 # 4. TITAN PARALLEL MOVIE ENGINE (v40 LOGIC)
@@ -248,7 +240,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         clips = []
         dur_per = audio.duration / len(sentences)
         
-        # نگیٹو پیرامیٹرز کو شارٹ اور ہائیلی فوکسڈ کر دیا گیا ہے تاکہ یو آر ایل مستحکم رہے اور تصویریں کالی نہ ہوں
         img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&nologo=true&enhance=false&negative=deformed,bad_anatomy,blurry,bad_hands,extra_limbs,disfigured,poor_details,extra_fingers,mutated_hands,animal,dog,cat,blood,bloody,wounded,scary,horror,mutilated_face,decaying_skin,tiger_head,lion_head" for s in sentences]
 
         with ThreadPoolExecutor(max_workers=5) as exe:
