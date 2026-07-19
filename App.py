@@ -11,6 +11,7 @@ import random
 from PIL import Image, ImageDraw, ImageFont
 import io
 import threading
+import gc
 from concurrent.futures import ThreadPoolExecutor
 
 # ==========================================
@@ -173,7 +174,7 @@ def translate_ur_to_en(text):
         pass
     return text
 
-def get_titan_prompt(text, style, char_desc=""):
+def get_titan_prompt(text, style, char_desc="", scene_desc=""):
     shariah = apply_islamic_visual_logic(text)
     english_translation = translate_ur_to_en(text)
     
@@ -189,12 +190,17 @@ def get_titan_prompt(text, style, char_desc=""):
     
     anatomy_helper = "highly detailed face, proportional body, anatomically correct hands and fingers, perfect detailed eyes, realistic human proportions"
     
-    if char_desc.strip():
-        final_prompt = f"Subject: A person depicted EXACTLY as {char_desc.strip()} (depict this exact same person, face, features, and clothes). Action: {english_translation}. Style: {style_prompt}. Details: {anatomy_helper}."
-    else:
-        final_prompt = f"Subject: {english_translation}. Style: {style_prompt}. Details: {anatomy_helper}."
-        
-    return final_prompt
+    subject_part = f"Subject: A person depicted EXACTLY as {char_desc.strip()} (depict this exact same person, face, and clothes)" if char_desc.strip() else f"Subject: {english_translation}"
+    action_part = f"Action: {english_translation}" if char_desc.strip() else ""
+    environment_part = f"Environment: {scene_desc.strip()}" if scene_desc.strip() else ""
+    
+    prompt_parts = [subject_part]
+    if action_part: prompt_parts.append(action_part)
+    if environment_part: prompt_parts.append(environment_part)
+    prompt_parts.append(f"Style: {style_prompt}")
+    prompt_parts.append(f"Details: {anatomy_helper}")
+    
+    return " | ".join(prompt_parts)
 
 # ==========================================
 # 4. TITAN PARALLEL MOVIE ENGINE (v40 LOGIC)
@@ -203,41 +209,92 @@ def fetch_img(url):
     for attempt in range(3):
         try:
             res = session.get(url, timeout=30)
-            if res.status_code == 200 and len(res.content) > 5000:
+            if res.status_code == 200 and len(res.content) > 3000:
                 return res.content
         except Exception:
             pass
         time.sleep(1.0)
     return None
 
+def fetch_img_with_fallback(prompt, w, h, seed):
+    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true&enhance=false"
+    data = fetch_img(url)
+    if data:
+        return data
+        
+    simple_prompt = prompt.split("Style:")[0].strip()
+    url_simple = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(simple_prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
+    data_simple = fetch_img(url_simple)
+    if data_simple:
+        return data_simple
+        
+    return None
+
+def apply_camera_motion(clip, motion_type, duration, w, h):
+    if motion_type == "Ken Burns":
+        clip = clip.resize(lambda t: 1.15 + 0.10 * (t / duration)).set_position(lambda t: (int(-40 * (t / duration)), 'center'))
+    elif motion_type == "Pan Left":
+        clip = clip.set_position(lambda t: (int(-80 * (t / duration)), 'center'))
+    elif motion_type == "Pan Right":
+        clip = clip.set_position(lambda t: (int(-80 * (1.0 - (t / duration))), 'center'))
+    elif motion_type == "Tilt":
+        clip = clip.set_position(lambda t: ('center', int(-60 * (t / duration))))
+    elif motion_type == "Dolly In":
+        clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
+    elif motion_type == "Dolly Out":
+        clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
+    else:
+        clip = clip.resize(lambda t: 1.0 + 0.10 * (t / duration)).set_position('center')
+    return clip
+
 def save_audio_safe(story, v_code, rate, pitch, audio_f):
-    def _run():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    for attempt in range(3):
         try:
-            loop.run_until_complete(edge_tts.Communicate(story, v_code, rate=rate, pitch=pitch).save(audio_f))
-        finally:
-            loop.close()
+            def _run():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(edge_tts.Communicate(story, v_code, rate=rate, pitch=pitch).save(audio_f))
+                finally:
+                    loop.close()
 
-    thread = threading.Thread(target=_run)
-    thread.start()
-    thread.join()
+            thread = threading.Thread(target=_run)
+            thread.start()
+            thread.join()
+            if os.path.exists(audio_f) and os.path.getsize(audio_f) > 1000:
+                return True
+        except Exception:
+            pass
+        time.sleep(1.0)
+    return False
 
-def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc="", enable_watermark=True, enable_bg_music=True):
+def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Smooth Camera", transition_type="Cinematic Cut", enable_watermark=True, enable_bg_music=True):
     u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
+    
+    # پروگریس بار کا قیام
+    progress_bar = st.progress(0.0)
     status = st.empty()
+    
     audio_f = f"a_{u_id}.mp3"
     bg_music_f = f"bg_{u_id}.mp3"
     generated_images = []
     has_bg_music = False
     
     try:
+        progress_bar.progress(0.05)
         status.info("🎙️ Generating Voiceover Track (آڈیو جنریٹ ہو رہی ہے)...")
         v_code = "ur-PK-UzmaNeural" if voice == "Uzma (Female)" else "ur-PK-AsadNeural"
-        save_audio_safe(story, v_code, rate, pitch, audio_f)
+        
+        # آڈیو آٹو ری ٹرائے سسٹم
+        audio_success = save_audio_safe(story, v_code, rate, pitch, audio_f)
+        if not audio_success:
+            raise Exception("Voice generation failed after multiple retries. Please check server load.")
+            
         audio = AudioFileClip(audio_f)
+        progress_bar.progress(0.15)
         
         if enable_bg_music:
+            status.info("🎵 Downloading Background Atmosphere Music...")
             story_lower = story.lower()
             is_horror = any(k in story_lower or k in story for k in ["قبر", "عذاب", "موت", "خوفناک", "خوف", "جن", "بھوت", "تاریک", "ڈراؤنی", "grave", "torment", "punishment", "scary", "ghost", "dark", "death", "screaming", "blood", "bloody", "horror"])
             is_epic = any(k in story_lower or k in story for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "شاہی", "تاریخ", "بہادر", "king", "queen", "throne", "palace", "empire", "warrior", "brave", "history", "castle"])
@@ -260,6 +317,8 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                     has_bg_music = True
             except:
                 pass
+                
+        progress_bar.progress(0.20)
         
         res_map = {
             "YouTube (16:9)": (1280, 720), 
@@ -276,44 +335,76 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         clips = []
         dur_per = audio.duration / len(sentences)
         
-        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&model=turbo&nologo=true&enhance=false&negative=deformed,bad_anatomy,blurry,bad_hands,extra_limbs,disfigured,poor_details,extra_fingers,mutated_hands,animal,dog,cat,captcha,blood,bloody,wounded,scary,horror,mutilated_face,decaying_skin,tiger_head,lion_head" for s in sentences]
-
-        with ThreadPoolExecutor(max_workers=5) as exe:
-            for i, img_data in enumerate(exe.map(fetch_img, img_urls)):
-                status.info(f"🎨 Generating & Downloading Scene {i+1}/{len(sentences)}...")
-                img_p = f"i_{u_id}_{i}.jpg"
-                generated_images.append(img_p)
-                
-                image_saved = False
-                if img_data:
-                    try:
-                        with Image.open(io.BytesIO(img_data)) as im:
-                            im = im.convert("RGB").resize((w, h))
+        generated_prompts = []
+        
+        for i, s in enumerate(sentences):
+            # پروگریس بار کا متحرک حساب کتاب
+            img_progress = 0.20 + ((i / len(sentences)) * 0.60)
+            progress_bar.progress(img_progress)
+            
+            status.info(f"🎨 Generating Scene {i+1}/{len(sentences)}...")
+            prompt = get_titan_prompt(s, style, char_desc, scene_desc)
+            generated_prompts.append(prompt)
+            
+            # ڈبل لیئرڈ ری ٹرائے سسٹم
+            img_data = fetch_img_with_fallback(prompt, w, h, seed)
+            img_p = f"i_{u_id}_{i}.jpg"
+            generated_images.append(img_p)
+            
+            image_saved = False
+            if img_data:
+                try:
+                    with Image.open(io.BytesIO(img_data)) as im:
+                        im = im.convert("RGB")
+                        
+                        # اگر کیمرہ پین یا ٹیلٹ ہے تو امیج کو قدرے بڑا کر کے پین کیا جائے گا تاکہ بلیک بارز نہ آئیں
+                        if camera_motion in ["Pan Left", "Pan Right", "Tilt", "Ken Burns"]:
+                            im = im.resize((int(w * 1.15), int(h * 1.15)))
+                        else:
+                            im = im.resize((w, h))
                             
-                            if enable_watermark:
-                                draw = ImageDraw.Draw(im)
-                                draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
-                                
-                            im.save(img_p, "JPEG")
-                        image_saved = True
-                    except Exception:
-                        pass
-                
-                if not image_saved:
-                    try:
-                        im = Image.new("RGB", (w, h), color=(15, 23, 42))
                         if enable_watermark:
                             draw = ImageDraw.Draw(im)
-                            draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                            draw.text((im.width - 140, im.height - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                            
                         im.save(img_p, "JPEG")
-                    except Exception:
-                        pass
-                
-                clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
-                clip = clip.resize(lambda t: 1.0 + 0.15 * (t/dur_per)).set_position('center')
-                clips.append(vfx.fadein(clip, 0.4))
+                    image_saved = True
+                except Exception:
+                    pass
             
-        status.info("🎞️ Compiling and Rendering HD Video (ویڈیو تیار ہو رہی ہے)...")
+            if not image_saved:
+                try:
+                    im = Image.new("RGB", (w, h), color=(15, 23, 42))
+                    if enable_watermark:
+                        draw = ImageDraw.Draw(im)
+                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                    im.save(img_p, "JPEG")
+                except Exception:
+                    pass
+            
+            # کیمرہ موشن پائپ لائن
+            if camera_motion in ["Pan Left", "Pan Right", "Tilt", "Ken Burns"]:
+                clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
+            else:
+                clip = ImageClip(img_p).set_duration(dur_per).set_fps(24).resize((w, h))
+                
+            clip = apply_camera_motion(clip, camera_motion, dur_per, w, h)
+            
+            # سین ٹرانزیشن پائپ لائن
+            if transition_type == "Cross Fade":
+                clip = clip.crossfadein(0.5)
+            elif transition_type == "Blur Transition":
+                clip = clip.fadein(0.4)
+            elif transition_type == "Flash Transition":
+                clip = clip.fadein(0.3)
+            elif transition_type == "Smooth Fade":
+                clip = clip.fadein(0.5)
+                
+            clips.append(clip)
+            time.sleep(0.5)
+            
+        progress_bar.progress(0.85)
+        status.info("🎞️ Mixing Audio & Rendering HD Video (ویڈیو رینڈر ہو رہی ہے)...")
         
         final_audio = audio
         bg_audio = None
@@ -342,7 +433,15 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         except Exception:
             pass
             
+        progress_bar.progress(1.0)
         status.success("🚀 Video Generated Successfully (ویڈیو بن چکی ہے)!")
+        
+        # تیار کردہ پرامپٹس کو کاپی بٹن کے ساتھ ظاہر کرنا
+        st.markdown("### 📝 Generated Prompts with Copy Button")
+        for idx, prompt_text in enumerate(generated_prompts):
+            st.text(f"Prompt {idx+1}:")
+            st.code(prompt_text, language="text")
+            
         return out
     except Exception as e: 
         try:
@@ -351,7 +450,11 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             for img_p in generated_images:
                 if os.path.exists(img_p): os.remove(img_p)
         except: pass
-        return f"Error: {e}"
+        progress_bar.empty()
+        return f"Error Details: {e}"
+    finally:
+        # کلاؤڈ سرور کو کریش سے بچانے کے لیے ریم پروسیس کا صفایا
+        gc.collect()
 
 # ==========================================
 # 5. UI NAVIGATION & TOOLS
@@ -379,16 +482,21 @@ elif menu == "🎬 Movie Studio":
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
     
-    char_desc = st.text_input("Consistent Character (کریکٹر کا حلیہ - مثلاً لباس، عمر، ڈکھیل):", 
+    char_desc = st.text_input("Character Memory (کریکٹر کا مستقل حلیہ - مثلاً لباس، عمر، ڈکھیل):", 
                               placeholder="Example: A 30-year-old brave warrior, short black beard, wearing a traditional dark green turban and grey robe")
+                              
+    scene_desc = st.text_input("Scene Memory (پس منظر کا مستقل حلیہ - مثلاً مٹی کے گھر، اندھیری رات، تیز بارش):", 
+                              placeholder="Example: Ancient rustic mud houses, dark rainy night, traditional old village background")
     
-    mc1, mc2, mc3, mc4, mc5, mc6 = st.columns(6)
+    mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8 = st.columns(8)
     with mc1: mv = st.selectbox("Voice:", ["Asad (Male)", "Uzma (Female)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    with mc6: sd = st.number_input("Character Seed:", value=786)
+    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Smooth Camera", "Ken Burns", "Pan Left", "Pan Right", "Tilt", "Dolly In", "Dolly Out"])
+    with mc7: transition_type = st.selectbox("Scene Transition:", ["Cinematic Cut", "Cross Fade", "Blur Transition", "Flash Transition", "Smooth Fade"])
+    with mc8: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
         rate_val = mv_rate.split(" ")[0]
@@ -400,8 +508,7 @@ elif menu == "🎬 Movie Studio":
         }
         pitch_val = pitch_map[mv_pitch]
         
-        with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
-            v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, enable_watermark, enable_bg_music)
+        v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, transition_type, enable_watermark, enable_bg_music)
             
         if "mp4" in str(v_res): st.video(v_res); st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
         else: st.error(v_res)
