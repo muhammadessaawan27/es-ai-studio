@@ -26,9 +26,14 @@ if not hasattr(Image, 'ANTIALIAS'):
 
 try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
-    import moviepy.video.fx.all as vfx
-except Exception as e:
-    pass
+    from moviepy.video.fx.all import fadein
+except Exception:
+    try:
+        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
+        import moviepy.video.fx.all as vfx
+        fadein = vfx.fadein
+    except Exception:
+        pass
 
 from streamlit_mic_recorder import mic_recorder
 
@@ -405,21 +410,21 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                         
                     clip = ImageClip(img_p).set_duration(dur_per).set_fps(24)
                     clip = clip.resize(lambda t: 1.2 - 0.15 * (t / dur_per)).set_position('center')
-                    clip = vfx.fadein(clip, 0.4)
+                    clip = fadein(clip, 0.4)
                     
                     clips.append(clip)
                 except Exception as e:
                     st.warning(f"Clip assembly warning on scene {i+1}: {e}")
             
         if not clips:
-            fallback_p = f"i_{u_id}_final_fallback.jpg"
+            fallback_p = f"i_{u_id}_fallback.jpg"
             img_data = generate_high_quality_placeholder(w, h, 1, enable_watermark)
             with open(fallback_p, 'wb') as f:
                 f.write(img_data)
             generated_images.append(fallback_p)
             clip = ImageClip(fallback_p).set_duration(audio.duration).set_fps(24)
             clip = clip.resize(lambda t: 1.2 - 0.15 * (t / audio.duration)).set_position('center')
-            clip = vfx.fadein(clip, 0.4)
+            clip = fadein(clip, 0.4)
             clips.append(clip)
             
         progress_bar.progress(0.85)
@@ -499,21 +504,19 @@ elif menu == "🎬 Movie Studio":
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
     
-    char_desc = st.text_input("Character Memory (کریکٹر کا مستقل حلیہ - مثلاً لباس، عمر، ڈکھیل):", 
+    char_desc = st.text_input("Character Memory (کریکٹر کا مستقل حلیہ - مثلاً لباس, عمر, ڈکھیل):", 
                               placeholder="Example: A 30-year-old brave warrior, short black beard, wearing a traditional dark green turban and grey robe")
                               
-    scene_desc = st.text_input("Scene Memory (پس منظر کا مستقل حلیہ - مثلاً مٹی کے گھر، اندھیری رات، تیز بارش):", 
+    scene_desc = st.text_input("Scene Memory (پس منظر کا مستقل حلیہ - مثلاً مٹی کے گھر, اندھیری رات, تیز بارش):", 
                               placeholder="Example: Ancient rustic mud houses, dark rainy night, traditional old village background")
     
-    mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8 = st.columns(8)
+    mc1, mc2, mc3, mc4, mc5, mc6 = st.columns(6)
     with mc1: mv = st.selectbox("Voice:", ["Asad (Male)", "Uzma (Female)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
     with mc6: sd = st.number_input("Character Seed:", value=786)
-    with mc7: camera_motion = st.text("Camera Motion: v40 Engine Fixed")
-    with mc8: transition_type = st.text("Transition: v40 Engine Fixed")
     
     if st.button("Generate Master Movie 🚀"):
         rate_val = mv_rate.split(" ")[0]
