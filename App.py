@@ -24,7 +24,7 @@ if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', 1)
 
 try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
     import moviepy.video.fx.all as vfx
 except Exception:
     pass
@@ -41,23 +41,32 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700&display=swap');
     
     .stApp { 
-        background-color: #ffffff !important; 
-        color: #000000 !important; 
+        background-color: #f8fafc !important; 
+        color: #0f172a !important; 
         font-family: 'Inter', sans-serif; 
     }
     
     .executive-header {
         text-align: center; 
-        padding: 10px; 
-        border-bottom: 1px solid #e2e8f0; 
-        margin-bottom: 15px; 
-        color: #000000 !important;
+        padding: 12px; 
+        border-bottom: 3px solid #10b981; 
+        margin-bottom: 20px; 
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.1);
     }
     
     .main-names { 
-        font-size: 1.5rem; 
+        font-size: 1.6rem; 
         font-weight: 800; 
-        color: #000000 !important; 
+        color: #0f172a !important; 
+        text-shadow: 0 0 5px rgba(16, 185, 129, 0.1);
+        animation: text-pulse 2.5s infinite alternate;
+    }
+    
+    @keyframes text-pulse {
+        0% { text-shadow: 0 0 5px rgba(16, 185, 129, 0.1); }
+        100% { text-shadow: 0 0 15px rgba(16, 185, 129, 0.4), 0 0 25px rgba(16, 185, 129, 0.2); }
     }
     
     .title-tag { 
@@ -72,21 +81,34 @@ st.markdown("""
     .circular-s {
         width: 100px; height: 100px; background: #0f172a; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
-        font-family: 'Orbitron', sans-serif; font-size: 45px; color: #ffffff !important;
-        border: 3px solid #00d4ff; box-shadow: 0 0 15px rgba(0,212,255,0.3);
-        animation: spin 10s infinite linear;
+        font-family: 'Orbitron', sans-serif; font-size: 45px; color: #10b981 !important;
+        border: 3px solid #10b981; 
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+        animation: spin 10s infinite linear, glow-pulse 3s infinite alternate;
+    }
+    
+    @keyframes glow-pulse {
+        0% { box-shadow: 0 0 10px rgba(16, 185, 129, 0.3); }
+        100% { box-shadow: 0 0 25px rgba(16, 185, 129, 0.6); }
     }
     @keyframes spin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
 
     .stButton>button { 
-        background: #000000 !important; 
-        color: white !important; 
+        background: #0f172a !important; 
+        color: #ffffff !important; 
         border-radius: 12px !important; 
         height: 55px; 
         width: 100%; 
         font-size: 20px; 
         font-weight: bold; 
-        border: none; 
+        border: 2px solid #10b981 !important; 
+        box-shadow: 0 4px 10px rgba(16, 185, 129, 0.1);
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        background: #10b981 !important;
+        color: #ffffff !important;
     }
     
     [data-testid="stSidebar"] { 
@@ -94,12 +116,12 @@ st.markdown("""
         border-right: 1px solid #e2e8f0; 
     }
     [data-testid="stSidebar"] * { 
-        color: #000000 !important; 
+        color: #0f172a !important; 
         font-weight: bold !important; 
     }
     
     div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input {
-        background-color: #f8fafc !important;
+        background-color: #ffffff !important;
         color: #0f172a !important;
         border: 2px solid #cbd5e1 !important;
         border-radius: 12px !important;
@@ -107,8 +129,8 @@ st.markdown("""
         transition: all 0.3s ease !important;
     }
     div[data-baseweb="textarea"] textarea:focus, div[data-baseweb="input"] input:focus {
-        border-color: #00d4ff !important;
-        box-shadow: 0 0 10px rgba(0, 212, 255, 0.2) !important;
+        border-color: #10b981 !important;
+        box-shadow: 0 0 12px rgba(16, 185, 129, 0.35) !important;
         background-color: #ffffff !important;
     }
     div[data-baseweb="textarea"] textarea::placeholder, div[data-baseweb="input"] input::placeholder {
@@ -213,17 +235,43 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
     thread.start()
     thread.join()
 
-def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc="", enable_watermark=True):
+def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc="", enable_watermark=True, enable_bg_music=True):
     u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
     status = st.empty()
     audio_f = f"a_{u_id}.mp3"
+    bg_music_f = f"bg_{u_id}.mp3"
     generated_images = []
+    has_bg_music = False
     
     try:
         status.info("🎙️ Generating Voiceover Track (آڈیو جنریٹ ہو رہی ہے)...")
         v_code = "ur-PK-UzmaNeural" if voice == "Uzma (Female)" else "ur-PK-AsadNeural"
         save_audio_safe(story, v_code, rate, pitch, audio_f)
         audio = AudioFileClip(audio_f)
+        
+        if enable_bg_music:
+            story_lower = story.lower()
+            is_horror = any(k in story_lower or k in story for k in ["قبر", "عذاب", "موت", "خوفناک", "خوف", "جن", "بھوت", "تاریک", "ڈراؤنی", "grave", "torment", "punishment", "scary", "ghost", "dark", "death", "screaming", "blood", "bloody", "horror"])
+            is_epic = any(k in story_lower or k in story for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "شاہی", "تاریخ", "بہادر", "king", "queen", "throne", "palace", "empire", "warrior", "brave", "history", "castle"])
+            is_peaceful = any(k in story_lower or k in story for k in ["نماز", "دعا", "مسجد", "ولی", "صبر", "سکون", "اللہ", "pray", "prayer", "mosque", "peace", "peaceful", "sad", "crying", "tears"])
+            
+            if is_horror:
+                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
+            elif is_epic:
+                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
+            elif is_peaceful:
+                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
+            else:
+                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+                
+            try:
+                res_bg = session.get(bg_url, timeout=30)
+                if res_bg.status_code == 200:
+                    with open(bg_music_f, 'wb') as f:
+                        f.write(res_bg.content)
+                    has_bg_music = True
+            except:
+                pass
         
         res_map = {
             "YouTube (16:9)": (1280, 720), 
@@ -240,7 +288,8 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         clips = []
         dur_per = audio.duration / len(sentences)
         
-        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&nologo=true&enhance=false&negative=deformed,bad_anatomy,blurry,bad_hands,extra_limbs,disfigured,poor_details,extra_fingers,mutated_hands,animal,dog,cat,blood,bloody,wounded,scary,horror,mutilated_face,decaying_skin,tiger_head,lion_head" for s in sentences]
+        # ماڈل کو ٹربو (model=turbo) پر فکس کیا گیا ہے تاکہ کلاؤڈ ریٹ لمٹ بائی پاس ہو اور کالی اسکرین کا مسئلہ نہ آئے
+        img_urls = [f"https://image.pollinations.ai/prompt/{urllib.parse.quote(get_titan_prompt(s, style, char_desc))}?width={w}&height={h}&seed={seed}&model=turbo&nologo=true&enhance=false&negative=deformed,bad_anatomy,blurry,bad_hands,extra_limbs,disfigured,poor_details,extra_fingers,mutated_hands,animal,dog,cat,captcha,blood,bloody,wounded,scary,horror,mutilated_face,decaying_skin,tiger_head,lion_head" for s in sentences]
 
         with ThreadPoolExecutor(max_workers=5) as exe:
             for i, img_data in enumerate(exe.map(fetch_img, img_urls)):
@@ -278,15 +327,29 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                 clips.append(vfx.fadein(clip, 0.4))
             
         status.info("🎞️ Compiling and Rendering HD Video (ویڈیو تیار ہو رہی ہے)...")
-        final_video = concatenate_videoclips(clips, method="compose").set_audio(audio)
+        
+        final_audio = audio
+        bg_audio = None
+        if has_bg_music and os.path.exists(bg_music_f):
+            try:
+                bg_audio = AudioFileClip(bg_music_f).volumex(0.12)
+                bg_audio = bg_audio.subclip(0, audio.duration)
+                final_audio = CompositeAudioClip([audio, bg_audio])
+            except:
+                pass
+                
+        final_video = concatenate_videoclips(clips, method="compose").set_audio(final_audio)
         out = f"Sglowina_{u_id}.mp4"
         final_video.write_videofile(out, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
         
         audio.close()
+        if bg_audio:
+            bg_audio.close()
         final_video.close()
         
         try:
             if os.path.exists(audio_f): os.remove(audio_f)
+            if os.path.exists(bg_music_f): os.remove(bg_music_f)
             for img_p in generated_images:
                 if os.path.exists(img_p): os.remove(img_p)
         except Exception:
@@ -297,6 +360,7 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
     except Exception as e: 
         try:
             if os.path.exists(audio_f): os.remove(audio_f)
+            if os.path.exists(bg_music_f): os.remove(bg_music_f)
             for img_p in generated_images:
                 if os.path.exists(img_p): os.remove(img_p)
         except: pass
@@ -310,6 +374,7 @@ menu = st.sidebar.radio("SGLOWINA COMMAND MENU", ["🏠 Smart Chat", "🎬 Movie
 st.sidebar.markdown("---")
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
+enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
 
 if menu == "🏠 Smart Chat":
     st.write("### 💬 Sglowina Intelligence Dashboard")
@@ -349,7 +414,7 @@ elif menu == "🎬 Movie Studio":
         pitch_val = pitch_map[mv_pitch]
         
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
-            v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, enable_watermark)
+            v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, enable_watermark, enable_bg_music)
             
         if "mp4" in str(v_res): st.video(v_res); st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
         else: st.error(v_res)
