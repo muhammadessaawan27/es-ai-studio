@@ -18,6 +18,7 @@ import gc
 # ==========================================
 session = requests.Session()
 
+# Premium Browser Headers to bypass SSL/Wikimedia blocks
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
@@ -43,16 +44,16 @@ except Exception:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 2. PAGE CONFIGURATION & SIDEBAR (MUST INITIALIZE FIRST)
+# 2. PAGE CONFIGURATION & SIDEBAR (MUST INITIALIZE FIRST - VERSION 1.5)
 # ==========================================
-st.set_page_config(page_title="Sglowina AI - Official V40.0", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Official V1.5", layout="wide", page_icon="🎬")
 
-# Sidebar Settings
+# Sidebar Settings (Rendered strictly only once to prevent Duplicate ID errors)
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
 
-# Minimal Session State for Chat only
+# Minimal Session State for Chat only (All enterprise/credits variables strictly purged)
 if "msgs" not in st.session_state:
     st.session_state.msgs = []
 
@@ -76,20 +77,9 @@ st.markdown("""
     }
     
     .main-names { 
-        font-size: 1.8rem; 
-        font-weight: 900; 
-        background: linear-gradient(45deg, #ff007a, #2563eb, #00f2fe);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-align: center;
-        font-family: 'Inter', sans-serif;
-        animation: pulseGlow-text 1.5s infinite alternate;
-        filter: drop-shadow(0 0 8px rgba(37, 99, 235, 0.4));
-    }
-    
-    @keyframes pulseGlow-text {
-        0% { filter: drop-shadow(0 0 5px rgba(37, 99, 235, 0.3)); }
-        100% { filter: drop-shadow(0 0 15px rgba(255, 0, 122, 0.6)); }
+        font-size: 1.5rem; 
+        font-weight: 800; 
+        color: #000000 !important; 
     }
     
     .title-tag { 
@@ -172,7 +162,7 @@ SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
 Founders & CEOs: Muhammad Essa Awan & Saba Wahid.
 Saba Wahid is the Founder and CEO. Muhammad Essa Awan is the COO and the lead visionary.
-Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 40.0 Release).
+Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.5 Release).
 """
 
 def apply_islamic_visual_logic(text):
@@ -198,7 +188,7 @@ def translate_ur_to_en(text):
     if not text or not text.strip():
         return text
     try:
-        url = "https://translate.googleapis.com/single"
+        url = "https://translate.googleapis.com/translate_a/single"
         params = {
             'client': 'gtx',
             'sl': 'ur',
@@ -284,18 +274,8 @@ def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc="", lightin
     if char_desc.strip():
         prompt_parts.append(f"character is {char_desc.strip()}. Use the same character identity in every scene, identical face, identical clothing, consistent appearance, same age, same body shape, same hairstyle, same identity")
     if scene_desc.strip():
-        prompt_parts.append(f"scene background environment of {scene_desc.strip()}")
-        
+        prompt_parts.append(f"scene background is {scene_desc.strip()}, same environment")
     prompt_parts.append(english_translation)
-    
-    prompt_parts.append(f"Lighting: {lighting_val}")
-    prompt_parts.append(f"Mood: {mood_val}")
-    prompt_parts.append(f"Environment: {env_val}")
-    prompt_parts.append(f"Weather: {weather_val}")
-    prompt_parts.append(f"Color Grading: {color_val}")
-    prompt_parts.append(f"Animation Focus: {anim_val}")
-    prompt_parts.append(f"Quality Grade: {quality_val}")
-    
     if shariah:
         prompt_parts.append(shariah)
     prompt_parts.append("highly detailed, cinematic lighting, 8k, realistic masterpiece, vivid colors, maintain exact same character identity across all scenes")
@@ -365,6 +345,7 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
         time.sleep(0.2)
     return False
 
+# سائز کو آٹو جفت کرنے کا فارمولا
 def make_even(val):
     return int((val // 2) * 2)
 
@@ -373,25 +354,22 @@ def apply_camera_motion_v40(clip, motion, duration, w, h):
         x_max = int(w * 0.15)
         y_max = int(h * 0.15)
         
-        if motion == "Zoom Out (v40 Default)" or motion == "Slow Zoom Out" or motion == "Pull Out" or motion == "Dolly Out":
+        if motion == "Zoom Out (v40 Default)":
             clip = clip.resize(lambda t: 1.2 - 0.15 * (t / duration)).set_position('center')
-        elif motion == "Slow Zoom In" or motion == "Push In" or motion == "Dolly In":
+        elif motion == "Zoom In":
             clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
-        elif motion == "Pan Left" or motion == "Tracking Shot":
+        elif motion == "Pan Left":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: (-int(x_max * (t / duration)), 'center'))
-        elif motion == "Pan Right" or motion == "Cinematic Reveal" or motion == "Orbit Reveal":
+        elif motion == "Pan Right":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: (-int(x_max * (1.0 - (t / duration))), 'center'))
-        elif motion == "Tilt Up" or motion == "Crane Shot" or motion == "Aerial Shot":
+        elif motion == "Pan Up":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: ('center', -int(y_max * (t / duration))))
-        elif motion == "Tilt Down" or motion == "Drone Shot":
+        elif motion == "Pan Down":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: ('center', -int(y_max * (1.0 - (t / duration)))))
-        elif motion == "Ken Burns Effect" or motion == "Parallax Motion":
-            clip = clip.resize(lambda t: 1.15 + 0.10 * (t / duration)).set_position(lambda t: (-int(x_max * 0.5 * (t / duration)), 'center'))
-        elif motion == "Cinematic Rotation" or motion == "Handheld Camera":
-            try:
-                clip = clip.resize(lambda t: 1.15).rotate(lambda t: 1 * (t / duration)).set_position('center')
-            except Exception:
-                clip = clip.resize(lambda t: 1.15).set_position('center')
+        elif motion == "Dolly In":
+            clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
+        elif motion == "Dolly Out":
+            clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
         else:
             clip = clip.resize(lambda t: 1.2 - 0.15 * (t / duration)).set_position('center')
     except Exception:
@@ -470,7 +448,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         
         clips = []
         dur_per = voice_audio.duration / len(sentences)
-        generated_prompts = []
         
         # v40 RENDER PIPELINE CORE FLOW (Pristine, untouched sequential downloading to files)
         for i, scene in enumerate(sentences):
@@ -478,7 +455,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
             
             refined_p = get_visual_prompt_v40(scene, style, char_desc, scene_desc, lighting, mood, env, weather, color, anim, quality)
-            generated_prompts.append(refined_p)
+            generated_prompts = [refined_p]
             
             if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                 w_target = make_even(w * 1.15)
@@ -487,7 +464,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 w_target = w
                 h_target = h
                 
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i}&nologo=true"
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i}&nologo=true&negative=double_faces,double_heads,multiple_faces,overlapping_limbs,extra_limbs,extra_hands,extra_fingers,mutated_hands,two_bodies,deformed,blurry,bad_anatomy,clones,twins"
             
             img_path = f"i_{u_id}_{i}.jpg"
             generated_images.append(img_path)
@@ -500,11 +477,15 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             # v40 Force Resize & Format conversion (Sglowina Watermark layered inside PIL)
             try:
                 with Image.open(img_path) as img_obj:
-                    img_obj = img_obj.convert("RGB").resize((w_target, h_target))
+                    # Apply camera-motion scaling safely (no black borders)
+                    if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
+                        img_obj = img_obj.convert("RGB").resize((int(w * 1.15), int(h * 1.15)))
+                    else:
+                        img_obj = img_obj.convert("RGB").resize((w, h))
                         
                     if enable_watermark:
                         draw = ImageDraw.Draw(img_obj)
-                        draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                         
                     img_obj.save(img_path, "JPEG")
             except Exception:
@@ -516,7 +497,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 
             # Zoom In Movement
             if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
-                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((w_target, h_target))
+                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
             else:
                 clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((w, h))
                 
@@ -643,7 +624,7 @@ with tab_movie:
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out", "Cinematic Camera Drift", "Ken Burns Effect", "Soft Rotate", "Random Professional Camera Motion"])
+    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
     with mc7: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
@@ -656,6 +637,7 @@ with tab_movie:
         }
         pitch_val = pitch_map[mv_pitch]
         
+        # رینڈرنگ ٹیبز کا فلو اب 100% پائتھون کے درست "with" فریم ورک پر لیمیٹ ہے
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
             v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, enable_watermark, enable_bg_music, v_style, v_lighting, v_mood, v_env, v_weather, v_color, v_anim, v_quality)
             
@@ -725,4 +707,4 @@ with tab_image:
             else:
                 st.warning("Please upload an image and write instructions first.")
 
-st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.3 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.5 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
