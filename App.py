@@ -14,7 +14,23 @@ import threading
 import gc
 
 # ==========================================
-# 1. INDUSTRIAL STABILITY & LOAD BALANCING
+# 1. ENTERPRISE SESSION STATE (MUST INITIALIZE FIRST)
+# ==========================================
+if "user_accounts" not in st.session_state:
+    st.session_state.user_accounts = {"essa_awan": "786", "saba_wahid": "1234"}
+if "logged_in_user" not in st.session_state:
+    st.session_state.logged_in_user = "essa_awan"
+if "user_credits" not in st.session_state:
+    st.session_state.user_credits = 500
+if "project_history" not in st.session_state:
+    st.session_state.project_history = []
+if "saved_prompts" not in st.session_state:
+    st.session_state.saved_prompts = []
+if "favorites" not in st.session_state:
+    st.session_state.favorites = []
+
+# ==========================================
+# 2. INDUSTRIAL STABILITY & LOAD BALANCING
 # ==========================================
 session = requests.Session()
 adapter = requests.adapters.HTTPAdapter(pool_connections=1000, pool_maxsize=1000)
@@ -37,9 +53,9 @@ except Exception:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 2. EXECUTIVE UI & PREMIUM STYLING
+# 3. EXECUTIVE UI & PREMIUM STYLING
 # ==========================================
-st.set_page_config(page_title="ES AI Master Studio", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Official V1.2", layout="wide", page_icon="🎬")
 
 st.markdown("""
     <style>
@@ -214,6 +230,46 @@ def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc=""):
     
     return ", ".join(prompt_parts)
 
+def fetch_img_failover(prompt, w, h, seed):
+    try:
+        herc_url = f"https://hercai.onrender.com/v3/text2image?prompt={urllib.parse.quote(prompt)}"
+        res = session.get(herc_url, timeout=20)
+        if res.status_code == 200:
+            img_url = res.json().get("url")
+            if img_url:
+                res_img = session.get(img_url, timeout=25)
+                if res_img.status_code == 200 and len(res_img.content) > 5000:
+                    return res_img.content
+    except Exception:
+        pass
+
+    try:
+        poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
+        res = session.get(poll_url, timeout=25)
+        if res.status_code == 200 and len(res.content) > 5000:
+            return res.content
+    except Exception:
+        pass
+
+    return None
+
+def generate_high_quality_placeholder(w, h, scene_num, enable_watermark=True):
+    im = Image.new("RGB", (w, h), color=(30, 41, 59))
+    draw = ImageDraw.Draw(im)
+    draw.rectangle([(20, 20), (w - 20, h - 20)], outline=(71, 85, 105), width=4)
+    for offset in range(100, w, 200):
+        draw.line([(offset, 0), (offset, h)], fill=(40, 55, 75), width=1)
+    for offset in range(100, h, 200):
+        draw.line([(0, offset), (w, offset)], fill=(40, 55, 75), width=1)
+    text_str = f"Sglowina Scene {scene_num}"
+    draw.text((w // 2 - 80, h // 2 - 15), text_str, fill=(203, 213, 225))
+    if enable_watermark:
+        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+    
+    img_byte_arr = io.BytesIO()
+    im.save(img_byte_arr, format='JPEG')
+    return img_byte_arr.getvalue()
+
 def save_audio_safe(story, v_code, rate, pitch, audio_f):
     for attempt in range(2):
         try:
@@ -240,12 +296,13 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
 # ==========================================
 # 5. FIXED V40 RENDER SYSTEM CORE (UNTOUCHED)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", enable_watermark=True, enable_bg_music=True):
-    u_id = str(uuid.uuid4())[:8]
+def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", enable_watermark=True, enable_bg_music=True):
+    u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
+    
     progress_bar = st.progress(0.0)
     status = st.empty()
     
-    audio_file = f"a_{u_id}.mp3"
+    audio_f = f"a_{u_id}.mp3"
     bg_music_f = f"bg_{u_id}.mp3"
     generated_images = []
     has_bg_music = False
@@ -254,16 +311,15 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         # Step 1: Human Voice
         progress_bar.progress(0.05)
         status.info("🎙️ Generating Voiceover Track (آڈیو جنریٹ ہو رہی ہے)...")
-        v_code = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
+        v_code = "ur-PK-UzmaNeural" if voice == "Uzma (Female)" else "ur-PK-AsadNeural"
         
-        save_audio_success = save_audio_safe(story, v_code, rate, pitch, audio_file)
-        if not save_audio_success:
+        audio_success = save_audio_safe(story, v_code, rate, pitch, audio_f)
+        if not audio_success:
             raise Exception("Voice generation failed.")
             
-        voice_audio = AudioFileClip(audio_file)
+        voice_audio = AudioFileClip(audio_f)
         progress_bar.progress(0.15)
         
-        # SSL Verification disabled to prevent download failures on Streamlit Cloud
         if enable_bg_music:
             status.info("🎵 Downloading Atmospheric Classical Background Track...")
             story_lower = story.lower()
@@ -281,17 +337,16 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 bg_url = "https://upload.wikimedia.org/wikipedia/commons/e/e6/Chopin_-_Nocturne_op._9_no._2.mp3"
                 
             try:
-                res_bg = session.get(bg_url, timeout=30, verify=False)
+                res_bg = session.get(bg_url, timeout=20, verify=False)
                 if res_bg.status_code == 200:
                     with open(bg_music_f, 'wb') as f:
                         f.write(res_bg.content)
                     has_bg_music = True
-            except Exception as e:
-                print(e)
+            except Exception:
+                pass
                 
         progress_bar.progress(0.20)
         
-        # Dimensions mapping
         res_map = {
             "YouTube (16:9)": (1280, 720), 
             "TikTok/Reels (9:16)": (720, 1280), 
@@ -301,7 +356,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         }
         w, h = res_map[ratio]
         
-        # Split by Sentences
         sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
         if not sentences: sentences = [story]
         
@@ -327,7 +381,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             with open(img_path, "wb") as f:
                 f.write(img_data)
                 
-            # v40 Force Resize & Format conversion
+            # v40 Force Resize & Format conversion (Sglowina Watermark layered inside PIL)
             try:
                 with Image.open(img_path) as img_obj:
                     img_obj = img_obj.convert("RGB").resize((w, h))
@@ -337,15 +391,14 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                         draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                         
                     img_obj.save(img_path, "JPEG")
-            except Exception as e:
-                print(e)
+            except Exception:
                 im = Image.new("RGB", (w, h), color=(30, 41, 59))
                 if enable_watermark:
                     draw = ImageDraw.Draw(im)
                     draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                 im.save(img_path, "JPEG")
                 
-            # Zoom In Movement (Zoon Out in reverse order)
+            # v40 Zoom Engine & Camera motions layered
             clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
             clip = clip.resize(lambda t: 1.0 + 0.15 * (t / dur_per)).set_position('center')
             clip = fadein(clip, 0.4)
@@ -372,8 +425,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 bg_audio = AudioFileClip(bg_music_f).volumex(0.10)
                 bg_audio = bg_audio.set_duration(voice_audio.duration)
                 final_audio = CompositeAudioClip([voice_audio, bg_audio])
-            except Exception as e:
-                print(e)
+            except Exception:
+                pass
                 
         # v40 final compose concatenation
         final_video = concatenate_videoclips(clips, method="compose").set_audio(final_audio)
@@ -386,20 +439,30 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         final_video.close()
         
         try:
-            if os.path.exists(audio_file): os.remove(audio_file)
+            if os.path.exists(audio_f): os.remove(audio_f)
             if os.path.exists(bg_music_f): os.remove(bg_music_f)
             for img_p in generated_images:
                 if os.path.exists(img_p): os.remove(img_p)
-        except Exception as e:
-            print(e)
+        except Exception:
+            pass
             
         progress_bar.progress(1.0)
         status.success("🚀 Video Generated Successfully (ویڈیو بن چکی ہے)!")
         
+        # Saved Projects History management
+        st.session_state.project_history.append({
+            "name": out_name,
+            "prompts": generated_prompts,
+            "story": story,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+        
+        st.session_state.user_credits = max(0, st.session_state.user_credits - 10)
+            
         return out_name
     except Exception as e: 
         try:
-            if os.path.exists(audio_file): os.remove(audio_file)
+            if os.path.exists(audio_f): os.remove(audio_f)
             if os.path.exists(bg_music_f): os.remove(bg_music_f)
             for img_p in generated_images:
                 if os.path.exists(img_p): os.remove(img_p)
@@ -412,11 +475,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
 # ==========================================
 # 6. UI NAVIGATION & CONTROL PANEL (Main page Tabs restored)
 # ==========================================
-st.sidebar.markdown("---")
-st.sidebar.subheader("🎬 Video Settings")
-enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
-enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
-
 tab_chat, tab_movie, tab_image = st.tabs(["💬 Electric AI Chat", "🎬 Pro Master Studio", "🎨 Pro Image Studio"])
 
 with tab_chat:
@@ -431,7 +489,7 @@ with tab_chat:
         with st.chat_message("assistant"):
             st.write(res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")); st.session_state.msgs.append({"role": "assistant", "content": res})
 
-elif tab_movie:
+with tab_movie:
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
     
@@ -441,14 +499,13 @@ elif tab_movie:
     scene_desc = st.text_input("Scene Memory (پس منظر کا مستقل حلیہ - مثلاً مٹی کے گھر, اندھیری رات, تیز بارش):", 
                               placeholder="Example: Ancient rustic mud houses, dark rainy night, traditional old village background")
     
-    mc1, mc2, mc3, mc4, mc5, mc6, mc7 = st.columns(7)
+    mc1, mc2, mc3, mc4, mc5, mc6 = st.columns(6)
     with mc1: mv = st.selectbox("Voice:", ["Asad (Male)", "Uzma (Female)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Zoom Out Outward", "Smooth Camera", "Ken Burns", "Pan Left", "Pan Right", "Tilt", "Dolly In", "Dolly Out"])
-    with mc7: sd = st.number_input("Character Seed:", value=786)
+    with mc6: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
         rate_val = mv_rate.split(" ")[0]
@@ -461,7 +518,7 @@ elif tab_movie:
         pitch_val = pitch_map[mv_pitch]
         
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
-            v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, enable_watermark, enable_bg_music)
+            v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, enable_watermark, enable_bg_music)
             
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
             st.video(v_res)
@@ -469,7 +526,7 @@ elif tab_movie:
         else: 
             st.error(v_res)
 
-elif tab_image:
+with tab_image:
     st.write("### 🎨 Industrial HD Visual Studio")
     
     tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Upload"])
@@ -501,11 +558,12 @@ elif tab_image:
                     if char_desc_img.strip():
                         final_p = f"Character is {char_desc_img.strip()}. Action/Scene: {single_p}"
                         
-                    img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(final_p + ' ' + i_style)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
-                    res = session.get(img_url, timeout=30)
-                    if res.status_code == 200:
-                        with Image.open(io.BytesIO(res.content)) as im:
+                    img_data = fetch_img_failover(final_p, w, h, random.randint(1,999999))
+                    if img_data:
+                        with Image.open(io.BytesIO(img_data)) as im:
                             st.image(im, caption=f"Prompt: {single_p[:30]}...")
+                            if final_p not in st.session_state.favorites:
+                                st.session_state.favorites.append(final_p)
                     else:
                         st.error(f"Image generation failed for prompt: {single_p}")
 
@@ -521,10 +579,9 @@ elif tab_image:
             if uploaded_file and modify_prompt:
                 with st.spinner("Modifying image..."):
                     img_name = translate_ur_to_en(modify_prompt)
-                    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(img_name + ' ' + i_style_mod)}?width=1024&height=1024&seed={random.randint(1,9999)}&nologo=true"
-                    res = session.get(url, timeout=30)
-                    if res.status_code == 200:
-                        with Image.open(io.BytesIO(res.content)) as im:
+                    img_data = fetch_img_failover(img_name, 1024, 1024, random.randint(1,999999))
+                    if img_data:
+                        with Image.open(io.BytesIO(img_data)) as im:
                             st.image(im, caption="Modified Masterpiece")
                     else:
                         st.error("Modification failed.")
