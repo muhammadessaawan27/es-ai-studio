@@ -43,26 +43,20 @@ except Exception:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 2. ENTERPRISE SESSION STATE INITIALIZATION
-# ==========================================
-if "user_accounts" not in st.session_state:
-    st.session_state.user_accounts = {"essa_awan": "786", "saba_wahid": "1234"}
-if "logged_in_user" not in st.session_state:
-    st.session_state.logged_in_user = "essa_awan"
-if "user_credits" not in st.session_state:
-    st.session_state.user_credits = 500
-if "project_history" not in st.session_state:
-    st.session_state.project_history = []
-if "saved_prompts" not in st.session_state:
-    st.session_state.saved_prompts = []
-if "favorites" not in st.session_state:
-    st.session_state.favorites = []
-
-# ==========================================
-# 3. EXECUTIVE UI & PREMIUM STYLING (V1.4 INCREMENT)
+# 2. PAGE CONFIGURATION & SIDEBAR (MUST INITIALIZE FIRST)
 # ==========================================
 st.set_page_config(page_title="Sglowina AI - Official V40.0", layout="wide", page_icon="🎬")
 
+# Sidebar Settings
+st.sidebar.subheader("🎬 Video Settings")
+enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
+enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
+
+# Minimal Session State for Chat only
+if "msgs" not in st.session_state:
+    st.session_state.msgs = []
+
+# Premium Light Styling Sheets
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700;900&display=swap');
@@ -204,7 +198,7 @@ def translate_ur_to_en(text):
     if not text or not text.strip():
         return text
     try:
-        url = "https://translate.googleapis.com/translate_a/single"
+        url = "https://translate.googleapis.com/single"
         params = {
             'client': 'gtx',
             'sl': 'ur',
@@ -232,7 +226,6 @@ def translate_ur_to_en(text):
         
     return text
 
-# آٹو اسمارٹ ڈائریکٹر موڈ کا الگورتھم
 def detect_auto_director_assets(text):
     text_lower = text.lower()
     
@@ -276,7 +269,6 @@ def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc="", lightin
     shariah = apply_islamic_visual_logic(urdu_text)
     english_translation = translate_ur_to_en(urdu_text)
     
-    # اسمارٹ آٹو موڈ ایکٹیویشن
     auto_director = detect_auto_director_assets(urdu_text)
     
     style_val = style if style != "Auto (Smart Director)" else auto_director["style"]
@@ -296,7 +288,6 @@ def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc="", lightin
         
     prompt_parts.append(english_translation)
     
-    # نئے 10 پریمیم پلگ ان ماڈیولز کی کی ورڈ انٹیگریشن
     prompt_parts.append(f"Lighting: {lighting_val}")
     prompt_parts.append(f"Mood: {mood_val}")
     prompt_parts.append(f"Environment: {env_val}")
@@ -374,17 +365,14 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
         time.sleep(0.2)
     return False
 
-# سائز کو آٹو جفت کرنے کا ریشو فارمولا
 def make_even(val):
     return int((val // 2) * 2)
 
-# تمام 30 پریمیم کیمرہ کنٹرولز کا الائنڈ پائپ لائن مینیجر
 def apply_camera_motion_v40(clip, motion, duration, w, h):
     try:
         x_max = int(w * 0.15)
         y_max = int(h * 0.15)
         
-        # v40 Zoom Out Default (Stable Zoom Out Formula)
         if motion == "Zoom Out (v40 Default)" or motion == "Slow Zoom Out" or motion == "Pull Out" or motion == "Dolly Out":
             clip = clip.resize(lambda t: 1.2 - 0.15 * (t / duration)).set_position('center')
         elif motion == "Slow Zoom In" or motion == "Push In" or motion == "Dolly In":
@@ -482,17 +470,16 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         
         clips = []
         dur_per = voice_audio.duration / len(sentences)
+        generated_prompts = []
         
         # v40 RENDER PIPELINE CORE FLOW (Pristine, untouched sequential downloading to files)
         for i, scene in enumerate(sentences):
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
             status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
             
-            # اسمارٹ پلگ ان آپشنز کے ساتھ پرامپٹ کی رینڈرنگ
             refined_p = get_visual_prompt_v40(scene, style, char_desc, scene_desc, lighting, mood, env, weather, color, anim, quality)
-            generated_prompts = [refined_p]
+            generated_prompts.append(refined_p)
             
-            # کیمرہ موشن پکسل سکیلنگ
             if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                 w_target = make_even(w * 1.15)
                 h_target = make_even(h * 1.15)
@@ -606,12 +593,6 @@ st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
 
-# Sglowina Enterprise Center (Credits display)
-st.sidebar.markdown("---")
-st.sidebar.subheader("👤 Sglowina Enterprise Center")
-st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
-st.sidebar.write(f"Credits Remaining: **{st.session_state.user_credits}** 🪙")
-
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
     if "msgs" not in st.session_state: st.session_state.msgs = []
@@ -624,7 +605,7 @@ with tab_chat:
         with st.chat_message("assistant"):
             st.write(res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")); st.session_state.msgs.append({"role": "assistant", "content": res})
 
-elif tab_movie:
+with tab_movie:
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
     
@@ -661,8 +642,8 @@ elif tab_movie:
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
-    with mc5: ms = st.selectbox("Style:", ["Realistic", "Cinematic", "3D Cartoon"])
-    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
+    with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
+    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out", "Cinematic Camera Drift", "Ken Burns Effect", "Soft Rotate", "Random Professional Camera Motion"])
     with mc7: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
@@ -676,7 +657,6 @@ elif tab_movie:
         pitch_val = pitch_map[mv_pitch]
         
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
-            # v40 Base Engine کو جوں کا توں رکھتے ہوئے نئے پلگ ان ماڈیولز کی شمولیت
             v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, enable_watermark, enable_bg_music, v_style, v_lighting, v_mood, v_env, v_weather, v_color, v_anim, v_quality)
             
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
@@ -685,7 +665,7 @@ elif tab_movie:
         else: 
             st.error(v_res)
 
-elif menu == "🎨 Pro Image Studio":
+with tab_image:
     st.write("### 🎨 Industrial HD Visual Studio")
     
     tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Upload"])
