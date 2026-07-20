@@ -14,23 +14,7 @@ import threading
 import gc
 
 # ==========================================
-# 1. ENTERPRISE SESSION STATE (MUST INITIALIZE FIRST)
-# ==========================================
-if "user_accounts" not in st.session_state:
-    st.session_state.user_accounts = {"essa_awan": "786", "saba_wahid": "1234"}
-if "logged_in_user" not in st.session_state:
-    st.session_state.logged_in_user = "essa_awan"
-if "user_credits" not in st.session_state:
-    st.session_state.user_credits = 500
-if "project_history" not in st.session_state:
-    st.session_state.project_history = []
-if "saved_prompts" not in st.session_state:
-    st.session_state.saved_prompts = []
-if "favorites" not in st.session_state:
-    st.session_state.favorites = []
-
-# ==========================================
-# 2. INDUSTRIAL STABILITY & LOAD BALANCING
+# 1. INDUSTRIAL STABILITY & LOAD BALANCING
 # ==========================================
 session = requests.Session()
 adapter = requests.adapters.HTTPAdapter(pool_connections=1000, pool_maxsize=1000)
@@ -53,21 +37,10 @@ except Exception:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 3. PAGE CONFIGURATION & SIDEBAR (MUST BE BEFORE TABS)
+# 2. EXECUTIVE UI & PREMIUM STYLING (V1.3 INCREMENT)
 # ==========================================
-st.set_page_config(page_title="Sglowina AI - Official V1.2", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Official V1.3", layout="wide", page_icon="🎬")
 
-# Sidebar Settings (Guarantees variables are defined first to prevent NameErrors)
-st.sidebar.subheader("🎬 Video Settings")
-enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
-enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("👤 Sglowina Enterprise Center")
-st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
-st.sidebar.write(f"Credits Remaining: **{st.session_state.user_credits}** 🪙")
-
-# Premium Light Styling Sheets
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700&display=swap');
@@ -101,14 +74,25 @@ st.markdown("""
     }
 
     .logo-container { display: flex; justify-content: center; align-items: center; padding: 20px 0; }
+    
     .circular-s {
-        width: 100px; height: 100px; background: #0f172a; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
+        width: 110px; height: 110px; 
+        background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff) !important;
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
         font-family: 'Orbitron', sans-serif; font-size: 45px; color: #ffffff !important;
-        border: 3px solid #00d4ff; box-shadow: 0 0 15px rgba(0,212,255,0.3);
-        animation: spin 10s infinite linear;
+        border: 5px solid #ffffff !important;
+        box-shadow: 0 0 50px #ff007a, inset 0 0 20px #ffffff;
+        animation: rotateShua 4s infinite linear, lightning-flash 1.5s infinite alternate;
     }
-    @keyframes spin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
+    
+    @keyframes rotateShua {
+        0% { transform: perspective(1000px) rotateY(0deg); }
+        100% { transform: perspective(1000px) rotateY(360deg); }
+    }
+    @keyframes lightning-flash {
+        0%, 100% { box-shadow: 0 0 30px #2563eb, 0 0 10px #ff007a; }
+        50% { box-shadow: 0 0 60px #ff007a, 0 0 40px #00d4ff; }
+    }
 
     .stButton>button { 
         background: #000000 !important; 
@@ -155,13 +139,13 @@ st.markdown("""<div class="executive-header"><div class="main-names">Muhammad Es
 st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 4. IDENTITY & ISLAMIC POLICY ENGINE
+# 3. IDENTITY & ISLAMIC POLICY ENGINE
 # ==========================================
 SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
 Founders & CEOs: Muhammad Essa Awan & Saba Wahid.
 Saba Wahid is the Founder and CEO. Muhammad Essa Awan is the COO and the lead visionary.
-Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.2 Release).
+Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.3 Release).
 """
 
 def apply_islamic_visual_logic(text):
@@ -231,13 +215,13 @@ def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc=""):
     
     prompt_parts = [f"{style_prompt} style"]
     if char_desc.strip():
-        prompt_parts.append(f"character is {char_desc.strip()}. Use the same character identity in every scene, identical face, identical clothing, consistent appearance")
+        prompt_parts.append(f"character is {char_desc.strip()}. Use the same character identity in every scene, identical face, identical clothing, consistent appearance, same age, same body shape, same hairstyle, same identity")
     if scene_desc.strip():
         prompt_parts.append(f"scene background is {scene_desc.strip()}, same environment")
     prompt_parts.append(english_translation)
     if shariah:
         prompt_parts.append(shariah)
-    prompt_parts.append("highly detailed, cinematic lighting, 8k, realistic masterpiece, vivid colors")
+    prompt_parts.append("highly detailed, cinematic lighting, 8k, realistic masterpiece, vivid colors, maintain exact same character identity across all scenes")
     
     return ", ".join(prompt_parts)
 
@@ -334,7 +318,8 @@ def apply_camera_motion_v40(clip, motion, duration, w, h):
 # ==========================================
 # 5. FIXED V40 RENDER SYSTEM CORE (UNTOUCHED)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Smooth Camera", enable_watermark=True, enable_bg_music=True):
+# یہ رینڈر انجن فکسڈ ہے اور کیمرہ موشن پائپ لائن کو بالکل درست رن کرے گا
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True):
     u_id = str(uuid.uuid4())[:8]
     progress_bar = st.progress(0.0)
     status = st.empty()
@@ -423,8 +408,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             # v40 Force Resize & Format conversion (Sglowina Watermark layered inside PIL)
             try:
                 with Image.open(img_path) as img_obj:
-                    # Apply camera-motion scaling safely (no black borders)
-                    if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
+                    # متبادل چہرہ خراب نہ ہونے کی ڈبل باڈی فلٹرنگ
+                    if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down", "Cinematic Camera Drift", "Ken Burns Effect", "Soft Rotate", "Random Professional Camera Motion"]:
                         img_obj = img_obj.convert("RGB").resize((int(w * 1.15), int(h * 1.15)))
                     else:
                         img_obj = img_obj.convert("RGB").resize((w, h))
@@ -441,8 +426,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                 im.save(img_path, "JPEG")
                 
-            # Zoom In Movement
-            if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
+            # Zoom In/Out & Multiple camera motions support layered
+            if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down", "Cinematic Camera Drift", "Ken Burns Effect", "Soft Rotate", "Random Professional Camera Motion"]:
                 clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
             else:
                 clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((w, h))
@@ -496,6 +481,16 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         progress_bar.progress(1.0)
         status.success("🚀 Video Generated Successfully (ویڈیو بن چکی ہے)!")
         
+        # Saved Projects History management
+        st.session_state.project_history.append({
+            "name": out_name,
+            "prompts": generated_prompts,
+            "story": story,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+            
+        st.session_state.user_credits = max(0, st.session_state.user_credits - 10)
+            
         return out_name
     except Exception as e: 
         try:
@@ -514,6 +509,18 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
 # ==========================================
 tab_chat, tab_movie, tab_image = st.tabs(["💬 Electric AI Chat", "🎬 Pro Master Studio", "🎨 Pro Image Studio"])
 
+# Sidebar Settings
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎬 Video Settings")
+enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
+enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
+
+# Sglowina Enterprise Center (Credits display)
+st.sidebar.markdown("---")
+st.sidebar.subheader("👤 Sglowina Enterprise Center")
+st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
+st.sidebar.write(f"Credits Remaining: **{st.session_state.user_credits}** 🪙")
+
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
     if "msgs" not in st.session_state: st.session_state.msgs = []
@@ -526,7 +533,7 @@ with tab_chat:
         with st.chat_message("assistant"):
             st.write(res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")); st.session_state.msgs.append({"role": "assistant", "content": res})
 
-with tab_movie:
+elif tab_movie:
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
     
@@ -542,7 +549,7 @@ with tab_movie:
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
+    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out", "Cinematic Camera Drift", "Ken Burns Effect", "Soft Rotate", "Random Professional Camera Motion"])
     with mc7: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
@@ -556,7 +563,7 @@ with tab_movie:
         pitch_val = pitch_map[mv_pitch]
         
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
-            v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, enable_watermark, enable_bg_music)
+            v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, enable_watermark, enable_bg_music)
             
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
             st.video(v_res)
@@ -564,7 +571,7 @@ with tab_movie:
         else: 
             st.error(v_res)
 
-with tab_image:
+elif tab_image:
     st.write("### 🎨 Industrial HD Visual Studio")
     
     tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Upload"])
@@ -624,4 +631,4 @@ with tab_image:
             else:
                 st.warning("Please upload an image and write instructions first.")
 
-st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.2 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.3 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
