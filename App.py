@@ -144,7 +144,7 @@ st.markdown("""<div class="executive-header"><div class="main-names">Muhammad Es
 st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 3. IDENTITY & ISLAMIC POLICY ENGINE
+# 4. IDENTITY & ISLAMIC POLICY ENGINE
 # ==========================================
 SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
@@ -204,9 +204,9 @@ def translate_ur_to_en(text):
         
     return text
 
-def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc=""):
-    shariah = apply_islamic_visual_logic(urdu_text)
-    english_translation = translate_ur_to_en(urdu_text)
+def get_titan_prompt(text, style, char_desc="", scene_desc=""):
+    shariah = apply_islamic_visual_logic(text)
+    english_translation = translate_ur_to_en(text)
     
     style_details = {
         "Realistic": "hyperrealistic photograph, highly detailed 8k resolution, sharp focus, realistic textures, natural volumetric lighting, cinematic photography style",
@@ -296,6 +296,7 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
 # ==========================================
 # 5. FIXED V40 RENDER SYSTEM CORE (UNTOUCHED)
 # ==========================================
+# فنکشن کا نام create_titan_movie_v1 پر فکس کر دیا گیا ہے تاکہ ایرر ختم ہو جائے
 def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", enable_watermark=True, enable_bg_music=True):
     u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
     
@@ -308,7 +309,6 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
     has_bg_music = False
     
     try:
-        # Step 1: Human Voice
         progress_bar.progress(0.05)
         status.info("🎙️ Generating Voiceover Track (آڈیو جنریٹ ہو رہی ہے)...")
         v_code = "ur-PK-UzmaNeural" if voice == "Uzma (Female)" else "ur-PK-AsadNeural"
@@ -337,12 +337,12 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                 bg_url = "https://upload.wikimedia.org/wikipedia/commons/e/e6/Chopin_-_Nocturne_op._9_no._2.mp3"
                 
             try:
-                res_bg = session.get(bg_url, timeout=20, verify=False)
+                res_bg = session.get(bg_url, timeout=20)
                 if res_bg.status_code == 200:
                     with open(bg_music_f, 'wb') as f:
                         f.write(res_bg.content)
                     has_bg_music = True
-            except Exception:
+            except:
                 pass
                 
         progress_bar.progress(0.20)
@@ -363,25 +363,25 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         dur_per = voice_audio.duration / len(sentences)
         generated_prompts = []
         
-        # v40 RENDER PIPELINE CORE FLOW (Pristine, untouched sequential downloading)
+        # v40 Core Render Loop
         for i, scene in enumerate(sentences):
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
             status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
             
-            refined_p = get_visual_prompt_v40(scene, style, char_desc, scene_desc)
+            refined_p = get_titan_prompt(scene, style, char_desc, scene_desc)
             generated_prompts.append(refined_p)
             
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w}&height={h}&seed={seed + i}&nologo=true"
-            
+            img_data = fetch_img_failover(refined_p, w, h, seed + i)
+            if not img_data:
+                st.warning(f"⚠️ Scene {i+1} image generation failed. Using high-quality stylized placeholder.")
+                img_data = generate_high_quality_placeholder(w, h, i+1, enable_watermark)
+                
             img_path = f"i_{u_id}_{i}.jpg"
             generated_images.append(img_path)
             
-            # v40 Write directly to disk first
-            img_data = session.get(img_url, timeout=60).content
             with open(img_path, "wb") as f:
                 f.write(img_data)
                 
-            # v40 Force Resize & Format conversion (Sglowina Watermark layered inside PIL)
             try:
                 with Image.open(img_path) as img_obj:
                     img_obj = img_obj.convert("RGB").resize((w, h))
@@ -398,9 +398,9 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                     draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                 im.save(img_path, "JPEG")
                 
-            # v40 Zoom Engine & Camera motions layered
+            # v40 Zoom Engine (1.2 to 1.0 cinematic movement)
             clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
-            clip = clip.resize(lambda t: 1.0 + 0.15 * (t / dur_per)).set_position('center')
+            clip = clip.resize(lambda t: 1.2 - 0.15 * (t / dur_per)).set_position('center')
             clip = fadein(clip, 0.4)
             clips.append(clip)
             
@@ -411,7 +411,7 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                 f.write(img_data)
             generated_images.append(fallback_p)
             clip = ImageClip(fallback_p).set_duration(voice_audio.duration).set_fps(24)
-            clip = clip.resize(lambda t: 1.0 + 0.15 * (t / voice_audio.duration)).set_position('center')
+            clip = clip.resize(lambda t: 1.2 - 0.15 * (t / voice_audio.duration)).set_position('center')
             clip = fadein(clip, 0.4)
             clips.append(clip)
             
@@ -423,12 +423,11 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         if has_bg_music and os.path.exists(bg_music_f):
             try:
                 bg_audio = AudioFileClip(bg_music_f).volumex(0.10)
-                bg_audio = bg_audio.set_duration(voice_audio.duration)
+                bg_audio = bg_audio.subclip(0, voice_audio.duration)
                 final_audio = CompositeAudioClip([voice_audio, bg_audio])
             except Exception:
                 pass
                 
-        # v40 final compose concatenation
         final_video = concatenate_videoclips(clips, method="compose").set_audio(final_audio)
         out_name = f"Sglowina_{u_id}.mp4"
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
@@ -449,7 +448,7 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         progress_bar.progress(1.0)
         status.success("🚀 Video Generated Successfully (ویڈیو بن چکی ہے)!")
         
-        # Saved Projects History management
+        # Sglowina History layered cleanly on v40 base
         st.session_state.project_history.append({
             "name": out_name,
             "prompts": generated_prompts,
@@ -457,6 +456,13 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
         })
         
+        st.markdown("### 📝 Generated Prompts with Copy Button")
+        for idx, prompt_text in enumerate(generated_prompts):
+            st.text(f"Prompt {idx+1}:")
+            st.code(prompt_text, language="text")
+            if prompt_text not in st.session_state.saved_prompts:
+                st.session_state.saved_prompts.append(prompt_text)
+            
         st.session_state.user_credits = max(0, st.session_state.user_credits - 10)
             
         return out_name
@@ -473,11 +479,26 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         gc.collect()
 
 # ==========================================
-# 6. UI NAVIGATION & CONTROL PANEL (Main page Tabs restored)
+# 6. UI NAVIGATION & CONTROL PANEL (Main Tabs)
 # ==========================================
-tab_chat, tab_movie, tab_image = st.tabs(["💬 Electric AI Chat", "🎬 Pro Master Studio", "🎨 Pro Image Studio"])
+menu = st.sidebar.radio("SGLOWINA COMMAND MENU", [
+    "🏠 Smart Chat", 
+    "🎬 Movie Studio", 
+    "🎨 Pro Image Studio",
+    "👤 Enterprise Center"
+])
 
-with tab_chat:
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎬 Video Settings")
+enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
+enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("👤 Sglowina Enterprise Center")
+st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
+st.sidebar.write(f"Credits Remaining: **{st.session_state.user_credits}** 🪙")
+
+if menu == "🏠 Smart Chat":
     st.write("### 💬 Sglowina Intelligence Dashboard")
     if "msgs" not in st.session_state: st.session_state.msgs = []
     for m in st.session_state.msgs:
@@ -489,7 +510,7 @@ with tab_chat:
         with st.chat_message("assistant"):
             st.write(res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")); st.session_state.msgs.append({"role": "assistant", "content": res})
 
-with tab_movie:
+elif menu == "🎬 Movie Studio":
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
     
@@ -526,7 +547,7 @@ with tab_movie:
         else: 
             st.error(v_res)
 
-with tab_image:
+elif menu == "🎨 Pro Image Studio":
     st.write("### 🎨 Industrial HD Visual Studio")
     
     tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Upload"])
@@ -587,5 +608,49 @@ with tab_image:
                         st.error("Modification failed.")
             else:
                 st.warning("Please upload an image and write instructions first.")
+
+elif menu == "👤 Enterprise Center":
+    st.write("### 👤 Sglowina Enterprise Administration Center")
+    
+    ent_tab_user, ent_tab_history, ent_tab_admin = st.tabs(["👤 User Profile", "📁 Project History & Prompts", "🔒 Admin Control Panel"])
+    
+    with ent_tab_user:
+        st.write(f"#### Logged-in User Profile")
+        st.info(f"User: **{st.session_state.logged_in_user}** | Allocated Credits: **{st.session_state.user_credits}** 🪙")
+        st.write("Secure Session Token:")
+        st.code(str(uuid.uuid5(uuid.NAMESPACE_DNS, st.session_state.logged_in_user))[:20])
+        
+    with ent_tab_history:
+        st.write("#### 📁 Active Download Manager & Saved Projects")
+        if not st.session_state.project_history:
+            st.write("No projects found in this session.")
+        else:
+            for proj in st.session_state.project_history:
+                st.write(f"🎬 **{proj['name']}** (Created: {proj['timestamp']})")
+                st.write(f"Script: `{proj['story']}`")
+                st.write("Saved Prompts for this video:")
+                for p_text in proj['prompts']:
+                    st.code(p_text, language="text")
+                st.markdown("---")
+                
+        st.write("#### ⭐ Saved & Favorite Prompts")
+        if not st.session_state.favorites:
+            st.write("No saved prompts found.")
+        else:
+            for fav in st.session_state.favorites:
+                st.code(fav, language="text")
+                
+    with ent_tab_admin:
+        st.write("#### 🔒 Secured Admin Control Settings")
+        admin_pass = st.text_input("Enter Admin Passcode:", type="password")
+        if admin_pass == "786" or admin_pass == "1234":
+            st.success("Access Granted!")
+            st.session_state.logged_in_user = st.selectbox("Manage Account:", ["essa_awan", "saba_wahid"])
+            new_credits = st.number_input("Adjust Allocated Credits:", min_value=0, max_value=10000, value=st.session_state.user_credits)
+            if st.button("Apply Changes"):
+                st.session_state.user_credits = new_credits
+                st.success("Credits adjusted successfully!")
+        else:
+            st.error("Access Denied: Invalid passcode.")
 
 st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.2 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
