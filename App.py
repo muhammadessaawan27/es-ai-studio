@@ -307,7 +307,8 @@ def apply_camera_motion_v40(clip, motion, duration, w, h):
 # ==========================================
 # 5. FIXED V40 RENDER SYSTEM CORE (UNTOUCHED)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Smooth Camera", enable_watermark=True, enable_bg_music=True):
+# یہ فکشن بالکل اصل v40 رینڈر فلو اور سیکیورٹی سورس کے ساتھ بحال ہے
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True):
     u_id = str(uuid.uuid4())[:8]
     progress_bar = st.progress(0.0)
     status = st.empty()
@@ -397,7 +398,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             try:
                 with Image.open(img_path) as img_obj:
                     # Apply camera-motion scaling safely (no black borders)
-                    if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"]:
+                    if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                         img_obj = img_obj.convert("RGB").resize((int(w * 1.15), int(h * 1.15)))
                     else:
                         img_obj = img_obj.convert("RGB").resize((w, h))
@@ -569,10 +570,9 @@ with tab_image:
                     if char_desc_img.strip():
                         final_p = f"Character is {char_desc_img.strip()}. Action/Scene: {single_p}"
                         
-                    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(final_p + ' ' + i_style)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
-                    res = session.get(url, timeout=30)
-                    if res.status_code == 200:
-                        with Image.open(io.BytesIO(res.content)) as im:
+                    img_data = fetch_img_failover(final_p, w, h, random.randint(1,999999))
+                    if img_data:
+                        with Image.open(io.BytesIO(img_data)) as im:
                             st.image(im, caption=f"Prompt: {single_p[:30]}...")
                     else:
                         st.error(f"Image generation failed for prompt: {single_p}")
@@ -589,10 +589,9 @@ with tab_image:
             if uploaded_file and modify_prompt:
                 with st.spinner("Modifying image..."):
                     img_name = translate_ur_to_en(modify_prompt)
-                    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(img_name + ' ' + i_style_mod)}?width=1024&height=1024&seed={random.randint(1,9999)}&nologo=true"
-                    res = session.get(url, timeout=30)
-                    if res.status_code == 200:
-                        with Image.open(io.BytesIO(res.content)) as im:
+                    img_data = fetch_img_failover(img_name, 1024, 1024, random.randint(1,999999))
+                    if img_data:
+                        with Image.open(io.BytesIO(img_data)) as im:
                             st.image(im, caption="Modified Masterpiece")
                     else:
                         st.error("Modification failed.")
