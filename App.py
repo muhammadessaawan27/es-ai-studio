@@ -18,7 +18,6 @@ import gc
 # ==========================================
 session = requests.Session()
 
-# Premium Browser Headers to bypass SSL/Wikimedia blocks
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
@@ -44,23 +43,7 @@ except Exception:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 2. ENTERPRISE SESSION STATE INITIALIZATION
-# ==========================================
-if "user_accounts" not in st.session_state:
-    st.session_state.user_accounts = {"essa_awan": "786", "saba_wahid": "1234"}
-if "logged_in_user" not in st.session_state:
-    st.session_state.logged_in_user = "essa_awan"
-if "user_credits" not in st.session_state:
-    st.session_state.user_credits = 500
-if "project_history" not in st.session_state:
-    st.session_state.project_history = []
-if "saved_prompts" not in st.session_state:
-    st.session_state.saved_prompts = []
-if "favorites" not in st.session_state:
-    st.session_state.favorites = []
-
-# ==========================================
-# 3. EXECUTIVE UI & PREMIUM STYLING (V1.4 INCREMENT)
+# 2. EXECUTIVE UI & PREMIUM STYLING (V1.4)
 # ==========================================
 st.set_page_config(page_title="Sglowina AI - Official V1.4", layout="wide", page_icon="🎬")
 
@@ -238,7 +221,6 @@ def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc=""):
     
     prompt_parts = [f"{style_prompt} style"]
     
-    # چہرہ خراب نہ ہونے اور ایک ہی کردار رکھنے کے لیے مستحکم اور مختصر فلٹرنگ
     if char_desc.strip():
         prompt_parts.append(f"character is single person {char_desc.strip()}. Consistent identity, same face and clothing, single character only")
     if scene_desc.strip():
@@ -367,7 +349,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         voice_audio = AudioFileClip(audio_file)
         progress_bar.progress(0.15)
         
-        # ویکیپیڈیا سے لائیو آڈیو ڈاؤن لوڈنگ مکسر
         if enable_bg_music:
             status.info("🎵 Downloading Atmospheric Classical Background Track...")
             story_lower = story.lower()
@@ -411,7 +392,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         
         clips = []
         dur_per = voice_audio.duration / len(sentences)
-        generated_prompts = []
+        generated_images_path = []
         
         # v40 RENDER PIPELINE CORE FLOW (Pristine, untouched sequential downloading to files)
         for i, scene in enumerate(sentences):
@@ -419,12 +400,11 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
             
             refined_p = get_visual_prompt_v40(scene, style, char_desc, scene_desc)
-            generated_prompts.append(refined_p)
             
             img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w}&height={h}&seed={seed + i}&nologo=true"
             
             img_path = f"i_{u_id}_{i}.jpg"
-            generated_images.append(img_path)
+            generated_images_path.append(img_path)
             
             # v40 Write directly to disk first
             img_data = session.get(img_url, timeout=60).content
@@ -434,7 +414,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             # v40 Force Resize & Format conversion (Sglowina Watermark layered inside PIL)
             try:
                 with Image.open(img_path) as img_obj:
-                    # کیمرہ موشن ری سائزنگ
+                    # Apply camera-motion scaling safely (no black borders)
                     if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                         img_obj = img_obj.convert("RGB").resize((int(w * 1.15), int(h * 1.15)))
                     else:
@@ -467,7 +447,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             img_data = generate_high_quality_placeholder(w, h, 1, enable_watermark)
             with open(fallback_p, 'wb') as f:
                 f.write(img_data)
-            generated_images.append(fallback_p)
+            generated_images_path.append(fallback_p)
             clip = ImageClip(fallback_p).set_duration(voice_audio.duration).set_fps(24)
             clip = clip.resize(lambda t: 1.0 + 0.15 * (t / voice_audio.duration)).set_position('center')
             clip = fadein(clip, 0.4)
@@ -499,7 +479,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         try:
             if os.path.exists(audio_file): os.remove(audio_file)
             if os.path.exists(bg_music_f): os.remove(bg_music_f)
-            for img_p in generated_images:
+            for img_p in generated_images_path:
                 if os.path.exists(img_p): os.remove(img_p)
         except Exception:
             pass
@@ -512,7 +492,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         try:
             if os.path.exists(audio_file): os.remove(audio_file)
             if os.path.exists(bg_music_f): os.remove(bg_music_f)
-            for img_p in generated_images:
+            for img_p in generated_images_path:
                 if os.path.exists(img_p): os.remove(img_p)
         except: pass
         progress_bar.empty()
@@ -521,7 +501,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         gc.collect()
 
 # ==========================================
-# 6. UI NAVIGATION & CONTROL PANEL (Main page Tabs restored)
+# 6. UI NAVIGATION & CONTROL PANEL (Main page Tabs restored with strict standard context)
 # ==========================================
 tab_chat, tab_movie, tab_image = st.tabs(["💬 Electric AI Chat", "🎬 Pro Master Studio", "🎨 Pro Image Studio"])
 
@@ -530,12 +510,6 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
-
-# Sglowina Enterprise Center (Credits display)
-st.sidebar.markdown("---")
-st.sidebar.subheader("👤 Sglowina Enterprise Center")
-st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
-st.sidebar.write(f"Credits Remaining: **{st.session_state.user_credits}** 🪙")
 
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
@@ -549,7 +523,7 @@ with tab_chat:
         with st.chat_message("assistant"):
             st.write(res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")); st.session_state.msgs.append({"role": "assistant", "content": res})
 
-elif tab_movie:
+with tab_movie:
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
     
@@ -587,7 +561,7 @@ elif tab_movie:
         else: 
             st.error(v_res)
 
-elif tab_image:
+with tab_image:
     st.write("### 🎨 Industrial HD Visual Studio")
     
     tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Upload"])
