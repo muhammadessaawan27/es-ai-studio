@@ -14,7 +14,23 @@ import threading
 import gc
 
 # ==========================================
-# 1. INDUSTRIAL STABILITY & LOAD BALANCING
+# 1. ENTERPRISE SESSION STATE (MUST INITIALIZE FIRST)
+# ==========================================
+if "user_accounts" not in st.session_state:
+    st.session_state.user_accounts = {"essa_awan": "786", "saba_wahid": "1234"}
+if "logged_in_user" not in st.session_state:
+    st.session_state.logged_in_user = "essa_awan"
+if "user_credits" not in st.session_state:
+    st.session_state.user_credits = 500
+if "project_history" not in st.session_state:
+    st.session_state.project_history = []
+if "saved_prompts" not in st.session_state:
+    st.session_state.saved_prompts = []
+if "favorites" not in st.session_state:
+    st.session_state.favorites = []
+
+# ==========================================
+# 2. INDUSTRIAL STABILITY & LOAD BALANCING
 # ==========================================
 session = requests.Session()
 adapter = requests.adapters.HTTPAdapter(pool_connections=1000, pool_maxsize=1000)
@@ -37,10 +53,21 @@ except Exception:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 2. EXECUTIVE UI & PREMIUM STYLING
+# 3. PAGE CONFIGURATION & SIDEBAR (MUST BE BEFORE TABS)
 # ==========================================
 st.set_page_config(page_title="Sglowina AI - Official V1.2", layout="wide", page_icon="🎬")
 
+# Sidebar Settings (Guarantees variables are defined first to prevent NameErrors)
+st.sidebar.subheader("🎬 Video Settings")
+enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
+enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("👤 Sglowina Enterprise Center")
+st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
+st.sidebar.write(f"Credits Remaining: **{st.session_state.user_credits}** 🪙")
+
+# Premium Light Styling Sheets
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700&display=swap');
@@ -128,7 +155,7 @@ st.markdown("""<div class="executive-header"><div class="main-names">Muhammad Es
 st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 3. IDENTITY & ISLAMIC POLICY ENGINE
+# 4. IDENTITY & ISLAMIC POLICY ENGINE
 # ==========================================
 SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
@@ -307,8 +334,7 @@ def apply_camera_motion_v40(clip, motion, duration, w, h):
 # ==========================================
 # 5. FIXED V40 RENDER SYSTEM CORE (UNTOUCHED)
 # ==========================================
-# یہ فکشن بالکل اصل v40 رینڈر فلو اور سیکیورٹی سورس کے ساتھ بحال ہے
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Smooth Camera", enable_watermark=True, enable_bg_music=True):
     u_id = str(uuid.uuid4())[:8]
     progress_bar = st.progress(0.0)
     status = st.empty()
