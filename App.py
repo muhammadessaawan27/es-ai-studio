@@ -14,23 +14,7 @@ import threading
 import gc
 
 # ==========================================
-# 1. ENTERPRISE SESSION STATE (MUST INITIALIZE FIRST)
-# ==========================================
-if "user_accounts" not in st.session_state:
-    st.session_state.user_accounts = {"essa_awan": "786", "saba_wahid": "1234"}
-if "logged_in_user" not in st.session_state:
-    st.session_state.logged_in_user = "essa_awan"
-if "user_credits" not in st.session_state:
-    st.session_state.user_credits = 500
-if "project_history" not in st.session_state:
-    st.session_state.project_history = []
-if "saved_prompts" not in st.session_state:
-    st.session_state.saved_prompts = []
-if "favorites" not in st.session_state:
-    st.session_state.favorites = []
-
-# ==========================================
-# 2. INDUSTRIAL STABILITY & LOAD BALANCING
+# 1. INDUSTRIAL STABILITY & LOAD BALANCING
 # ==========================================
 session = requests.Session()
 adapter = requests.adapters.HTTPAdapter(pool_connections=1000, pool_maxsize=1000)
@@ -42,18 +26,18 @@ if not hasattr(Image, 'ANTIALIAS'):
 try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
     from moviepy.video.fx.all import fadein
-except Exception as e:
+except Exception:
     try:
         from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
         import moviepy.video.fx.all as vfx
         fadein = vfx.fadein
-    except Exception as inner_e:
-        print(f"Dependency load exception: {inner_e}")
+    except Exception:
+        pass
 
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 3. EXECUTIVE UI & PREMIUM STYLING
+# 2. EXECUTIVE UI & PREMIUM STYLING
 # ==========================================
 st.set_page_config(page_title="Sglowina AI - Official V1.2", layout="wide", page_icon="🎬")
 
@@ -144,7 +128,7 @@ st.markdown("""<div class="executive-header"><div class="main-names">Muhammad Es
 st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 4. IDENTITY & ISLAMIC POLICY ENGINE
+# 3. IDENTITY & ISLAMIC POLICY ENGINE
 # ==========================================
 SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
@@ -190,8 +174,8 @@ def translate_ur_to_en(text):
             translated = "".join([part[0] for part in json_data[0] if part and part[0]])
             if translated.strip():
                 return translated.strip()
-    except Exception as e:
-        print(f"Translation primary engine exception: {e}")
+    except Exception:
+        pass
     
     try:
         instr = f"Extract only the main visual subject and atmosphere from this Urdu: '{text}'. Describe it clearly in English for a 3D animation model. No preamble."
@@ -199,8 +183,8 @@ def translate_ur_to_en(text):
         res = session.get(url, timeout=20)
         if res.status_code == 200 and len(res.text) < 1000:
             return res.text.strip()
-    except Exception as e:
-        print(f"Translation backup engine exception: {e}")
+    except:
+        pass
         
     return text
 
@@ -219,27 +203,39 @@ def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc=""):
     style_prompt = style_details.get(style, "epic cinematic lighting, highly detailed masterpiece")
     
     prompt_parts = [f"{style_prompt} style"]
-    
     if char_desc.strip():
-        prompt_parts.append(f"character is {char_desc.strip()}. Use the same character identity in every scene, identical face, identical clothing, consistent appearance, same age, same body shape, same hairstyle, same identity")
+        prompt_parts.append(f"character is {char_desc.strip()}. Use the same character identity in every scene, identical face, identical clothing, consistent appearance")
     if scene_desc.strip():
-        prompt_parts.append(f"scene background is {scene_desc.strip()}, same environment background in all scenes, consistent scene memory")
-        
+        prompt_parts.append(f"scene background is {scene_desc.strip()}, same environment")
     prompt_parts.append(english_translation)
     if shariah:
         prompt_parts.append(shariah)
-    prompt_parts.append("highly detailed, cinematic lighting, 8k, realistic masterpiece, vivid colors, maintain exact same character identity across all scenes")
+    prompt_parts.append("highly detailed, cinematic lighting, 8k, realistic masterpiece, vivid colors")
     
     return ", ".join(prompt_parts)
 
-def verify_image_bytes(data):
+def fetch_img_failover(prompt, w, h, seed):
     try:
-        im = Image.open(io.BytesIO(data))
-        im.verify()
-        return True
-    except Exception as e:
-        print(f"Bytes verification exception: {e}")
-        return False
+        herc_url = f"https://hercai.onrender.com/v3/text2image?prompt={urllib.parse.quote(prompt)}"
+        res = session.get(herc_url, timeout=20)
+        if res.status_code == 200:
+            img_url = res.json().get("url")
+            if img_url:
+                res_img = session.get(img_url, timeout=25)
+                if res_img.status_code == 200 and len(res_img.content) > 5000:
+                    return res_img.content
+    except Exception:
+        pass
+
+    try:
+        poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
+        res = session.get(poll_url, timeout=25)
+        if res.status_code == 200 and len(res.content) > 5000:
+            return res.content
+    except Exception:
+        pass
+
+    return None
 
 def generate_high_quality_placeholder(w, h, scene_num, enable_watermark=True):
     im = Image.new("RGB", (w, h), color=(30, 41, 59))
@@ -258,61 +254,6 @@ def generate_high_quality_placeholder(w, h, scene_num, enable_watermark=True):
     im.save(img_byte_arr, format='JPEG')
     return img_byte_arr.getvalue()
 
-# پائیدار فیل اوور انجن بشمول 3 گنا ری ٹرائی لوپ، پرامپٹ کی حد اور کونسول لاگنگ
-def fetch_img_failover(prompt, w, h, seed, scene_idx, status_placeholder):
-    # ٹائم آؤٹ اور طویل پرامپٹس کو بائی پاس کرنے کے لیے پرامپٹ کو 280 حروف تک محدود کرنا
-    clean_prompt = prompt
-    if len(prompt) > 280:
-        parts = prompt.split(" | ")
-        if len(parts) > 1:
-            clean_prompt = " | ".join([parts[0], parts[-1]])[:280]
-        else:
-            clean_prompt = prompt[:280]
-
-    # Hercai کے لیے 3 کوششیں
-    for attempt in range(3):
-        current_seed = seed + attempt if attempt > 0 else seed
-        try:
-            herc_url = f"https://hercai.onrender.com/v3/text2image?prompt={urllib.parse.quote(clean_prompt)}"
-            res = session.get(herc_url, timeout=20)
-            if res.status_code == 200:
-                img_url = res.json().get("url")
-                if img_url:
-                    res_img = session.get(img_url, timeout=25)
-                    if res_img.status_code == 200 and len(res_img.content) > 5000:
-                        if verify_image_bytes(res_img.content):
-                            return res_img.content
-                        else:
-                            status_placeholder.warning(f"⚠️ Scene {scene_idx}: Hercai downloaded corrupt image bytes on attempt {attempt+1}/3.")
-                    else:
-                        status_placeholder.warning(f"⚠️ Scene {scene_idx}: Hercai download returned status {res_img.status_code} (bytes: {len(res_img.content) if res_img else 0}) on attempt {attempt+1}/3.")
-                else:
-                    status_placeholder.warning(f"⚠️ Scene {scene_idx}: Hercai response did not contain URL on attempt {attempt+1}/3.")
-            else:
-                status_placeholder.warning(f"⚠️ Scene {scene_idx}: Hercai API failed with status code {res.status_code} on attempt {attempt+1}/3.")
-        except Exception as e:
-            status_placeholder.warning(f"⚠️ Scene {scene_idx}: Hercai attempt {attempt+1}/3 connection error: {e}")
-        time.sleep(1.0)
-
-    # Pollinations کے لیے 3 کوششیں (Hercai ناکام ہونے پر متبادل)
-    for attempt in range(3):
-        current_seed = seed + attempt + 10 if attempt > 0 else seed
-        try:
-            poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt)}?width={w}&height={h}&seed={current_seed}&nologo=true"
-            res = session.get(poll_url, timeout=25)
-            if res.status_code == 200 and len(res.content) > 5000:
-                if verify_image_bytes(res.content):
-                    return res.content
-                else:
-                    status_placeholder.warning(f"⚠️ Scene {scene_idx}: Pollinations downloaded corrupt image bytes on attempt {attempt+1}/3.")
-            else:
-                status_placeholder.warning(f"⚠️ Scene {scene_idx}: Pollinations API failed with status {res.status_code if res else 'No Response'} (bytes: {len(res.content) if res else 0}) on attempt {attempt+1}/3.")
-        except Exception as e:
-            status_placeholder.warning(f"⚠️ Scene {scene_idx}: Pollinations attempt {attempt+1}/3 connection error: {e}")
-        time.sleep(1.0)
-
-    return None
-
 def save_audio_safe(story, v_code, rate, pitch, audio_f):
     for attempt in range(2):
         try:
@@ -321,8 +262,8 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
                 asyncio.set_event_loop(loop)
                 try:
                     loop.run_until_complete(edge_tts.Communicate(story, v_code, rate=rate, pitch=pitch).save(audio_f))
-                except Exception as e:
-                    print(f"Edge TTS inner error: {e}")
+                except Exception:
+                    pass
                 finally:
                     loop.close()
 
@@ -331,8 +272,8 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
             thread.join()
             if os.path.exists(audio_f) and os.path.getsize(audio_f) > 1000:
                 return True
-        except Exception as e:
-            print(f"Audio save exception: {e}")
+        except Exception:
+            pass
         time.sleep(0.2)
     return False
 
@@ -354,53 +295,39 @@ def apply_camera_motion_v40(clip, motion, duration, w, h):
         elif motion == "Pan Down":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: ('center', -int(y_max * (1.0 - (t / duration)))))
         elif motion == "Dolly In":
-            clip = clip.resize(lambda t: 1.0 + 0.18 * (t / duration)).set_position('center')
+            clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
         elif motion == "Dolly Out":
-            clip = clip.resize(lambda t: 1.18 - 0.18 * (t / duration)).set_position('center')
-        elif motion == "Cinematic Camera Drift":
-            clip = clip.resize(lambda t: 1.15).set_position(lambda t: (-int(x_max * 0.5 * (t / duration)), -int(y_max * 0.5 * (t / duration))))
-        elif motion == "Ken Burns Effect":
-            clip = clip.resize(lambda t: 1.15 + 0.10 * (t / duration)).set_position(lambda t: (-int(x_max * 0.5 * (t / duration)), 'center'))
-        elif motion == "Soft Rotate":
-            try:
-                clip = clip.resize(lambda t: 1.15).rotate(lambda t: 2 * (t / duration) - 1).set_position('center')
-            except Exception as e:
-                print(f"Rotate warning: {e}")
-                clip = clip.resize(lambda t: 1.15).set_position('center')
-        elif motion == "Random Professional Camera Motion":
-            chosen = random.choice(["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out", "Cinematic Camera Drift", "Ken Burns Effect"])
-            clip = apply_camera_motion_v40(clip, chosen, duration, w, h)
+            clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
         else:
             clip = clip.resize(lambda t: 1.2 - 0.15 * (t / duration)).set_position('center')
-    except Exception as e:
-        print(f"Camera motion error: {e}")
+    except Exception:
         clip = clip.set_position('center')
     return clip
 
 # ==========================================
 # 5. FIXED V40 RENDER SYSTEM CORE (UNTOUCHED)
 # ==========================================
-def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True):
-    u_id = f"v1_render_{str(uuid.uuid4())[:6]}"
-    
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Smooth Camera", enable_watermark=True, enable_bg_music=True):
+    u_id = str(uuid.uuid4())[:8]
     progress_bar = st.progress(0.0)
     status = st.empty()
     
-    audio_f = f"a_{u_id}.mp3"
+    audio_file = f"a_{u_id}.mp3"
     bg_music_f = f"bg_{u_id}.mp3"
     generated_images = []
     has_bg_music = False
     
     try:
+        # Step 1: Human Voice
         progress_bar.progress(0.05)
         status.info("🎙️ Generating Voiceover Track (آڈیو جنریٹ ہو رہی ہے)...")
-        v_code = "ur-PK-UzmaNeural" if "Female" in voice else "ur-PK-AsadNeural"
+        v_code = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
         
-        audio_success = save_audio_safe(story, v_code, rate, pitch, audio_f)
-        if not audio_success:
+        save_audio_success = save_audio_safe(story, v_code, rate, pitch, audio_file)
+        if not save_audio_success:
             raise Exception("Voice generation failed.")
             
-        voice_audio = AudioFileClip(audio_f)
+        voice_audio = AudioFileClip(audio_file)
         progress_bar.progress(0.15)
         
         if enable_bg_music:
@@ -425,11 +352,12 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                     with open(bg_music_f, 'wb') as f:
                         f.write(res_bg.content)
                     has_bg_music = True
-            except Exception as e:
-                print(e)
+            except:
+                pass
                 
         progress_bar.progress(0.20)
         
+        # Dimensions mapping
         res_map = {
             "YouTube (16:9)": (1280, 720), 
             "TikTok/Reels (9:16)": (720, 1280), 
@@ -439,6 +367,7 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
         }
         w, h = res_map[ratio]
         
+        # Split by Sentences
         sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
         if not sentences: sentences = [story]
         
@@ -451,24 +380,24 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
             status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
             
-            refined_p = get_titan_prompt(scene, style, char_desc, scene_desc)
+            refined_p = get_visual_prompt_v40(scene, style, char_desc, scene_desc)
             generated_prompts.append(refined_p)
             
-            img_data = fetch_img_failover(refined_p, w, h, seed + i, i+1, status)
-            if not img_data:
-                status.warning(f"⚠️ Scene {i+1} image generation failed. Generating verified robust placeholder.")
-                img_data = generate_high_quality_placeholder(w, h, i+1, enable_watermark)
-                
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w}&height={h}&seed={seed + i}&nologo=true"
+            
             img_path = f"i_{u_id}_{i}.jpg"
             generated_images.append(img_path)
             
+            # v40 Write directly to disk first
+            img_data = session.get(img_url, timeout=60).content
             with open(img_path, "wb") as f:
                 f.write(img_data)
                 
+            # v40 Force Resize & Format conversion (Sglowina Watermark layered inside PIL)
             try:
                 with Image.open(img_path) as img_obj:
-                    # کیمرہ موشن پائپ لائن فورس رینڈرنگ
-                    if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down", "Cinematic Camera Drift", "Ken Burns Effect", "Soft Rotate", "Random Professional Camera Motion"]:
+                    # Apply camera-motion scaling safely (no black borders)
+                    if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"]:
                         img_obj = img_obj.convert("RGB").resize((int(w * 1.15), int(h * 1.15)))
                     else:
                         img_obj = img_obj.convert("RGB").resize((w, h))
@@ -478,16 +407,15 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                         draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                         
                     img_obj.save(img_path, "JPEG")
-            except Exception as e:
-                print(f"PIL Image exception: {e}")
+            except Exception:
                 im = Image.new("RGB", (w, h), color=(30, 41, 59))
                 if enable_watermark:
                     draw = ImageDraw.Draw(im)
                     draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                 im.save(img_path, "JPEG")
                 
-            # v40 Zoom Engine & Camera motions integrated cleanly
-            if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down", "Cinematic Camera Drift", "Ken Burns Effect", "Soft Rotate", "Random Professional Camera Motion"]:
+            # Zoom In Movement
+            if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                 clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
             else:
                 clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((w, h))
@@ -517,8 +445,8 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
                 bg_audio = AudioFileClip(bg_music_f).volumex(0.10)
                 bg_audio = bg_audio.set_duration(voice_audio.duration)
                 final_audio = CompositeAudioClip([voice_audio, bg_audio])
-            except Exception as e:
-                print(f"Background mixing exception: {e}")
+            except Exception:
+                pass
                 
         # v40 final compose concatenation
         final_video = concatenate_videoclips(clips, method="compose").set_audio(final_audio)
@@ -535,22 +463,12 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
             if os.path.exists(bg_music_f): os.remove(bg_music_f)
             for img_p in generated_images:
                 if os.path.exists(img_p): os.remove(img_p)
-        except Exception as e:
-            print(f"Cleanup error exception: {e}")
+        except Exception:
+            pass
             
         progress_bar.progress(1.0)
         status.success("🚀 Video Generated Successfully (ویڈیو بن چکی ہے)!")
         
-        # Saved Projects History management
-        st.session_state.project_history.append({
-            "name": out_name,
-            "prompts": generated_prompts,
-            "story": story,
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-        })
-            
-        st.session_state.user_credits = max(0, st.session_state.user_credits - 10)
-            
         return out_name
     except Exception as e: 
         try:
@@ -567,27 +485,7 @@ def create_titan_movie_v1(story, voice, rate, pitch, ratio, style, seed, char_de
 # ==========================================
 # 6. UI NAVIGATION & CONTROL PANEL (Main page Tabs restored)
 # ==========================================
-tab_chat, tab_movie, tab_image, tab_enterprise = st.tabs([
-    "💬 Electric AI Chat", 
-    "🎬 Pro Master Studio", 
-    "🎨 Pro Image Studio",
-    "👤 Enterprise Center"
-])
-
-# Sidebar Settings
-st.sidebar.markdown("---")
-st.sidebar.subheader("🎬 Video Settings")
-enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
-enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
-
-# Sglowina Enterprise Center (Credits display)
-st.sidebar.markdown("---")
-st.sidebar.subheader("👤 Sglowina Enterprise Center")
-st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
-st.sidebar.write(f"Credits Remaining: **{st.session_state.user_credits}** 🪙")
-
-if menu := "Smart Chat":
-    pass
+tab_chat, tab_movie, tab_image = st.tabs(["💬 Electric AI Chat", "🎬 Pro Master Studio", "🎨 Pro Image Studio"])
 
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
@@ -601,7 +499,7 @@ with tab_chat:
         with st.chat_message("assistant"):
             st.write(res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")); st.session_state.msgs.append({"role": "assistant", "content": res})
 
-elif tab_movie:
+with tab_movie:
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
     
@@ -617,7 +515,7 @@ elif tab_movie:
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out", "Cinematic Camera Drift", "Ken Burns Effect", "Soft Rotate", "Random Professional Camera Motion"])
+    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
     with mc7: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
@@ -631,7 +529,7 @@ elif tab_movie:
         pitch_val = pitch_map[mv_pitch]
         
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
-            v_res = create_titan_movie_v1(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, enable_watermark, enable_bg_music)
+            v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, enable_watermark, enable_bg_music)
             
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
             st.video(v_res)
@@ -639,7 +537,7 @@ elif tab_movie:
         else: 
             st.error(v_res)
 
-elif tab_image:
+with tab_image:
     st.write("### 🎨 Industrial HD Visual Studio")
     
     tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Upload"])
@@ -671,12 +569,11 @@ elif tab_image:
                     if char_desc_img.strip():
                         final_p = f"Character is {char_desc_img.strip()}. Action/Scene: {single_p}"
                         
-                    img_data = fetch_img_failover(final_p, w, h, random.randint(1,999999))
-                    if img_data:
-                        with Image.open(io.BytesIO(img_data)) as im:
+                    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(final_p + ' ' + i_style)}?width={w}&height={h}&seed={random.randint(1,999999)}&nologo=true"
+                    res = session.get(url, timeout=30)
+                    if res.status_code == 200:
+                        with Image.open(io.BytesIO(res.content)) as im:
                             st.image(im, caption=f"Prompt: {single_p[:30]}...")
-                            if final_p not in st.session_state.favorites:
-                                st.session_state.favorites.append(final_p)
                     else:
                         st.error(f"Image generation failed for prompt: {single_p}")
 
@@ -692,57 +589,14 @@ elif tab_image:
             if uploaded_file and modify_prompt:
                 with st.spinner("Modifying image..."):
                     img_name = translate_ur_to_en(modify_prompt)
-                    img_data = fetch_img_failover(img_name, 1024, 1024, random.randint(1,999999))
-                    if img_data:
-                        with Image.open(io.BytesIO(img_data)) as im:
+                    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(img_name + ' ' + i_style_mod)}?width=1024&height=1024&seed={random.randint(1,9999)}&nologo=true"
+                    res = session.get(url, timeout=30)
+                    if res.status_code == 200:
+                        with Image.open(io.BytesIO(res.content)) as im:
                             st.image(im, caption="Modified Masterpiece")
                     else:
                         st.error("Modification failed.")
             else:
                 st.warning("Please upload an image and write instructions first.")
-
-elif tab_enterprise:
-    st.write("### 👤 Sglowina Enterprise Administration Center")
-    
-    ent_tab_user, ent_tab_history, ent_tab_admin = st.tabs(["👤 User Profile", "📁 Project History & Prompts", "🔒 Admin Control Panel"])
-    
-    with ent_tab_user:
-        st.write(f"#### Logged-in User Profile")
-        st.info(f"User: **{st.session_state.logged_in_user}** | Allocated Credits: **{st.session_state.user_credits}** 🪙")
-        st.write("Secure Session Token:")
-        st.code(str(uuid.uuid5(uuid.NAMESPACE_DNS, st.session_state.logged_in_user))[:20])
-        
-    with ent_tab_history:
-        st.write("#### 📁 Active Download Manager & Saved Projects")
-        if not st.session_state.project_history:
-            st.write("No projects found in this session.")
-        else:
-            for proj in st.session_state.project_history:
-                st.write(f"🎬 **{proj['name']}** (Created: {proj['timestamp']})")
-                st.write(f"Script: `{proj['story']}`")
-                st.write("Saved Prompts for this video:")
-                for p_text in proj['prompts']:
-                    st.code(p_text, language="text")
-                st.markdown("---")
-                
-        st.write("#### ⭐ Saved & Favorite Prompts")
-        if not st.session_state.favorites:
-            st.write("No saved prompts found.")
-        else:
-            for fav in st.session_state.favorites:
-                st.code(fav, language="text")
-                
-    with ent_tab_admin:
-        st.write("#### 🔒 Secured Admin Control Settings")
-        admin_pass = st.text_input("Enter Admin Passcode:", type="password")
-        if admin_pass == "786" or admin_pass == "1234":
-            st.success("Access Granted!")
-            st.session_state.logged_in_user = st.selectbox("Manage Account:", ["essa_awan", "saba_wahid"])
-            new_credits = st.number_input("Adjust Allocated Credits:", min_value=0, max_value=10000, value=st.session_state.user_credits)
-            if st.button("Apply Changes"):
-                st.session_state.user_credits = new_credits
-                st.success("Credits adjusted successfully!")
-        else:
-            st.error("Access Denied: Invalid passcode.")
 
 st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.2 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
