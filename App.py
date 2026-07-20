@@ -14,23 +14,7 @@ import threading
 import gc
 
 # ==========================================
-# 1. ENTERPRISE SESSION STATE (MUST INITIALIZE FIRST)
-# ==========================================
-if "user_accounts" not in st.session_state:
-    st.session_state.user_accounts = {"essa_awan": "786", "saba_wahid": "1234"}
-if "logged_in_user" not in st.session_state:
-    st.session_state.logged_in_user = "essa_awan"
-if "user_credits" not in st.session_state:
-    st.session_state.user_credits = 500
-if "project_history" not in st.session_state:
-    st.session_state.project_history = []
-if "saved_prompts" not in st.session_state:
-    st.session_state.saved_prompts = []
-if "favorites" not in st.session_state:
-    st.session_state.favorites = []
-
-# ==========================================
-# 2. INDUSTRIAL STABILITY & LOAD BALANCING
+# 1. INDUSTRIAL STABILITY & LOAD BALANCING
 # ==========================================
 session = requests.Session()
 adapter = requests.adapters.HTTPAdapter(pool_connections=1000, pool_maxsize=1000)
@@ -53,19 +37,18 @@ except Exception:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 3. PAGE CONFIGURATION & SIDEBAR (MUST BE BEFORE TABS)
+# 2. PAGE CONFIGURATION & SIDEBAR (MUST INITIALIZE FIRST)
 # ==========================================
-st.set_page_config(page_title="Sglowina AI - Official V1.2", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Official V1.3", layout="wide", page_icon="🎬")
 
-# Sidebar Video Settings
+# Sidebar Settings
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("👤 Sglowina Enterprise Center")
-st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
-st.sidebar.write(f"Credits Remaining: **{st.session_state.user_credits}** 🪙")
+# Minimal Session State for Chat only
+if "msgs" not in st.session_state:
+    st.session_state.msgs = []
 
 # Premium Light Styling Sheets
 st.markdown("""
@@ -400,7 +383,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         
         clips = []
         dur_per = voice_audio.duration / len(sentences)
-        generated_prompts = []
         
         # v40 RENDER PIPELINE CORE FLOW (Pristine, untouched sequential downloading to files)
         for i, scene in enumerate(sentences):
@@ -408,7 +390,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
             
             refined_p = get_visual_prompt_v40(scene, style, char_desc, scene_desc)
-            generated_prompts.append(refined_p)
             
             img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w}&height={h}&seed={seed + i}&nologo=true"
             
@@ -513,6 +494,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
 # 6. UI NAVIGATION & CONTROL PANEL (Main page Tabs with absolute strict "with" syntax)
 # ==========================================
 tab_chat, tab_movie, tab_image = st.tabs(["💬 Electric AI Chat", "🎬 Pro Master Studio", "🎨 Pro Image Studio"])
+
+# Sidebar Settings
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎬 Video Settings")
+enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
+enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
 
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
@@ -624,4 +611,4 @@ with tab_image:
             else:
                 st.warning("Please upload an image and write instructions first.")
 
-st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.2 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.3 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
