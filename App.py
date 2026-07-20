@@ -43,13 +43,29 @@ except Exception:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 2. EXECUTIVE UI & PREMIUM STYLING (V1.4)
+# 2. ENTERPRISE SESSION STATE INITIALIZATION
+# ==========================================
+if "user_accounts" not in st.session_state:
+    st.session_state.user_accounts = {"essa_awan": "786", "saba_wahid": "1234"}
+if "logged_in_user" not in st.session_state:
+    st.session_state.logged_in_user = "essa_awan"
+if "user_credits" not in st.session_state:
+    st.session_state.user_credits = 500
+if "project_history" not in st.session_state:
+    st.session_state.project_history = []
+if "saved_prompts" not in st.session_state:
+    st.session_state.saved_prompts = []
+if "favorites" not in st.session_state:
+    st.session_state.favorites = []
+
+# ==========================================
+# 3. EXECUTIVE UI & PREMIUM STYLING (V1.4 INCREMENT)
 # ==========================================
 st.set_page_config(page_title="Sglowina AI - Official V1.4", layout="wide", page_icon="🎬")
 
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700;900&display=swap');
     
     .stApp { 
         background-color: #ffffff !important; 
@@ -59,16 +75,29 @@ st.markdown("""
     
     .executive-header {
         text-align: center; 
-        padding: 10px; 
+        padding: 15px; 
         border-bottom: 1px solid #e2e8f0; 
-        margin-bottom: 15px; 
-        color: #000000 !important;
+        margin-bottom: 20px; 
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(37, 99, 235, 0.05);
     }
     
     .main-names { 
-        font-size: 1.5rem; 
-        font-weight: 800; 
-        color: #000000 !important; 
+        font-size: 1.8rem; 
+        font-weight: 900; 
+        background: linear-gradient(45deg, #ff007a, #2563eb, #00f2fe);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        font-family: 'Inter', sans-serif;
+        animation: pulseGlow-text 1.5s infinite alternate;
+        filter: drop-shadow(0 0 8px rgba(37, 99, 235, 0.4));
+    }
+    
+    @keyframes pulseGlow-text {
+        0% { filter: drop-shadow(0 0 5px rgba(37, 99, 235, 0.3)); }
+        100% { filter: drop-shadow(0 0 15px rgba(255, 0, 122, 0.6)); }
     }
     
     .title-tag { 
@@ -220,12 +249,10 @@ def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc=""):
     style_prompt = style_details.get(style, "epic cinematic lighting, highly detailed masterpiece")
     
     prompt_parts = [f"{style_prompt} style"]
-    
     if char_desc.strip():
-        prompt_parts.append(f"character is single person {char_desc.strip()}. Consistent identity, same face and clothing, single character only")
+        prompt_parts.append(f"character is {char_desc.strip()}. Use the same character identity in every scene, identical face, identical clothing, consistent appearance, same age, same body shape, same hairstyle, same identity")
     if scene_desc.strip():
-        prompt_parts.append(f"scene background environment of {scene_desc.strip()}")
-        
+        prompt_parts.append(f"scene background is {scene_desc.strip()}, same environment")
     prompt_parts.append(english_translation)
     if shariah:
         prompt_parts.append(shariah)
@@ -296,8 +323,13 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
         time.sleep(0.2)
     return False
 
+# سائز کو آٹو جفت (Even Number) کرنے کا محفوظ فارمولا
+def make_even(val):
+    return int((val // 2) * 2)
+
 def apply_camera_motion_v40(clip, motion, duration, w, h):
     try:
+        # 1.15 سکیلنگ کے مطابق درست سائیڈ مارجنز کا حساب
         x_max = int(w * 0.15)
         y_max = int(h * 0.15)
         
@@ -306,13 +338,13 @@ def apply_camera_motion_v40(clip, motion, duration, w, h):
         elif motion == "Zoom In":
             clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
         elif motion == "Pan Left":
-            clip = clip.resize(lambda t: 1.15).set_position(lambda t: (-int(x_max * (t / duration)), 'center'))
+            clip = clip.set_position(lambda t: (-int(x_max * (t / duration)), 'center'))
         elif motion == "Pan Right":
-            clip = clip.resize(lambda t: 1.15).set_position(lambda t: (-int(x_max * (1.0 - (t / duration))), 'center'))
+            clip = clip.set_position(lambda t: (-int(x_max * (1.0 - (t / duration))), 'center'))
         elif motion == "Pan Up":
-            clip = clip.resize(lambda t: 1.15).set_position(lambda t: ('center', -int(y_max * (t / duration))))
+            clip = clip.set_position(lambda t: ('center', -int(y_max * (t / duration))))
         elif motion == "Pan Down":
-            clip = clip.resize(lambda t: 1.15).set_position(lambda t: ('center', -int(y_max * (1.0 - (t / duration)))))
+            clip = clip.set_position(lambda t: ('center', -int(y_max * (1.0 - (t / duration)))))
         elif motion == "Dolly In":
             clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
         elif motion == "Dolly Out":
@@ -386,13 +418,17 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         }
         w, h = res_map[ratio]
         
+        # تمام پکسلز کی جفت (Even Number) ہونے کی سخت ترین توثیق
+        w = make_even(w)
+        h = make_even(h)
+        
         # Split by Sentences
         sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
         if not sentences: sentences = [story]
         
         clips = []
         dur_per = voice_audio.duration / len(sentences)
-        generated_images_path = []
+        generated_images = []
         
         # v40 RENDER PIPELINE CORE FLOW (Pristine, untouched sequential downloading to files)
         for i, scene in enumerate(sentences):
@@ -401,10 +437,18 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             
             refined_p = get_visual_prompt_v40(scene, style, char_desc, scene_desc)
             
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w}&height={h}&seed={seed + i}&nologo=true"
+            # کیمرہ موشن کے مطابق پکسلز کو جفت پر لاک کر کے ریزولوشن سیٹ کرنا
+            if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
+                w_target = make_even(w * 1.15)
+                h_target = make_even(h * 1.15)
+            else:
+                w_target = w
+                h_target = h
+                
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i}&nologo=true"
             
             img_path = f"i_{u_id}_{i}.jpg"
-            generated_images_path.append(img_path)
+            generated_images.append(img_path)
             
             # v40 Write directly to disk first
             img_data = session.get(img_url, timeout=60).content
@@ -414,27 +458,23 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             # v40 Force Resize & Format conversion (Sglowina Watermark layered inside PIL)
             try:
                 with Image.open(img_path) as img_obj:
-                    # Apply camera-motion scaling safely (no black borders)
-                    if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
-                        img_obj = img_obj.convert("RGB").resize((int(w * 1.15), int(h * 1.15)))
-                    else:
-                        img_obj = img_obj.convert("RGB").resize((w, h))
+                    img_obj = img_obj.convert("RGB").resize((w_target, h_target))
                         
                     if enable_watermark:
                         draw = ImageDraw.Draw(img_obj)
-                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                        draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                         
                     img_obj.save(img_path, "JPEG")
             except Exception:
-                im = Image.new("RGB", (w, h), color=(30, 41, 59))
+                im = Image.new("RGB", (w_target, h_target), color=(30, 41, 59))
                 if enable_watermark:
                     draw = ImageDraw.Draw(im)
-                    draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                    draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                 im.save(img_path, "JPEG")
                 
-            # Zoom In Movement
+            # Zoom In/Out Motion Customizations
             if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
-                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
+                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((w_target, h_target))
             else:
                 clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((w, h))
                 
@@ -447,7 +487,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             img_data = generate_high_quality_placeholder(w, h, 1, enable_watermark)
             with open(fallback_p, 'wb') as f:
                 f.write(img_data)
-            generated_images_path.append(fallback_p)
+            generated_images.append(fallback_p)
             clip = ImageClip(fallback_p).set_duration(voice_audio.duration).set_fps(24)
             clip = clip.resize(lambda t: 1.0 + 0.15 * (t / voice_audio.duration)).set_position('center')
             clip = fadein(clip, 0.4)
@@ -479,7 +519,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         try:
             if os.path.exists(audio_file): os.remove(audio_file)
             if os.path.exists(bg_music_f): os.remove(bg_music_f)
-            for img_p in generated_images_path:
+            for img_p in generated_images:
                 if os.path.exists(img_p): os.remove(img_p)
         except Exception:
             pass
@@ -492,7 +532,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         try:
             if os.path.exists(audio_file): os.remove(audio_file)
             if os.path.exists(bg_music_f): os.remove(bg_music_f)
-            for img_p in generated_images_path:
+            for img_p in generated_images:
                 if os.path.exists(img_p): os.remove(img_p)
         except: pass
         progress_bar.empty()
