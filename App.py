@@ -17,6 +17,13 @@ import gc
 # 1. INDUSTRIAL STABILITY & LOAD BALANCING
 # ==========================================
 session = requests.Session()
+
+# Premium Browser Headers to bypass SSL/Wikimedia blocks
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+session.headers.update(headers)
+
 adapter = requests.adapters.HTTPAdapter(pool_connections=1000, pool_maxsize=1000)
 session.mount('https://', adapter)
 
@@ -37,20 +44,26 @@ except Exception:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 2. PAGE CONFIGURATION & SIDEBAR (MUST INITIALIZE FIRST)
+# 2. ENTERPRISE SESSION STATE INITIALIZATION
 # ==========================================
-st.set_page_config(page_title="Sglowina AI - Official V1.3", layout="wide", page_icon="🎬")
+if "user_accounts" not in st.session_state:
+    st.session_state.user_accounts = {"essa_awan": "786", "saba_wahid": "1234"}
+if "logged_in_user" not in st.session_state:
+    st.session_state.logged_in_user = "essa_awan"
+if "user_credits" not in st.session_state:
+    st.session_state.user_credits = 500
+if "project_history" not in st.session_state:
+    st.session_state.project_history = []
+if "saved_prompts" not in st.session_state:
+    st.session_state.saved_prompts = []
+if "favorites" not in st.session_state:
+    st.session_state.favorites = []
 
-# Sidebar Settings
-st.sidebar.subheader("🎬 Video Settings")
-enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
-enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
+# ==========================================
+# 3. EXECUTIVE UI & PREMIUM STYLING (V1.4 INCREMENT)
+# ==========================================
+st.set_page_config(page_title="Sglowina AI - Official V1.4", layout="wide", page_icon="🎬")
 
-# Minimal Session State for Chat only
-if "msgs" not in st.session_state:
-    st.session_state.msgs = []
-
-# Premium Light Styling Sheets
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700&display=swap');
@@ -84,14 +97,25 @@ st.markdown("""
     }
 
     .logo-container { display: flex; justify-content: center; align-items: center; padding: 20px 0; }
+    
     .circular-s {
-        width: 100px; height: 100px; background: #0f172a; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-family: 'Orbitron', sans-serif; font-size: 45px; color: #ffffff !important;
-        border: 3px solid #00d4ff; box-shadow: 0 0 15px rgba(0,212,255,0.3);
-        animation: spin 10s infinite linear;
+        width: 120px; height: 120px; 
+        background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff) !important;
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        font-family: 'Orbitron', sans-serif; font-size: 50px; color: #ffffff !important;
+        border: 5px solid #ffffff !important;
+        box-shadow: 0 0 50px #ff007a, inset 0 0 20px #ffffff;
+        animation: rotateShua 4s infinite linear, lightningGlow 1.5s infinite alternate;
     }
-    @keyframes spin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
+    
+    @keyframes rotateShua {
+        0% { transform: perspective(1000px) rotateY(0deg); }
+        100% { transform: perspective(1000px) rotateY(360deg); }
+    }
+    @keyframes lightningGlow {
+        0%, 100% { box-shadow: 0 0 25px #2563eb, 0 0 50px #ff007a, inset 0 0 15px #ffffff; }
+        50% { box-shadow: 0 0 50px #ff007a, 0 0 80px #00d4ff, inset 0 0 25px #ffffff; }
+    }
 
     .stButton>button { 
         background: #000000 !important; 
@@ -144,7 +168,7 @@ SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
 Founders & CEOs: Muhammad Essa Awan & Saba Wahid.
 Saba Wahid is the Founder and CEO. Muhammad Essa Awan is the COO and the lead visionary.
-Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.3 Release).
+Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.4 Release).
 """
 
 def apply_islamic_visual_logic(text):
@@ -213,10 +237,13 @@ def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc=""):
     style_prompt = style_details.get(style, "epic cinematic lighting, highly detailed masterpiece")
     
     prompt_parts = [f"{style_prompt} style"]
+    
+    # چہرہ خراب نہ ہونے اور ایک ہی کردار رکھنے کے لیے مستحکم اور مختصر فلٹرنگ
     if char_desc.strip():
-        prompt_parts.append(f"character is {char_desc.strip()}. Use the same character identity in every scene, identical face, identical clothing, consistent appearance, same age, same body shape, same hairstyle, same identity")
+        prompt_parts.append(f"character is single person {char_desc.strip()}. Consistent identity, same face and clothing, single character only")
     if scene_desc.strip():
-        prompt_parts.append(f"scene background is {scene_desc.strip()}, same environment")
+        prompt_parts.append(f"scene background environment of {scene_desc.strip()}")
+        
     prompt_parts.append(english_translation)
     if shariah:
         prompt_parts.append(shariah)
@@ -340,6 +367,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         voice_audio = AudioFileClip(audio_file)
         progress_bar.progress(0.15)
         
+        # ویکیپیڈیا سے لائیو آڈیو ڈاؤن لوڈنگ مکسر
         if enable_bg_music:
             status.info("🎵 Downloading Atmospheric Classical Background Track...")
             story_lower = story.lower()
@@ -383,6 +411,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         
         clips = []
         dur_per = voice_audio.duration / len(sentences)
+        generated_prompts = []
         
         # v40 RENDER PIPELINE CORE FLOW (Pristine, untouched sequential downloading to files)
         for i, scene in enumerate(sentences):
@@ -390,6 +419,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
             
             refined_p = get_visual_prompt_v40(scene, style, char_desc, scene_desc)
+            generated_prompts.append(refined_p)
             
             img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w}&height={h}&seed={seed + i}&nologo=true"
             
@@ -404,7 +434,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             # v40 Force Resize & Format conversion (Sglowina Watermark layered inside PIL)
             try:
                 with Image.open(img_path) as img_obj:
-                    # Apply camera-motion scaling safely (no black borders)
+                    # کیمرہ موشن ری سائزنگ
                     if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                         img_obj = img_obj.convert("RGB").resize((int(w * 1.15), int(h * 1.15)))
                     else:
@@ -491,7 +521,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         gc.collect()
 
 # ==========================================
-# 6. UI NAVIGATION & CONTROL PANEL (Main page Tabs with absolute strict "with" syntax)
+# 6. UI NAVIGATION & CONTROL PANEL (Main page Tabs restored)
 # ==========================================
 tab_chat, tab_movie, tab_image = st.tabs(["💬 Electric AI Chat", "🎬 Pro Master Studio", "🎨 Pro Image Studio"])
 
@@ -500,6 +530,12 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
+
+# Sglowina Enterprise Center (Credits display)
+st.sidebar.markdown("---")
+st.sidebar.subheader("👤 Sglowina Enterprise Center")
+st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
+st.sidebar.write(f"Credits Remaining: **{st.session_state.user_credits}** 🪙")
 
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
@@ -513,7 +549,7 @@ with tab_chat:
         with st.chat_message("assistant"):
             st.write(res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")); st.session_state.msgs.append({"role": "assistant", "content": res})
 
-with tab_movie:
+elif tab_movie:
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
     
@@ -551,7 +587,7 @@ with tab_movie:
         else: 
             st.error(v_res)
 
-with tab_image:
+elif tab_image:
     st.write("### 🎨 Industrial HD Visual Studio")
     
     tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Upload"])
