@@ -44,9 +44,9 @@ except Exception:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 2. PAGE CONFIGURATION & SIDEBAR (MUST INITIALIZE FIRST - VERSION 1.7)
+# 2. PAGE CONFIGURATION & SIDEBAR (MUST INITIALIZE FIRST - VERSION 1.8)
 # ==========================================
-st.set_page_config(page_title="Sglowina AI - Official V1.7", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Official V1.8", layout="wide", page_icon="🎬")
 
 # Sidebar Settings (Rendered strictly only once to prevent Duplicate ID errors)
 st.sidebar.subheader("🎬 Video Settings")
@@ -173,7 +173,7 @@ SGLOWINA_BIO = """
 Sglowina AI is proudly developed by the Sglowina Team.
 Founders & CEOs: Muhammad Essa Awan & Saba Wahid.
 Saba Wahid is the Founder and CEO. Muhammad Essa Awan is the COO and the lead visionary.
-Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.7 Release).
+Muhammad Essa Awan is the spouse of Saba Wahid. (Official Version 1.8 Release).
 """
 
 def apply_islamic_visual_logic(text):
@@ -227,45 +227,6 @@ def translate_ur_to_en(text):
         
     return text
 
-def detect_auto_director_assets(text):
-    text_lower = text.lower()
-    
-    is_horror = any(k in text_lower or k in text for k in ["قبر", "عذاب", "موت", "خوفناک", "خوف", "جن", "بھوت", "تاریک", "ڈراؤنی", "grave", "torment", "punishment", "scary", "ghost", "dark", "death", "screaming", "blood", "horror"])
-    is_epic = any(k in text_lower or k in text for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "شاہی", "تاریخ", "بہادر", "king", "queen", "throne", "palace", "empire", "warrior", "brave", "history", "castle"])
-    is_peaceful = any(k in text_lower or k in text for k in ["نماز", "دعا", "مسجد", "ولی", "صبر", "سکون", "اللہ", "pray", "prayer", "mosque", "peace", "peaceful", "sad", "crying", "tears"])
-    is_jungle = any(k in text_lower or k in text for k in ["جنگل", "درخت", "شیر", "جانور", "دریا", "jungle", "forest", "lion", "animal", "river", "trees"])
-    
-    if is_horror:
-        return {
-            "style": "Dark Fantasy", "lighting": "Moonlight", "mood": "Horror",
-            "env": "Haunted Village", "weather": "Thunderstorm", "color": "Horror Green",
-            "anim": "Cinematic Motion Blur", "quality": "Ultra HDR", "camera": "Slow Zoom In"
-        }
-    elif is_epic:
-        return {
-            "style": "Epic Movie", "lighting": "Volumetric Light", "mood": "Epic",
-            "env": "Old Castle", "weather": "Heavy Clouds", "color": "Teal & Orange",
-            "anim": "AI Camera Director", "quality": "8K", "camera": "Dolly In"
-        }
-    elif is_peaceful:
-        return {
-            "style": "Cinematic Realistic", "lighting": "Golden Hour", "mood": "Peaceful",
-            "env": "Ancient Temple", "weather": "Clear", "color": "Teal & Orange",
-            "anim": "Smooth Motion", "quality": "Maximum Quality", "camera": "Slow Zoom Out"
-        }
-    elif is_jungle:
-        return {
-            "style": "Adventure", "lighting": "Sunset", "mood": "Magical",
-            "env": "Dense Jungle", "weather": "Fog", "color": "Teal & Orange",
-            "anim": "Intelligent Scene Transition", "quality": "Maximum Quality", "camera": "Drone Shot"
-        }
-    else:
-        return {
-            "style": "Cinematic Realistic", "lighting": "Golden Hour", "mood": "Epic",
-            "env": "Old Castle", "weather": "Sunset Sky", "color": "Teal & Orange",
-            "anim": "Smooth Motion", "quality": "Maximum Quality", "camera": "Slow Zoom Out"
-        }
-
 def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc="", v_style="Auto (Smart Director)", lighting="Auto (Smart Director)", mood="Auto (Smart Director)", env="Auto (Smart Director)", weather="Auto (Smart Director)", color="Auto (Smart Director)", anim="Auto (Smart Director)", quality="Auto (Smart Director)"):
     shariah = apply_islamic_visual_logic(urdu_text)
     english_translation = translate_ur_to_en(urdu_text)
@@ -285,18 +246,8 @@ def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc="", v_style
     if char_desc.strip():
         prompt_parts.append(f"character is {char_desc.strip()}. Use the same character identity in every scene, identical face, identical clothing, consistent appearance, same age, same body shape, same hairstyle, same identity")
     if scene_desc.strip():
-        prompt_parts.append(f"scene background environment of {scene_desc.strip()}")
-        
+        prompt_parts.append(f"scene background is {scene_desc.strip()}, same environment")
     prompt_parts.append(english_translation)
-    
-    prompt_parts.append(f"Lighting: {lighting_val}")
-    prompt_parts.append(f"Mood: {mood_val}")
-    prompt_parts.append(f"Environment: {env_val}")
-    prompt_parts.append(f"Weather: {weather_val}")
-    prompt_parts.append(f"Color Grading: {color_val}")
-    prompt_parts.append(f"Animation Focus: {anim_val}")
-    prompt_parts.append(f"Quality Grade: {quality_val}")
-    
     if shariah:
         prompt_parts.append(shariah)
     prompt_parts.append("highly detailed, cinematic lighting, 8k, realistic masterpiece, vivid colors, maintain exact same character identity across all scenes")
@@ -366,7 +317,6 @@ def save_audio_safe(story, v_code, rate, pitch, audio_f):
         time.sleep(0.2)
     return False
 
-# سائز کو آٹو جفت کرنے کا ریشو فارمولا
 def make_even(val):
     return int((val // 2) * 2)
 
@@ -383,9 +333,9 @@ def apply_camera_motion_v40(clip, motion, duration, w, h):
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: (-int(x_max * (t / duration)), 'center'))
         elif motion == "Pan Right" or motion == "Cinematic Reveal" or motion == "Orbit Reveal":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: (-int(x_max * (1.0 - (t / duration))), 'center'))
-        elif motion == "Tilt Up" or motion == "Crane Shot" or motion == "Aerial Shot":
+        elif motion == "Pan Up" or motion == "Crane Shot" or motion == "Aerial Shot":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: ('center', -int(y_max * (t / duration))))
-        elif motion == "Tilt Down" or motion == "Drone Shot":
+        elif motion == "Pan Down" or motion == "Drone Shot":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: ('center', -int(y_max * (1.0 - (t / duration)))))
         elif motion == "Ken Burns Effect" or motion == "Parallax Motion":
             clip = clip.resize(lambda t: 1.15 + 0.10 * (t / duration)).set_position(lambda t: (-int(x_max * 0.5 * (t / duration)), 'center'))
@@ -403,8 +353,7 @@ def apply_camera_motion_v40(clip, motion, duration, w, h):
 # ==========================================
 # 5. FIXED V40 RENDER SYSTEM CORE (UNTOUCHED)
 # ==========================================
-# یہ فکشن اب تمام 20 پیرامیٹرز کی مطابقت کے ساتھ فکسڈ ہے
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True, v_style="Auto (Smart Director)", lighting="Auto (Smart Director)", mood="Auto (Smart Director)", env="Auto (Smart Director)", weather="Auto (Smart Director)", color="Auto (Smart Director)", anim="Auto (Smart Director)", quality="Auto (Smart Director)"):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True, lighting="Auto (Smart Director)", mood="Auto (Smart Director)", env="Auto (Smart Director)", weather="Auto (Smart Director)", color="Auto (Smart Director)", anim="Auto (Smart Director)", quality="Auto (Smart Director)"):
     u_id = str(uuid.uuid4())[:8]
     progress_bar = st.progress(0.0)
     status = st.empty()
@@ -479,8 +428,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
             status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
             
-            # تمام 20 کسٹم پیرامیٹرز کے ساتھ پرامپٹ کی رینڈرنگ
-            refined_p = get_visual_prompt_v40(scene, style, char_desc, scene_desc, v_style, lighting, mood, env, weather, color, anim, quality)
+            refined_p = get_visual_prompt_v40(scene, style, char_desc, scene_desc, lighting, mood, env, weather, color, anim, quality)
+            generated_prompts = [refined_p]
             
             if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                 w_target = make_even(w * 1.15)
@@ -589,7 +538,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         gc.collect()
 
 # ==========================================
-# 6. UI NAVIGATION & CONTROL PANEL (Main page Tabs restored with strict standard context - Version 1.7)
+# 6. UI NAVIGATION & CONTROL PANEL (Main page Tabs restored with strict standard context - Version 1.8)
 # ==========================================
 tab_chat, tab_movie, tab_image = st.tabs(["💬 Electric AI Chat", "🎬 Pro Master Studio", "🎨 Pro Image Studio"])
 
@@ -598,12 +547,6 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
-
-# Sglowina Enterprise Center (Credits display)
-st.sidebar.markdown("---")
-st.sidebar.subheader("👤 Sglowina Enterprise Center")
-st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
-st.sidebar.write(f"Credits Remaining: **{st.session_state.user_credits}** 🪙")
 
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
@@ -669,7 +612,6 @@ with tab_movie:
         pitch_val = pitch_map[mv_pitch]
         
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
-            # v40 Base Engine کو 100٪ درست 20 پیرامیٹرز کے ساتھ کال کیا جا رہا ہے
             v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, enable_watermark, enable_bg_music, v_style, v_lighting, v_mood, v_env, v_weather, v_color, v_anim, v_quality)
             
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
@@ -678,7 +620,64 @@ with tab_movie:
         else: 
             st.error(v_res)
 
-elif menu := "Smart Chat":
-    pass
+with tab_image:
+    st.write("### 🎨 Industrial HD Visual Studio")
+    
+    tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Upload"])
+    
+    with tab_txt:
+        p_i = st.text_area("Describe Image (One per line for batch):", height=150)
+        
+        char_desc_img = st.text_input("Consistent Character (کریکٹر کا مستقل حلیہ):", 
+                                      placeholder="Example: A young girl, blue eyes, brown braided hair, red scarf")
+        
+        ic1, ic2, ic3 = st.columns(3)
+        with ic1: i_style = st.selectbox("Art Style:", ["Realistic HD", "Cinematic Film", "Anime Art", "Logo Design", "3D Cartoon", "Rustic Village Life", "Historical Epic"])
+        with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok", "CinemaScope (21:9)", "Standard Box (4:3)"])
+        with ic3: count = st.slider("Quantity:", 1, 10, 1)
+        
+        if st.button("Generate Titan Visuals 🚀"):
+            dim = {
+                "Square (1:1)": (1024, 1024), 
+                "YouTube HD": (1280, 720), 
+                "TikTok": (720, 1280),
+                "CinemaScope (21:9)": (1680, 720),
+                "Standard Box (4:3)": (1024, 768)
+            }
+            w, h = dim[i_size]
+            prompt_list = [line.strip() for line in p_i.split('\n') if line.strip()]
+            for idx, single_p in enumerate(prompt_list):
+                for q in range(count):
+                    final_p = single_p
+                    if char_desc_img.strip():
+                        final_p = f"Character is {char_desc_img.strip()}. Action/Scene: {single_p}"
+                        
+                    img_data = fetch_img_failover(final_p, w, h, random.randint(1,999999))
+                    if img_data:
+                        with Image.open(io.BytesIO(img_data)) as im:
+                            st.image(im, caption=f"Prompt: {single_p[:30]}...")
+                    else:
+                        st.error(f"Image generation failed for prompt: {single_p}")
 
-st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.7 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+    with tab_img:
+        uploaded_file = st.file_uploader("Upload Image to Modify:", type=["jpg", "png", "jpeg"])
+        if uploaded_file:
+            st.image(uploaded_file, caption="Uploaded Original Image", use_container_width=True)
+            
+        modify_prompt = st.text_input("Modification Instructions (تبدیلی کے احکامات):", placeholder="Example: Make the background dark green, add cinematic volumetric light")
+        i_style_mod = st.selectbox("Modification Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon"])
+        
+        if st.button("Modify & Re-render Image 🎨"):
+            if uploaded_file and modify_prompt:
+                with st.spinner("Modifying image..."):
+                    img_name = translate_ur_to_en(modify_prompt)
+                    img_data = fetch_img_failover(img_name, 1024, 1024, random.randint(1,999999))
+                    if img_data:
+                        with Image.open(io.BytesIO(img_data)) as im:
+                            st.image(im, caption="Modified Masterpiece")
+                    else:
+                        st.error("Modification failed.")
+            else:
+                st.warning("Please upload an image and write instructions first.")
+
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.8 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
