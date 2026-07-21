@@ -1,9 +1,9 @@
-streamlit
+streamlit>=1.30.0
+asyncio
 edge-tts
-moviepy==1.0.3
 requests
-bcrypt
-pandas
-qrcode
-Pillow
+pillow
+moviepy==1.0.3
 streamlit-mic-recorder
+bcrypt
+numpy
