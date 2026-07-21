@@ -18,6 +18,7 @@ import gc
 # ==========================================
 session = requests.Session()
 
+# Premium Browser Headers to bypass SSL/Wikimedia blocks
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
@@ -237,15 +238,17 @@ def get_visual_prompt_v40(urdu_text, style, char_desc="", scene_desc=""):
     
     prompt_parts = [f"{style_prompt} style"]
     if char_desc.strip():
-        prompt_parts.append(f"character is {char_desc.strip()}. Use the same character identity in every scene, identical face, identical clothing, consistent appearance, same age, same body shape, same hairstyle, same identity")
+        # Character Memory Upgrade: Including age, face, eyes, hair, clothing, body shape
+        prompt_parts.append(f"character is {char_desc.strip()}. same face in every scene, same clothes, consistent identity, exact age, exact eyes, exact hair, identical body shape, matching identity")
     if scene_desc.strip():
-        prompt_parts.append(f"scene background is {scene_desc.strip()}, same environment")
+        # Scene Memory Upgrade: Including full environment, location, lighting, weather, buildings, background details
+        prompt_parts.append(f"scene background is {scene_desc.strip()}. complete environment, realistic location, dynamic lighting, weather details, surrounding buildings, doors, structures, jungle, temples, objects, and highly detailed background environment context, full world visible")
     prompt_parts.append(english_translation)
     if shariah:
         prompt_parts.append(shariah)
         
-    # شکل اور ہونٹوں کی خوبصورتی کو بڑھانے کی پوزیٹو گائیڈ لائنز
-    anatomy_helper = "perfect symmetric face, highly detailed clear eyes, sharp detailed lips, photorealistic skin texture, anatomically correct hands, proportional human anatomy"
+    # شکل اور ہونٹوں کی خوبصورتی کو بڑھانے کی پوزیٹو گائیڈ لائنز (Anatomy Helper Upgrade)
+    anatomy_helper = "masterpiece, best quality, ultra realistic, 8k UHD, perfect symmetrical face, beautiful expressive eyes, natural eyelashes, perfect eyebrows, sharp detailed nose, perfect lips, realistic skin pores, cinematic lighting, HDR, professional photography, high detail, correct human anatomy, perfect hands, five fingers, perfect body proportions, single face, single body, same person, consistent identity, high quality textures, award winning photography"
     prompt_parts.append(anatomy_helper)
     
     return ", ".join(prompt_parts)
@@ -264,7 +267,16 @@ def fetch_img_failover(prompt, w, h, seed):
         pass
 
     try:
-        poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
+        # Negative Prompt Lock for safe formatting
+        params = {
+            "width": w,
+            "height": h,
+            "seed": seed,
+            "nologo": "true",
+            "negative": "worst quality, low quality, low resolution, blurry, out of focus, bad anatomy, bad proportions, mutated face, deformed face, duplicate person, extra head, multiple faces, double face, distorted eyes, cross eyes, bad lips, extra mouth, missing mouth, bad teeth, extra arms, extra legs, extra fingers, missing fingers, fused fingers, broken hands, disfigured, watermark, logo, text, signature, noise, grain"
+        }
+        url_params = urllib.parse.urlencode(params)
+        poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?{url_params}"
         res = session.get(poll_url, timeout=25)
         if res.status_code == 200 and len(res.content) > 5000:
             return res.content
@@ -323,13 +335,13 @@ def apply_camera_motion_v40(clip, motion, duration, w, h):
         x_max = int(w * 0.15)
         y_max = int(h * 0.15)
         
-        if motion == "Zoom Out (v40 Default)":
+        if motion == "Zoom Out (v40 Default)" or motion == "Slow Zoom Out" or motion == "Pull Out" or motion == "Dolly Out":
             clip = clip.resize(lambda t: 1.2 - 0.15 * (t / duration)).set_position('center')
-        elif motion == "Zoom In":
+        elif motion == "Slow Zoom In" or motion == "Push In" or motion == "Dolly In":
             clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
-        elif motion == "Pan Left":
+        elif motion == "Pan Left" or motion == "Tracking Shot":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: (-int(x_max * (t / duration)), 'center'))
-        elif motion == "Pan Right":
+        elif motion == "Pan Right" or motion == "Cinematic Reveal" or motion == "Orbit Reveal":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: (-int(x_max * (1.0 - (t / duration))), 'center'))
         elif motion == "Pan Up":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: ('center', -int(y_max * (t / duration))))
@@ -433,8 +445,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 w_target = w
                 h_target = h
                 
-            # شکل کے اوپر شکل خراب ہونے سے بچنے کے لیے سخت نیگیٹو پرامپٹ لاکنگ
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i}&nologo=true&negative=deformed,blurry,bad_anatomy,smudged_face,blurry_face,deformed_lips,bad_eyes,mutated_face,double_faces,double_heads,multiple_faces,overlapping_limbs,extra_limbs,extra_fingers,twins,clones"
+            # Character Seed مستقل لاکنگ (Character Seed Lock)
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed}&nologo=true&negative=worst%20quality,%20low%20quality,%20low%20resolution,%20blurry,%20out%20of%20focus,%20bad%20anatomy,%20bad%20proportions,%20mutated%20face,%20deformed%20face,%20duplicate%20person,%20extra%20head,%20multiple%20faces,%20double%20face,%20distorted%20eyes,%20cross%20eyes,%20bad%20lips,%20extra%20mouth,%20missing%20mouth,%20bad%20teeth,%20extra%20arms,%20extra%20legs,%20extra%20fingers,%20missing%20fingers,%20fused%20fingers,%20broken%20hands,%20disfigured,%20watermark,%20logo,%20text,%20signature,%20noise,%20grain"
             
             img_path = f"i_{u_id}_{i}.jpg"
             generated_images.append(img_path)
@@ -534,7 +546,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         gc.collect()
 
 # ==========================================
-# 6. UI NAVIGATION & CONTROL PANEL (Main page Tabs restored with strict standard context - Version 1.5)
+# 6. UI NAVIGATION & CONTROL PANEL (Main page Tabs restored with strict standard context)
 # ==========================================
 tab_chat, tab_movie, tab_image = st.tabs(["💬 Electric AI Chat", "🎬 Pro Master Studio", "🎨 Pro Image Studio"])
 
@@ -566,6 +578,28 @@ with tab_movie:
     scene_desc = st.text_input("Scene Memory (پس منظر کا مستقل حلیہ - مثلاً مٹی کے گھر, اندھیری رات, تیز بارش):", 
                               placeholder="Example: Ancient rustic mud houses, dark rainy night, traditional old village background")
     
+    # 🎬 Advanced Cinematic Director Controls (فلمی معیار کی سیٹنگز)
+    with st.expander("🎬 Advanced Cinematic Director Controls (فلمی معیار کی سیٹنگز)", expanded=False):
+        ac1, ac2, ac3, ac4 = st.columns(4)
+        with ac1:
+            v_style = st.selectbox("Visual Style:", ["Auto (Smart Director)", "Realistic", "Cinematic Realistic", "Ultra Photorealistic", "Documentary Style", "Found Footage", "Horror", "Mystery", "Adventure", "Ancient Ruins", "Jungle Exploration", "Fantasy", "Historical", "Islamic Historical", "Dark Fantasy", "Epic Movie", "Action Movie", "Survival", "Sci-Fi", "Post Apocalypse", "Medieval", "Pirate Adventure"])
+        with ac2:
+            v_lighting = st.selectbox("Lighting:", ["Auto (Smart Director)", "Natural Daylight", "Golden Hour", "Blue Hour", "Moonlight", "Torch Light", "Candle Light", "Volumetric Light", "Volumetric Fog", "Misty Atmosphere", "Storm Lighting", "Lightning Effects", "Dark Cinematic", "Horror Shadows", "Fire Glow", "Soft Studio Light", "Neon Light", "Sunset", "Sunrise"])
+        with ac3:
+            v_mood = st.selectbox("Mood:", ["Auto (Smart Director)", "Peaceful", "Emotional", "Suspense", "Horror", "Mystery", "Epic", "Dangerous", "Tense", "Lonely", "Magical", "Survival", "Thriller", "Psychological", "Dark", "Inspirational", "Heroic"])
+        with ac4:
+            v_env = st.selectbox("Environment:", ["Auto (Smart Director)", "Dense Jungle", "Ancient Temple", "Haunted Village", "Dark Cave", "Underground Tunnel", "Desert Ruins", "Snow Mountains", "Rain Forest", "Abandoned City", "Old Castle", "Fog Forest", "Swamp", "Waterfall", "River", "Volcano", "Ocean", "Ancient Library", "Underground Palace", "Abandoned Hospital", "Secret Laboratory"])
+
+        ac5, ac6, ac7, ac8 = st.columns(4)
+        with ac5:
+            v_weather = st.selectbox("Weather:", ["Auto (Smart Director)", "Clear", "Rain", "Heavy Rain", "Thunderstorm", "Fog", "Snow", "Wind", "Dust Storm", "Sandstorm", "Heavy Clouds", "Sunset Sky", "Night Sky", "Aurora"])
+        with ac6:
+            v_color = st.selectbox("Color Grading:", ["Auto (Smart Director)", "Hollywood Cinematic", "Horror Green", "Teal & Orange", "Warm", "Cold Blue", "Desaturated", "Vintage", "High Contrast", "Film Look", "Netflix Style", "IMAX Style", "HDR Cinema"])
+        with ac7:
+            v_anim = st.selectbox("Animation Style:", ["Auto (Smart Director)", "Automatic Cinematic Motion", "AI Smart Camera", "Smooth Motion", "Character Focus", "Face Tracking", "Motion Blur", "Depth Effect", "Dynamic Zoom", "Intelligent Scene Transition", "Cinematic Motion Blur", "Smart Object Tracking", "AI Camera Director", "Auto Frame", "Smart Focus"])
+        with ac8:
+            v_quality = st.selectbox("Video Quality:", ["Auto (Smart Director)", "HD", "Full HD", "2K", "4K", "8K", "Ultra Detail", "HDR", "Ultra HDR", "Maximum Quality"])
+
     mc1, mc2, mc3, mc4, mc5, mc6, mc7 = st.columns(7)
     with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
