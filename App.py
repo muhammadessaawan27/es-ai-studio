@@ -18,7 +18,6 @@ import gc
 # ==========================================
 session = requests.Session()
 
-# Premium Browser Headers to bypass SSL/Wikimedia blocks
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
@@ -44,20 +43,20 @@ except Exception:
 from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
-# 2. PAGE CONFIGURATION & SIDEBAR (MUST INITIALIZE FIRST - VERSION 1.5)
+# 2. PAGE CONFIGURATION & SIDEBAR (VERSION 1.5 RELEASE)
 # ==========================================
 st.set_page_config(page_title="Sglowina AI - Official V1.5", layout="wide", page_icon="🎬")
 
-# Sidebar Settings (Rendered strictly only once in the entire file)
+# Sidebar Settings (Only Video settings are kept, enterprise cleared)
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
 
-# Minimal Session State for Chat only (All enterprise/credits variables strictly purged)
+# Minimal Session State for Chat only
 if "msgs" not in st.session_state:
     st.session_state.msgs = []
 
-# Premium Light Styling Sheets
+# Premium Light Styling Sheets with Pulsing Emerald-Blue Header
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700;900&display=swap');
@@ -77,9 +76,18 @@ st.markdown("""
     }
     
     .main-names { 
-        font-size: 1.5rem; 
-        font-weight: 800; 
-        color: #000000 !important; 
+        font-size: 1.8rem; 
+        font-weight: 900; 
+        color: #ff007a !important;
+        text-align: center;
+        font-family: 'Inter', sans-serif;
+        text-shadow: 0 0 10px rgba(37, 99, 235, 0.6), 0 0 20px rgba(0, 242, 254, 0.4);
+        animation: pulseGlow-text 1.5s infinite alternate;
+    }
+    
+    @keyframes pulseGlow-text {
+        0% { color: #ff007a !important; text-shadow: 0 0 10px rgba(37, 99, 235, 0.6); }
+        100% { color: #2563eb !important; text-shadow: 0 0 20px rgba(255, 0, 122, 0.8); }
     }
     
     .title-tag { 
@@ -317,35 +325,56 @@ def apply_camera_motion_v40(clip, motion, duration, w, h):
         x_max = int(w * 0.15)
         y_max = int(h * 0.15)
         
-        if motion == "Zoom Out (v40 Default)" or motion == "Slow Zoom Out" or motion == "Pull Out" or motion == "Dolly Out":
+        if motion == "Zoom Out (v40 Default)":
             clip = clip.resize(lambda t: 1.2 - 0.15 * (t / duration)).set_position('center')
-        elif motion == "Slow Zoom In" or motion == "Push In" or motion == "Dolly In":
+        elif motion == "Zoom In":
             clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
-        elif motion == "Pan Left" or motion == "Tracking Shot":
+        elif motion == "Pan Left":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: (-int(x_max * (t / duration)), 'center'))
-        elif motion == "Pan Right" or motion == "Cinematic Reveal" or motion == "Orbit Reveal":
+        elif motion == "Pan Right":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: (-int(x_max * (1.0 - (t / duration))), 'center'))
         elif motion == "Pan Up":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: ('center', -int(y_max * (t / duration))))
         elif motion == "Pan Down":
             clip = clip.resize(lambda t: 1.15).set_position(lambda t: ('center', -int(y_max * (1.0 - (t / duration)))))
-        elif motion == "Ken Burns Effect" or motion == "Parallax Motion":
-            clip = clip.resize(lambda t: 1.15 + 0.10 * (t / duration)).set_position(lambda t: (-int(x_max * 0.5 * (t / duration)), 'center'))
-        elif motion == "Cinematic Rotation" or motion == "Handheld Camera":
-            try:
-                clip = clip.resize(lambda t: 1.15).rotate(lambda t: 1 * (t / duration)).set_position('center')
-            except Exception:
-                clip = clip.resize(lambda t: 1.15).set_position('center')
+        elif motion == "Dolly In":
+            clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
+        elif motion == "Dolly Out":
+            clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
         else:
             clip = clip.resize(lambda t: 1.2 - 0.15 * (t / duration)).set_position('center')
     except Exception:
         clip = clip.set_position('center')
     return clip
 
+# تصویر پر ٹیکسٹ اور کینوا ٹائپوگرافی ڈیزائن کرنے کا پریمیم انجن
+def apply_canva_typography(image_path, text):
+    try:
+        with Image.open(image_path) as im:
+            draw = ImageDraw.Draw(im)
+            w, h = im.size
+            font_size = int(h * 0.06)
+            try:
+                font = ImageFont.truetype("arial.ttf", font_size)
+            except Exception:
+                font = ImageFont.load_default()
+            
+            text_width = len(text) * (font_size * 0.5)
+            x = int((w - text_width) / 2) if w > text_width else 20
+            y = int(h * 0.82)
+            
+            # Canva drop shadow effect
+            draw.text((x + 3, y + 3), text, fill=(0, 0, 0), font=font)
+            # Gold White pulsing premium color
+            draw.text((x, y), text, fill=(255, 223, 0), font=font)
+            im.save(image_path, "JPEG")
+    except Exception as e:
+        print(f"Canva Typography Overlay Exception: {e}")
+
 # ==========================================
 # 5. FIXED V40 RENDER SYSTEM CORE (UNTOUCHED)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None):
     u_id = str(uuid.uuid4())[:8]
     progress_bar = st.progress(0.0)
     status = st.empty()
@@ -354,6 +383,11 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
     bg_music_f = f"bg_{u_id}.mp3"
     generated_images = []
     has_bg_music = False
+    
+    # تصویر اپلوڈ کریکٹر میموری انٹیگریشن
+    final_char_desc = char_desc
+    if uploaded_char_img is not None:
+        final_char_desc += " [Strictly match facial structure, gender, age, and clothing of uploaded reference image]"
     
     try:
         # Step 1: Human Voice
@@ -414,15 +448,14 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         
         clips = []
         dur_per = voice_audio.duration / len(sentences)
-        generated_prompts = []
+        generated_images = []
         
         # v40 RENDER PIPELINE CORE FLOW (Pristine, untouched sequential downloading to files)
         for i, scene in enumerate(sentences):
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
             status.info(f"🎨 منظر {i+1} بن رہا ہے: {scene[:30]}...")
             
-            refined_p = get_visual_prompt_v40(scene, style, char_desc, scene_desc)
-            generated_prompts.append(refined_p)
+            refined_p = get_visual_prompt_v40(scene, style, final_char_desc, scene_desc)
             
             if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                 w_target = make_even(w * 1.15)
@@ -536,12 +569,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
 # ==========================================
 tab_chat, tab_movie, tab_image = st.tabs(["💬 Electric AI Chat", "🎬 Pro Master Studio", "🎨 Pro Image Studio"])
 
-# Sidebar Settings
-st.sidebar.markdown("---")
-st.sidebar.subheader("🎬 Video Settings")
-enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
-enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
-
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
     if "msgs" not in st.session_state: st.session_state.msgs = []
@@ -560,6 +587,11 @@ with tab_movie:
     
     char_desc = st.text_input("Character Memory (کریکٹر کا مستقل حلیہ - مثلاً لباس, عمر, ڈکھیل):", 
                               placeholder="Example: A 30-year-old brave warrior, short black beard, wearing a traditional dark green turban and grey robe")
+    
+    # کردار کی مستقل تصویر اپلوڈ کرنے والا مینیو
+    uploaded_char_img = st.file_uploader("Upload Consistent Character Image (کردار کی مستقل تصویر اپ لوڈ کریں):", type=["jpg", "png", "jpeg"])
+    if uploaded_char_img is not None:
+        st.image(uploaded_char_img, caption="Character Identity Locked ✅", width=120)
                               
     scene_desc = st.text_input("Scene Memory (پس منظر کا مستقل حلیہ - مثلاً مٹی کے گھر, اندھیری رات, تیز بارش):", 
                               placeholder="Example: Ancient rustic mud houses, dark rainy night, traditional old village background")
@@ -574,104 +606,4 @@ with tab_movie:
         with ac3:
             v_mood = st.selectbox("Mood:", ["Auto (Smart Director)", "Peaceful", "Emotional", "Suspense", "Horror", "Mystery", "Epic", "Dangerous", "Tense", "Lonely", "Magical", "Survival", "Thriller", "Psychological", "Dark", "Inspirational", "Heroic"])
         with ac4:
-            v_env = st.selectbox("Environment:", ["Auto (Smart Director)", "Dense Jungle", "Ancient Temple", "Haunted Village", "Dark Cave", "Underground Tunnel", "Desert Ruins", "Snow Mountains", "Rain Forest", "Abandoned City", "Old Castle", "Fog Forest", "Swamp", "Waterfall", "River", "Volcano", "Ocean", "Ancient Library", "Underground Palace", "Abandoned Hospital", "Secret Laboratory"])
-
-        ac5, ac6, ac7, ac8 = st.columns(4)
-        with ac5:
-            v_weather = st.selectbox("Weather:", ["Auto (Smart Director)", "Clear", "Rain", "Heavy Rain", "Thunderstorm", "Fog", "Snow", "Wind", "Dust Storm", "Sandstorm", "Heavy Clouds", "Sunset Sky", "Night Sky", "Aurora"])
-        with ac6:
-            v_color = st.selectbox("Color Grading:", ["Auto (Smart Director)", "Hollywood Cinematic", "Horror Green", "Teal & Orange", "Warm", "Cold Blue", "Desaturated", "Vintage", "High Contrast", "Film Look", "Netflix Style", "IMAX Style", "HDR Cinema"])
-        with ac7:
-            v_anim = st.selectbox("Animation Style:", ["Auto (Smart Director)", "Automatic Cinematic Motion", "AI Smart Camera", "Smooth Motion", "Character Focus", "Face Tracking", "Motion Blur", "Depth Effect", "Dynamic Zoom", "Intelligent Scene Transition", "Cinematic Motion Blur", "Smart Object Tracking", "AI Camera Director", "Auto Frame", "Smart Focus"])
-        with ac8:
-            v_quality = st.selectbox("Video Quality:", ["Auto (Smart Director)", "HD", "Full HD", "2K", "4K", "8K", "Ultra Detail", "HDR", "Ultra HDR", "Maximum Quality"])
-
-    mc1, mc2, mc3, mc4, mc5, mc6, mc7 = st.columns(7)
-    with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
-    with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
-    with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
-    with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
-    with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
-    with mc7: sd = st.number_input("Character Seed:", value=786)
-    
-    if st.button("Generate Master Movie 🚀"):
-        rate_val = mv_rate.split(" ")[0]
-        
-        pitch_map = {
-            "Normal (نارمل)": "+0Hz",
-            "Deep (بھاری آواز)": "-15Hz",
-            "Very Deep (موٹی آواز)": "-28Hz"
-        }
-        pitch_val = pitch_map[mv_pitch]
-        
-        with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
-            v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, enable_watermark, enable_bg_music)
-            
-        if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
-            st.video(v_res)
-            st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
-        else: 
-            st.error(v_res)
-
-with tab_image:
-    st.write("### 🎨 Industrial HD Visual Studio")
-    
-    tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Upload"])
-    
-    with tab_txt:
-        p_i = st.text_area("Describe Image (One per line for batch):", height=150)
-        
-        char_desc_img = st.text_input("Consistent Character (کریکٹر کا مستقل حلیہ):", 
-                                      placeholder="Example: A young girl, blue eyes, brown braided hair, red scarf")
-        
-        ic1, ic2, ic3 = st.columns(3)
-        with ic1: i_style = st.selectbox("Art Style:", ["Realistic HD", "Cinematic Film", "Anime Art", "Logo Design", "3D Cartoon", "Rustic Village Life", "Historical Epic"])
-        with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok", "CinemaScope (21:9)", "Standard Box (4:3)"])
-        with ic3: count = st.slider("Quantity:", 1, 10, 1)
-        
-        if st.button("Generate Titan Visuals 🚀"):
-            dim = {
-                "Square (1:1)": (1024, 1024), 
-                "YouTube HD": (1280, 720), 
-                "TikTok": (720, 1280),
-                "CinemaScope (21:9)": (1680, 720),
-                "Standard Box (4:3)": (1024, 768)
-            }
-            w, h = dim[i_size]
-            prompt_list = [line.strip() for line in p_i.split('\n') if line.strip()]
-            for idx, single_p in enumerate(prompt_list):
-                for q in range(count):
-                    final_p = single_p
-                    if char_desc_img.strip():
-                        final_p = f"Character is {char_desc_img.strip()}. Action/Scene: {single_p}"
-                        
-                    img_data = fetch_img_failover(final_p, w, h, random.randint(1,999999))
-                    if img_data:
-                        with Image.open(io.BytesIO(img_data)) as im:
-                            st.image(im, caption=f"Prompt: {single_p[:30]}...")
-                    else:
-                        st.error(f"Image generation failed for prompt: {single_p}")
-
-    with tab_img:
-        uploaded_file = st.file_uploader("Upload Image to Modify:", type=["jpg", "png", "jpeg"])
-        if uploaded_file:
-            st.image(uploaded_file, caption="Uploaded Original Image", use_container_width=True)
-            
-        modify_prompt = st.text_input("Modification Instructions (تبدیلی کے احکامات):", placeholder="Example: Make the background dark green, add cinematic volumetric light")
-        i_style_mod = st.selectbox("Modification Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon"])
-        
-        if st.button("Modify & Re-render Image 🎨"):
-            if uploaded_file and modify_prompt:
-                with st.spinner("Modifying image..."):
-                    img_name = translate_ur_to_en(modify_prompt)
-                    img_data = fetch_img_failover(img_name, 1024, 1024, random.randint(1,999999))
-                    if img_data:
-                        with Image.open(io.BytesIO(img_data)) as im:
-                            st.image(im, caption="Modified Masterpiece")
-                    else:
-                        st.error("Modification failed.")
-            else:
-                st.warning("Please upload an image and write instructions first.")
-
-st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.5 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+            v_env = st.selectbox("Environment:", ["Auto (Smart Director)", "Dense Jungle", "Ancient Temple", "Haunted Village", "Dark Cave", "Underground Tunnel", "Desert Ruins", "Snow Mountains", "Rain Forest", "Abandoned City", "Old Castle", "Fog Forest", "Swamp", "Waterfall", "River", "Volcano", "Ocean", "Ancient Library", "Underground Palace", "Abandoned H
