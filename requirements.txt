@@ -1,9 +1,7 @@
 streamlit>=1.30.0
-asyncio
-edge-tts
+edge_tts
 requests
 pillow
 moviepy==1.0.3
 streamlit-mic-recorder
-bcrypt
 numpy
