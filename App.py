@@ -116,17 +116,33 @@ def init_db_v21():
         )
     """)
     
-    cursor.execute("SELECT COUNT(*) FROM users WHERE username = 'essa_awan'")
+    # Secure force seeding for administrative passwords (including the unified EssaSaba login)
+    h_admin = hash_password("786")
+    
+    # 1. New Combined Founder User: EssaSaba (Password: 786)
+    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'essasaba'")
     if cursor.fetchone()[0] == 0:
-        h1 = hash_password("786")
         cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                       ("essa_awan", "essa@sglowina.ai", h1, "Enterprise", 5000, "Admin", "2026-07-21"))
+                       ("essasaba", "essasaba@sglowina.ai", h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+    else:
+        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'essasaba'", (h_admin,))
+
+    # 2. Individual Admin: essa_awan (Password: 786)
+    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'essa_awan'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       ("essa_awan", "essa@sglowina.ai", h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+    else:
+        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'essa_awan'", (h_admin,))
                        
-    cursor.execute("SELECT COUNT(*) FROM users WHERE username = 'saba_wahid'")
+    # 3. Individual Admin: saba_wahid (Password: 1234)
+    h_saba = hash_password("1234")
+    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
     if cursor.fetchone()[0] == 0:
-        h2 = hash_password("1234")
         cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                       ("saba_wahid", "saba@sglowina.ai", h2, "Enterprise", 5000, "Admin", "2026-07-21"))
+                       ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", 5000, "Admin", "2026-07-21"))
+    else:
+        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'saba_wahid'", (h_saba,))
                        
     conn.commit()
     conn.close()
@@ -145,6 +161,8 @@ if "msgs" not in st.session_state:
 # 3. ENTERPRISE AUTHENTICATION HELPERS
 # ==========================================
 def register_saas_user(username, email, password):
+    username = username.strip().lower()
+    email = email.strip().lower()
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -159,9 +177,11 @@ def register_saas_user(username, email, password):
         conn.close()
 
 def authenticate_user(username, password):
+    username = username.strip().lower()
+    password = password.strip()
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT password_hash FROM users WHERE username = ?", (username,))
+    cursor.execute("SELECT password_hash FROM users WHERE LOWER(username) = LOWER(?)", (username,))
     row = cursor.fetchone()
     conn.close()
     if row:
@@ -169,17 +189,19 @@ def authenticate_user(username, password):
     return False
 
 def get_user_data(username):
+    username = username.strip().lower()
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+    cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,))
     row = cursor.fetchone()
     conn.close()
     return row
 
 def deduct_user_credits(username, amount):
+    username = username.strip().lower()
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE username = ?", (amount, username))
+    cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE LOWER(username) = LOWER(?)", (amount, username))
     conn.commit()
     conn.close()
 
@@ -251,53 +273,60 @@ st.markdown("""
     
     .executive-header {
         text-align: center; 
-        padding: 10px; 
-        border-bottom: 1px solid #e2e8f0; 
-        margin-bottom: 15px; 
-        color: #000000 !important;
+        padding: 15px; 
+        border-bottom: 2px solid #e2e8f0; 
+        margin-bottom: 20px; 
+        background-color: #05050a !important;
+        border-radius: 12px;
     }
     
-    /* فاؤنڈرز کے نام کی شاندار نیون چمکدار اینیمیشن */
+    /* فاؤنڈرز کے نام کی شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ */
     .main-names { 
-        font-size: 2.0rem; 
+        font-size: 2.2rem; 
         font-weight: 900; 
         text-align: center;
         font-family: 'Orbitron', sans-serif;
         color: #ffffff !important;
+        background: transparent;
         text-shadow: 
-            0 0 5px #fff,
-            0 0 10px #ff007a,
-            0 0 20px #ff007a,
-            0 0 40px #2563eb,
-            0 0 80px #2563eb;
-        animation: neonPulse 1.5s ease-in-out infinite alternate;
+            0 0 7px #fff,
+            0 0 15px #ff007a,  /* Neon Pink */
+            0 0 25px #ff007a,
+            0 0 35px #2563eb,  /* Electric Blue */
+            0 0 55px #2563eb,
+            0 0 75px #2563eb;
+        animation: electricGlow 1.5s ease-in-out infinite alternate;
     }
 
-    @keyframes neonPulse {
-        from {
+    @keyframes electricGlow {
+        0% {
             text-shadow: 
-                0 0 5px #fff,
-                0 0 10px #ff007a,
-                0 0 20px #ff007a,
-                0 0 40px #2563eb,
-                0 0 80px #2563eb;
-        }
-        to {
-            text-shadow: 
-                0 0 2px #fff,
-                0 0 5px #ff007a,
+                0 0 7px #fff,
                 0 0 15px #ff007a,
-                0 0 30px #00f2fe,
-                0 0 60px #00f2fe;
+                0 0 25px #ff007a,
+                0 0 35px #2563eb,
+                0 0 55px #2563eb,
+                0 0 75px #2563eb;
+        }
+        100% {
+            text-shadow: 
+                0 0 4px #fff,
+                0 0 10px #2563eb,
+                0 0 20px #2563eb,
+                0 0 30px #ff007a,
+                0 0 50px #ff007a,
+                0 0 70px #ff007a;
         }
     }
     
     .title-tag { 
-        font-size: 0.9rem; 
+        font-size: 0.95rem; 
         font-weight: bold; 
-        color: #64748b !important; 
+        color: #94a3b8 !important; 
         letter-spacing: 4px; 
         text-transform: uppercase; 
+        text-align: center;
+        margin-top: 5px;
     }
 
     .logo-container { display: flex; justify-content: center; align-items: center; padding: 20px 0; }
@@ -720,7 +749,7 @@ with tab_auth:
             btn_login = st.form_submit_button("Sign In 🚀")
             if btn_login:
                 if authenticate_user(u_name, p_word):
-                    st.session_state.logged_in_user = u_name
+                    st.session_state.logged_in_user = u_name.strip().lower()
                     st.success(f"Welcome back, {u_name}! Session authorized.")
                     st.rerun()
                 else:
