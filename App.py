@@ -231,11 +231,11 @@ if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', 1)
 
 try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip
     from moviepy.video.fx.all import fadein
 except Exception:
     try:
-        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
+        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip
         import moviepy.video.fx.all as vfx
         fadein = vfx.fadein
     except Exception:
@@ -437,13 +437,14 @@ def run_ai_prompt_assistant(story_text):
 
 # Core utility helper function to generate consistent cinematic prompt
 def get_visual_prompt_v40(scene, style, char_desc, scene_desc):
-    prompt = f"Cinematic film capture of {scene}."
+    # اسمارٹ پرامپٹ انجینئرنگ تا کہ جینڈر اور کریکٹر مکس اپ نہ ہو
+    prompt = f"Cinematic film scene of: {scene}. Explicitly portray correct subjects and genders described in the text."
     if style and style != "Auto (Smart Director)":
         prompt += f" Designed in visual style: {style}."
     if char_desc:
-        prompt += f" Maintain character looks consistently as: {char_desc}."
+        prompt += f" Strictly maintain the character appearance and details as: {char_desc}."
     if scene_desc:
-        prompt += f" Setting and background looks like: {scene_desc}."
+        prompt += f" Setting and background environment: {scene_desc}."
     return prompt[:400]
 
 # Motion control logic safely wrapped to prevent MoviePy engine crash
@@ -479,7 +480,7 @@ def fetch_img_failover(prompt, w, h, seed):
 # Translate Urdu text automatically to english
 def translate_ur_to_en(text):
     try:
-        url = f"https://text.pollinations.ai/{urllib.parse.quote('Translate this text to English visual instructions, output translation only: ' + text)}?model=openai"
+        url = f"https://text.pollinations.ai/{urllib.parse.quote('Translate this Urdu text to English visual prompt, strictly keeping exact genders, subjects, and objects: ' + text)}?model=openai"
         res = session.get(url, timeout=15)
         if res.status_code == 200:
             return res.text.strip()
@@ -515,7 +516,7 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
 # ==========================================
 # 7. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None, gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key=""):
     u_id = str(uuid.uuid4())[:8]
     progress_bar = st.progress(0.0)
     status = st.empty()
@@ -607,12 +608,39 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         # v40 RENDER PIPELINE CORE FLOW
         for i, scene in enumerate(sentences):
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
-            status.info(f"🎨 Generating visual scene {i+1}...")
+            
+            # Smart Auto-Director: مناظر کے مطابق آٹو کیمرہ موشن منتخب کریں
+            active_motion = camera_motion
+            if camera_motion == "Smart Auto-Director (Dynamic)":
+                active_motion = random.choice(["Zoom In", "Zoom Out (v40 Default)", "Pan Left", "Pan Right", "Pan Up", "Pan Down"])
             
             refined_p = get_visual_prompt_v40(scene, style, final_char_desc, scene_desc)
             generated_prompts.append(refined_p)
             
-            if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
+            # --- Real AI Video Motion Mode (WAN-FAST) ---
+            if "Real AI Video" in gen_mode and pollinations_key.strip():
+                status.info(f"🎥 Rendering 3D Video Frame {i+1} via Wan-Fast API...")
+                aspect_ratio_param = "16:9" if "16:9" in ratio else "9:16"
+                vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(refined_p)}?model=wan-fast&aspectRatio={aspect_ratio_param}&key={pollinations_key}&duration=4"
+                vid_path = f"v_{u_id}_{i}.mp4"
+                
+                try:
+                    res_vid = session.get(vid_url, timeout=90)
+                    if res_vid.status_code == 200:
+                        with open(vid_path, "wb") as f_vid:
+                            f_vid.write(res_vid.content)
+                        clip = VideoFileClip(vid_path).resize((w, h))
+                        clip = clip.set_duration(dur_per)
+                        clip = fadein(clip, 0.4)
+                        clips.append(clip)
+                        generated_images.append(vid_path) 
+                        continue
+                except Exception:
+                    st.warning(f"Video API failed for scene {i+1}, falling back to static cinematic photo zoom...")
+            
+            # Fallback to Free Cinematic Zoom & Pan Image System
+            status.info(f"🎨 Generating visual scene {i+1}...")
+            if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                 w_target = make_even(w * 1.15)
                 h_target = make_even(h * 1.15)
             else:
@@ -631,7 +659,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             # Force Resize & Format conversion (Sglowina Watermark layered inside PIL)
             try:
                 with Image.open(img_path) as img_obj:
-                    if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
+                    if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                         img_obj = img_obj.convert("RGB").resize((int(w * 1.15), int(h * 1.15)))
                     else:
                         img_obj = img_obj.convert("RGB").resize((w, h))
@@ -648,12 +676,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                 im.save(img_path, "JPEG")
                 
-            if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
+            if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                 clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
             else:
                 clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((w, h))
                 
-            clip = apply_camera_motion_v40(clip, camera_motion, dur_per, w, h)
+            clip = apply_camera_motion_v40(clip, active_motion, dur_per, w, h)
             clip = fadein(clip, 0.4)
             clips.append(clip)
             
@@ -794,6 +822,12 @@ with tab_chat:
 with tab_movie:
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     
+    st.subheader("⚙️ AI Generation Mode")
+    gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"])
+    pollinations_key = ""
+    if "Real AI Video" in gen_mode:
+        pollinations_key = st.text_input("Enter Pollinations API Key (sk_* or pk_*):", type="password", help="Go to https://enter.pollinations.ai to get a free key!")
+    
     # AI Prompt Assistant Module Layer
     with st.expander("🔮 AI Script & Prompt Assistant Module", expanded=False):
         raw_story_input = st.text_area("Write your story here (AI will generate breakdown & prompts):", height=120)
@@ -907,7 +941,8 @@ with tab_movie:
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
+    # "Smart Auto-Director (Dynamic)" شامل کر دیا گیا ہے جو خودکار طور پر حرکتیں بدلے گا
+    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Smart Auto-Director (Dynamic)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
     with mc7: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
@@ -921,7 +956,7 @@ with tab_movie:
         pitch_val = pitch_map[mv_pitch]
         
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
-            v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, enable_watermark, enable_bg_music, uploaded_char_img)
+            v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, enable_watermark, enable_bg_music, uploaded_char_img, gen_mode, pollinations_key)
             
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
             st.video(v_res)
