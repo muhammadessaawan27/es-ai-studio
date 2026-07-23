@@ -1091,9 +1091,9 @@ with tab_enterprise:
         
         bcol1, bcol2 = st.columns(2)
         with bcol1:
-            st.info("💚 **EasyPaisa Account**\n\n* **Account Name:** SGLOWINA OFFICIAL\n* **Account Number:** 03XXXXXXXXX")
+            st.info("💚 **EasyPaisa Account**\n\n* **Account Name:** Saba Wahid\n* **Account Number:** 03086834020")
         with bcol2:
-            st.warning("❤️ **JazzCash Account**\n\n* **Account Name:** SGLOWINA OFFICIAL\n* **Account Number:** 03XXXXXXXXX")
+            st.warning("❤️ **JazzCash Account**\n\n* **Account Name:** Ayisha bi bi\n* **Account Number:** 03240755475")
             
         st.write("2. After transferring the money, please submit your payment request below for instant verification:")
         
