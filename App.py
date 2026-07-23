@@ -236,7 +236,6 @@ if u_sidebar_db:
     st.sidebar.write(f"Credits Remaining: **{u_sidebar_db['credits']}** 🪙")
     st.sidebar.write(f"Plan: **{u_sidebar_db['plan']}**")
 else:
-    # Set default values for demonstration/guest session if not logged in
     st.sidebar.write("Credits Remaining: **Guest Mode**")
     st.sidebar.write("Plan: **Free Trial**")
 
@@ -258,19 +257,39 @@ st.markdown("""
         color: #000000 !important;
     }
     
+    /* فاؤنڈرز کے نام کی شاندار نیون چمکدار اینیمیشن */
     .main-names { 
-        font-size: 1.8rem; 
+        font-size: 2.0rem; 
         font-weight: 900; 
-        color: #2563eb !important;
         text-align: center;
-        font-family: 'Inter', sans-serif;
-        text-shadow: 0 0 10px rgba(255, 0, 122, 0.2), 0 0 20px rgba(0, 242, 254, 0.2);
-        animation: pulseGlow-text 1.5s infinite alternate;
+        font-family: 'Orbitron', sans-serif;
+        color: #ffffff !important;
+        text-shadow: 
+            0 0 5px #fff,
+            0 0 10px #ff007a,
+            0 0 20px #ff007a,
+            0 0 40px #2563eb,
+            0 0 80px #2563eb;
+        animation: neonPulse 1.5s ease-in-out infinite alternate;
     }
-    
-    @keyframes pulseGlow-text {
-        0% { color: #2563eb !important; text-shadow: 0 0 8px rgba(255, 0, 122, 0.2), 0 0 15px rgba(0, 242, 254, 0.2); }
-        100% { color: #ff007a !important; text-shadow: 0 0 15px rgba(37, 99, 235, 0.4), 0 0 25px rgba(0, 242, 254, 0.3); }
+
+    @keyframes neonPulse {
+        from {
+            text-shadow: 
+                0 0 5px #fff,
+                0 0 10px #ff007a,
+                0 0 20px #ff007a,
+                0 0 40px #2563eb,
+                0 0 80px #2563eb;
+        }
+        to {
+            text-shadow: 
+                0 0 2px #fff,
+                0 0 5px #ff007a,
+                0 0 15px #ff007a,
+                0 0 30px #00f2fe,
+                0 0 60px #00f2fe;
+        }
     }
     
     .title-tag { 
@@ -396,7 +415,7 @@ def get_visual_prompt_v40(scene, style, char_desc, scene_desc):
         prompt += f" Setting and background looks like: {scene_desc}."
     return prompt[:400]
 
-# Motion control logic function safely wrapped to prevent MoviePy engine crash
+# Motion control logic safely wrapped to prevent MoviePy engine crash
 def apply_camera_motion_v40(clip, motion, duration, w, h):
     try:
         if motion == "Zoom In":
@@ -987,7 +1006,7 @@ with tab_image:
                 st.warning("Please upload an image and write instructions first.")
 
 # -----------------
-# TAB 5: ENTERPRISE CENTER (Corrected 'with' block syntax to eliminate error)
+# TAB 5: ENTERPRISE CENTER
 # -----------------
 with tab_enterprise:
     st.write("### 👤 Sglowina Enterprise Administration Center")
