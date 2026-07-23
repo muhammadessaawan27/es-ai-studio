@@ -10,6 +10,7 @@ import uuid
 import random
 from PIL import Image, ImageDraw, ImageFont, ImageStat
 import io
+import numpy as np
 import threading
 import gc
 import sqlite3
@@ -33,6 +34,24 @@ def hash_password(password):
 def verify_password(password, hashed):
     salt = b"sglowina_saas_salt_1234"
     return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000).hex() == hashed
+
+# Background Image Uploader to get public URL for Character Consistency
+def get_public_url(uploaded_file):
+    try:
+        file_bytes = uploaded_file.getvalue()
+        url = "https://tmpfiles.org/api/v1/upload"
+        files = {'file': (uploaded_file.name, file_bytes, uploaded_file.type)}
+        res = requests.post(url, files=files, timeout=12)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get("status") == "success":
+                temp_url = data["data"]["url"]
+                # Convert view URL to direct file download URL for Pollinations
+                raw_url = temp_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+                return raw_url
+    except Exception:
+        pass
+    return None
 
 # ==========================================
 # 1. DATABASE CONFIGURATION (SQLITE SAAS LAYER)
@@ -435,36 +454,76 @@ def run_ai_prompt_assistant(story_text):
         pass
     return "Failed to analyze story."
 
-# Core utility helper function to generate consistent cinematic prompt
+# Core utility helper function to generate consistent cinematic prompt (Optimized for photorealistic 8K render)
 def get_visual_prompt_v40(scene, style, char_desc, scene_desc):
-    # اسمارٹ پرامپٹ انجینئرنگ تا کہ جینڈر اور کریکٹر مکس اپ نہ ہو
-    prompt = f"Cinematic film scene of: {scene}. Explicitly portray correct subjects and genders described in the text."
+    prompt = f"Cinematic film capture, photorealistic octane 3D render, highly detailed face and features, 8k resolution, masterfully crafted, flawless composition: {scene}."
     if style and style != "Auto (Smart Director)":
         prompt += f" Designed in visual style: {style}."
     if char_desc:
-        prompt += f" Strictly maintain the character appearance and details as: {char_desc}."
+        prompt += f" Maintain consistent character look: {char_desc}, highly detailed, perfect anatomy."
     if scene_desc:
-        prompt += f" Setting and background environment: {scene_desc}."
+        prompt += f" Setting background environment: {scene_desc}, hyper-detailed background."
     return prompt[:400]
 
-# Motion control logic safely wrapped to prevent MoviePy engine crash
+# SECURE FIXED V40 MOTION CONTROLLER (Guarantees exact width/height crop at every frame to eliminate odd dimension broken pipes)
 def apply_camera_motion_v40(clip, motion, duration, w, h):
-    try:
-        if motion == "Zoom In":
-            return clip.resize(lambda t: 1.0 + 0.12 * (t / duration)).set_position('center')
-        elif motion == "Zoom Out (v40 Default)":
-            return clip.resize(lambda t: 1.12 - 0.12 * (t / duration)).set_position('center')
-        elif motion == "Pan Left":
-            return clip.set_position(lambda t: (int(-0.15 * w * (1 - t/duration)), 'center'))
-        elif motion == "Pan Right":
-            return clip.set_position(lambda t: (int(-0.15 * w * (t/duration)), 'center'))
-        elif motion == "Pan Up":
-            return clip.set_position(lambda t: ('center', int(-0.15 * h * (1 - t/duration))))
-        elif motion == "Pan Down":
-            return clip.set_position(lambda t: ('center', int(-0.15 * h * (t/duration))))
-    except Exception:
-        pass
-    return clip
+    w = make_even(w)
+    h = make_even(h)
+    
+    def effect(get_frame, t):
+        try:
+            img = Image.fromarray(get_frame(t))
+            img_w, img_h = img.size
+            
+            # Dynamic zoom factor calculations
+            if motion == "Zoom In":
+                zoom = 1.0 + 0.15 * (t / duration)
+            elif motion == "Zoom Out (v40 Default)":
+                zoom = 1.15 - 0.15 * (t / duration)
+            else:
+                zoom = 1.15 # Room for panning
+                
+            new_w = int(img_w * zoom)
+            new_h = int(img_h * zoom)
+            
+            img_resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            
+            dx = 0
+            dy = 0
+            if motion == "Pan Left":
+                percent = t / duration
+                dx = int((new_w - w) * (1.0 - percent))
+                dy = int((new_h - h) / 2)
+            elif motion == "Pan Right":
+                percent = t / duration
+                dx = int((new_w - w) * percent)
+                dy = int((new_h - h) / 2)
+            elif motion == "Pan Up":
+                percent = t / duration
+                dx = int((new_w - w) / 2)
+                dy = int((new_h - h) * (1.0 - percent))
+            elif motion == "Pan Down":
+                percent = t / duration
+                dx = int((new_w - w) / 2)
+                dy = int((new_h - h) * percent)
+            else:
+                dx = int((new_w - w) / 2)
+                dy = int((new_h - h) / 2)
+                
+            dx = max(0, min(dx, new_w - w))
+            dy = max(0, min(dy, new_h - h))
+            
+            img_cropped = img_resized.crop((dx, dy, dx + w, dy + h))
+            if img_cropped.size != (w, h):
+                img_cropped = img_cropped.resize((w, h))
+                
+            return np.array(img_cropped)
+        except Exception:
+            # Fallback to direct resizing if frame array manipulation behaves unexpectedly
+            im_fallback = Image.fromarray(get_frame(t)).resize((w, h))
+            return np.array(im_fallback)
+            
+    return clip.fl(effect)
 
 # Image failover provider from pollination
 def fetch_img_failover(prompt, w, h, seed):
@@ -477,7 +536,7 @@ def fetch_img_failover(prompt, w, h, seed):
         pass
     return None
 
-# Translate Urdu text automatically to english
+# Translate Urdu text automatically to english (Strict gender/context mapping)
 def translate_ur_to_en(text):
     try:
         url = f"https://text.pollinations.ai/{urllib.parse.quote('Translate this Urdu text to English visual prompt, strictly keeping exact genders, subjects, and objects: ' + text)}?model=openai"
@@ -514,7 +573,7 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
         return b""
 
 # ==========================================
-# 7. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED)
+# 7. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & STABILIZED)
 # ==========================================
 def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None, gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key=""):
     u_id = str(uuid.uuid4())[:8]
@@ -545,6 +604,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
     final_char_desc = char_desc
     if uploaded_char_img is not None:
         final_char_desc += " [Strictly match facial structure, gender, age, and clothing of uploaded reference image]"
+    
+    # Background Upload once per render run to preserve user character reference image
+    raw_char_url = None
+    if uploaded_char_img is not None:
+        status.info("🔒 Locking character identity from reference image (تصویر کا حلیہ لاک ہو رہا ہے)...")
+        raw_char_url = get_public_url(uploaded_char_img)
     
     try:
         progress_bar.progress(0.05)
@@ -609,7 +674,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         for i, scene in enumerate(sentences):
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
             
-            # Smart Auto-Director: مناظر کے مطابق آٹو کیمرہ موشن منتخب کریں
+            # Smart Auto-Director: Automatically choose camera motion per scene to keep visuals dynamic
             active_motion = camera_motion
             if camera_motion == "Smart Auto-Director (Dynamic)":
                 active_motion = random.choice(["Zoom In", "Zoom Out (v40 Default)", "Pan Left", "Pan Right", "Pan Up", "Pan Down"])
@@ -622,6 +687,10 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 status.info(f"🎥 Rendering 3D Video Frame {i+1} via Wan-Fast API...")
                 aspect_ratio_param = "16:9" if "16:9" in ratio else "9:16"
                 vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(refined_p)}?model=wan-fast&aspectRatio={aspect_ratio_param}&key={pollinations_key}&duration=4"
+                
+                if raw_char_url:
+                    vid_url += f"&image={urllib.parse.quote(raw_char_url)}"
+                    
                 vid_path = f"v_{u_id}_{i}.mp4"
                 
                 try:
@@ -638,17 +707,19 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 except Exception:
                     st.warning(f"Video API failed for scene {i+1}, falling back to static cinematic photo zoom...")
             
-            # Fallback to Free Cinematic Zoom & Pan Image System
+            # Fallback/Default to Free Cinematic Zoom & Pan Image System
             status.info(f"🎨 Generating visual scene {i+1}...")
-            if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
-                w_target = make_even(w * 1.15)
-                h_target = make_even(h * 1.15)
-            else:
-                w_target = w
-                h_target = h
-                
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i}&nologo=true&negative=double_faces,double_heads,multiple_faces,overlapping_limbs,extra_limbs,extra_hands,extra_fingers,mutated_hands,two_bodies,deformed,blurry,bad_anatomy,clones,twins"
             
+            # Download slightly larger to allow clean panning/cropping without odd dimension broken pipe crashes
+            w_target = make_even(w * 1.15)
+            h_target = make_even(h * 1.15)
+                
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i}&nologo=true&negative=deformed,bad_anatomy,mutated_face,distorted_features,extra_limbs,extra_fingers,blurry,bad_eyes,weird_morphing,double_faces,mutated_hands"
+            
+            # Apply visual adapter identity lock directly to the image generator if upload exists
+            if raw_char_url:
+                img_url += f"&image={urllib.parse.quote(raw_char_url)}"
+                
             img_path = f"i_{u_id}_{i}.jpg"
             generated_images.append(img_path)
             
@@ -656,18 +727,13 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             with open(img_path, "wb") as f:
                 f.write(img_data)
                 
-            # Force Resize & Format conversion (Sglowina Watermark layered inside PIL)
+            # PIL Image Verification to lock even boundaries
             try:
                 with Image.open(img_path) as img_obj:
-                    if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
-                        img_obj = img_obj.convert("RGB").resize((int(w * 1.15), int(h * 1.15)))
-                    else:
-                        img_obj = img_obj.convert("RGB").resize((w, h))
-                        
+                    img_obj = img_obj.convert("RGB").resize((w_target, h_target))
                     if active_watermark:
                         draw = ImageDraw.Draw(img_obj)
-                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
-                        
+                        draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                     img_obj.save(img_path, "JPEG")
             except Exception:
                 im = Image.new("RGB", (w_target, h_target), color=(30, 41, 59))
@@ -676,11 +742,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                 im.save(img_path, "JPEG")
                 
-            if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
-                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
-            else:
-                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((w, h))
-                
+            clip = ImageClip(img_path).set_duration(dur_per).set_fps(24)
             clip = apply_camera_motion_v40(clip, active_motion, dur_per, w, h)
             clip = fadein(clip, 0.4)
             clips.append(clip)
@@ -941,7 +1003,6 @@ with tab_movie:
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    # "Smart Auto-Director (Dynamic)" شامل کر دیا گیا ہے جو خودکار طور پر حرکتیں بدلے گا
     with mc6: camera_motion = st.selectbox("Camera Motion:", ["Smart Auto-Director (Dynamic)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
     with mc7: sd = st.number_input("Character Seed:", value=786)
     
