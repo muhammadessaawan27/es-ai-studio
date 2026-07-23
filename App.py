@@ -84,14 +84,16 @@ def init_db_v21():
         )
     """)
     
+    # Secure Local Payment Request Ledger
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS payments (
+        CREATE TABLE IF NOT EXISTS local_payments (
             id TEXT PRIMARY KEY,
-            user_id INTEGER,
-            package TEXT,
+            username TEXT,
+            method TEXT,
+            trx_id TEXT UNIQUE,
             amount REAL,
-            status TEXT,
-            date TEXT
+            status TEXT DEFAULT 'Pending',
+            created_at TEXT
         )
     """)
     
@@ -1076,20 +1078,51 @@ with tab_enterprise:
             st.warning("Please login first.")
                 
     with ent_tab_billing:
-        st.write("### 💳 Subscription Plans & Credit Packages")
-        col_plan1, col_plan2 = st.columns(2)
-        with col_plan1:
-            st.write("#### 📦 Subscription Plans")
-            st.info("Free Plan: 50 Credits/Month, Watermark enforced")
-            st.success("Starter Plan ($19): 500 Credits/Month, No Watermark")
-            st.warning("Premium Plan ($49): 1500 Credits/Month, Priority processing")
-            st.error("Enterprise Plan ($199): Unlimited Credits, dedicated support")
-        with col_plan2:
-            st.write("#### 🪙 Credit Packages")
-            st.write("100 Credits Package ($5)")
-            st.write("500 Credits Package ($20)")
-            st.write("1000 Credits Package ($35)")
-        st.write("Payment Gateway is ready. Stripe/PayPal API configuration locked.")
+        st.write("### 💳 Subscription Plans & Credit Packages (Pakistani Local Payment Integration)")
+        
+        # Sglowina Premium Monthly Plan setup
+        st.success("#### 🏆 Sglowina Premium Monthly Plan")
+        st.write("💰 **Price:** 1000 PKR / Month")
+        st.write("🪙 **Credits Received:** 450 Credits (Guarantees at least 30 Cinematic Video Generations!)")
+        
+        st.markdown("---")
+        st.write("### 📱 How to Pay via EasyPaisa / JazzCash")
+        st.write("1. Send **1000 PKR** to one of the accounts below:")
+        
+        bcol1, bcol2 = st.columns(2)
+        with bcol1:
+            st.info("💚 **EasyPaisa Account**\n\n* **Account Name:** SGLOWINA OFFICIAL\n* **Account Number:** 03XXXXXXXXX")
+        with bcol2:
+            st.warning("❤️ **JazzCash Account**\n\n* **Account Name:** SGLOWINA OFFICIAL\n* **Account Number:** 03XXXXXXXXX")
+            
+        st.write("2. After transferring the money, please submit your payment request below for instant verification:")
+        
+        # Payment verification form for customers
+        if u_db:
+            with st.form("local_payment_form"):
+                p_method = st.selectbox("Payment Method Used:", ["EasyPaisa", "JazzCash"])
+                p_trx_id = st.text_input("Enter Transaction ID (TrxID):", placeholder="e.g., 50123456789")
+                p_amount = st.number_input("Amount Sent (PKR):", min_value=500.0, max_value=50000.0, value=1000.0, step=100.0)
+                btn_p_submit = st.form_submit_button("Submit Payment Proof 🚀")
+                
+                if btn_p_submit:
+                    if p_trx_id.strip():
+                        conn = get_db_connection()
+                        cursor = conn.cursor()
+                        try:
+                            req_id = str(uuid.uuid4())[:8]
+                            cursor.execute("INSERT INTO local_payments (id, username, method, trx_id, amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                           (req_id, u_db['username'], p_method, p_trx_id.strip(), p_amount, 'Pending', time.strftime("%Y-%m-%d %H:%M:%S")))
+                            conn.commit()
+                            st.success("Your payment request has been submitted successfully! Sglowina administrators will verify and credit your 450 coins shortly.")
+                        except sqlite3.IntegrityError:
+                            st.error("This Transaction ID (TrxID) has already been submitted.")
+                        finally:
+                            conn.close()
+                    else:
+                        st.warning("Please enter a valid Transaction ID (TrxID).")
+        else:
+            st.error("Please log in first to submit a payment request.")
                 
     with ent_tab_admin:
         st.write("#### 🔒 Secured Admin Control Settings")
@@ -1118,6 +1151,41 @@ with tab_enterprise:
             with saas_col3:
                 st.metric("Total Allocated Credits", total_credits_allocated)
                 
+            # -----------------
+            # NEW: Local Payment Approval Desk
+            # -----------------
+            st.markdown("---")
+            st.write("### 📲 Pending Local Payment Requests")
+            cursor.execute("SELECT * FROM local_payments WHERE status = 'Pending'")
+            pending_reqs = cursor.fetchall()
+            
+            if not pending_reqs:
+                st.info("No pending payment requests found.")
+            else:
+                for req in pending_reqs:
+                    st.write(f"👤 **User:** `{req['username']}` | 📱 **Method:** {req['method']} | 🔑 **TrxID:** `{req['trx_id']}` | 💰 **Amount:** {req['amount']} PKR")
+                    
+                    # Generate a unique key for button click
+                    app_btn_key = f"approve_{req['id']}"
+                    if st.button(f"Approve Payment & Credit 450 Coins for {req['username']}", key=app_btn_key):
+                        # Update request status
+                        cursor.execute("UPDATE local_payments SET status = 'Approved' WHERE id = ?", (req['id'],))
+                        
+                        # Add 450 credits to user and upgrade plan to Premium
+                        cursor.execute("UPDATE users SET credits = credits + 450, plan = 'Premium' WHERE username = ?", (req['username'],))
+                        
+                        # Get user's new balance for logging
+                        cursor.execute("SELECT id, credits FROM users WHERE username = ?", (req['username'],))
+                        target_u = cursor.fetchone()
+                        
+                        if target_u:
+                            log_credit_usage(target_u['id'], "Manual Purchase Approval", 450, target_u['credits'])
+                            
+                        conn.commit()
+                        st.success(f"Payment {req['trx_id']} approved! 450 credits successfully loaded onto {req['username']}'s account.")
+                        st.rerun()
+            
+            st.markdown("---")
             cursor.execute("SELECT * FROM users")
             all_users = cursor.fetchall()
             
@@ -1130,7 +1198,7 @@ with tab_enterprise:
             new_plan = st.selectbox("Change Subscription Plan:", ["Free", "Starter", "Premium", "Enterprise"])
             new_role = st.selectbox("Change User Role:", ["User", "Admin"])
             new_status = st.selectbox("Change Account Status:", ["Active", "Banned"])
-            new_credits = st.number_input("Adjust Credits Balance:", min_value=0, max_value=10000, value=500)
+            new_credits = st.number_input("Adjust Credits Balance:", min_value=0, max_value=100000, value=500)
             
             if st.button("Apply Admin Settings"):
                 cursor.execute("UPDATE users SET credits = ?, plan = ?, role = ?, status = ? WHERE username = ?", (new_credits, new_plan, new_role, new_status, manage_user))
