@@ -10,6 +10,7 @@ import uuid
 import random
 from PIL import Image, ImageDraw, ImageFont, ImageStat
 import io
+import numpy as np
 import threading
 import gc
 import sqlite3
@@ -291,74 +292,34 @@ st.markdown("""
         font-family: 'Inter', sans-serif; 
     }
     
-    .executive-header {
-        text-align: center; 
-        padding: 15px; 
-        border-bottom: 2px solid #e2e8f0; 
-        margin-bottom: 20px; 
-        background-color: #05050a !important;
-        border-radius: 12px;
+    .logo-container { 
+        display: flex; 
+        flex-direction: column;
+        justify-content: center; 
+        align-items: center; 
+        padding: 20px 0; 
     }
-    
-    /* فاؤنڈرز کے نام کی شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ */
-    .main-names { 
-        font-size: 2.2rem; 
-        font-weight: 900; 
-        text-align: center;
-        font-family: 'Orbitron', sans-serif;
-        color: #ffffff !important;
-        background: transparent;
-        text-shadow: 
-            0 0 7px #fff,
-            0 0 15px #ff007a,  /* Neon Pink */
-            0 0 25px #ff007a,
-            0 0 35px #2563eb,  /* Electric Blue */
-            0 0 55px #2563eb,
-            0 0 75px #2563eb;
-        animation: electricGlow 1.5s ease-in-out infinite alternate;
-    }
-
-    @keyframes electricGlow {
-        0% {
-            text-shadow: 
-                0 0 7px #fff,
-                0 0 15px #ff007a,
-                0 0 25px #ff007a,
-                0 0 35px #2563eb,
-                0 0 55px #2563eb,
-                0 0 75px #2563eb;
-        }
-        100% {
-            text-shadow: 
-                0 0 4px #fff,
-                0 0 10px #2563eb,
-                0 0 20px #2563eb,
-                0 0 30px #ff007a,
-                0 0 50px #ff007a,
-                0 0 70px #ff007a;
-        }
-    }
-    
-    .title-tag { 
-        font-size: 0.95rem; 
-        font-weight: bold; 
-        color: #94a3b8 !important; 
-        letter-spacing: 4px; 
-        text-transform: uppercase; 
-        text-align: center;
-        margin-top: 5px;
-    }
-
-    .logo-container { display: flex; justify-content: center; align-items: center; padding: 20px 0; }
     
     .circular-s {
-        width: 120px; height: 120px; 
+        width: 100px; height: 100px; 
         background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff) !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        font-family: 'Orbitron', sans-serif; font-size: 50px; color: #ffffff !important;
-        border: 5px solid #ffffff !important;
-        box-shadow: 0 0 50px #ff007a, inset 0 0 20px #ffffff;
+        font-family: 'Orbitron', sans-serif; font-size: 45px; color: #ffffff !important;
+        border: 4px solid #ffffff !important;
+        box-shadow: 0 0 30px #ff007a, inset 0 0 15px #ffffff;
         animation: rotateShua 4s infinite linear, lightningGlow 1.5s infinite alternate;
+    }
+    
+    /* ڈیش بورڈ کو ہینگ ہونے سے بچانے کے لیے آسان پریمیم ٹیکسٹ اسٹائل */
+    .logo-text {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 2.0rem;
+        font-weight: 900;
+        color: #000000 !important;
+        margin-top: 15px;
+        text-align: center;
+        letter-spacing: 3px;
+        text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
     }
     
     @keyframes rotateShua {
@@ -366,8 +327,8 @@ st.markdown("""
         100% { transform: perspective(1000px) rotateY(360deg); }
     }
     @keyframes lightningGlow {
-        0%, 100% { box-shadow: 0 0 25px #2563eb, 0 0 50px #ff007a, inset 0 0 15px #ffffff; }
-        50% { box-shadow: 0 0 50px #ff007a, 0 0 80px #00d4ff, inset 0 0 25px #ffffff; }
+        0%, 100% { box-shadow: 0 0 15px #2563eb, 0 0 30px #ff007a, inset 0 0 10px #ffffff; }
+        50% { box-shadow: 0 0 30px #ff007a, 0 0 50px #00d4ff, inset 0 0 15px #ffffff; }
     }
 
     .stButton>button { 
@@ -410,9 +371,16 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown("""<div class="executive-header"><div class="main-names">Muhammad Essa Awan & Saba Wahid</div>
-    <div class="title-tag">Founders & CEOs | SGLOWINA AI OFFICIAL STUDIO</div></div>""", unsafe_allow_html=True)
-st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
+# گھومتا ہوا S لوگو اور انگلش میں Sglowina کا پریمیم ہلکا برانڈنگ لے آؤٹ
+st.markdown('<div class="logo-container"><div class="circular-s">S</div><div class="logo-text">Sglowina</div></div>', unsafe_allow_html=True)
+
+# لاگ ان کے بعد کا لائیو اور واضح ویلکم بینر
+if st.session_state.logged_in_user != "demo_user":
+    st.markdown(f"""
+        <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; color: #166534; font-family: 'Inter', sans-serif;">
+            <strong>✨ Welcome Back, {st.session_state.logged_in_user.upper()}!</strong> Sglowina AI Studio is now fully authorized.
+        </div>
+    """, unsafe_allow_html=True)
 
 # ==========================================
 # 6. SAAS INTEGRATED CORE ENGINE & UTILS
@@ -453,9 +421,9 @@ def run_ai_prompt_assistant(story_text):
         pass
     return "Failed to analyze story."
 
-# Core utility helper function to generate consistent cinematic prompt (Optimized to prioritize background scene & environment)
+# Core utility helper function to generate consistent cinematic prompt (Prioritizes scenery & environment background first)
 def get_visual_prompt_v40(scene, style, char_desc, scene_desc):
-    # اسمارٹ لاجک: سب سے پہلے کہانی کا منظر اور بیک گراؤنڈ اٹیچ کیا ہے تا کہ صرف ادمی نہ آئے بلکہ پورا ماحول بنے
+    # اسمارٹ پرامپٹ انجینئرنگ تا کہ صرف ادمی نہ آئے بلکہ پورا سین کہانی کے مطابق ڈیزائن ہو
     prompt = f"Cinematic film scene: {scene}."
     if scene_desc:
         prompt += f" Environment background: {scene_desc}."
@@ -689,9 +657,17 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     else:
                         img_obj = img_obj.convert("RGB").resize((w, h))
                         
-                    if active_watermark:
-                        draw = ImageDraw.Draw(img_obj)
-                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                    # Write clean, readable Urdu subtitle at the bottom of the video frame to satisfy 'لکھائی' requirement
+                    draw = ImageDraw.Draw(img_obj)
+                    try:
+                        font = ImageFont.truetype("arial.ttf", 32)
+                    except:
+                        font = ImageFont.load_default()
+                        
+                    text_w = len(scene) * 10
+                    current_w, current_h = img_obj.size
+                    draw.rectangle([(current_w//2 - text_w//2 - 10, current_h - 60), (current_w//2 + text_w//2 + 10, current_h - 20)], fill=(0,0,0,150))
+                    draw.text((current_w//2 - text_w//2, current_h - 52), scene, fill=(255,255,255), font=font)
                         
                     img_obj.save(img_path, "JPEG")
             except Exception:
