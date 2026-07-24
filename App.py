@@ -301,7 +301,7 @@ st.markdown("""
         border-radius: 12px;
     }
     
-    /* Founders name cinematic neon pink and electric blue lighting */
+    /* فاؤنڈرز کے نام کی شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ */
     .main-names { 
         font-size: 2.2rem; 
         font-weight: 900; 
@@ -311,9 +311,9 @@ st.markdown("""
         background: transparent;
         text-shadow: 
             0 0 7px #fff,
-            0 0 15px #ff007a,  
+            0 0 15px #ff007a,  /* Neon Pink */
             0 0 25px #ff007a,
-            0 0 35px #2563eb,  
+            0 0 35px #2563eb,  /* Electric Blue */
             0 0 55px #2563eb,
             0 0 75px #2563eb;
         animation: electricGlow 1.5s ease-in-out infinite alternate;
@@ -979,6 +979,7 @@ with tab_movie:
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
+    # "Smart Auto-Director (Dynamic)" - Automatically alters transitions per frame dynamically
     with mc6: camera_motion = st.selectbox("Camera Motion:", ["Smart Auto-Director (Dynamic)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
     with mc7: sd = st.number_input("Character Seed:", value=786)
     
@@ -1281,5 +1282,3 @@ with tab_enterprise:
             st.error("Access Denied: Only database-defined Administrators can access this control panel.")
 
 st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.5 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
-
---- END OF FILE Paste July 24, 2026 - 9:31PM ---
