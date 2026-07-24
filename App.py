@@ -10,7 +10,6 @@ import uuid
 import random
 from PIL import Image, ImageDraw, ImageFont, ImageStat
 import io
-import numpy as np
 import threading
 import gc
 import sqlite3
@@ -454,15 +453,16 @@ def run_ai_prompt_assistant(story_text):
         pass
     return "Failed to analyze story."
 
-# Core utility helper function to generate consistent cinematic prompt (Optimized with 8K Photorealistic settings)
+# Core utility helper function to generate consistent cinematic prompt (Optimized to prioritize background scene & environment)
 def get_visual_prompt_v40(scene, style, char_desc, scene_desc):
-    prompt = f"Cinematic film capture, photorealistic octane 3D render, highly detailed face and features, 8k resolution, masterfully crafted, flawless composition: {scene}."
+    # اسمارٹ لاجک: سب سے پہلے کہانی کا منظر اور بیک گراؤنڈ اٹیچ کیا ہے تا کہ صرف ادمی نہ آئے بلکہ پورا ماحول بنے
+    prompt = f"Cinematic film scene: {scene}."
+    if scene_desc:
+        prompt += f" Environment background: {scene_desc}."
+    if char_desc:
+        prompt += f" Featuring consistent character: {char_desc}."
     if style and style != "Auto (Smart Director)":
         prompt += f" Designed in visual style: {style}."
-    if char_desc:
-        prompt += f" Maintain consistent character look: {char_desc}, highly detailed, perfect anatomy."
-    if scene_desc:
-        prompt += f" Setting background environment: {scene_desc}, hyper-detailed background."
     return prompt[:400]
 
 # Motion control logic safely wrapped to prevent MoviePy engine crash
@@ -631,7 +631,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
             status.info(f"🎨 Generating visual scene {i+1}...")
             
-            # Smart Auto-Director: Automatically choose camera motion per scene to keep visuals dynamic
+            # اسمارٹ ڈائریکٹر: اگر آٹو موڈ آن ہو تو خودکار طریقے سے ہر منظر کا موشن تبدیل کریں
             active_motion = camera_motion
             if camera_motion == "Smart Auto-Director (Dynamic)":
                 active_motion = random.choice(["Zoom In", "Zoom Out (v40 Default)", "Pan Left", "Pan Right", "Pan Up", "Pan Down"])
@@ -663,7 +663,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     st.warning(f"Video API failed, falling back to static photo...")
             
             # Fallback/Default to Free Cinematic Zoom & Pan Image System
-            status.info(f"🎨 Generating visual scene {i+1}...")
             if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                 w_target = make_even(w * 1.15)
                 h_target = make_even(h * 1.15)
@@ -845,6 +844,7 @@ with tab_chat:
 with tab_movie:
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     
+    # NEW: Generation Mode Selector for Real Walking/Talking Character Motion
     st.subheader("⚙️ AI Generation Mode")
     gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"])
     pollinations_key = ""
