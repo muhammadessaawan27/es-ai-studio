@@ -34,6 +34,24 @@ def verify_password(password, hashed):
     salt = b"sglowina_saas_salt_1234"
     return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000).hex() == hashed
 
+# Background Image Uploader to get public URL for Character Consistency
+def get_public_url(uploaded_file):
+    try:
+        file_bytes = uploaded_file.getvalue()
+        url = "https://tmpfiles.org/api/v1/upload"
+        files = {'file': (uploaded_file.name, file_bytes, uploaded_file.type)}
+        res = requests.post(url, files=files, timeout=12)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get("status") == "success":
+                temp_url = data["data"]["url"]
+                # Convert view URL to direct file download URL for Pollinations
+                raw_url = temp_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+                return raw_url
+    except Exception:
+        pass
+    return None
+
 # ==========================================
 # 1. DATABASE CONFIGURATION (SQLITE SAAS LAYER)
 # ==========================================
@@ -231,11 +249,11 @@ if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', 1)
 
 try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
     from moviepy.video.fx.all import fadein
 except Exception:
     try:
-        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip
+        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
         import moviepy.video.fx.all as vfx
         fadein = vfx.fadein
     except Exception:
@@ -435,15 +453,15 @@ def run_ai_prompt_assistant(story_text):
         pass
     return "Failed to analyze story."
 
-# Core utility helper function to generate consistent cinematic prompt
+# Core utility helper function to generate consistent cinematic prompt (Optimized with 8K Photorealistic settings)
 def get_visual_prompt_v40(scene, style, char_desc, scene_desc):
-    prompt = f"Cinematic film capture of {scene}."
+    prompt = f"Cinematic film capture, photorealistic octane 3D render, highly detailed face and features, 8k resolution, masterfully crafted, flawless composition: {scene}."
     if style and style != "Auto (Smart Director)":
         prompt += f" Designed in visual style: {style}."
     if char_desc:
-        prompt += f" Maintain character looks consistently as: {char_desc}."
+        prompt += f" Maintain consistent character look: {char_desc}, highly detailed, perfect anatomy."
     if scene_desc:
-        prompt += f" Setting and background looks like: {scene_desc}."
+        prompt += f" Setting background environment: {scene_desc}, hyper-detailed background."
     return prompt[:400]
 
 # Motion control logic safely wrapped to prevent MoviePy engine crash
@@ -513,9 +531,9 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
         return b""
 
 # ==========================================
-# 7. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED)
+# 7. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None, gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key=""):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None):
     u_id = str(uuid.uuid4())[:8]
     progress_bar = st.progress(0.0)
     status = st.empty()
@@ -544,6 +562,9 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
     final_char_desc = char_desc
     if uploaded_char_img is not None:
         final_char_desc += " [Strictly match facial structure, gender, age, and clothing of uploaded reference image]"
+        
+    # Get public URL of consistent character image
+    raw_char_url = get_public_url(uploaded_char_img) if uploaded_char_img is not None else None
     
     try:
         progress_bar.progress(0.05)
@@ -607,33 +628,14 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         # v40 RENDER PIPELINE CORE FLOW
         for i, scene in enumerate(sentences):
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
+            status.info(f"🎨 Generating visual scene {i+1}...")
             
-            refined_p = get_visual_prompt_v40(scene, style, final_char_desc, scene_desc)
+            # Translate Urdu story block directly to English to ensure accurate context matching
+            english_scene = translate_ur_to_en(scene)
+            
+            refined_p = get_visual_prompt_v40(english_scene, style, final_char_desc, scene_desc)
             generated_prompts.append(refined_p)
             
-            # --- NEW: Real AI Video Motion Mode (WAN-FAST) ---
-            if "Real AI Video" in gen_mode and pollinations_key.strip():
-                status.info(f"🎥 Rendering 3D Video Frame {i+1} via Wan-Fast API...")
-                aspect_ratio_param = "16:9" if "16:9" in ratio else "9:16"
-                vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(refined_p)}?model=wan-fast&aspectRatio={aspect_ratio_param}&key={pollinations_key}&duration=4"
-                vid_path = f"v_{u_id}_{i}.mp4"
-                
-                try:
-                    res_vid = session.get(vid_url, timeout=90)
-                    if res_vid.status_code == 200:
-                        with open(vid_path, "wb") as f_vid:
-                            f_vid.write(res_vid.content)
-                        clip = VideoFileClip(vid_path).resize((w, h))
-                        clip = clip.set_duration(dur_per)
-                        clip = fadein(clip, 0.4)
-                        clips.append(clip)
-                        generated_images.append(vid_path) # Track to delete later
-                        continue
-                except Exception:
-                    st.warning(f"Video API failed for scene {i+1}, falling back to static cinematic photo zoom...")
-            
-            # Fallback to Free Cinematic Zoom & Pan Image System
-            status.info(f"🎨 Generating visual scene {i+1}...")
             if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                 w_target = make_even(w * 1.15)
                 h_target = make_even(h * 1.15)
@@ -642,6 +644,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 h_target = h
                 
             img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i}&nologo=true&negative=double_faces,double_heads,multiple_faces,overlapping_limbs,extra_limbs,extra_hands,extra_fingers,mutated_hands,two_bodies,deformed,blurry,bad_anatomy,clones,twins"
+            if raw_char_url:
+                img_url += f"&image={urllib.parse.quote(raw_char_url)}"
             
             img_path = f"i_{u_id}_{i}.jpg"
             generated_images.append(img_path)
@@ -703,7 +707,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             except Exception:
                 pass
                 
-        final_video = concatenate_videoclips(clips, method="compose").set_audio(final_audio)
+        # Force size-locked canvas concatenation to prevent ffmpeg odd-height broken pipe crash
+        final_video = concatenate_videoclips(clips, method="compose", size=(w, h)).set_audio(final_audio)
         out_name = f"Sglowina_{u_id}.mp4"
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
         
@@ -815,13 +820,6 @@ with tab_chat:
 # -----------------
 with tab_movie:
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
-    
-    # NEW: Generation Mode Selector for Real Walking/Talking Character Motion
-    st.subheader("⚙️ AI Generation Mode")
-    gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"])
-    pollinations_key = ""
-    if "Real AI Video" in gen_mode:
-        pollinations_key = st.text_input("Enter Pollinations API Key (sk_* or pk_*):", type="password", help="Go to https://enter.pollinations.ai to get a free key with daily credits!")
     
     # AI Prompt Assistant Module Layer
     with st.expander("🔮 AI Script & Prompt Assistant Module", expanded=False):
@@ -950,7 +948,7 @@ with tab_movie:
         pitch_val = pitch_map[mv_pitch]
         
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
-            v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, enable_watermark, enable_bg_music, uploaded_char_img, gen_mode, pollinations_key)
+            v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, enable_watermark, enable_bg_music, uploaded_char_img)
             
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
             st.video(v_res)
