@@ -10,6 +10,7 @@ import uuid
 import random
 from PIL import Image, ImageDraw, ImageFont, ImageStat
 import io
+import numpy as np
 import threading
 import gc
 import sqlite3
@@ -249,11 +250,11 @@ if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', 1)
 
 try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip
     from moviepy.video.fx.all import fadein
 except Exception:
     try:
-        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
+        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip
         import moviepy.video.fx.all as vfx
         fadein = vfx.fadein
     except Exception:
@@ -533,7 +534,7 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
 # ==========================================
 # 7. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None, gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key=""):
     u_id = str(uuid.uuid4())[:8]
     progress_bar = st.progress(0.0)
     status = st.empty()
@@ -630,13 +631,40 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
             status.info(f"🎨 Generating visual scene {i+1}...")
             
+            # Smart Auto-Director: Automatically choose camera motion per scene to keep visuals dynamic
+            active_motion = camera_motion
+            if camera_motion == "Smart Auto-Director (Dynamic)":
+                active_motion = random.choice(["Zoom In", "Zoom Out (v40 Default)", "Pan Left", "Pan Right", "Pan Up", "Pan Down"])
+            
             # Translate Urdu story block directly to English to ensure accurate context matching
             english_scene = translate_ur_to_en(scene)
             
             refined_p = get_visual_prompt_v40(english_scene, style, final_char_desc, scene_desc)
             generated_prompts.append(refined_p)
             
-            if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
+            # --- Real AI Video Video Mode (WAN-FAST) ---
+            if "Real AI Video" in gen_mode and pollinations_key.strip():
+                status.info(f"🎥 Rendering 3D Video Frame {i+1} via Wan-Fast API...")
+                aspect_ratio_param = "16:9" if "16:9" in ratio else "9:16"
+                vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(refined_p)}?model=wan-fast&aspectRatio={aspect_ratio_param}&key={pollinations_key}&duration=4"
+                if raw_char_url:
+                    vid_url += f"&image={urllib.parse.quote(raw_char_url)}"
+                vid_path = f"v_{u_id}_{i}.mp4"
+                try:
+                    res_vid = session.get(vid_url, timeout=90)
+                    if res_vid.status_code == 200:
+                        with open(vid_path, "wb") as f_vid:
+                            f_vid.write(res_vid.content)
+                        clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_per)
+                        clips.append(fadein(clip, 0.4))
+                        generated_images.append(vid_path) 
+                        continue
+                except Exception:
+                    st.warning(f"Video API failed, falling back to static photo...")
+            
+            # Fallback/Default to Free Cinematic Zoom & Pan Image System
+            status.info(f"🎨 Generating visual scene {i+1}...")
+            if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                 w_target = make_even(w * 1.15)
                 h_target = make_even(h * 1.15)
             else:
@@ -654,18 +682,13 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             with open(img_path, "wb") as f:
                 f.write(img_data)
                 
-            # Force Resize & Format conversion (Sglowina Watermark layered inside PIL)
+            # PIL Image Verification to lock even boundaries
             try:
                 with Image.open(img_path) as img_obj:
-                    if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
-                        img_obj = img_obj.convert("RGB").resize((int(w * 1.15), int(h * 1.15)))
-                    else:
-                        img_obj = img_obj.convert("RGB").resize((w, h))
-                        
+                    img_obj = img_obj.convert("RGB").resize((w_target, h_target))
                     if active_watermark:
                         draw = ImageDraw.Draw(img_obj)
-                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
-                        
+                        draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                     img_obj.save(img_path, "JPEG")
             except Exception:
                 im = Image.new("RGB", (w_target, h_target), color=(30, 41, 59))
@@ -674,12 +697,13 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                 im.save(img_path, "JPEG")
                 
-            if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
-                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
+            if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
+                target_w, target_h = make_even(w * 1.15), make_even(h * 1.15)
+                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((target_w, target_h))
             else:
                 clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((w, h))
                 
-            clip = apply_camera_motion_v40(clip, camera_motion, dur_per, w, h)
+            clip = apply_camera_motion_v40(clip, active_motion, dur_per, w, h)
             clip = fadein(clip, 0.4)
             clips.append(clip)
             
@@ -707,8 +731,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             except Exception:
                 pass
                 
-        # Force size-locked canvas concatenation to prevent ffmpeg odd-height broken pipe crash
-        final_video = concatenate_videoclips(clips, method="compose", size=(w, h)).set_audio(final_audio)
+        # Force size-locked canvas resizing on concatenate_videoclips to prevent ffmpeg odd-height broken pipe crash
+        final_video = concatenate_videoclips(clips, method="compose").resize((w, h)).set_audio(final_audio)
         out_name = f"Sglowina_{u_id}.mp4"
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
         
@@ -821,6 +845,23 @@ with tab_chat:
 with tab_movie:
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     
+    st.subheader("⚙️ AI Generation Mode")
+    gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"])
+    pollinations_key = ""
+    if "Real AI Video" in gen_mode:
+        pollinations_key = st.text_input("Enter Pollinations API Key (sk_* or pk_*):", type="password")
+        
+        # Guide expander inside UI
+        with st.expander("🔑 Pollinations AI API Key حاصل کرنے کا طریقہ (Guide)"):
+            st.markdown("""
+            1. سب سے پہلے **[Pollinations AI کے آفیشل پورٹل](https://enter.pollinations.ai/)** پر جائیں۔
+            2. اگر آپ کا اکاؤنٹ نہیں ہے تو **Sign Up** کریں، ورنہ اپنے اکاؤنٹ میں **Log In** کریں۔
+            3. لاگ اِن کرنے کے بعد **API Keys** یا **Developer** سیکشن پر جائیں، وہاں سے ایک نئی API Key تخلیق کریں اور اسے کاپی کر لیں۔
+            4. کاپی کی گئی Key کو اوپر دیے گئے **Enter Pollinations API Key** والے باکس میں پیسٹ کریں۔
+            5. آپ کے اکاؤنٹ میں روزانہ کے مفت کریڈٹس (Daily Free Credits) شامل ہوں گے، جنہیں آپ لائیو ویڈیو بنانے کے لیے استعمال کر سکتے ہیں۔
+            6. اگر آپ کے پاس API Key نہیں ہے یا کریڈٹس ختم ہو جائیں، تو پریشان نہ ہوں! ہماری ایپ خودکار طور پر **Cinematic Photo Zoom & Pan (Free Mode)** پر واپس چلی جائے گی، جس سے آپ کی ویڈیو جنریشن کبھی بند نہیں ہوگی۔
+            """)
+            
     # AI Prompt Assistant Module Layer
     with st.expander("🔮 AI Script & Prompt Assistant Module", expanded=False):
         raw_story_input = st.text_area("Write your story here (AI will generate breakdown & prompts):", height=120)
@@ -934,7 +975,8 @@ with tab_movie:
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
+    # "Smart Auto-Director (Dynamic)" - Automatically alters transitions per frame dynamically
+    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Smart Auto-Director (Dynamic)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
     with mc7: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
@@ -948,7 +990,7 @@ with tab_movie:
         pitch_val = pitch_map[mv_pitch]
         
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
-            v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, enable_watermark, enable_bg_music, uploaded_char_img)
+            v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, enable_watermark, enable_bg_music, uploaded_char_img, gen_mode, pollinations_key)
             
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
             st.video(v_res)
