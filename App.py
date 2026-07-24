@@ -292,51 +292,34 @@ st.markdown("""
         font-family: 'Inter', sans-serif; 
     }
     
+    /* ہیڈر کا بالکل صاف اور کلاسک سفید انٹرفیس */
     .executive-header {
         text-align: center; 
-        padding: 15px; 
-        border-bottom: 2px solid #e2e8f0; 
-        margin-bottom: 20px; 
-        background-color: #05050a !important;
-        border-radius: 12px;
+        padding: 10px; 
+        border-bottom: 1px solid #e2e8f0; 
+        margin-bottom: 15px; 
+        color: #000000 !important;
     }
     
-    /* فاؤنڈرز کے نام کی شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ */
+    /* فاؤنڈرز کے نام کی شاندار نیلے اور پنک کنٹراسٹ چمکدار نیون اینیمیشن */
     .main-names { 
         font-size: 2.2rem; 
         font-weight: 900; 
         text-align: center;
         font-family: 'Orbitron', sans-serif;
-        color: #ffffff !important;
-        background: transparent;
-        text-shadow: 
-            0 0 7px #fff,
-            0 0 15px #ff007a,  /* Neon Pink */
-            0 0 25px #ff007a,
-            0 0 35px #2563eb,  /* Electric Blue */
-            0 0 55px #2563eb,
-            0 0 75px #2563eb;
-        animation: electricGlow 1.5s ease-in-out infinite alternate;
+        color: #2563eb !important;
+        text-shadow: 0 0 10px rgba(255, 0, 122, 0.3), 0 0 20px rgba(0, 242, 254, 0.3);
+        animation: pulseGlow-text 1.5s infinite alternate;
     }
 
-    @keyframes electricGlow {
-        0% {
-            text-shadow: 
-                0 0 7px #fff,
-                0 0 15px #ff007a,
-                0 0 25px #ff007a,
-                0 0 35px #2563eb,
-                0 0 55px #2563eb,
-                0 0 75px #2563eb;
+    @keyframes pulseGlow-text {
+        0% { 
+            color: #2563eb !important; 
+            text-shadow: 0 0 8px rgba(255, 0, 122, 0.3), 0 0 15px rgba(0, 242, 254, 0.3); 
         }
-        100% {
-            text-shadow: 
-                0 0 4px #fff,
-                0 0 10px #2563eb,
-                0 0 20px #2563eb,
-                0 0 30px #ff007a,
-                0 0 50px #ff007a,
-                0 0 70px #ff007a;
+        100% { 
+            color: #ff007a !important; 
+            text-shadow: 0 0 15px rgba(37, 99, 235, 0.5), 0 0 25px rgba(0, 242, 254, 0.4); 
         }
     }
     
