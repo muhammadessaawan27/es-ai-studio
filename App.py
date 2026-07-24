@@ -631,7 +631,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
             status.info(f"🎨 Generating visual scene {i+1}...")
             
-            # اسمارٹ ڈائریکٹر: اگر آٹو موڈ آن ہو تو خودکار طریقے سے ہر منظر کا موشن تبدیل کریں
+            # Smart Auto-Director Fix (Dynamic Motion per Scene)
             active_motion = camera_motion
             if camera_motion == "Smart Auto-Director (Dynamic)":
                 active_motion = random.choice(["Zoom In", "Zoom Out (v40 Default)", "Pan Left", "Pan Right", "Pan Up", "Pan Down"])
@@ -662,7 +662,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 except Exception:
                     st.warning(f"Video API failed, falling back to static photo...")
             
-            # Fallback/Default to Free Cinematic Zoom & Pan Image System
+            # Fallback to Free Cinematic Zoom & Pan Image System
             if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                 w_target = make_even(w * 1.15)
                 h_target = make_even(h * 1.15)
@@ -681,13 +681,18 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             with open(img_path, "wb") as f:
                 f.write(img_data)
                 
-            # PIL Image Verification to lock even boundaries
+            # Force Resize & Format conversion (Sglowina Watermark layered inside PIL)
             try:
                 with Image.open(img_path) as img_obj:
-                    img_obj = img_obj.convert("RGB").resize((w_target, h_target))
+                    if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
+                        img_obj = img_obj.convert("RGB").resize((int(w * 1.15), int(h * 1.15)))
+                    else:
+                        img_obj = img_obj.convert("RGB").resize((w, h))
+                        
                     if active_watermark:
                         draw = ImageDraw.Draw(img_obj)
-                        draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                        
                     img_obj.save(img_path, "JPEG")
             except Exception:
                 im = Image.new("RGB", (w_target, h_target), color=(30, 41, 59))
@@ -697,8 +702,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 im.save(img_path, "JPEG")
                 
             if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
-                target_w, target_h = make_even(w * 1.15), make_even(h * 1.15)
-                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((target_w, target_h))
+                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
             else:
                 clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((w, h))
                 
@@ -844,7 +848,6 @@ with tab_chat:
 with tab_movie:
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     
-    # NEW: Generation Mode Selector for Real Walking/Talking Character Motion
     st.subheader("⚙️ AI Generation Mode")
     gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"])
     pollinations_key = ""
