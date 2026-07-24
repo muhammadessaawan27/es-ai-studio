@@ -10,7 +10,6 @@ import uuid
 import random
 from PIL import Image, ImageDraw, ImageFont, ImageStat
 import io
-import numpy as np
 import threading
 import gc
 import sqlite3
@@ -34,24 +33,6 @@ def hash_password(password):
 def verify_password(password, hashed):
     salt = b"sglowina_saas_salt_1234"
     return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000).hex() == hashed
-
-# Background Image Uploader to get public URL for Character Consistency
-def get_public_url(uploaded_file):
-    try:
-        file_bytes = uploaded_file.getvalue()
-        url = "https://tmpfiles.org/api/v1/upload"
-        files = {'file': (uploaded_file.name, file_bytes, uploaded_file.type)}
-        res = requests.post(url, files=files, timeout=12)
-        if res.status_code == 200:
-            data = res.json()
-            if data.get("status") == "success":
-                temp_url = data["data"]["url"]
-                # Convert view URL to direct file download URL for Pollinations
-                raw_url = temp_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
-                return raw_url
-    except Exception:
-        pass
-    return None
 
 # ==========================================
 # 1. DATABASE CONFIGURATION (SQLITE SAAS LAYER)
@@ -454,19 +435,18 @@ def run_ai_prompt_assistant(story_text):
         pass
     return "Failed to analyze story."
 
-# Core utility helper function to generate consistent cinematic prompt (Optimized for photorealistic 8K render)
+# Core utility helper function to generate consistent cinematic prompt
 def get_visual_prompt_v40(scene, style, char_desc, scene_desc):
-    # اسمارٹ پرامپٹ انجینئرنگ تا کہ جینڈر اور کریکٹر مکس اپ نہ ہو
-    prompt = f"Cinematic film capture, photorealistic octane 3D render, highly detailed face and features, 8k resolution, masterfully crafted, flawless composition: {scene}."
+    prompt = f"Cinematic film capture of {scene}."
     if style and style != "Auto (Smart Director)":
         prompt += f" Designed in visual style: {style}."
     if char_desc:
-        prompt += f" Maintain consistent character look: {char_desc}, highly detailed, perfect anatomy."
+        prompt += f" Maintain character looks consistently as: {char_desc}."
     if scene_desc:
-        prompt += f" Setting background environment: {scene_desc}, hyper-detailed background."
+        prompt += f" Setting and background looks like: {scene_desc}."
     return prompt[:400]
 
-# REVERTED BACK TO TRUSTED ORIGINAL KINETIC MOTION CONTROLLER (100% stable, no black frames)
+# Motion control logic safely wrapped to prevent MoviePy engine crash
 def apply_camera_motion_v40(clip, motion, duration, w, h):
     try:
         if motion == "Zoom In":
@@ -496,10 +476,10 @@ def fetch_img_failover(prompt, w, h, seed):
         pass
     return None
 
-# Translate Urdu text automatically to english (Strict gender/context mapping)
+# Translate Urdu text automatically to english
 def translate_ur_to_en(text):
     try:
-        url = f"https://text.pollinations.ai/{urllib.parse.quote('Translate this Urdu text to English visual prompt, strictly keeping exact genders, subjects, and objects: ' + text)}?model=openai"
+        url = f"https://text.pollinations.ai/{urllib.parse.quote('Translate this text to English visual instructions, output translation only: ' + text)}?model=openai"
         res = session.get(url, timeout=15)
         if res.status_code == 200:
             return res.text.strip()
@@ -533,7 +513,7 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
         return b""
 
 # ==========================================
-# 7. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & SECURED CANVAS RESIZING)
+# 7. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED)
 # ==========================================
 def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None, gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key=""):
     u_id = str(uuid.uuid4())[:8]
@@ -564,12 +544,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
     final_char_desc = char_desc
     if uploaded_char_img is not None:
         final_char_desc += " [Strictly match facial structure, gender, age, and clothing of uploaded reference image]"
-    
-    # Background Upload once per render run to preserve user character reference image
-    raw_char_url = None
-    if uploaded_char_img is not None:
-        status.info("🔒 Locking character identity from reference image (تصویر کا حلیہ لاک ہو رہا ہے)...")
-        raw_char_url = get_public_url(uploaded_char_img)
     
     try:
         progress_bar.progress(0.05)
@@ -634,23 +608,14 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         for i, scene in enumerate(sentences):
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
             
-            # Smart Auto-Director: Automatically choose camera motion per scene to keep visuals dynamic
-            active_motion = camera_motion
-            if camera_motion == "Smart Auto-Director (Dynamic)":
-                active_motion = random.choice(["Zoom In", "Zoom Out (v40 Default)", "Pan Left", "Pan Right", "Pan Up", "Pan Down"])
-            
             refined_p = get_visual_prompt_v40(scene, style, final_char_desc, scene_desc)
             generated_prompts.append(refined_p)
             
-            # --- Real AI Video Video Mode (WAN-FAST) ---
+            # --- NEW: Real AI Video Motion Mode (WAN-FAST) ---
             if "Real AI Video" in gen_mode and pollinations_key.strip():
                 status.info(f"🎥 Rendering 3D Video Frame {i+1} via Wan-Fast API...")
                 aspect_ratio_param = "16:9" if "16:9" in ratio else "9:16"
                 vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(refined_p)}?model=wan-fast&aspectRatio={aspect_ratio_param}&key={pollinations_key}&duration=4"
-                
-                if raw_char_url:
-                    vid_url += f"&image={urllib.parse.quote(raw_char_url)}"
-                    
                 vid_path = f"v_{u_id}_{i}.mp4"
                 
                 try:
@@ -662,28 +627,22 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                         clip = clip.set_duration(dur_per)
                         clip = fadein(clip, 0.4)
                         clips.append(clip)
-                        generated_images.append(vid_path) 
+                        generated_images.append(vid_path) # Track to delete later
                         continue
                 except Exception:
                     st.warning(f"Video API failed for scene {i+1}, falling back to static cinematic photo zoom...")
             
-            # Fallback/Default to Free Cinematic Zoom & Pan Image System
+            # Fallback to Free Cinematic Zoom & Pan Image System
             status.info(f"🎨 Generating visual scene {i+1}...")
-            
-            # Download slightly larger to allow clean panning/cropping without odd dimension broken pipe crashes
-            if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
+            if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
                 w_target = make_even(w * 1.15)
                 h_target = make_even(h * 1.15)
             else:
                 w_target = w
                 h_target = h
                 
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i}&nologo=true&negative=deformed,bad_anatomy,mutated_face,distorted_features,extra_limbs,extra_fingers,blurry,bad_eyes,weird_morphing,double_faces,mutated_hands"
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i}&nologo=true&negative=double_faces,double_heads,multiple_faces,overlapping_limbs,extra_limbs,extra_hands,extra_fingers,mutated_hands,two_bodies,deformed,blurry,bad_anatomy,clones,twins"
             
-            # Apply visual adapter identity lock directly to the image generator if upload exists
-            if raw_char_url:
-                img_url += f"&image={urllib.parse.quote(raw_char_url)}"
-                
             img_path = f"i_{u_id}_{i}.jpg"
             generated_images.append(img_path)
             
@@ -691,13 +650,18 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             with open(img_path, "wb") as f:
                 f.write(img_data)
                 
-            # PIL Image Verification to lock even boundaries
+            # Force Resize & Format conversion (Sglowina Watermark layered inside PIL)
             try:
                 with Image.open(img_path) as img_obj:
-                    img_obj = img_obj.convert("RGB").resize((w_target, h_target))
+                    if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
+                        img_obj = img_obj.convert("RGB").resize((int(w * 1.15), int(h * 1.15)))
+                    else:
+                        img_obj = img_obj.convert("RGB").resize((w, h))
+                        
                     if active_watermark:
                         draw = ImageDraw.Draw(img_obj)
-                        draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                        
                     img_obj.save(img_path, "JPEG")
             except Exception:
                 im = Image.new("RGB", (w_target, h_target), color=(30, 41, 59))
@@ -706,14 +670,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                 im.save(img_path, "JPEG")
                 
-            if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
-                target_w = make_even(w * 1.15)
-                target_h = make_even(h * 1.15)
-                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((target_w, target_h))
+            if camera_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
+                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
             else:
                 clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((w, h))
                 
-            clip = apply_camera_motion_v40(clip, active_motion, dur_per, w, h)
+            clip = apply_camera_motion_v40(clip, camera_motion, dur_per, w, h)
             clip = fadein(clip, 0.4)
             clips.append(clip)
             
@@ -741,8 +703,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             except Exception:
                 pass
                 
-        # SECURE SIZE LOCK IN CONCATENATION: Forces final movie frame to strictly match (w, h) so FFMPEG is guaranteed to NEVER see odd parameters
-        final_video = concatenate_videoclips(clips, method="compose", size=(w, h)).set_audio(final_audio)
+        final_video = concatenate_videoclips(clips, method="compose").set_audio(final_audio)
         out_name = f"Sglowina_{u_id}.mp4"
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
         
@@ -855,11 +816,12 @@ with tab_chat:
 with tab_movie:
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     
+    # NEW: Generation Mode Selector for Real Walking/Talking Character Motion
     st.subheader("⚙️ AI Generation Mode")
     gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"])
     pollinations_key = ""
     if "Real AI Video" in gen_mode:
-        pollinations_key = st.text_input("Enter Pollinations API Key (sk_* or pk_*):", type="password", help="Go to https://enter.pollinations.ai to get a free key!")
+        pollinations_key = st.text_input("Enter Pollinations API Key (sk_* or pk_*):", type="password", help="Go to https://enter.pollinations.ai to get a free key with daily credits!")
     
     # AI Prompt Assistant Module Layer
     with st.expander("🔮 AI Script & Prompt Assistant Module", expanded=False):
@@ -974,8 +936,7 @@ with tab_movie:
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    # "Smart Auto-Director (Dynamic)" شامل کر دیا گیا ہے جو خودکار طور پر حرکتیں بدلے گا
-    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Smart Auto-Director (Dynamic)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
+    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
     with mc7: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
@@ -1123,4 +1084,157 @@ with tab_enterprise:
             st.write("Joined Sglowina Cloud:")
             st.code(u_db['created_at'])
         else:
-            st.warning("Please lo
+            st.warning("Please login first to view profile.")
+        
+    with ent_tab_history:
+        st.write("#### 📁 Active Download Manager & Saved Projects")
+        if u_db:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM projects WHERE user_id = ?", (u_db['id'],))
+            rows = cursor.fetchall()
+            conn.close()
+            
+            if not rows:
+                st.write("No saved projects found.")
+            else:
+                for proj in rows:
+                    st.write(f"🎬 **{proj['project_name']}** (Created: {proj['created_at']})")
+                    st.write("Saved Prompts for this video:")
+                    st.code(proj['prompt'], language="text")
+                    st.markdown("---")
+        else:
+            st.warning("Please login first.")
+                
+    with ent_tab_billing:
+        st.write("### 💳 Subscription Plans & Credit Packages (Pakistani Local Payment Integration)")
+        
+        # Sglowina Premium Monthly Plan setup
+        st.success("#### 🏆 Sglowina Premium Monthly Plan")
+        st.write("💰 **Price:** 1000 PKR / Month")
+        st.write("🪙 **Credits Received:** 450 Credits (Guarantees at least 30 Cinematic Video Generations!)")
+        
+        st.markdown("---")
+        st.write("### 📱 How to Pay via EasyPaisa / JazzCash")
+        st.write("1. Send **1000 PKR** to one of the accounts below:")
+        
+        bcol1, bcol2 = st.columns(2)
+        with bcol1:
+            st.info("💚 **EasyPaisa Account**\n\n* **Account Name:** Saba Wahid\n* **Account Number:** 03086834020")
+        with bcol2:
+            st.warning("❤️ **JazzCash Account**\n\n* **Account Name:** Ayisha bi bi\n* **Account Number:** 03240755475")
+            
+        st.write("2. After transferring the money, please submit your payment request below for instant verification:")
+        
+        # Payment verification form for customers
+        if u_db:
+            with st.form("local_payment_form"):
+                p_method = st.selectbox("Payment Method Used:", ["EasyPaisa", "JazzCash"])
+                p_trx_id = st.text_input("Enter Transaction ID (TrxID):", placeholder="e.g., 50123456789")
+                p_amount = st.number_input("Amount Sent (PKR):", min_value=500.0, max_value=50000.0, value=1000.0, step=100.0)
+                btn_p_submit = st.form_submit_button("Submit Payment Proof 🚀")
+                
+                if btn_p_submit:
+                    if p_trx_id.strip():
+                        conn = get_db_connection()
+                        cursor = conn.cursor()
+                        try:
+                            req_id = str(uuid.uuid4())[:8]
+                            cursor.execute("INSERT INTO local_payments (id, username, method, trx_id, amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                           (req_id, u_db['username'], p_method, p_trx_id.strip(), p_amount, 'Pending', time.strftime("%Y-%m-%d %H:%M:%S")))
+                            conn.commit()
+                            st.success("Your payment request has been submitted successfully! Sglowina administrators will verify and credit your 450 coins shortly.")
+                        except sqlite3.IntegrityError:
+                            st.error("This Transaction ID (TrxID) has already been submitted.")
+                        finally:
+                            conn.close()
+                    else:
+                        st.warning("Please enter a valid Transaction ID (TrxID).")
+        else:
+            st.error("Please log in first to submit a payment request.")
+                
+    with ent_tab_admin:
+        st.write("#### 🔒 Secured Admin Control Settings")
+        if u_db and u_db['role'] == 'Admin':
+            st.success("Access Granted: Administrator Mode Activated")
+            
+            # Fetch SaaS Stats
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT COUNT(*) FROM users")
+            total_users = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM projects")
+            total_projects = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT SUM(credits) FROM users")
+            total_credits_allocated = cursor.fetchone()[0]
+            
+            st.write("### System Metrics Dashboard")
+            saas_col1, saas_col2, saas_col3 = st.columns(3)
+            with saas_col1:
+                st.metric("Total Users Count", total_users)
+            with saas_col2:
+                st.metric("Total Generated Projects", total_projects)
+            with saas_col3:
+                st.metric("Total Allocated Credits", total_credits_allocated)
+                
+            # -----------------
+            # NEW: Local Payment Approval Desk
+            # -----------------
+            st.markdown("---")
+            st.write("### 📲 Pending Local Payment Requests")
+            cursor.execute("SELECT * FROM local_payments WHERE status = 'Pending'")
+            pending_reqs = cursor.fetchall()
+            
+            if not pending_reqs:
+                st.info("No pending payment requests found.")
+            else:
+                for req in pending_reqs:
+                    st.write(f"👤 **User:** `{req['username']}` | 📱 **Method:** {req['method']} | 🔑 **TrxID:** `{req['trx_id']}` | 💰 **Amount:** {req['amount']} PKR")
+                    
+                    # Generate a unique key for button click
+                    app_btn_key = f"approve_{req['id']}"
+                    if st.button(f"Approve Payment & Credit 450 Coins for {req['username']}", key=app_btn_key):
+                        # Update request status
+                        cursor.execute("UPDATE local_payments SET status = 'Approved' WHERE id = ?", (req['id'],))
+                        
+                        # Add 450 credits to user and upgrade plan to Premium
+                        cursor.execute("UPDATE users SET credits = credits + 450, plan = 'Premium' WHERE username = ?", (req['username'],))
+                        
+                        # Get user's new balance for logging
+                        cursor.execute("SELECT id, credits FROM users WHERE username = ?", (req['username'],))
+                        target_u = cursor.fetchone()
+                        
+                        if target_u:
+                            log_credit_usage(target_u['id'], "Manual Purchase Approval", 450, target_u['credits'])
+                            
+                        conn.commit()
+                        st.success(f"Payment {req['trx_id']} approved! 450 credits successfully loaded onto {req['username']}'s account.")
+                        st.rerun()
+            
+            st.markdown("---")
+            cursor.execute("SELECT * FROM users")
+            all_users = cursor.fetchall()
+            
+            st.write("### User Database Management")
+            for u in all_users:
+                st.write(f"👤 **{u['username']}** | Role: {u['role']} | Plan: {u['plan']} | Credits: {u['credits']} 🪙 | Status: {u['status']}")
+                
+            st.markdown("---")
+            manage_user = st.selectbox("Select User to Adjust:", [u['username'] for u in all_users])
+            new_plan = st.selectbox("Change Subscription Plan:", ["Free", "Starter", "Premium", "Enterprise"])
+            new_role = st.selectbox("Change User Role:", ["User", "Admin"])
+            new_status = st.selectbox("Change Account Status:", ["Active", "Banned"])
+            new_credits = st.number_input("Adjust Credits Balance:", min_value=0, max_value=100000, value=500)
+            
+            if st.button("Apply Admin Settings"):
+                cursor.execute("UPDATE users SET credits = ?, plan = ?, role = ?, status = ? WHERE username = ?", (new_credits, new_plan, new_role, new_status, manage_user))
+                conn.commit()
+                st.success(f"Successfully updated settings for {manage_user}!")
+            conn.close()
+        else:
+            st.error("Access Denied: Only database-defined Administrators can access this control panel.")
+
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.5 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
