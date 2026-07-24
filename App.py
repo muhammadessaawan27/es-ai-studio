@@ -682,7 +682,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             with open(img_path, "wb") as f:
                 f.write(img_data)
                 
-            # PIL Image Verification to lock even boundaries (Urdu Subtitles removed completely to satisfy full screen requirement)
+            # PIL Image Verification to lock even boundaries
             try:
                 with Image.open(img_path) as img_obj:
                     if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
@@ -690,9 +690,17 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     else:
                         img_obj = img_obj.convert("RGB").resize((w, h))
                         
-                    if active_watermark:
-                        draw = ImageDraw.Draw(img_obj)
-                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                    # Write clean, readable Urdu subtitle at the bottom of the video frame to satisfy 'لکھائی' requirement
+                    draw = ImageDraw.Draw(img_obj)
+                    try:
+                        font = ImageFont.truetype("arial.ttf", 32)
+                    except:
+                        font = ImageFont.load_default()
+                        
+                    text_w = len(scene) * 10
+                    current_w, current_h = img_obj.size
+                    draw.rectangle([(current_w//2 - text_w//2 - 10, current_h - 60), (current_w//2 + text_w//2 + 10, current_h - 20)], fill=(0,0,0,150))
+                    draw.text((current_w//2 - text_w//2, current_h - 52), scene, fill=(255,255,255), font=font)
                         
                     img_obj.save(img_path, "JPEG")
             except Exception:
@@ -979,7 +987,6 @@ with tab_movie:
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    # "Smart Auto-Director (Dynamic)" - Automatically alters transitions per frame dynamically
     with mc6: camera_motion = st.selectbox("Camera Motion:", ["Smart Auto-Director (Dynamic)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
     with mc7: sd = st.number_input("Character Seed:", value=786)
     
