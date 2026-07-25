@@ -410,62 +410,167 @@ def run_ai_prompt_assistant(story_text):
         pass
     return "Failed to analyze story."
 
-# Core utility helper function to generate consistent cinematic prompt (Optimized to prioritize background scene & environment)
-def get_visual_prompt_v40(scene, style, char_desc, scene_desc):
-    # اسمارٹ لاجک: سب سے پہلے کہانی کا منظر اور بیک گراؤنڈ اٹیچ کیا ہے تا کہ صرف ادمی نہ آئے بلکہ پورا ماحول بنے
-    prompt = f"Cinematic film scene: {scene}."
+# AI Hollywood Director Mode Intelligent Scene Analyzer
+def analyze_scene_for_director(scene_text):
+    text = scene_text.lower()
+    
+    # Defaults
+    motion = "Zoom Out (v40 Default)"
+    lighting = "Volumetric Light"
+    color_grading = "Hollywood Cinematic"
+    composition = "Medium Shot, Rule of Thirds"
+    
+    # Analyze motions dynamically
+    if any(k in text for k in ["run", "chase", " भाग", "بھاگ", "دوڑ", "fast", "speed", "action"]):
+        motion = "Tracking Shot"
+    elif any(k in text for k in ["crying", "sad", "رویا", "اداس", "آنسو", "tears", "love", "eyes", "face", "look"]):
+        motion = "Push In"
+    elif any(k in text for k in ["scary", "ghost", "خوفناک", "بھوت", "ڈراؤنی", "grave", "dark", "shadow"]):
+        motion = "Dolly In"
+        lighting = "Dark Cinematic, Horror Shadows"
+        color_grading = "Horror Green"
+    elif any(k in text for k in ["palace", "castle", "mountain", "valley", "سلطنت", "محل", "پہاڑ", "وسیع", "landscape", "sky", "sea", "ocean"]):
+        motion = "Drone Shot"
+        composition = "Extreme Wide Shot"
+    elif any(k in text for k in ["king", "throne", "emperor", "بادشاہ", "تخت"]):
+        motion = "Crane Shot"
+        composition = "Wide Shot, Low Angle"
+    elif any(k in text for k in ["fight", "battle", "sword", "جنگ", "تلوار"]):
+        motion = "Handheld Camera"
+    elif any(k in text for k in ["walk", "stroll", "چل رہا", "چلتے"]):
+        motion = "Follow Shot"
+    elif any(k in text for k in ["think", "silent", "quiet", "صبر", "سوچ"]):
+        motion = "Ken Burns Effect"
+        composition = "Close-up"
+    else:
+        motion = random.choice(["Zoom In", "Zoom Out (v40 Default)", "Parallax Motion", "Orbit Camera", "Ken Burns Effect"])
+        
+    # Tone and Lighting detection
+    if any(k in text for k in ["نماز", "دعا", "مسجد", "ولی", "صبر", "سکون", "اللہ", "holy", "pray", "prayer", "mosque", "peace"]):
+        lighting = "Golden Hour"
+        color_grading = "Warm"
+    elif any(k in text for k in ["night", "رات", "اندھیرا"]):
+        lighting = "Moonlight"
+        color_grading = "Cold Blue"
+        
+    return {
+        "motion": motion,
+        "lighting": lighting,
+        "color_grading": color_grading,
+        "composition": composition
+    }
+
+# Smart Prompt Engine to build optimized prompts
+def build_ultra_cinematic_prompt(scene, style, char_desc, scene_desc, director_settings):
+    motion = director_settings.get("motion", "Zoom Out (v40 Default)")
+    lighting = director_settings.get("lighting", "Volumetric Light")
+    color_grading = director_settings.get("color_grading", "Hollywood Cinematic")
+    composition = director_settings.get("composition", "Medium Shot, Rule of Thirds")
+    
+    # 10/10 quality keywords boost
+    quality_boost = "ultra photorealistic, 8k resolution, face restoration, sharp focus, highly detailed eyes, symmetrical face structure, natural skin texture, perfect anatomy, detail enhancement, professional photography"
+    
+    prompt_parts = [
+        f"{composition}, cinematic framing",
+        f"Scene: {scene}"
+    ]
+    
     if scene_desc:
-        prompt += f" Environment background: {scene_desc}."
+        prompt_parts.append(f"Background environment: {scene_desc}")
     if char_desc:
-        prompt += f" Featuring consistent character: {char_desc}."
+        prompt_parts.append(f"Featuring consistent character: {char_desc}")
     if style and style != "Auto (Smart Director)":
-        prompt += f" Designed in visual style: {style}."
-    return prompt[:400]
+        prompt_parts.append(f"Style: {style}")
+        
+    prompt_parts.append(f"Lighting: {lighting}")
+    prompt_parts.append(f"Color grade: {color_grading}")
+    prompt_parts.append(quality_boost)
+    
+    return ", ".join(prompt_parts)[:500]
 
 # Motion control logic safely wrapped to prevent MoviePy engine crash (Dynamic Slide bounding boxes)
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     try:
-        # Resize image scale factor to allow slide padding without pixel pixelation or black bars
-        scale_factor = 1.25
-        clip = ImageClip(img_path).set_duration(duration).set_fps(24).resize(width=int(w * scale_factor))
+        scale_factor = 1.30
+        base_clip = ImageClip(img_path).set_duration(duration).set_fps(24)
+        cw, ch = int(w * scale_factor), int(h * scale_factor)
+        clip = base_clip.resize((cw, ch))
         
-        cw, ch = clip.size
+        animated_clip = None
         
         if motion == "Zoom In":
             animated_clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
         elif motion == "Zoom Out (v40 Default)":
             animated_clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
         elif motion == "Pan Left":
-            # Slide coordinates dynamically from offset margin to zero
             animated_clip = clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
         elif motion == "Pan Right":
-            # Slide coordinates dynamically from zero to offset margin
             animated_clip = clip.set_position(lambda t: (int((w - cw) * (1 - t / duration)), 'center'))
         elif motion == "Pan Up":
-            clip_tall = ImageClip(img_path).set_duration(duration).set_fps(24).resize(height=int(h * scale_factor))
-            tw, th = clip_tall.size
-            animated_clip = clip_tall.set_position(lambda t: ('center', int((h - th) * (t / duration))))
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration))))
         elif motion == "Pan Down":
-            clip_tall = ImageClip(img_path).set_duration(duration).set_fps(24).resize(height=int(h * scale_factor))
-            tw, th = clip_tall.size
-            animated_clip = clip_tall.set_position(lambda t: ('center', int((h - th) * (1 - t / duration))))
-        elif motion == "Dolly In":
-            animated_clip = clip.resize(lambda t: 1.0 + 0.20 * (t / duration)).set_position('center')
-        elif motion == "Dolly Out":
-            animated_clip = clip.resize(lambda t: 1.20 - 0.20 * (t / duration)).set_position('center')
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
+        elif motion == "Dolly In" or motion == "Push In":
+            animated_clip = clip.resize(lambda t: 1.0 + 0.25 * (t / duration)).set_position('center')
+        elif motion == "Dolly Out" or motion == "Pull Out":
+            animated_clip = clip.resize(lambda t: 1.25 - 0.25 * (t / duration)).set_position('center')
+        elif motion == "Orbit Camera" or motion == "Arc Shot":
+            animated_clip = clip.rotate(lambda t: -3 + 6 * (t / duration)).resize(lambda t: 1.1 + 0.1 * (t / duration)).set_position('center')
+        elif motion == "Crane Shot":
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -2 * (t / duration))
+        elif motion == "Drone Shot":
+            animated_clip = clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center')
+        elif motion == "Tracking Shot" or motion == "Follow Shot":
+            animated_clip = clip.set_position(lambda t: (
+                int((w - cw) * (t / duration)),
+                int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5)))
+            ))
+        elif motion == "Handheld Camera" or motion == "Shoulder Camera":
+            animated_clip = clip.set_position(lambda t: (
+                int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))),
+                int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7)))
+            )).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0))
+        elif motion == "Cinematic Reveal":
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
+        elif motion == "Whip Pan":
+            animated_clip = clip.set_position(lambda t: (int((w - cw) * ((t / duration) ** 3)), 'center'))
+        elif motion == "Tilt Up":
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration))))
+        elif motion == "Tilt Down":
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
+        elif motion == "Roll Camera":
+            animated_clip = clip.rotate(lambda t: 8 * (t / duration)).set_position('center')
+        elif motion == "Parallax Motion" or motion == "Ken Burns Effect":
+            animated_clip = clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
+        elif motion == "Rack Focus" or motion == "Motion Blur":
+            animated_clip = clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center')
         else:
-            animated_clip = ImageClip(img_path).set_duration(duration).set_fps(24).resize((w, h))
+            animated_clip = clip.set_position('center')
 
-        # Enforce exact bounding box limits via CompositeVideoClip to prevent sizing mismatches and ensure perfect crop margins
         final_clip = CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
         return final_clip
-    except Exception:
-        pass
+    except Exception as ex:
+        st.warning(f"Error applying camera motion '{motion}': {ex}. Falling back to default centering.")
     try:
         return ImageClip(img_path).set_duration(duration).resize((w, h))
     except Exception:
         pass
     return None
+
+# Safe transitions renderer
+def apply_clip_transition(clip, transition, duration):
+    try:
+        if transition == "Cross Dissolve (Fade)":
+            return clip.fadein(0.5).fadeout(0.5)
+        elif transition == "Flash Transition (White Glow)":
+            return clip.fadein(0.3).fadeout(0.3)
+        elif transition == "Film Dissolve (Muted)":
+            return clip.fadein(0.4).fadeout(0.4)
+        elif transition == "Instant Cut":
+            return clip
+    except Exception:
+        pass
+    return clip
 
 # Image failover provider from pollination (Upgraded strictly to Flux for high definition features)
 def fetch_img_failover(prompt, w, h, seed):
@@ -517,7 +622,7 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
 # ==========================================
 # 7. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Smart Auto-Director (Dynamic)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None, gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key=""):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None, gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", advanced_params=None):
     u_id = str(uuid.uuid4())[:8]
     progress_bar = st.progress(0.0)
     status = st.empty()
@@ -548,7 +653,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
     
     final_char_desc = char_desc
     if raw_char_url:
-        final_char_desc += f" (Strictly match the face, age, gender, hair, facial features, and appearance of reference: {raw_char_url})"
+        final_char_desc += f" (Strictly maintain identical facial appearance, age, gender, clothing, hair, and identical features matching the reference character image: {raw_char_url})"
     
     try:
         progress_bar.progress(0.05)
@@ -614,15 +719,33 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
             status.info(f"🎨 Generating visual scene {i+1}...")
             
-            # Smart Auto-Director Fix (Dynamic Motion per Scene)
-            active_motion = camera_motion
-            if camera_motion == "Smart Auto-Director (Dynamic)":
-                active_motion = random.choice(["Zoom In", "Zoom Out (v40 Default)", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
-            
             # Translate Urdu story block directly to English to ensure accurate context matching
             english_scene = translate_ur_to_en(scene)
             
-            refined_p = get_visual_prompt_v40(english_scene, style, final_char_desc, scene_desc)
+            # Get default analyzed settings from AI Director
+            dir_settings = analyze_scene_for_director(english_scene)
+            
+            # Override if user selected a specific non-auto motion
+            if camera_motion != "AI Hollywood Director (Auto)":
+                dir_settings["motion"] = camera_motion
+                
+            # Respect other Advanced Controls if modified from 'Auto'
+            if advanced_params:
+                if advanced_params.get("v_lighting") != "Auto (Smart Director)":
+                    dir_settings["lighting"] = advanced_params.get("v_lighting")
+                if advanced_params.get("v_color") != "Auto (Smart Director)":
+                    dir_settings["color_grading"] = advanced_params.get("v_color")
+                if advanced_params.get("v_env") != "Auto (Smart Director)":
+                    scene_desc = (scene_desc + ", " + advanced_params.get("v_env")) if scene_desc else advanced_params.get("v_env")
+                if advanced_params.get("v_weather") != "Auto (Smart Director)":
+                    scene_desc = (scene_desc + ", " + advanced_params.get("v_weather")) if scene_desc else advanced_params.get("v_weather")
+                if advanced_params.get("v_mood") != "Auto (Smart Director)":
+                    dir_settings["composition"] = dir_settings["composition"] + f", {advanced_params.get('v_mood')} mood"
+            
+            active_motion = dir_settings["motion"]
+            
+            # Build smart descriptive prompt with Flux optimized composition and styling rules
+            refined_p = build_ultra_cinematic_prompt(english_scene, style, final_char_desc, scene_desc, dir_settings)
             generated_prompts.append(refined_p)
             
             # --- Real AI Video Video Mode (WAN-FAST) ---
@@ -639,7 +762,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                         with open(vid_path, "wb") as f_vid:
                             f_vid.write(res_vid.content)
                         clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_per)
-                        clips.append(fadein(clip, 0.4))
+                        clip = apply_clip_transition(clip, transition_style, dur_per)
+                        clips.append(clip)
                         generated_images.append(vid_path) 
                         continue
                 except Exception:
@@ -679,7 +803,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 im.save(img_path, "JPEG")
                 
             clip = apply_camera_motion_v40(img_path, active_motion, dur_per, w, h)
-            clip = fadein(clip, 0.4)
+            clip = apply_clip_transition(clip, transition_style, dur_per)
             clips.append(clip)
             
         if not clips:
@@ -689,7 +813,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 f.write(img_data)
             generated_images.append(fallback_p)
             clip = apply_camera_motion_v40(fallback_p, "Zoom Out (v40 Default)", voice_audio.duration, w, h)
-            clip = fadein(clip, 0.4)
+            clip = apply_clip_transition(clip, transition_style, voice_audio.duration)
             clips.append(clip)
             
         progress_bar.progress(0.85)
@@ -943,14 +1067,43 @@ with tab_movie:
         with ac8:
             v_quality = st.selectbox("Video Quality:", ["Auto (Smart Director)", "HD", "Full HD", "2K", "4K", "8K", "Ultra Detail", "HDR", "Ultra HDR", "Maximum Quality"])
 
-    mc1, mc2, mc3, mc4, mc5, mc6, mc7 = st.columns(7)
+    mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8 = st.columns(8)
     with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    with mc6: camera_motion = st.selectbox("Camera Motion:", ["Smart Auto-Director (Dynamic)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
-    with mc7: sd = st.number_input("Character Seed:", value=786)
+    with mc6: camera_motion = st.selectbox("Camera Motion:", [
+        "AI Hollywood Director (Auto)",
+        "Zoom Out (v40 Default)",
+        "Zoom In",
+        "Pan Left",
+        "Pan Right",
+        "Pan Up",
+        "Pan Down",
+        "Dolly In",
+        "Dolly Out",
+        "Orbit Camera",
+        "Crane Shot",
+        "Drone Shot",
+        "Tracking Shot",
+        "Follow Shot",
+        "Push In",
+        "Pull Out",
+        "Arc Shot",
+        "Handheld Camera",
+        "Shoulder Camera",
+        "Cinematic Reveal",
+        "Whip Pan",
+        "Tilt Up",
+        "Tilt Down",
+        "Roll Camera",
+        "Parallax Motion",
+        "Ken Burns Effect",
+        "Rack Focus"
+    ])
+    with mc7: transition_style = st.selectbox("Transition Effect:", ["Cross Dissolve (Fade)", "Flash Transition (White Glow)", "Film Dissolve (Muted)", "Instant Cut"])
+    with mc8: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
         rate_val = mv_rate.split(" ")[0]
@@ -962,8 +1115,37 @@ with tab_movie:
         }
         pitch_val = pitch_map[mv_pitch]
         
+        adv_params = {
+            "v_style": v_style,
+            "v_lighting": v_lighting,
+            "v_mood": v_mood,
+            "v_env": v_env,
+            "v_weather": v_weather,
+            "v_color": v_color,
+            "v_anim": v_anim,
+            "v_quality": v_quality
+        }
+        
         with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
-            v_res = create_cinematic_v40(m_script, mv, rate_val, pitch_val, mr, ms, sd, char_desc, scene_desc, camera_motion, enable_watermark, enable_bg_music, uploaded_char_img, gen_mode, pollinations_key)
+            v_res = create_cinematic_v40(
+                story=m_script, 
+                voice_gen=mv, 
+                rate=rate_val, 
+                pitch=pitch_val, 
+                ratio=mr, 
+                style=ms, 
+                seed=sd, 
+                char_desc=char_desc, 
+                scene_desc=scene_desc, 
+                camera_motion=camera_motion, 
+                transition_style=transition_style,
+                enable_watermark=enable_watermark, 
+                enable_bg_music=enable_bg_music, 
+                uploaded_char_img=uploaded_char_img, 
+                gen_mode=gen_mode, 
+                pollinations_key=pollinations_key,
+                advanced_params=adv_params
+            )
             
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
             st.video(v_res)
