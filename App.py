@@ -158,12 +158,19 @@ def init_db_v21():
         )
     """)
     
-    # Coupons table for referral and marketing rewards
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS coupons (
             code TEXT PRIMARY KEY,
             credits INTEGER,
             uses_left INTEGER
+        )
+    """)
+    
+    # Secure Master Config Table to lock Admin API Key permanently
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS system_config (
+            key TEXT PRIMARY KEY,
+            value TEXT
         )
     """)
     
@@ -274,6 +281,7 @@ def analyze_scene_for_director(scene_text):
     color_grading = "Hollywood Cinematic"
     composition = "Medium Shot, Rule of Thirds"
     
+    # 1. Dynamic speaker shot cuts logic based on pronouns / names
     if any(k in text for k in ["saba", "she", "her", "woman", "female", "girl"]):
         composition = "Tight close-up portrait shot, extreme details of female face, emotional expression"
         motion = "Push In"
@@ -287,6 +295,7 @@ def analyze_scene_for_director(scene_text):
         composition = "Cinematic wide-angle establishing landscape shot, highly atmospheric environment"
         motion = "Drone Shot"
 
+    # 2. Camera motion mapping
     if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag"]):
         motion = "Tracking Shot"
     elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
@@ -382,9 +391,38 @@ def build_ultra_cinematic_prompt(scene, style, char_desc, scene_desc, director_s
     
     return ", ".join(prompt_parts)[:500]
 
-# Enhanced Cinematic Prompt Mastermind incorporating dual reference image context
+# Enhanced Cinematic Prompt Mastermind incorporating dual reference image context & STRICT EASTERN STYLING
 def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
     try:
+        scene_lower = urdu_scene.lower()
+        gender_booster = ""
+        
+        # PROMPT BOUSTER ENGINE: Forcefully overrides default Western biases
+        if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
+            if "صبا" in scene_lower or "saba" in scene_lower or "woman" in scene_lower or "female" in scene_lower or "girl" in scene_lower:
+                gender_booster = (
+                    "beautiful elegant Eastern Pakistani Punjabi Pathan woman, realistic South Asian sharp facial features, "
+                    "wearing traditional modest cotton Shalwar Kameez with a clean modest Dupatta elegantly draped over her head as a hijab, "
+                    "extremely realistic, 8k resolution, highly detailed, strictly no western look, modest posture"
+                )
+            elif "عیسی" in scene_lower or "essa" in scene_lower or "man" in scene_lower or "male" in scene_lower or "boy" in scene_lower:
+                gender_booster = (
+                    "handsome majestic Eastern Pakistani Punjabi Pathan man, highly realistic South Asian facial structure, "
+                    "wearing a traditional modest cotton Shalwar Kameez with high collar, neat short Islamic beard, "
+                    "strictly no western look, photorealistic, 8k resolution"
+                )
+            else:
+                gender_booster = (
+                    "traditional modest Eastern Islamic attire, Shalwar Kameez, modest clothing, "
+                    "Pakistani/Arabian traditional South Asian features, strictly no western exposure"
+                )
+        elif character_heritage == "Ancient Arabian":
+            gender_booster = "wearing ancient traditional Arabian flowing historical robes, classic desert turban, historic Middle Eastern facial features"
+        elif character_heritage == "Western / Modern":
+            gender_booster = "modern stylish contemporary Western clothing, jeans and jacket"
+        elif character_heritage == "Far Eastern":
+            gender_booster = "traditional East Asian oriental attire"
+
         instruction = (
             "You are an expert Hollywood visual artist and prompt engineer. "
             "Analyze the Urdu scene and write a highly detailed visual English image prompt for the Flux model. \n"
@@ -393,7 +431,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, ch
             "2. For human characters, strictly enforce gender separation. Do NOT mix genders. A female character (e.g. Saba) must have a beautiful, clean, feminine Eastern face. Absolutely NO facial hair, NO beards, and NO mustaches on females.\n"
             "3. A male character (e.g. Essa) must have a handsome, masculine face with a neat short black beard.\n"
             "4. All human characters must have realistic Middle Eastern, Pakistani, or Arabian features (no western default faces) and wear traditional modest clothing based on the heritage style.\n"
-            "5. STRICT CHARACTER CONSISTENCY: Keep the characters' face, hair, and look completely identical across scenes. If a male reference image URL is provided, strictly copy the face and features of: {raw_male_url}. If a female reference image URL is provided, strictly copy the face and features of: {raw_female_url}.\n"
+            "5. STRICT CHARACTER CONSISTENCY: Keep the characters' face, hair, and look completely identical across scenes. If a male reference image URL is provided, copy the face and features of: {raw_male_url}. If a female reference image URL is provided, copy the face and features of: {raw_female_url}.\n"
             "6. If both characters are mentioned, depict them as a distinct couple (one bearded man and one modest woman) interacting. Do NOT merge them into one body.\n"
             "7. Describe the scene's exact environment (e.g. deep green jungle, flowing river, mud-houses, rain, storms, animals like lions/snakes in the foreground) with strong descriptive words so the image generator produces it precisely.\n"
             "8. Write ONLY the final English prompt, with no conversational preamble or extra text."
@@ -402,10 +440,10 @@ def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, ch
         prompt_input = f"Urdu Scene: {urdu_scene}\n"
         if char_memory:
             prompt_input += f"Character Memory/Appearance override: {char_memory}\n"
+        if gender_booster:
+            prompt_input += f"FORCE GENDER AND ATTIRE STYLING TAGS: {gender_booster}\n"
         if scene_memory:
             prompt_input += f"Scene Environment/Background override: {scene_memory}\n"
-        if character_heritage != "Automatic":
-            prompt_input += f"Cultural Heritage: {character_heritage}\n"
         if raw_male_url:
             prompt_input += f"Male reference image URL: {raw_male_url}\n"
         if raw_female_url:
@@ -693,6 +731,17 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         raw_male_url = get_public_url(uploaded_male_img) if uploaded_male_img is not None else None
         raw_female_url = get_public_url(uploaded_female_img) if uploaded_female_img is not None else None
         
+        # MASTER API KEY RESOLVER: Auto fetches Master Key if user didn't enter one
+        active_api_key = pollinations_key.strip()
+        if not active_api_key:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_config WHERE key = 'master_pollinations_key'")
+            row = cursor.fetchone()
+            if row and row['value'].strip():
+                active_api_key = row['value'].strip()
+            conn.close()
+        
         try:
             progress_bar.progress(0.05)
             status.info("🎙️ Processing Dialogue Voiceovers...")
@@ -775,24 +824,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 if camera_motion != "AI Hollywood Director (Auto)":
                     dir_settings["motion"] = camera_motion
                     
-                heritage_desc = ""
-                if not is_spiritual:
-                    if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
-                        heritage_desc = "character must wear elegant modest traditional Eastern Islamic attire, modest long robes, turban or modest Eastern headwear, neat modest beard for men, Eastern facial features, strictly no Western garments"
-                    elif character_heritage == "Ancient Arabian":
-                        heritage_desc = "character must wear ancient Arabian historical flowing robes, classic desert turban, historic Middle Eastern appearance"
-                    elif character_heritage == "Western / Modern":
-                        heritage_desc = "character must wear modern western clothing"
-                    elif character_heritage == "Far Eastern":
-                        heritage_desc = "character must wear traditional Asian clothing"
+                active_motion = dir_settings["motion"]
                 
-                combined_char_desc = char_desc
-                if heritage_desc:
-                    combined_char_desc = (combined_char_desc + ", " + heritage_desc) if combined_char_desc else heritage_desc
-                    
+                # Build smart descriptive prompt with Flux optimized composition, dual reference images, and heritage override rules
                 refined_p = generate_enhanced_cinematic_prompt(
                     urdu_scene=scene,
-                    char_memory=combined_char_desc,
+                    char_memory=char_desc,
                     scene_memory=scene_desc,
                     character_heritage=character_heritage,
                     enable_islamic_filter=enable_islamic_filter,
@@ -806,10 +843,40 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}, cinematic film look"
                 generated_prompts.append(refined_p)
                 
+                # --- Real AI Video Video Mode (WAN-FAST & Image-to-Video References) ---
+                if "Real AI Video" in gen_mode and active_api_key:
+                    status.info(f"🎥 Rendering 3D Video Frame {i+1} via Wan-Fast API...")
+                    aspect_ratio_param = "16:9" if "16:9" in ratio else "9:16"
+                    vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(refined_p)}?model=wan-fast&aspectRatio={aspect_ratio_param}&key={active_api_key}&duration=4"
+                    
+                    # Direct starting frame reference injection for image to video
+                    ref_url = None
+                    if "Saba" in scene or "saba" in scene.lower() or "female" in scene.lower():
+                        ref_url = raw_female_url if raw_female_url else raw_male_url
+                    else:
+                        ref_url = raw_male_url if raw_male_url else raw_female_url
+                        
+                    if ref_url:
+                        vid_url += f"&image={urllib.parse.quote(ref_url)}"
+                        
+                    vid_path = f"v_{u_id}_{i}.mp4"
+                    try:
+                        res_vid = session.get(vid_url, timeout=90)
+                        if res_vid.status_code == 200:
+                            with open(vid_path, "wb") as f_vid:
+                                f_vid.write(res_vid.content)
+                            clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_per)
+                            clip = apply_clip_transition(clip, transition_style, dur_per)
+                            clips.append(clip)
+                            generated_images.append(vid_path) 
+                            continue
+                    except Exception:
+                        st.warning(f"Video API failed, falling back to static photo...")
+                
                 w_target = make_even(w * 1.25)
                 h_target = make_even(h * 1.25)
                 
-                # Keep seed constant per render for perfect face locking
+                # Maintain strict seed alignment to guarantee absolute face consistency across frames
                 unique_seed = seed
                 
                 img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={unique_seed}&nologo=true&model=flux"
@@ -830,6 +897,10 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             
             # ASSEMBLE CLIPS WITH EXACT VOICE SYNCHRONIZATION AND EFFECTS
             for i, scene in enumerate(sentences):
+                # Skip if already rendered as real AI video above
+                if len(clips) > i:
+                    continue
+                    
                 img_path = img_paths[i]
                 sub_audio_path = temporary_audio_tracks[i]
                 
@@ -874,7 +945,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             
             final_video = concatenate_videoclips(clips, method="compose").resize((w, h))
             
-            # OVERLAY GLOBAL BACKGROUND MUSIC IN FINAL MASTER MIX
+            # OVERLAY GLOBAL BACKGROUND MUSIC IN FINAL MASTER MIX (Guaranteed to play)
             if has_bg_music and os.path.exists(bg_music_f):
                 try:
                     bg_track = AudioFileClip(bg_music_f).volumex(0.06).set_duration(final_video.duration)
@@ -1305,7 +1376,7 @@ with tab_enterprise:
                         st.error("Invalid coupon code.")
                     conn.close()
                 else:
-                    st.error("Please log in to redeem coupons.")
+                    st.error("Please log in first to redeem coupons.")
         
         st.markdown("---")
         st.write("### 📱 How to Pay via EasyPaisa / JazzCash")
@@ -1350,9 +1421,33 @@ with tab_enterprise:
         if u_db and u_db['role'] == 'Admin':
             st.success("Access Granted: Administrator Mode Activated")
             
+            # --- NEW: MASTER API KEY MANAGEMENT UI ---
+            st.write("### 🔑 Sglowina Master API Key Configuration")
+            st.info("بطور ایڈمنسٹریٹر آپ یہاں اپنی پریمیم اے پی آئی کی (API Key) لگا کر ہمیشہ کے لیے سیو کر سکتے ہیں، تاکہ تمام صارفین بغیر اپنی کی درج کیے مستقل ویڈیو جنریٹ کر سکیں۔")
+            
             conn = get_db_connection()
             cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_config WHERE key = 'master_pollinations_key'")
+            m_row = cursor.fetchone()
+            current_master_key = m_row['value'] if m_row else ""
+            conn.close()
             
+            with st.form("master_key_config_form"):
+                new_master_key_input = st.text_input("Set Master API Key (e.g. sk_... / pk_...):", value=current_master_key, type="password")
+                btn_save_master_key = st.form_submit_button("Save Master API Key 💾")
+                if btn_save_master_key:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("INSERT OR REPLACE INTO system_config (key, value) VALUES ('master_pollinations_key', ?)", (new_master_key_input.strip(),))
+                    conn.commit()
+                    conn.close()
+                    st.success("Master API Key saved successfully! All user renders will now use this key. 🟢")
+                    time.sleep(1)
+                    st.rerun()
+            
+            st.markdown("---")
+            conn = get_db_connection()
+            cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM users")
             total_users = cursor.fetchone()[0]
             
