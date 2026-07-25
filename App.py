@@ -709,7 +709,7 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
 # ==========================================
 # 4. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", advanced_params=None):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast", advanced_params=None):
     u_id = str(uuid.uuid4())[:8]
     
     # CONCURRENCY QUEUE DECK: Safely parks excess render requests
@@ -867,9 +867,15 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 
                 # --- Real AI Video Video Mode (WAN-FAST & Image-to-Video References) ---
                 if "Real AI Video" in gen_mode and active_api_key:
-                    status.info(f"🎥 Rendering 3D Video Frame {i+1} via Wan-Fast API...")
+                    status.info(f"🎥 Rendering 3D Video Frame {i+1} via {video_model} API...")
                     aspect_ratio_param = "16:9" if "16:9" in ratio else "9:16"
-                    vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(refined_p)}?model=wan-fast&aspectRatio={aspect_ratio_param}&key={active_api_key}&duration=4"
+                    
+                    # AUTOMATIC HIGH-MOTION INJECTOR FOR REAL MOVEMENT IN FLUX/WAN
+                    motion_prompt = refined_p
+                    motion_prompt = re.sub(r'(portrait|standing|sitting|symmetrical face|still image|static)', '', motion_prompt, flags=re.IGNORECASE)
+                    motion_prompt = f"high motion, extreme 3D physics movement, character physically walking forward, head moving, eyes blinking, wind blowing, natural realistic animation, {motion_prompt}"
+                    
+                    vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt[:400])}?model={video_model}&aspectRatio={aspect_ratio_param}&key={active_api_key}&duration=4"
                     
                     # Direct starting frame reference injection for image to video
                     ref_url = None
@@ -1232,7 +1238,8 @@ with tab_movie:
     scene_desc = st.text_input("Scene Memory (جنگل، موسم، ماحول، جانور):", 
                               placeholder="Example: Deep green ancient forest, high realistic trees, thick foliage, dark stormy night")
 
-    mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9 = st.columns(9)
+    # Layout modified to include both Cultural Heritage and specific Video Model choices
+    mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9, mc10 = st.columns(10)
     with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
@@ -1269,7 +1276,8 @@ with tab_movie:
     ])
     with mc7: transition_style = st.selectbox("Transition Effect:", ["Cross Dissolve (Fade)", "Flash Transition (White Glow)", "Film Dissolve (Muted)", "Instant Cut"])
     with mc8: character_heritage = st.selectbox("Cultural Heritage (مشرقی یا مغربی لباس):", ["Automatic", "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)", "Ancient Arabian", "Western / Modern", "Far Eastern"])
-    with mc9: sd = st.number_input("Character Seed:", value=786)
+    with mc9: video_model = st.selectbox("AI Video Model:", ["wan-fast", "seedance", "veo"])
+    with mc10: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
         rate_val = mv_rate.split(" ")[0]
@@ -1302,6 +1310,7 @@ with tab_movie:
                 character_heritage=character_heritage,
                 gen_mode=gen_mode, 
                 pollinations_key=pollinations_key,
+                video_model=video_model,
                 advanced_params=None
             )
             
