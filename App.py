@@ -17,18 +17,30 @@ import sqlite3
 import hashlib
 import concurrent.futures
 
+# ==========================================
+# 1. STREAMLIT INITIALIZATION & GLOBAL STATES
+# ==========================================
 # Streamlit page config MUST be the first Streamlit command called
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V2.1", layout="wide", page_icon="🎬")
 
-# Global Default Settings to prevent NameError scoping issues in Streamlit
-enable_watermark = True
-enable_bg_music = True
+# Initialize global default settings in session state to prevent NameError scoping issues
+if "enable_watermark" not in st.session_state:
+    st.session_state.enable_watermark = True
+if "enable_bg_music" not in st.session_state:
+    st.session_state.enable_bg_music = True
+if "logged_in_user" not in st.session_state:
+    st.session_state.logged_in_user = "demo_user"
+if "msgs" not in st.session_state:
+    st.session_state.msgs = []
 
-# Bio Data
-SGLOWINA_BIO = """
-Sglowina AI is an Enterprise-grade SaaS platform co-founded and directed by Muhammad Essa Awan and Saba Wahid. 
-It is dedicated to state-of-the-art AI video creation, intelligent automated scripting, and premium visual studio synthesis.
-"""
+# Render sidebar widgets globally at the very top
+st.sidebar.subheader("🎬 Video Settings")
+enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=st.session_state.enable_watermark)
+enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=st.session_state.enable_bg_music)
+
+# Update session state values
+st.session_state.enable_watermark = enable_watermark
+st.session_state.enable_bg_music = enable_bg_music
 
 # Global Concurrency Queue locks to support up to 100 concurrent render requests without server crash
 render_semaphore = threading.Semaphore(value=2)  # Maximum 2 concurrent encoding processes to save RAM/CPU
@@ -66,7 +78,7 @@ def get_public_url(uploaded_file):
     return None
 
 # ==========================================
-# 1. DYNAMIC DATABASE LAYER (PostgreSQL & SQLite Concurrency Compatible)
+# 2. DYNAMIC DATABASE LAYER (PostgreSQL & SQLite Concurrency Compatible)
 # ==========================================
 def get_db_connection():
     pg_url = os.environ.get("DATABASE_URL") # Checks for production PostgreSQL (e.g. Render/Heroku)
@@ -214,14 +226,6 @@ def init_db_v21():
     conn.close()
 
 init_db_v21()
-
-# ==========================================
-# 2. SESSION STATE MANAGEMENT
-# ==========================================
-if "logged_in_user" not in st.session_state:
-    st.session_state.logged_in_user = "demo_user"
-if "msgs" not in st.session_state:
-    st.session_state.msgs = []
 
 # ==========================================
 # 3. ENTERPRISE AUTHENTICATION HELPERS
@@ -703,7 +707,7 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
         return b""
 
 # ==========================================
-# 5. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
+# 4. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
 # ==========================================
 def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", advanced_params=None):
     u_id = str(uuid.uuid4())[:8]
@@ -1025,7 +1029,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             gc.collect()
 
 # ==========================================
-# 6. UI & PREMIUM BRANDING STYLING (V2.1)
+# 5. UI & PREMIUM BRANDING STYLING (V2.1)
 # ==========================================
 st.markdown("""
     <style>
@@ -1037,22 +1041,22 @@ st.markdown("""
         font-family: 'Inter', sans-serif; 
     }
     
-    /* شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ ٹائٹل کے لیے (اصل 3.5rem سائز بحال) */
+    /* شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ ٹائٹل کے لیے (صحیح سائز 2.2rem پر بحال) */
     .glow-title { 
-        font-size: 3.5rem; 
+        font-size: 2.2rem; 
         font-weight: 900; 
         text-align: center;
         font-family: 'Orbitron', sans-serif;
         background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        text-shadow: 0 0 30px rgba(255, 0, 122, 0.2);
+        text-shadow: 0 0 15px rgba(255, 0, 122, 0.2);
         margin-top: 15px;
         margin-bottom: 5px;
         letter-spacing: 2px;
     }
 
-    .logo-container { display: flex; justify-content: center; align-items: center; padding: 20px 0; }
+    .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
     
     .circular-s {
         width: 120px; height: 120px; 
@@ -1116,22 +1120,71 @@ st.markdown("""
 st.markdown('<div class="glow-title">SGLOWINA AI</div>', unsafe_allow_html=True)
 st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
 
-# Sidebar Settings (Rendered strictly once to avoid duplicate widget keys)
-st.sidebar.subheader("🎬 Video Settings")
-enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=enable_watermark)
-enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=enable_bg_music)
+# ==========================================
+# 6. UI NAVIGATION & CONTROL PANEL
+# ==========================================
+tab_auth, tab_chat, tab_movie, tab_image, tab_enterprise = st.tabs([
+    "🔑 Sign In & Registrations",
+    "💬 Electric AI Chat", 
+    "🎬 Pro Master Studio", 
+    "🎨 Pro Image Studio",
+    "👤 Enterprise Center"
+])
 
-# Sglowina Enterprise Center sidebar credits log
-st.sidebar.markdown("---")
-st.sidebar.subheader("👤 Sglowina Enterprise Center")
-st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
-u_sidebar_db = get_user_data(st.session_state.logged_in_user)
-if u_sidebar_db:
-    st.sidebar.write(f"Credits Remaining: **{u_sidebar_db['credits']}** 🪙")
-    st.sidebar.write(f"Plan: **{u_sidebar_db['plan']}**")
-else:
-    st.sidebar.write("Credits Remaining: **Guest Mode**")
-    st.sidebar.write("Plan: **Free Trial**")
+# -----------------
+# TAB 1: AUTHENTICATION
+# -----------------
+with tab_auth:
+    st.write("### 🔑 Sglowina Secure Authentication Portal")
+    auth_mode = st.radio("Choose Action", ["Sign In", "Create New Account"])
+    
+    if auth_mode == "Sign In":
+        with st.form("login_form"):
+            u_name = st.text_input("Username")
+            p_word = st.text_input("Password", type="password")
+            btn_login = st.form_submit_button("Sign In 🚀")
+            if btn_login:
+                if authenticate_user(u_name, p_word):
+                    st.session_state.logged_in_user = u_name.strip().lower()
+                    if st.session_state.logged_in_user in ["essasaba", "essa_awan", "saba_wahid"]:
+                        st.success("Welcome back to SGLOWINA AI, Muhammad Essa Awan & Saba Wahid! (Admin Authorized) 🟢")
+                    else:
+                        st.success(f"Welcome to SGLOWINA AI, {u_name}! (Authorized User) 🟢")
+                    time.sleep(1.5)
+                    st.rerun()
+                else:
+                    st.error("Invalid credentials.")
+    else:
+        with st.form("reg_form"):
+            new_u = st.text_input("Choose Username")
+            new_e = st.text_input("Email Address")
+            new_p = st.text_input("Password", type="password")
+            btn_reg = st.form_submit_button("Register Account 🎯")
+            if btn_reg:
+                if new_u and new_e and new_p:
+                    success, msg = register_saas_user(new_u, new_e, new_p)
+                    if success:
+                        st.success(f"Welcome to SGLOWINA AI! Account for '{new_u}' registered successfully. Please sign in. 🟢")
+                    else:
+                        st.error(msg)
+                else:
+                    st.warning("Please fill out all fields.")
+
+# -----------------
+# TAB 2: CHAT INTERACTION
+# -----------------
+with tab_chat:
+    st.write("### 💬 Sglowina Intelligence Dashboard")
+    for m in st.session_state.msgs:
+        with st.chat_message(m["role"]): st.write(m["content"])
+    if p := st.chat_input("How can I help you?"):
+        st.session_state.msgs.append({"role": "user", "content": p})
+        with st.chat_message("user"): st.write(p)
+        res = SGLOWINA_BIO if any(k in p.lower() for k in ["kisne", "who made", "owner", "essa", "saba"]) else requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true").text
+        with st.chat_message("assistant"):
+            translated_response = res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
+            st.write(translated_response)
+            st.session_state.msgs.append({"role": "assistant", "content": translated_response})
 
 # -----------------
 # TAB 3: PRO MOVIE STUDIO
@@ -1484,7 +1537,7 @@ with tab_enterprise:
             
             # --- NEW: MASTER API KEY MANAGEMENT UI ---
             st.write("### 🔑 Sglowina Master API Key Configuration")
-            st.info("بطور ایڈمنسٹریٹر آپ یہاں اپنی پریمیم اے پی آئی کی (API Key) لگا کر ہمیشہ کے لیے سیو کر سکتے ہیں، تاکہ تمام صارفین بغیر اپنی کی درج کیے مستقل ویڈیو جنریٹ کر سکsound۔")
+            st.info("بطور ایڈمنسٹریٹر آپ یہاں اپنی پریمیم اے پی آئی کی (API Key) لگا کر ہمیشہ کے لیے سیو کر سکتے ہیں، تاکہ تمام صارفین بغیر اپنی کی درج کیے مستقل ویڈیو جنریٹ کر سکیں۔")
             
             conn = get_db_connection()
             cursor = conn.cursor()
