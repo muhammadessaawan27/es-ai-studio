@@ -721,10 +721,43 @@ def parallel_download_flux_images(urls, paths):
         futures = [executor.submit(download_single, urls[i], paths[i]) for i in range(len(urls))]
         concurrent.futures.wait(futures)
 
+# ==========================================
+# FAILOVER IMAGE EMERGENCY RECOVERY SYSTEM (Guarantees File Existence)
+# ==========================================
+def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
+    if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
+        try:
+            # Create a sophisticated slate-dark fallback gradient card
+            base = Image.new("RGB", (w, h), color=(15, 23, 42))
+            draw = ImageDraw.Draw(base)
+            
+            # Draw sleek futuristic grid borders
+            draw.rectangle([15, 15, w - 15, h - 15], outline=(30, 41, 59), width=3)
+            
+            try:
+                font = ImageFont.load_default()
+            except Exception:
+                font = None
+                
+            draw.text((45, h // 2 - 20), "Sglowina AI Studio - Scene Visualization Frame", fill=(0, 242, 254), font=font)
+            draw.text((45, h // 2 + 10), f"Story Scene: {scene_text[:55]}...", fill=(148, 163, 184), font=font)
+            base.save(img_path, "JPEG")
+        except Exception:
+            try:
+                # Absolute baseline black card fallback
+                im = Image.new("RGB", (w, h), color=(0, 0, 0))
+                im.save(img_path, "JPEG")
+            except:
+                pass
+
 # Motion control logic safely wrapped to prevent MoviePy engine crash
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     if not MOVIEPY_AVAILABLE:
         return None
+        
+    # Safeguard file availability on local disk before MoviePy processing
+    ensure_image_exists(img_path, w, h, "Visualizing scene...")
+    
     try:
         scale_factor = 1.30
         
@@ -798,10 +831,13 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
         return final_clip
     except Exception as ex:
         st.warning(f"Error applying camera motion '{motion}': {ex}. Falling back to default centering.")
+        
+    # Emergency fallback to static resized ImageClip (absolutely crash-proof)
     try:
         return ImageClip(img_path).set_duration(duration).resize((w, h))
-    except Exception:
-        pass
+    except Exception as e_inner:
+        st.error(f"Fallback ImageClip failed: {e_inner}")
+        
     return None
 
 # Safe transitions renderer
@@ -1127,7 +1163,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 
             progress_bar.progress(0.25)
             
-            # Simulated Image Download Timer Loop (Elapsed & Remaining Time)
+            # Image Download Loop with strict Failover generation
             start_t = time.time()
             total_images = len(flux_prompt_urls)
             for idx, img_url in enumerate(flux_prompt_urls):
@@ -1143,6 +1179,9 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                             f_img.write(res_img.content)
                 except Exception:
                     pass
+                
+                # Safeguard: If download fails or times out, immediately generate elegant local slate card
+                ensure_image_exists(img_path, w, h, sentences[idx])
             
             progress_bar.progress(0.45)
             status.info("🎞️ Assembling Audio Syncing and Camera Motions...")
@@ -1155,6 +1194,9 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     
                 img_path = img_paths[i]
                 sub_audio_path = temporary_audio_tracks[i]
+                
+                # Double-check safety net right before MoviePy parsing
+                ensure_image_exists(img_path, w, h, scene)
                 
                 # Apply Color LUT matrix harmony on the downloaded frame
                 apply_color_lut_harmony(img_path, style)
@@ -1175,6 +1217,10 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 
                 # Compile video motion frame
                 clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h)
+                
+                if clip is None:
+                    # In case of absolute disaster, create an active slate fallback clip
+                    clip = ImageClip(img_path).set_duration(dur_scene).resize((w, h))
                 
                 # Download and mix scene environmental SFX
                 sfx_file, sfx_display_name = download_scene_sfx(scene, u_id, i)
@@ -1328,7 +1374,7 @@ st.markdown("""
         100% { transform: perspective(1000px) rotateY(360deg); }
     }
     @keyframes lightningGlow {
-        0%, 100% { box-shadow: 0 0 20px #0072ff, 0 0 40px #00f2fe, inset 0 0 15px #ffffff; }
+        0%, 100% { box-shadow: 0 0 25px #0072ff, 0 0 40px #00f2fe, inset 0 0 15px #ffffff; }
         50% { box-shadow: 0 0 40px #00f2fe, 0 0 60px #00d4ff, inset 0 0 20px #ffffff; }
     }
 
@@ -1637,6 +1683,7 @@ with tab_image:
                                 f_temp.write(img_data)
                                 
                             if canva_overlay_text.strip():
+                                ensure_image_exists(img_path_temp, w, h, canva_overlay_text)
                                 apply_canva_typography(img_path_temp, canva_overlay_text.strip())
                                 
                             with Image.open(img_path_temp) as im:
@@ -1678,6 +1725,7 @@ with tab_image:
                                 f_temp_mod.write(img_data)
                                 
                             if canva_overlay_text_mod.strip():
+                                ensure_image_exists(img_path_temp_mod, 1024, 1024, canva_overlay_text_mod)
                                 apply_canva_typography(img_path_temp_mod, canva_overlay_text_mod.strip())
                                 
                             with Image.open(img_path_temp_mod) as im:
