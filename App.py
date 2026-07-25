@@ -250,11 +250,11 @@ if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', 1)
 
 try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
     from moviepy.video.fx.all import fadein
 except Exception:
     try:
-        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip
+        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
         import moviepy.video.fx.all as vfx
         fadein = vfx.fadein
     except Exception:
@@ -292,22 +292,22 @@ st.markdown("""
         font-family: 'Inter', sans-serif; 
     }
     
-    /* شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ ٹائٹل کے لیے */
+    /* شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ ٹائٹل کے لیے (صحیح سائز میں فٹ) */
     .glow-title { 
-        font-size: 3.5rem; 
+        font-size: 2.2rem; 
         font-weight: 900; 
         text-align: center;
         font-family: 'Orbitron', sans-serif;
         background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        text-shadow: 0 0 30px rgba(255, 0, 122, 0.2);
+        text-shadow: 0 0 15px rgba(255, 0, 122, 0.2);
         margin-top: 15px;
         margin-bottom: 5px;
         letter-spacing: 2px;
     }
 
-    .logo-container { display: flex; justify-content: center; align-items: center; padding: 20px 0; }
+    .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
     
     .circular-s {
         width: 120px; height: 120px; 
@@ -422,29 +422,55 @@ def get_visual_prompt_v40(scene, style, char_desc, scene_desc):
         prompt += f" Designed in visual style: {style}."
     return prompt[:400]
 
-# Motion control logic safely wrapped to prevent MoviePy engine crash
-def apply_camera_motion_v40(clip, motion, duration, w, h):
+# Motion control logic safely wrapped to prevent MoviePy engine crash (Dynamic Slide bounding boxes)
+def apply_camera_motion_v40(img_path, motion, duration, w, h):
     try:
+        # Resize image scale factor to allow slide padding without pixel pixelation or black bars
+        scale_factor = 1.25
+        clip = ImageClip(img_path).set_duration(duration).set_fps(24).resize(width=int(w * scale_factor))
+        
+        cw, ch = clip.size
+        
         if motion == "Zoom In":
-            return clip.resize(lambda t: 1.0 + 0.12 * (t / duration)).set_position('center')
+            animated_clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
         elif motion == "Zoom Out (v40 Default)":
-            return clip.resize(lambda t: 1.12 - 0.12 * (t / duration)).set_position('center')
+            animated_clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
         elif motion == "Pan Left":
-            return clip.set_position(lambda t: (int(-0.15 * w * (1 - t/duration)), 'center'))
+            # Slide coordinates dynamically from offset margin to zero
+            animated_clip = clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
         elif motion == "Pan Right":
-            return clip.set_position(lambda t: (int(-0.15 * w * (t/duration)), 'center'))
+            # Slide coordinates dynamically from zero to offset margin
+            animated_clip = clip.set_position(lambda t: (int((w - cw) * (1 - t / duration)), 'center'))
         elif motion == "Pan Up":
-            return clip.set_position(lambda t: ('center', int(-0.15 * h * (1 - t/duration))))
+            clip_tall = ImageClip(img_path).set_duration(duration).set_fps(24).resize(height=int(h * scale_factor))
+            tw, th = clip_tall.size
+            animated_clip = clip_tall.set_position(lambda t: ('center', int((h - th) * (t / duration))))
         elif motion == "Pan Down":
-            return clip.set_position(lambda t: ('center', int(-0.15 * h * (t/duration))))
+            clip_tall = ImageClip(img_path).set_duration(duration).set_fps(24).resize(height=int(h * scale_factor))
+            tw, th = clip_tall.size
+            animated_clip = clip_tall.set_position(lambda t: ('center', int((h - th) * (1 - t / duration))))
+        elif motion == "Dolly In":
+            animated_clip = clip.resize(lambda t: 1.0 + 0.20 * (t / duration)).set_position('center')
+        elif motion == "Dolly Out":
+            animated_clip = clip.resize(lambda t: 1.20 - 0.20 * (t / duration)).set_position('center')
+        else:
+            animated_clip = ImageClip(img_path).set_duration(duration).set_fps(24).resize((w, h))
+
+        # Enforce exact bounding box limits via CompositeVideoClip to prevent sizing mismatches and ensure perfect crop margins
+        final_clip = CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
+        return final_clip
     except Exception:
         pass
-    return clip
+    try:
+        return ImageClip(img_path).set_duration(duration).resize((w, h))
+    except Exception:
+        pass
+    return None
 
-# Image failover provider from pollination
+# Image failover provider from pollination (Upgraded strictly to Flux for high definition features)
 def fetch_img_failover(prompt, w, h, seed):
     try:
-        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true"
+        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
         res = session.get(url, timeout=30)
         if res.status_code == 200:
             return res.content
@@ -491,7 +517,7 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
 # ==========================================
 # 7. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Zoom Out (v40 Default)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None, gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key=""):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="Smart Auto-Director (Dynamic)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None, gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key=""):
     u_id = str(uuid.uuid4())[:8]
     progress_bar = st.progress(0.0)
     status = st.empty()
@@ -517,12 +543,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
     
     active_watermark = True if user_type == "Free" else enable_watermark
     
-    final_char_desc = char_desc
-    if uploaded_char_img is not None:
-        final_char_desc += " [Strictly match facial structure, gender, age, and clothing of uploaded reference image]"
-        
     # Get public URL of consistent character image
     raw_char_url = get_public_url(uploaded_char_img) if uploaded_char_img is not None else None
+    
+    final_char_desc = char_desc
+    if raw_char_url:
+        final_char_desc += f" (Strictly match the face, age, gender, hair, facial features, and appearance of reference: {raw_char_url})"
     
     try:
         progress_bar.progress(0.05)
@@ -591,7 +617,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             # Smart Auto-Director Fix (Dynamic Motion per Scene)
             active_motion = camera_motion
             if camera_motion == "Smart Auto-Director (Dynamic)":
-                active_motion = random.choice(["Zoom In", "Zoom Out (v40 Default)", "Pan Left", "Pan Right", "Pan Up", "Pan Down"])
+                active_motion = random.choice(["Zoom In", "Zoom Out (v40 Default)", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out"])
             
             # Translate Urdu story block directly to English to ensure accurate context matching
             english_scene = translate_ur_to_en(scene)
@@ -619,15 +645,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 except Exception:
                     st.warning(f"Video API failed, falling back to static photo...")
             
-            # Fallback to Free Cinematic Zoom & Pan Image System
-            if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
-                w_target = make_even(w * 1.15)
-                h_target = make_even(h * 1.15)
-            else:
-                w_target = w
-                h_target = h
+            # Headroom target scaling to prevent black boundaries on cinematic pan/scale
+            w_target = make_even(w * 1.25)
+            h_target = make_even(h * 1.25)
                 
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i}&nologo=true&negative=double_faces,double_heads,multiple_faces,overlapping_limbs,extra_limbs,extra_hands,extra_fingers,mutated_hands,two_bodies,deformed,blurry,bad_anatomy,clones,twins"
+            # Upgraded strictly to model=flux for perfect eyes, faces, and fine details
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i}&nologo=true&model=flux&negative=double_faces,double_heads,multiple_faces,overlapping_limbs,extra_limbs,extra_hands,extra_fingers,mutated_hands,two_bodies,deformed,blurry,bad_anatomy,clones,twins"
             if raw_char_url:
                 img_url += f"&image={urllib.parse.quote(raw_char_url)}"
             
@@ -641,14 +664,11 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             # PIL Image Verification to lock even boundaries (Urdu Subtitles removed completely to satisfy full screen requirement)
             try:
                 with Image.open(img_path) as img_obj:
-                    if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
-                        img_obj = img_obj.convert("RGB").resize((int(w * 1.15), int(h * 1.15)))
-                    else:
-                        img_obj = img_obj.convert("RGB").resize((w, h))
+                    img_obj = img_obj.convert("RGB").resize((w_target, h_target))
                         
                     if active_watermark:
                         draw = ImageDraw.Draw(img_obj)
-                        draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+                        draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                         
                     img_obj.save(img_path, "JPEG")
             except Exception:
@@ -658,12 +678,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
                 im.save(img_path, "JPEG")
                 
-            if active_motion in ["Pan Left", "Pan Right", "Pan Up", "Pan Down"]:
-                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((int(w * 1.15), int(h * 1.15)))
-            else:
-                clip = ImageClip(img_path).set_duration(dur_per).set_fps(24).resize((w, h))
-                
-            clip = apply_camera_motion_v40(clip, active_motion, dur_per, w, h)
+            clip = apply_camera_motion_v40(img_path, active_motion, dur_per, w, h)
             clip = fadein(clip, 0.4)
             clips.append(clip)
             
@@ -673,8 +688,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             with open(fallback_p, 'wb') as f:
                 f.write(img_data)
             generated_images.append(fallback_p)
-            clip = ImageClip(fallback_p).set_duration(voice_audio.duration).set_fps(24)
-            clip = clip.resize(lambda t: 1.0 + 0.15 * (t / voice_audio.duration)).set_position('center')
+            clip = apply_camera_motion_v40(fallback_p, "Zoom Out (v40 Default)", voice_audio.duration, w, h)
             clip = fadein(clip, 0.4)
             clips.append(clip)
             
