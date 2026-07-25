@@ -46,7 +46,6 @@ def get_public_url(uploaded_file):
             data = res.json()
             if data.get("status") == "success":
                 temp_url = data["data"]["url"]
-                # Convert view URL to direct file download URL for Pollinations
                 raw_url = temp_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
                 return raw_url
     except Exception:
@@ -103,7 +102,6 @@ def init_db_v21():
         )
     """)
     
-    # Secure Local Payment Request Ledger
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS local_payments (
             id TEXT PRIMARY KEY,
@@ -137,7 +135,6 @@ def init_db_v21():
         )
     """)
     
-    # Secure force seeding for administrative passwords (including the unified EssaSaba login)
     h_admin = hash_password("786")
     
     # 1. New Combined Founder User: EssaSaba (Password: 786)
@@ -265,12 +262,10 @@ except Exception:
 # ==========================================
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V2.1", layout="wide", page_icon="🎬")
 
-# Sidebar Settings (Rendered strictly once to avoid duplicate widget keys)
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
 
-# Sglowina Enterprise Center sidebar credits log
 st.sidebar.markdown("---")
 st.sidebar.subheader("👤 Sglowina Enterprise Center")
 st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
@@ -292,7 +287,6 @@ st.markdown("""
         font-family: 'Inter', sans-serif; 
     }
     
-    /* شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ ٹائٹل کے لیے (صحیح سائز میں فٹ) */
     .glow-title { 
         font-size: 2.2rem; 
         font-weight: 900; 
@@ -420,36 +414,36 @@ def analyze_scene_for_director(scene_text):
     color_grading = "Hollywood Cinematic"
     composition = "Medium Shot, Rule of Thirds"
     
-    # Analyze motions dynamically
-    if any(k in text for k in ["run", "chase", " भाग", "بھاگ", "دوڑ", "fast", "speed", "action"]):
+    # Analyze motions dynamically based on cues
+    if any(k in text for k in ["run", "chase", "run away", "bhaag", "fast", "speed", "action"]):
         motion = "Tracking Shot"
-    elif any(k in text for k in ["crying", "sad", "رویا", "اداس", "آنسو", "tears", "love", "eyes", "face", "look"]):
+    elif any(k in text for k in ["crying", "sad", "tears", "love", "eyes", "face", "look", "gaze"]):
         motion = "Push In"
-    elif any(k in text for k in ["scary", "ghost", "خوفناک", "بھوت", "ڈراؤنی", "grave", "dark", "shadow"]):
+    elif any(k in text for k in ["scary", "ghost", "darkness", "grave", "dark", "shadow", "frightened"]):
         motion = "Dolly In"
         lighting = "Dark Cinematic, Horror Shadows"
         color_grading = "Horror Green"
-    elif any(k in text for k in ["palace", "castle", "mountain", "valley", "سلطنت", "محل", "پہاڑ", "وسیع", "landscape", "sky", "sea", "ocean"]):
+    elif any(k in text for k in ["palace", "castle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "river"]):
         motion = "Drone Shot"
         composition = "Extreme Wide Shot"
-    elif any(k in text for k in ["king", "throne", "emperor", "بادشاہ", "تخت"]):
+    elif any(k in text for k in ["king", "throne", "emperor", "crown", "court"]):
         motion = "Crane Shot"
         composition = "Wide Shot, Low Angle"
-    elif any(k in text for k in ["fight", "battle", "sword", "جنگ", "تلوار"]):
+    elif any(k in text for k in ["fight", "battle", "sword", "war", "clash"]):
         motion = "Handheld Camera"
-    elif any(k in text for k in ["walk", "stroll", "چل رہا", "چلتے"]):
+    elif any(k in text for k in ["walk", "stroll", "walking"]):
         motion = "Follow Shot"
-    elif any(k in text for k in ["think", "silent", "quiet", "صبر", "سوچ"]):
+    elif any(k in text for k in ["think", "silent", "quiet", "patience", "meditate"]):
         motion = "Ken Burns Effect"
         composition = "Close-up"
     else:
         motion = random.choice(["Zoom In", "Zoom Out (v40 Default)", "Parallax Motion", "Orbit Camera", "Ken Burns Effect"])
         
     # Tone and Lighting detection
-    if any(k in text for k in ["نماز", "دعا", "مسجد", "ولی", "صبر", "سکون", "اللہ", "holy", "pray", "prayer", "mosque", "peace"]):
+    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "peaceful", "holy"]):
         lighting = "Golden Hour"
         color_grading = "Warm"
-    elif any(k in text for k in ["night", "رات", "اندھیرا"]):
+    elif any(k in text for k in ["night", "midnight", "dark"]):
         lighting = "Moonlight"
         color_grading = "Cold Blue"
         
@@ -460,14 +454,54 @@ def analyze_scene_for_director(scene_text):
         "composition": composition
     }
 
-# Smart Prompt Engine to build optimized prompts
+# Translation Engine with Strict Subject and Anatomy Enforcement
+def translate_ur_to_en_enhanced(text):
+    try:
+        instruction = (
+            "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into highly descriptive English visual instructions. "
+            "CRITICAL RULES: \n"
+            "1. Explicitly identify the main subjects (e.g., 'a single male', 'a single female', 'a lion', 'only a peaceful landscape with no humans'). \n"
+            "2. Do NOT blend genders. If the subject is a man, do NOT include feminine descriptions. If the subject is a woman, do NOT include masculine features. \n"
+            "3. Never add animals unless they are explicitly mentioned in the text. \n"
+            "4. Ensure anatomical perfection. No extra hands, no overlapping bodies, no weird deformities. \n"
+            "5. Output ONLY the English translation and detailed visual descriptions, with no conversational filler or prefixes."
+        )
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
+        res = session.get(url, timeout=15)
+        if res.status_code == 200:
+            return res.text.strip()
+    except Exception:
+        pass
+    return text
+
+# Islamic Holy Figures and Spiritual Safety Filter
+def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
+    combined_text = (scene_text_en + " " + scene_text_ur).lower()
+    
+    spiritual_keywords = [
+        "prophet", "sahaba", "saint", "angel", "god", "allah", "messenger", "nooh", "musa", "isa", "ibrahim", "yousuf", "muhammad", 
+        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر",
+        "grave", "shroud", "hell", "heaven", "paradise", "pious", "aulia", "angels", "holy dome", "mosque"
+    ]
+    
+    if any(k in combined_text for k in spiritual_keywords):
+        safe_prompt = (
+            "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light emanating from the heavens, "
+            "sacred light beam, peaceful glowing ancient background, majestic natural mountains and glowing golden sand, "
+            "awe-inspiring holy atmosphere, highly detailed cosmic sky. "
+            "STRICTLY NO human faces, NO visible bodies, NO portraits, NO human figures, NO blasphemous shapes. "
+            "Pure sacred light, beautiful symbolic representation."
+        )
+        return True, safe_prompt
+    return False, scene_text_en
+
+# Smart Prompt Engine to build optimized prompts with negative prompts injected
 def build_ultra_cinematic_prompt(scene, style, char_desc, scene_desc, director_settings):
     motion = director_settings.get("motion", "Zoom Out (v40 Default)")
     lighting = director_settings.get("lighting", "Volumetric Light")
     color_grading = director_settings.get("color_grading", "Hollywood Cinematic")
     composition = director_settings.get("composition", "Medium Shot, Rule of Thirds")
     
-    # 10/10 quality keywords boost
     quality_boost = "ultra photorealistic, 8k resolution, face restoration, sharp focus, highly detailed eyes, symmetrical face structure, natural skin texture, perfect anatomy, detail enhancement, professional photography"
     
     prompt_parts = [
@@ -488,7 +522,7 @@ def build_ultra_cinematic_prompt(scene, style, char_desc, scene_desc, director_s
     
     return ", ".join(prompt_parts)[:500]
 
-# Motion control logic safely wrapped to prevent MoviePy engine crash (Dynamic Slide bounding boxes)
+# Motion control logic safely wrapped to prevent MoviePy engine crash
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     try:
         scale_factor = 1.30
@@ -583,17 +617,6 @@ def fetch_img_failover(prompt, w, h, seed):
         pass
     return None
 
-# Translate Urdu text automatically to english
-def translate_ur_to_en(text):
-    try:
-        url = f"https://text.pollinations.ai/{urllib.parse.quote('Translate this text to English visual instructions, output translation only: ' + text)}?model=openai"
-        res = session.get(url, timeout=15)
-        if res.status_code == 200:
-            return res.text.strip()
-    except Exception:
-        pass
-    return text
-
 # Text to speech async to sync wrapper
 def save_audio_safe(text, voice, rate, pitch, filename):
     try:
@@ -622,7 +645,7 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
 # ==========================================
 # 7. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None, gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", advanced_params=None):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_char_img=None, uploaded_char_details="Single Person", enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", advanced_params=None):
     u_id = str(uuid.uuid4())[:8]
     progress_bar = st.progress(0.0)
     status = st.empty()
@@ -650,10 +673,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
     
     # Get public URL of consistent character image
     raw_char_url = get_public_url(uploaded_char_img) if uploaded_char_img is not None else None
-    
-    final_char_desc = char_desc
-    if raw_char_url:
-        final_char_desc += f" (Strictly maintain identical facial appearance, age, gender, clothing, hair, and identical features matching the reference character image: {raw_char_url})"
     
     try:
         progress_bar.progress(0.05)
@@ -719,8 +738,15 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
             status.info(f"🎨 Generating visual scene {i+1}...")
             
-            # Translate Urdu story block directly to English to ensure accurate context matching
-            english_scene = translate_ur_to_en(scene)
+            # Translate Urdu story block with strict gender-guard context matching
+            english_scene = translate_ur_to_en_enhanced(scene)
+            
+            # Apply Islamic Spiritual Safety Filter (Locks face representation for holy subjects)
+            is_spiritual = False
+            if enable_islamic_filter:
+                is_spiritual, safe_scene_en = apply_islamic_safety_filter(english_scene, scene)
+                if is_spiritual:
+                    english_scene = safe_scene_en
             
             # Get default analyzed settings from AI Director
             dir_settings = analyze_scene_for_director(english_scene)
@@ -744,8 +770,32 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             
             active_motion = dir_settings["motion"]
             
+            # Add dynamic Cultural Heritage styling tags (eastern / muslim appearance)
+            heritage_desc = ""
+            if not is_spiritual:
+                if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
+                    heritage_desc = "character must wear elegant modest traditional Eastern Islamic attire, modest long robes, turban or modest Eastern headwear, neat modest beard for men, Eastern facial features, strictly no Western garments"
+                elif character_heritage == "Ancient Arabian":
+                    heritage_desc = "character must wear ancient Arabian historical flowing robes, classic desert turban, historic Middle Eastern appearance"
+                elif character_heritage == "Western / Modern":
+                    heritage_desc = "character must wear modern western clothing"
+                elif character_heritage == "Far Eastern":
+                    heritage_desc = "character must wear traditional Asian clothing"
+            
+            # Formulate final consistent character prompts
+            combined_char_desc = char_desc
+            if raw_char_url:
+                combined_char_desc += f" (Identical visual appearance, gender, faces, and clothing features of uploaded reference image: {raw_char_url}, depicting {uploaded_char_details})"
+            if heritage_desc:
+                combined_char_desc = (combined_char_desc + ", " + heritage_desc) if combined_char_desc else heritage_desc
+                
             # Build smart descriptive prompt with Flux optimized composition and styling rules
-            refined_p = build_ultra_cinematic_prompt(english_scene, style, final_char_desc, scene_desc, dir_settings)
+            refined_p = build_ultra_cinematic_prompt(english_scene, style, combined_char_desc, scene_desc, dir_settings)
+            
+            # Enforce anatomy guard dynamically to prevent women with beards or cross-gender blunders
+            if not is_spiritual:
+                refined_p += " [Avoid cross-gender blending, absolutely no woman with beard, absolutely no female with facial hair, anatomically perfect, symmetrical eyes, detailed limbs]"
+                
             generated_prompts.append(refined_p)
             
             # --- Real AI Video Video Mode (WAN-FAST) ---
@@ -774,7 +824,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             h_target = make_even(h * 1.25)
                 
             # Upgraded strictly to model=flux for perfect eyes, faces, and fine details
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i}&nologo=true&model=flux&negative=double_faces,double_heads,multiple_faces,overlapping_limbs,extra_limbs,extra_hands,extra_fingers,mutated_hands,two_bodies,deformed,blurry,bad_anatomy,clones,twins"
+            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i}&nologo=true&model=flux&negative=double_faces,double_heads,multiple_faces,overlapping_limbs,extra_limbs,extra_hands,extra_fingers,mutated_hands,two_bodies,deformed,blurry,bad_anatomy,clones,twins,cross_gender,woman_with_beard"
             if raw_char_url:
                 img_url += f"&image={urllib.parse.quote(raw_char_url)}"
             
@@ -785,7 +835,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             with open(img_path, "wb") as f:
                 f.write(img_data)
                 
-            # PIL Image Verification to lock even boundaries (Urdu Subtitles removed completely to satisfy full screen requirement)
             try:
                 with Image.open(img_path) as img_obj:
                     img_obj = img_obj.convert("RGB").resize((w_target, h_target))
@@ -901,7 +950,11 @@ with tab_auth:
             if btn_login:
                 if authenticate_user(u_name, p_word):
                     st.session_state.logged_in_user = u_name.strip().lower()
-                    st.success(f"Welcome back, {u_name}! Session authorized.")
+                    if st.session_state.logged_in_user in ["essasaba", "essa_awan", "saba_wahid"]:
+                        st.success("Welcome back to SGLOWINA AI, Muhammad Essa Awan & Saba Wahid! (Admin Authorized) 🟢")
+                    else:
+                        st.success(f"Welcome to SGLOWINA AI, {u_name}! (Authorized User) 🟢")
+                    time.sleep(1.5)
                     st.rerun()
                 else:
                     st.error("Invalid credentials.")
@@ -915,7 +968,7 @@ with tab_auth:
                 if new_u and new_e and new_p:
                     success, msg = register_saas_user(new_u, new_e, new_p)
                     if success:
-                        st.success(msg)
+                        st.success(f"Welcome to SGLOWINA AI! Account for '{new_u}' registered successfully. Please sign in. 🟢")
                     else:
                         st.error(msg)
                 else:
@@ -949,7 +1002,6 @@ with tab_movie:
     if "Real AI Video" in gen_mode:
         pollinations_key = st.text_input("Enter Pollinations API Key (sk_* or pk_*):", type="password")
         
-        # Guide expander inside UI
         with st.expander("🔑 Pollinations AI API Key حاصل کرنے کا طریقہ (Guide)"):
             st.markdown("""
             1. سب سے پہلے **[Pollinations AI کے آفیشل پورٹل](https://enter.pollinations.ai/)** پر جائیں۔
@@ -972,6 +1024,9 @@ with tab_movie:
 
     m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
     
+    # Islamic and Spiritual Safety Filter Toggle (Prevents blasphemous or direct holy face depictions)
+    enable_islamic_filter = st.checkbox("Enable Islamic & Spiritual Safety Filter (حرمتِ انبیاء و اولیاء فلٹر) 🛡️", value=True, help="اگر کہانی میں اولیاء اللہ، انبیاء، قبر، جنت، جہنم یا صحابہ کا ذکر ہو تو یہ فلٹر خودکار طور پر چہرے بنانے کے بجائے روحانی نور اور تجلی دکھائے گا تا کہ بے ادبی نہ ہو۔")
+    
     # Character & Scene Memory with Libraries
     char_col1, char_col2 = st.columns([2, 1])
     with char_col1:
@@ -980,8 +1035,15 @@ with tab_movie:
     
     # Upload character reference image
     uploaded_char_img = st.file_uploader("Upload Consistent Character Image:", type=["jpg", "png", "jpeg"])
+    uploaded_char_details = "Single Person"
     if uploaded_char_img is not None:
-        st.image(uploaded_char_img, caption="Character Identity Locked ✅", width=120)
+        st.image(uploaded_char_img, caption="Character Identity Reference Loaded ✅", width=120)
+        uploaded_char_details = st.selectbox("Select Gender/Structure of Uploaded Reference Image:", [
+            "Single Person (Man) - مرد", 
+            "Single Person (Woman) - عورت", 
+            "Couple (Man and Woman) - مرد اور عورت", 
+            "Group of People - گروہ"
+        ])
         
     with char_col2:
         char_name_save = st.text_input("Save/Name Character:", key="char_name")
@@ -1067,7 +1129,7 @@ with tab_movie:
         with ac8:
             v_quality = st.selectbox("Video Quality:", ["Auto (Smart Director)", "HD", "Full HD", "2K", "4K", "8K", "Ultra Detail", "HDR", "Ultra HDR", "Maximum Quality"])
 
-    mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8 = st.columns(8)
+    mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9 = st.columns(9)
     with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
@@ -1103,7 +1165,8 @@ with tab_movie:
         "Rack Focus"
     ])
     with mc7: transition_style = st.selectbox("Transition Effect:", ["Cross Dissolve (Fade)", "Flash Transition (White Glow)", "Film Dissolve (Muted)", "Instant Cut"])
-    with mc8: sd = st.number_input("Character Seed:", value=786)
+    with mc8: character_heritage = st.selectbox("Cultural Heritage (مسلم یا مغربی حلیہ):", ["Automatic", "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)", "Ancient Arabian", "Western / Modern", "Far Eastern"])
+    with mc9: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
         rate_val = mv_rate.split(" ")[0]
@@ -1142,6 +1205,9 @@ with tab_movie:
                 enable_watermark=enable_watermark, 
                 enable_bg_music=enable_bg_music, 
                 uploaded_char_img=uploaded_char_img, 
+                uploaded_char_details=uploaded_char_details,
+                enable_islamic_filter=enable_islamic_filter,
+                character_heritage=character_heritage,
                 gen_mode=gen_mode, 
                 pollinations_key=pollinations_key,
                 advanced_params=adv_params
@@ -1232,7 +1298,7 @@ with tab_image:
                 u_db = get_user_data(st.session_state.logged_in_user)
                 if u_db and u_db['credits'] >= 5:
                     with st.spinner("Modifying image..."):
-                        img_name = translate_ur_to_en(modify_prompt)
+                        img_name = translate_ur_to_en_enhanced(modify_prompt)
                         img_data = fetch_img_failover(img_name, 1024, 1024, random.randint(1,999999))
                         if img_data:
                             img_path_temp_mod = "temp_canvas_mod.jpg"
@@ -1304,7 +1370,6 @@ with tab_enterprise:
     with ent_tab_billing:
         st.write("### 💳 Subscription Plans & Credit Packages (Pakistani Local Payment Integration)")
         
-        # Sglowina Premium Monthly Plan setup
         st.success("#### 🏆 Sglowina Premium Monthly Plan")
         st.write("💰 **Price:** 1000 PKR / Month")
         st.write("🪙 **Credits Received:** 450 Credits (Guarantees at least 30 Cinematic Video Generations!)")
@@ -1321,7 +1386,6 @@ with tab_enterprise:
             
         st.write("2. After transferring the money, please submit your payment request below for instant verification:")
         
-        # Payment verification form for customers
         if u_db:
             with st.form("local_payment_form"):
                 p_method = st.selectbox("Payment Method Used:", ["EasyPaisa", "JazzCash"])
@@ -1353,7 +1417,6 @@ with tab_enterprise:
         if u_db and u_db['role'] == 'Admin':
             st.success("Access Granted: Administrator Mode Activated")
             
-            # Fetch SaaS Stats
             conn = get_db_connection()
             cursor = conn.cursor()
             
@@ -1375,9 +1438,6 @@ with tab_enterprise:
             with saas_col3:
                 st.metric("Total Allocated Credits", total_credits_allocated)
                 
-            # -----------------
-            # NEW: Local Payment Approval Desk
-            # -----------------
             st.markdown("---")
             st.write("### 📲 Pending Local Payment Requests")
             cursor.execute("SELECT * FROM local_payments WHERE status = 'Pending'")
@@ -1389,16 +1449,11 @@ with tab_enterprise:
                 for req in pending_reqs:
                     st.write(f"👤 **User:** `{req['username']}` | 📱 **Method:** {req['method']} | 🔑 **TrxID:** `{req['trx_id']}` | 💰 **Amount:** {req['amount']} PKR")
                     
-                    # Generate a unique key for button click
                     app_btn_key = f"approve_{req['id']}"
                     if st.button(f"Approve Payment & Credit 450 Coins for {req['username']}", key=app_btn_key):
-                        # Update request status
                         cursor.execute("UPDATE local_payments SET status = 'Approved' WHERE id = ?", (req['id'],))
-                        
-                        # Add 450 credits to user and upgrade plan to Premium
                         cursor.execute("UPDATE users SET credits = credits + 450, plan = 'Premium' WHERE username = ?", (req['username'],))
                         
-                        # Get user's new balance for logging
                         cursor.execute("SELECT id, credits FROM users WHERE username = ?", (req['username'],))
                         target_u = cursor.fetchone()
                         
