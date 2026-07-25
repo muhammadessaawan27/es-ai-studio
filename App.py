@@ -1,6 +1,5 @@
 import streamlit as st
 import asyncio
-import edge_tts
 import requests
 import urllib.parse
 import os
@@ -18,10 +17,67 @@ import hashlib
 import concurrent.futures
 
 # ==========================================
-# 1. STREAMLIT INITIALIZATION & GLOBAL STATES
+# 1. BROWSER SESSION STABILITY HEADERS (Guaranteed to load first)
+# ==========================================
+headers_browser = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+session = requests.Session()
+session.headers.update(headers_browser)
+
+# ==========================================
+# 2. MOVIEPY CINEMATIC IMPORTS WITH SAFE FALLBACK
+# ==========================================
+try:
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
+    MOVIEPY_AVAILABLE = True
+    MOVIEPY_ERROR = ""
+except Exception as e:
+    MOVIEPY_AVAILABLE = False
+    MOVIEPY_ERROR = str(e)
+    
+    # Fallback placeholders to prevent NameError compilation crashes
+    class AudioFileClip:
+        def __init__(self, *args, **kwargs):
+            raise NameError("MoviePy library is missing on this server. Please add 'moviepy' to your requirements.txt.")
+    class ImageClip:
+        def __init__(self, *args, **kwargs):
+            raise NameError("MoviePy library is missing on this server. Please add 'moviepy' to your requirements.txt.")
+    class VideoFileClip:
+        def __init__(self, *args, **kwargs):
+            raise NameError("MoviePy library is missing on this server. Please add 'moviepy' to your requirements.txt.")
+    def concatenate_videoclips(*args, **kwargs):
+        raise NameError("MoviePy library is missing on this server. Please add 'moviepy' to your requirements.txt.")
+    def CompositeAudioClip(*args, **kwargs):
+        raise NameError("MoviePy library is missing on this server. Please add 'moviepy' to your requirements.txt.")
+    def CompositeVideoClip(*args, **kwargs):
+        raise NameError("MoviePy library is missing on this server. Please add 'moviepy' to your requirements.txt.")
+
+# Try importing edge_tts safely
+try:
+    import edge_tts
+    EDGE_TTS_AVAILABLE = True
+except ImportError:
+    EDGE_TTS_AVAILABLE = False
+
+# ==========================================
+# 3. STREAMLIT CONFIGURATION & GLOBAL STATES
 # ==========================================
 # Streamlit page config MUST be the first Streamlit command called
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V2.1", layout="wide", page_icon="🎬")
+
+# Show warnings if critical libraries are missing
+if not MOVIEPY_AVAILABLE:
+    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to your requirements.txt file in GitHub.")
+if not EDGE_TTS_AVAILABLE:
+    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to your requirements.txt file in GitHub.")
+
+# Sglowina Platform Bio
+SGLOWINA_BIO = (
+    "Sglowina AI is a SaaS Enterprise platform designed and developed by Muhammad Essa Awan and Saba Wahid. "
+    "It is built to empower creators with highly advanced AI-driven video synthesis, image styling, "
+    "and intelligent automated director tools."
+)
 
 # Initialize global default settings in session state to prevent NameError scoping issues
 if "enable_watermark" not in st.session_state:
@@ -78,7 +134,7 @@ def get_public_url(uploaded_file):
     return None
 
 # ==========================================
-# 2. DYNAMIC DATABASE LAYER (PostgreSQL & SQLite Concurrency Compatible)
+# 4. DYNAMIC DATABASE LAYER (PostgreSQL & SQLite Concurrency Compatible)
 # ==========================================
 def get_db_connection():
     pg_url = os.environ.get("DATABASE_URL") # Checks for production PostgreSQL (e.g. Render/Heroku)
@@ -228,7 +284,7 @@ def init_db_v21():
 init_db_v21()
 
 # ==========================================
-# 3. ENTERPRISE AUTHENTICATION HELPERS
+# 5. ENTERPRISE AUTHENTICATION HELPERS
 # ==========================================
 def register_saas_user(username, email, password):
     username = username.strip().lower()
@@ -576,6 +632,8 @@ def parallel_download_flux_images(urls, paths):
 
 # Motion control logic safely wrapped to prevent MoviePy engine crash
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
+    if not MOVIEPY_AVAILABLE:
+        return None
     try:
         scale_factor = 1.30
         
@@ -706,10 +764,40 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
     except Exception:
         return b""
 
+# Canva Typography Text Overlay on Image
+def apply_canva_typography(img_path, text):
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            draw = ImageDraw.Draw(im)
+            w, h = im.size
+            bar_height = int(h * 0.1) if h * 0.1 > 40 else 40
+            
+            # Create semi-transparent black overlay bar at the bottom
+            overlay = Image.new('RGBA', im.size, (0, 0, 0, 0))
+            draw_overlay = ImageDraw.Draw(overlay)
+            draw_overlay.rectangle([(0, h - bar_height), (w, h)], fill=(0, 0, 0, 160))
+            im = Image.alpha_composite(im.convert('RGBA'), overlay).convert('RGB')
+            
+            draw = ImageDraw.Draw(im)
+            try:
+                font = ImageFont.load_default()
+            except Exception:
+                font = None
+                
+            draw.text((20, h - bar_height + 10), text, fill=(255, 255, 255), font=font)
+            im.save(img_path, "JPEG")
+    except Exception:
+        pass
+
 # ==========================================
 # 4. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
 # ==========================================
 def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast", advanced_params=None):
+    if not MOVIEPY_AVAILABLE:
+        st.error(f"MoviePy is not available on this server. Error: {MOVIEPY_ERROR}. Please check your requirements.txt file.")
+        return "Error"
+        
     u_id = str(uuid.uuid4())[:8]
     
     # CONCURRENCY QUEUE DECK: Safely parks excess render requests
@@ -807,7 +895,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
                     
                 try:
-                    res_bg = requests.get(bg_url, timeout=12, headers=headers_browser)
+                    res_bg = session.get(bg_url, timeout=12, verify=False)
                     if res_bg.status_code == 200:
                         with open(bg_music_f, 'wb') as f:
                             f.write(res_bg.content)
@@ -893,13 +981,32 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                         if res_vid.status_code == 200:
                             with open(vid_path, "wb") as f_vid:
                                 f_vid.write(res_vid.content)
-                            clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_per)
-                            clip = apply_clip_transition(clip, transition_style, dur_per)
+                            
+                            sub_audio_path = temporary_audio_tracks[i]
+                            scene_voice_clip = AudioFileClip(sub_audio_path)
+                            dur_scene = scene_voice_clip.duration
+                            
+                            clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_scene)
+                            
+                            # Download and mix scene environmental SFX
+                            sfx_file = download_scene_sfx(scene, u_id, i)
+                            if sfx_file and os.path.exists(sfx_file):
+                                try:
+                                    sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
+                                    clip_composite_audio = CompositeAudioClip([scene_voice_clip, sfx_audio])
+                                    clip = clip.set_audio(clip_composite_audio)
+                                    generated_images.append(sfx_file)
+                                except Exception:
+                                    clip = clip.set_audio(scene_voice_clip)
+                            else:
+                                clip = clip.set_audio(scene_voice_clip)
+                                
+                            clip = apply_clip_transition(clip, transition_style, dur_scene)
                             clips.append(clip)
                             generated_images.append(vid_path) 
                             continue
-                    except Exception:
-                        st.warning(f"Video API failed, falling back to static photo...")
+                    except Exception as vid_ex:
+                        st.warning(f"Video API failed, falling back to static photo... Error: {vid_ex}")
                 
                 w_target = make_even(w * 1.25)
                 h_target = make_even(h * 1.25)
@@ -1047,7 +1154,6 @@ st.markdown("""
         font-family: 'Inter', sans-serif; 
     }
     
-    /* شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ ٹائٹل کے لیے (صحیح سائز 2.2rem پر بحال) */
     .glow-title { 
         font-size: 2.2rem; 
         font-weight: 900; 
@@ -1580,62 +1686,4 @@ with tab_enterprise:
             cursor.execute("SELECT SUM(credits) FROM users")
             total_credits_allocated = cursor.fetchone()[0]
             
-            st.write("### System Metrics Dashboard")
-            saas_col1, saas_col2, saas_col3 = st.columns(3)
-            with saas_col1:
-                st.metric("Total Users Count", total_users)
-            with saas_col2:
-                st.metric("Total Generated Projects", total_projects)
-            with saas_col3:
-                st.metric("Total Allocated Credits", total_credits_allocated)
-                
-            st.markdown("---")
-            st.write("### 📲 Pending Local Payment Requests")
-            cursor.execute("SELECT * FROM local_payments WHERE status = 'Pending'")
-            pending_reqs = cursor.fetchall()
-            
-            if not pending_reqs:
-                st.info("No pending payment requests found.")
-            else:
-                for req in pending_reqs:
-                    st.write(f"👤 **User:** `{req['username']}` | 📱 **Method:** {req['method']} | 🔑 **TrxID:** `{req['trx_id']}` | 💰 **Amount:** {req['amount']} PKR")
-                    
-                    app_btn_key = f"approve_{req['id']}"
-                    if st.button(f"Approve Payment & Credit 450 Coins for {req['username']}", key=app_btn_key):
-                        cursor.execute("UPDATE local_payments SET status = 'Approved' WHERE id = ?", (req['id'],))
-                        cursor.execute("UPDATE users SET credits = credits + 450, plan = 'Premium' WHERE username = ?", (req['username'],))
-                        
-                        cursor.execute("SELECT id, credits FROM users WHERE username = ?", (req['username'],))
-                        target_u = cursor.fetchone()
-                        
-                        if target_u:
-                            log_credit_usage(target_u['id'], "Manual Purchase Approval", 450, target_u['credits'])
-                            
-                        conn.commit()
-                        st.success(f"Payment {req['trx_id']} approved! 450 credits successfully loaded onto {req['username']}'s account.")
-                        st.rerun()
-            
-            st.markdown("---")
-            cursor.execute("SELECT * FROM users")
-            all_users = cursor.fetchall()
-            
-            st.write("### User Database Management")
-            for u in all_users:
-                st.write(f"👤 **{u['username']}** | Role: {u['role']} | Plan: {u['plan']} | Credits: {u['credits']} 🪙 | Status: {u['status']}")
-                
-            st.markdown("---")
-            manage_user = st.selectbox("Select User to Adjust:", [u['username'] for u in all_users])
-            new_plan = st.selectbox("Change Subscription Plan:", ["Free", "Starter", "Premium", "Enterprise"])
-            new_role = st.selectbox("Change User Role:", ["User", "Admin"])
-            new_status = st.selectbox("Change Account Status:", ["Active", "Banned"])
-            new_credits = st.number_input("Adjust Credits Balance:", min_value=0, max_value=100000, value=500)
-            
-            if st.button("Apply Admin Settings"):
-                cursor.execute("UPDATE users SET credits = ?, plan = ?, role = ?, status = ? WHERE username = ?", (new_credits, new_plan, new_role, new_status, manage_user))
-                conn.commit()
-                st.success(f"Successfully updated settings for {manage_user}!")
-            conn.close()
-        else:
-            st.error("Access Denied: Only database-defined Administrators can access this control panel.")
-
-st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.5 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+            st.write("##
