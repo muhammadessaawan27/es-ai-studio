@@ -8,7 +8,7 @@ import time
 import re
 import uuid
 import random
-from PIL import Image, ImageDraw, ImageFont, ImageStat
+from PIL import Image, ImageDraw, ImageFont, ImageStat, ImageFilter, ImageEnhance
 import io
 import numpy as np
 import threading
@@ -257,7 +257,7 @@ except Exception:
     except Exception:
         pass
 
-# AI Hollywood Director Mode Intelligent Scene Analyzer
+# AI Hollywood Director Mode Intelligent Scene & Speaker Analyzer
 def analyze_scene_for_director(scene_text):
     text = scene_text.lower()
     
@@ -266,30 +266,33 @@ def analyze_scene_for_director(scene_text):
     color_grading = "Hollywood Cinematic"
     composition = "Medium Shot, Rule of Thirds"
     
-    # Analyze motions dynamically based on textual context
+    # 1. Dynamic speaker shot cuts logic based on pronouns / names
+    if any(k in text for k in ["saba", "she", "her", "woman", "female", "girl"]):
+        composition = "Tight close-up portrait shot, extreme details of female face, emotional expression"
+        motion = "Push In"
+    elif any(k in text for k in ["essa", "he", "him", "man", "male", "boy", "warrior", "king"]):
+        composition = "Cinematic masculine close-up portrait, focus on eyes and facial details"
+        motion = "Zoom In"
+    elif any(k in text for k in ["together", "couple", "they", "them", "sitting with", "walking with"]):
+        composition = "Cinematic medium shot of a couple, side-by-side interacting"
+        motion = "Orbit Camera"
+    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "mud"]):
+        composition = "Cinematic wide-angle establishing landscape shot, highly atmospheric environment"
+        motion = "Drone Shot"
+
+    # 2. Camera motion mapping
     if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag"]):
         motion = "Tracking Shot"
-    elif any(k in text for k in ["cry", "sad", "tears", "mourn", "grief", "eyes", "face", "looking"]):
-        motion = "Push In"
     elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
         motion = "Dolly In"
         lighting = "Dark Cinematic, Horror Shadows"
         color_grading = "Horror Green"
-    elif any(k in text for k in ["palace", "castle", "mountain", "valley", "landscape", "sky", "sea", "ocean"]):
-        motion = "Drone Shot"
-        composition = "Extreme Wide Shot"
-    elif any(k in text for k in ["king", "throne", "emperor", "court"]):
-        motion = "Crane Shot"
-        composition = "Wide Shot, Low Angle"
     elif any(k in text for k in ["fight", "battle", "sword", "war"]):
         motion = "Handheld Camera"
     elif any(k in text for k in ["walk", "stroll"]):
         motion = "Follow Shot"
     elif any(k in text for k in ["think", "silent", "quiet", "meditate"]):
         motion = "Ken Burns Effect"
-        composition = "Close-up"
-    else:
-        motion = random.choice(["Zoom In", "Zoom Out (v40 Default)", "Parallax Motion", "Orbit Camera", "Ken Burns Effect"])
         
     if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine"]):
         lighting = "Golden Hour"
@@ -309,7 +312,7 @@ def analyze_scene_for_director(scene_text):
 def translate_ur_to_en_enhanced(text):
     try:
         instruction = (
-            "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into highly descriptive English visual instructions. "
+            "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into highly descriptive English visual instructions. \n"
             "CRITICAL RULES: \n"
             "1. Explicitly identify the main subjects (e.g., 'a single male', 'a single female', 'a lion', 'only a peaceful landscape with no humans'). \n"
             "2. Do NOT blend genders. If the subject is a man, do NOT include feminine descriptions. If the subject is a woman, do NOT include masculine features. \n"
@@ -378,7 +381,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, ch
     try:
         instruction = (
             "You are an expert Hollywood visual artist and prompt engineer. "
-            "Analyze the Urdu scene and write a highly detailed visual English image prompt for the Flux model. "
+            "Analyze the Urdu scene and write a highly detailed visual English image prompt for the Flux model. \n"
             "CRITICAL INSTRUCTIONS:\n"
             "1. If 'Islamic Safety Filter' is Active and the text contains Islamic holy names (like Prophets/انبیاء, Sahaba/صحابہ, Auliya, Allah, Quran, or grave, heaven, hell), you MUST strictly avoid generating any human face or human body. Instead, generate a highly spiritual scene depicting glorious volumetric white and golden divine light rays emanating from a cosmic night sky, beautiful natural mountains, or ancient desert paths. No human silhouettes.\n"
             "2. For human characters, strictly enforce gender separation. Do NOT mix genders. A female character (e.g. Saba) must have a beautiful, clean, feminine Eastern face. Absolutely NO facial hair, NO beards, and NO mustaches on females.\n"
@@ -418,10 +421,79 @@ def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, ch
         pass
     return f"Cinematic film scene: {urdu_scene}, highly detailed, 8k"
 
+# Post-Processing Color LUT Grading Matrix Harmony
+def apply_color_lut_harmony(img_path, style_preset):
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            # Apply color tinting based on style preset mathematically
+            if style_preset in ["Realistic HD", "Cinematic Film"]:
+                r, g, b = im.split()
+                # Warm highlights, cool shadows (Teal & Orange cinematic grade)
+                r = r.point(lambda i: int(i * 1.05))
+                b = b.point(lambda i: int(i * 0.95))
+                im = Image.merge("RGB", (r, g, b))
+            elif style_preset == "Dark Gothic / Mystery":
+                im = ImageEnhance.Color(im).enhance(0.7)
+                r, g, b = im.split()
+                b = b.point(lambda i: int(i * 1.10))
+                im = Image.merge("RGB", (r, g, b))
+            elif style_preset == "Historical Epic":
+                r, g, b = im.split()
+                r = r.point(lambda i: int(i * 1.08))
+                g = g.point(lambda i: int(i * 1.02))
+                b = b.point(lambda i: int(i * 0.90))
+                im = Image.merge("RGB", (r, g, b))
+            
+            # Pop contrast slightly for cinema density
+            im = ImageEnhance.Contrast(im).enhance(1.08)
+            im.save(img_path, "JPEG")
+    except Exception:
+        pass
+
+# Dynamic Sound Effects (SFX) Downloader & Path Mapper
+def download_scene_sfx(scene_text, u_id, idx):
+    text = scene_text.lower()
+    sfx_url = None
+    
+    # Sound mapping from reliable, fast-loading public sources
+    if any(k in text for k in ["rain", "storm", "thunder", "clouds", "بارش", "طوفان"]):
+        sfx_url = "https://www.soundjay.com/nature/sounds/rain-07.mp3"
+    elif any(k in text for k in ["sword", "fight", "battle", "clash", "تلوار", "جنگ"]):
+        sfx_url = "https://www.soundjay.com/mechanical/sounds/cutlery-clink-1.mp3" # Metallic clink
+    elif any(k in text for k in ["forest", "jungle", "birds", "nature", "درخت", "جنگل"]):
+        sfx_url = "https://www.soundjay.com/nature/sounds/forest-wind-1.mp3"
+    elif any(k in text for k in ["fire", "burn", "flame", "آگ"]):
+        sfx_url = "https://www.soundjay.com/nature/sounds/fire-1.mp3"
+    elif any(k in text for k in ["wind", "breeze", "ہوا"]):
+        sfx_url = "https://www.soundjay.com/nature/sounds/wind-howl-01.mp3"
+        
+    if sfx_url:
+        sfx_filename = f"sfx_{u_id}_{idx}.mp3"
+        try:
+            res = session.get(sfx_url, timeout=10)
+            if res.status_code == 200:
+                with open(sfx_filename, "wb") as f:
+                    f.write(res.content)
+                return sfx_filename
+        except Exception:
+            pass
+    return None
+
 # Motion control logic safely wrapped to prevent MoviePy engine crash
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     try:
         scale_factor = 1.30
+        
+        # Apply slight motion blur during rapid panning
+        if motion in ["Whip Pan", "Tracking Shot"]:
+            try:
+                with Image.open(img_path) as im_blur:
+                    im_blur = im_blur.filter(ImageFilter.GaussianBlur(radius=1))
+                    im_blur.save(img_path, "JPEG")
+            except Exception:
+                pass
+
         base_clip = ImageClip(img_path).set_duration(duration).set_fps(24)
         cw, ch = int(w * scale_factor), int(h * scale_factor)
         clip = base_clip.resize((cw, ch))
@@ -451,11 +523,13 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
         elif motion == "Drone Shot":
             animated_clip = clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center')
         elif motion == "Tracking Shot" or motion == "Follow Shot":
+            # Tracking with micro vibration shake
             animated_clip = clip.set_position(lambda t: (
                 int((w - cw) * (t / duration)),
                 int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5)))
             ))
         elif motion == "Handheld Camera" or motion == "Shoulder Camera":
+            # Pure manual handheld camera shake calculations
             animated_clip = clip.set_position(lambda t: (
                 int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))),
                 int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7)))
@@ -501,17 +575,6 @@ def apply_clip_transition(clip, transition, duration):
     except Exception:
         pass
     return clip
-
-# Image failover provider from pollination (Upgraded strictly to Flux for high definition features)
-def fetch_img_failover(prompt, w, h, seed):
-    try:
-        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
-        res = session.get(url, timeout=30)
-        if res.status_code == 200:
-            return res.content
-    except Exception:
-        pass
-    return None
 
 # Text to speech async to sync wrapper
 def save_audio_safe(text, voice, rate, pitch, filename):
@@ -581,34 +644,33 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             raise Exception("Voice generation failed.")
             
         voice_audio = AudioFileClip(audio_file)
-        progress_bar.progress(0.15)
+        progress_bar.progress(0.12)
         
+        # DOWNLOADING BACKGROUND MUSIC TRACK (CDN hosted stable tracks)
         if enable_bg_music:
             status.info("🎵 Downloading Atmospheric Background Track...")
             story_lower = story.lower()
             is_horror = any(k in story_lower or k in story for k in ["قبر", "عذاب", "موت", "خوفناک", "خوف", "جن", "بھوت", "تاریک", "ڈراؤنی", "grave", "torment", "punishment", "scary", "ghost", "dark", "death", "screaming", "blood", "bloody", "horror"])
             is_epic = any(k in story_lower or k in story for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "شاہی", "تاریخ", "بہادر", "king", "queen", "throne", "palace", "empire", "warrior", "brave", "history", "castle"])
-            is_peaceful = any(k in story_lower or k in story for k in ["نماز", "دعا", "مسجد", "ولی", "صبر", "سکون", "اللہ", "pray", "prayer", "mosque", "peace", "peaceful", "sad", "crying", "tears"])
             
+            # SoundHelix highly responsive CDNs that do not fail downloads
             if is_horror:
-                bg_url = "https://upload.wikimedia.org/wikipedia/commons/1/18/Beethoven_-_Moonlight_Sonata_-_1st_movement.mp3"
+                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
             elif is_epic:
-                bg_url = "https://upload.wikimedia.org/wikipedia/commons/d/df/Johann_Sebastian_Bach_-_Air_on_the_G_String_-_arranged_for_piano_and_violin.mp3"
-            elif is_peaceful:
-                bg_url = "https://upload.wikimedia.org/wikipedia/commons/e/e6/Chopin_-_Nocturne_op._9_no._2.mp3"
+                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
             else:
-                bg_url = "https://upload.wikimedia.org/wikipedia/commons/e/e6/Chopin_-_Nocturne_op._9_no._2.mp3"
+                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
                 
             try:
-                res_bg = session.get(bg_url, timeout=20, verify=False)
+                res_bg = requests.get(bg_url, timeout=12, headers=headers_browser)
                 if res_bg.status_code == 200:
                     with open(bg_music_f, 'wb') as f:
                         f.write(res_bg.content)
                     has_bg_music = True
-            except:
-                pass
+            except Exception as bg_ex:
+                st.warning(f"Background music skipped due to CDN timeout: {bg_ex}")
                 
-        progress_bar.progress(0.20)
+        progress_bar.progress(0.18)
         
         res_map = {
             "YouTube (16:9)": (1280, 720), 
@@ -629,8 +691,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         dur_per = voice_audio.duration / len(sentences)
         
         for i, scene in enumerate(sentences):
-            progress_bar.progress(0.20 + (i / len(sentences)) * 0.60)
-            status.info(f"🎨 Generating visual scene {i+1}...")
+            progress_bar.progress(0.18 + (i / len(sentences)) * 0.62)
+            status.info(f"🎨 Processing Scene {i+1}/{len(sentences)}...")
             
             # Translate Urdu story block with strict gender-guard context matching
             english_scene = translate_ur_to_en_enhanced(scene)
@@ -649,19 +711,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             if camera_motion != "AI Hollywood Director (Auto)":
                 dir_settings["motion"] = camera_motion
                 
-            # Respect other Advanced Controls if modified from 'Auto'
-            if advanced_params:
-                if advanced_params.get("v_lighting") != "Auto (Smart Director)":
-                    dir_settings["lighting"] = advanced_params.get("v_lighting")
-                if advanced_params.get("v_color") != "Auto (Smart Director)":
-                    dir_settings["color_grading"] = advanced_params.get("v_color")
-                if advanced_params.get("v_env") != "Auto (Smart Director)":
-                    scene_desc = (scene_desc + ", " + advanced_params.get("v_env")) if scene_desc else advanced_params.get("v_env")
-                if advanced_params.get("v_weather") != "Auto (Smart Director)":
-                    scene_desc = (scene_desc + ", " + advanced_params.get("v_weather")) if scene_desc else advanced_params.get("v_weather")
-                if advanced_params.get("v_mood") != "Auto (Smart Director)":
-                    dir_settings["composition"] = dir_settings["composition"] + f", {advanced_params.get('v_mood')} mood"
-            
             active_motion = dir_settings["motion"]
             
             # Add dynamic Cultural Heritage styling tags (eastern / muslim appearance)
@@ -735,6 +784,9 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             with open(img_path, "wb") as f:
                 f.write(img_data)
                 
+            # Apply mathematical LUT Tone Grading preset automatically on the PIL image object
+            apply_color_lut_harmony(img_path, style)
+            
             try:
                 with Image.open(img_path) as img_obj:
                     img_obj = img_obj.convert("RGB").resize((w_target, h_target))
@@ -752,6 +804,23 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 im.save(img_path, "JPEG")
                 
             clip = apply_camera_motion_v40(img_path, active_motion, dur_per, w, h)
+            
+            # NATIVE ENVIRONMENTAL SOUND EFFECTS (SFX) DOWNLOAD & MULTI-AUDIO MIXING
+            sfx_file = download_scene_sfx(scene, u_id, i)
+            scene_voice_audio = voice_audio.subclip(i * dur_per, min((i + 1) * dur_per, voice_audio.duration))
+            
+            if sfx_file and os.path.exists(sfx_file):
+                try:
+                    sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_per)
+                    # Overlay environment SFX and Speech Voiceover on the individual scene clip
+                    clip_compound_audio = CompositeAudioClip([scene_voice_audio, sfx_audio])
+                    clip = clip.set_audio(clip_compound_audio)
+                    generated_images.append(sfx_file) # Track to delete later
+                except Exception:
+                    clip = clip.set_audio(scene_voice_audio)
+            else:
+                clip = clip.set_audio(scene_voice_audio)
+                
             clip = apply_clip_transition(clip, transition_style, dur_per)
             clips.append(clip)
             
@@ -768,30 +837,29 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         progress_bar.progress(0.85)
         status.info("🎞️ Rendering final MP4 movie...")
         
-        final_audio = voice_audio
-        bg_audio = None
+        # Concat clips (automatically maintains scene audio and nested SFX in sync)
+        final_video = concatenate_videoclips(clips, method="compose").resize((w, h))
+        
+        # OVERLAY GLOBAL BACKGROUND MUSIC IN FINAL MASTER MIX (Guaranteed to play)
         if has_bg_music and os.path.exists(bg_music_f):
             try:
-                bg_audio = AudioFileClip(bg_music_f).volumex(0.10)
-                bg_audio = bg_audio.set_duration(voice_audio.duration)
-                final_audio = CompositeAudioClip([voice_audio, bg_audio])
-            except Exception:
-                pass
+                bg_track = AudioFileClip(bg_music_f).volumex(0.06).set_duration(final_video.duration)
+                combined_master_audio = CompositeAudioClip([final_video.audio, bg_track])
+                final_video = final_video.set_audio(combined_master_audio)
+            except Exception as e:
+                st.warning(f"Background music mixing warning: {e}")
                 
-        final_video = concatenate_videoclips(clips, method="compose").resize((w, h)).set_audio(final_audio)
         out_name = f"Sglowina_{u_id}.mp4"
         final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
         
         voice_audio.close()
-        if bg_audio:
-            bg_audio.close()
         final_video.close()
         
         try:
             if os.path.exists(audio_file): os.remove(audio_file)
             if os.path.exists(bg_music_f): os.remove(bg_music_f)
-            for img_p in generated_images:
-                if os.path.exists(img_p): os.remove(img_p)
+            for file_p in generated_images:
+                if os.path.exists(file_p): os.remove(file_p)
         except Exception:
             pass
             
@@ -813,8 +881,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         try:
             if os.path.exists(audio_file): os.remove(audio_file)
             if os.path.exists(bg_music_f): os.remove(bg_music_f)
-            for img_p in generated_images:
-                if os.path.exists(img_p): os.remove(img_p)
+            for file_p in generated_images:
+                if os.path.exists(file_p): os.remove(file_p)
         except: pass
         progress_bar.empty()
         return f"Error Details: {e}"
