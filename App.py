@@ -1686,4 +1686,62 @@ with tab_enterprise:
             cursor.execute("SELECT SUM(credits) FROM users")
             total_credits_allocated = cursor.fetchone()[0]
             
-            st.write("##
+            st.write("### System Metrics Dashboard")
+            saas_col1, saas_col2, saas_col3 = st.columns(3)
+            with saas_col1:
+                st.metric("Total Users Count", total_users)
+            with saas_col2:
+                st.metric("Total Generated Projects", total_projects)
+            with saas_col3:
+                st.metric("Total Allocated Credits", total_credits_allocated)
+                
+            st.markdown("---")
+            st.write("### 📲 Pending Local Payment Requests")
+            cursor.execute("SELECT * FROM local_payments WHERE status = 'Pending'")
+            pending_reqs = cursor.fetchall()
+            
+            if not pending_reqs:
+                st.info("No pending payment requests found.")
+            else:
+                for req in pending_reqs:
+                    st.write(f"👤 **User:** `{req['username']}` | 📱 **Method:** {req['method']} | 🔑 **TrxID:** `{req['trx_id']}` | 💰 **Amount:** {req['amount']} PKR")
+                    
+                    app_btn_key = f"approve_{req['id']}"
+                    if st.button(f"Approve Payment & Credit 450 Coins for {req['username']}", key=app_btn_key):
+                        cursor.execute("UPDATE local_payments SET status = 'Approved' WHERE id = ?", (req['id'],))
+                        cursor.execute("UPDATE users SET credits = credits + 450, plan = 'Premium' WHERE username = ?", (req['username'],))
+                        
+                        cursor.execute("SELECT id, credits FROM users WHERE username = ?", (req['username'],))
+                        target_u = cursor.fetchone()
+                        
+                        if target_u:
+                            log_credit_usage(target_u['id'], "Manual Purchase Approval", 450, target_u['credits'])
+                            
+                        conn.commit()
+                        st.success(f"Payment {req['trx_id']} approved! 450 credits successfully loaded onto {req['username']}'s account.")
+                        st.rerun()
+            
+            st.markdown("---")
+            cursor.execute("SELECT * FROM users")
+            all_users = cursor.fetchall()
+            
+            st.write("### User Database Management")
+            for u in all_users:
+                st.write(f"👤 **{u['username']}** | Role: {u['role']} | Plan: {u['plan']} | Credits: {u['credits']} 🪙 | Status: {u['status']}")
+                
+            st.markdown("---")
+            manage_user = st.selectbox("Select User to Adjust:", [u['username'] for u in all_users])
+            new_plan = st.selectbox("Change Subscription Plan:", ["Free", "Starter", "Premium", "Enterprise"])
+            new_role = st.selectbox("Change User Role:", ["User", "Admin"])
+            new_status = st.selectbox("Change Account Status:", ["Active", "Banned"])
+            new_credits = st.number_input("Adjust Credits Balance:", min_value=0, max_value=100000, value=500)
+            
+            if st.button("Apply Admin Settings"):
+                cursor.execute("UPDATE users SET credits = ?, plan = ?, role = ?, status = ? WHERE username = ?", (new_credits, new_plan, new_role, new_status, manage_user))
+                conn.commit()
+                st.success(f"Successfully updated settings for {manage_user}!")
+            conn.close()
+        else:
+            st.error("Access Denied: Only database-defined Administrators can access this control panel.")
+
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.5 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
