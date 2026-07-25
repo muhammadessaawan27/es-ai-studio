@@ -292,62 +292,19 @@ st.markdown("""
         font-family: 'Inter', sans-serif; 
     }
     
-    .executive-header {
-        text-align: center; 
-        padding: 15px; 
-        border-bottom: 2px solid #e2e8f0; 
-        margin-bottom: 20px; 
-        background-color: #05050a !important;
-        border-radius: 12px;
-    }
-    
-    /* فاؤنڈرز کے نام کی شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ */
-    .main-names { 
-        font-size: 2.2rem; 
+    /* شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ ٹائٹل کے لیے */
+    .glow-title { 
+        font-size: 3.5rem; 
         font-weight: 900; 
         text-align: center;
         font-family: 'Orbitron', sans-serif;
-        color: #ffffff !important;
-        background: transparent;
-        text-shadow: 
-            0 0 7px #fff,
-            0 0 15px #ff007a,  /* Neon Pink */
-            0 0 25px #ff007a,
-            0 0 35px #2563eb,  /* Electric Blue */
-            0 0 55px #2563eb,
-            0 0 75px #2563eb;
-        animation: electricGlow 1.5s ease-in-out infinite alternate;
-    }
-
-    @keyframes electricGlow {
-        0% {
-            text-shadow: 
-                0 0 7px #fff,
-                0 0 15px #ff007a,
-                0 0 25px #ff007a,
-                0 0 35px #2563eb,
-                0 0 55px #2563eb,
-                0 0 75px #2563eb;
-        }
-        100% {
-            text-shadow: 
-                0 0 4px #fff,
-                0 0 10px #2563eb,
-                0 0 20px #2563eb,
-                0 0 30px #ff007a,
-                0 0 50px #ff007a,
-                0 0 70px #ff007a;
-        }
-    }
-    
-    .title-tag { 
-        font-size: 0.95rem; 
-        font-weight: bold; 
-        color: #94a3b8 !important; 
-        letter-spacing: 4px; 
-        text-transform: uppercase; 
-        text-align: center;
-        margin-top: 5px;
+        background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 0 0 30px rgba(255, 0, 122, 0.2);
+        margin-top: 15px;
+        margin-bottom: 5px;
+        letter-spacing: 2px;
     }
 
     .logo-container { display: flex; justify-content: center; align-items: center; padding: 20px 0; }
@@ -411,8 +368,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown("""<div class="executive-header"><div class="main-names">Muhammad Essa Awan & Saba Wahid</div>
-    <div class="title-tag">Founders & CEOs | SGLOWINA AI OFFICIAL STUDIO</div></div>""", unsafe_allow_html=True)
+st.markdown('<div class="glow-title">SGLOWINA AI</div>', unsafe_allow_html=True)
 st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
 
 # ==========================================
