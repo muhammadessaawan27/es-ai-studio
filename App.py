@@ -17,6 +17,13 @@ import sqlite3
 import hashlib
 import concurrent.futures
 
+# Streamlit page config MUST be the first Streamlit command called
+st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V2.1", layout="wide", page_icon="🎬")
+
+# Global Default Settings to prevent NameError scoping issues in Streamlit
+enable_watermark = True
+enable_bg_music = True
+
 # Bio Data
 SGLOWINA_BIO = """
 Sglowina AI is an Enterprise-grade SaaS platform co-founded and directed by Muhammad Essa Awan and Saba Wahid. 
@@ -397,7 +404,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, ch
         scene_lower = urdu_scene.lower()
         gender_booster = ""
         
-        # PROMPT BOUSTER ENGINE: Forcefully overrides default Western biases
+        # PROMPT BOOSTER ENGINE: Forcefully overrides default Western biases
         if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
             if "صبا" in scene_lower or "saba" in scene_lower or "woman" in scene_lower or "female" in scene_lower or "girl" in scene_lower:
                 gender_booster = (
@@ -658,6 +665,17 @@ def apply_clip_transition(clip, transition, duration):
     except Exception:
         pass
     return clip
+
+# Image failover provider from pollination (Upgraded strictly to Flux for high definition features)
+def fetch_img_failover(prompt, w, h, seed):
+    try:
+        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
+        res = session.get(url, timeout=30)
+        if res.status_code == 200:
+            return res.content
+    except Exception:
+        pass
+    return None
 
 # Text to speech async to sync wrapper
 def save_audio_safe(text, voice, rate, pitch, filename):
@@ -1007,70 +1025,113 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             gc.collect()
 
 # ==========================================
-# 6. UI NAVIGATION & CONTROL PANEL
+# 6. UI & PREMIUM BRANDING STYLING (V2.1)
 # ==========================================
-tab_auth, tab_chat, tab_movie, tab_image, tab_enterprise = st.tabs([
-    "🔑 Sign In & Registrations",
-    "💬 Electric AI Chat", 
-    "🎬 Pro Master Studio", 
-    "🎨 Pro Image Studio",
-    "👤 Enterprise Center"
-])
-
-# -----------------
-# TAB 1: AUTHENTICATION
-# -----------------
-with tab_auth:
-    st.write("### 🔑 Sglowina Secure Authentication Portal")
-    auth_mode = st.radio("Choose Action", ["Sign In", "Create New Account"])
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700;900&display=swap');
     
-    if auth_mode == "Sign In":
-        with st.form("login_form"):
-            u_name = st.text_input("Username")
-            p_word = st.text_input("Password", type="password")
-            btn_login = st.form_submit_button("Sign In 🚀")
-            if btn_login:
-                if authenticate_user(u_name, p_word):
-                    st.session_state.logged_in_user = u_name.strip().lower()
-                    if st.session_state.logged_in_user in ["essasaba", "essa_awan", "saba_wahid"]:
-                        st.success("Welcome back to SGLOWINA AI, Muhammad Essa Awan & Saba Wahid! (Admin Authorized) 🟢")
-                    else:
-                        st.success(f"Welcome to SGLOWINA AI, {u_name}! (Authorized User) 🟢")
-                    time.sleep(1.5)
-                    st.rerun()
-                else:
-                    st.error("Invalid credentials.")
-    else:
-        with st.form("reg_form"):
-            new_u = st.text_input("Choose Username")
-            new_e = st.text_input("Email Address")
-            new_p = st.text_input("Password", type="password")
-            btn_reg = st.form_submit_button("Register Account 🎯")
-            if btn_reg:
-                if new_u and new_e and new_p:
-                    success, msg = register_saas_user(new_u, new_e, new_p)
-                    if success:
-                        st.success(f"Welcome to SGLOWINA AI! Account for '{new_u}' registered successfully. Please sign in. 🟢")
-                    else:
-                        st.error(msg)
-                else:
-                    st.warning("Please fill out all fields.")
+    .stApp { 
+        background-color: #ffffff !important; 
+        color: #000000 !important; 
+        font-family: 'Inter', sans-serif; 
+    }
+    
+    /* شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ ٹائٹل کے لیے (اصل 3.5rem سائز بحال) */
+    .glow-title { 
+        font-size: 3.5rem; 
+        font-weight: 900; 
+        text-align: center;
+        font-family: 'Orbitron', sans-serif;
+        background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 0 0 30px rgba(255, 0, 122, 0.2);
+        margin-top: 15px;
+        margin-bottom: 5px;
+        letter-spacing: 2px;
+    }
 
-# -----------------
-# TAB 2: CHAT INTERACTION
-# -----------------
-with tab_chat:
-    st.write("### 💬 Sglowina Intelligence Dashboard")
-    for m in st.session_state.msgs:
-        with st.chat_message(m["role"]): st.write(m["content"])
-    if p := st.chat_input("How can I help you?"):
-        st.session_state.msgs.append({"role": "user", "content": p})
-        with st.chat_message("user"): st.write(p)
-        res = SGLOWINA_BIO if any(k in p.lower() for k in ["kisne", "who made", "owner", "essa", "saba"]) else requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true").text
-        with st.chat_message("assistant"):
-            translated_response = res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
-            st.write(translated_response)
-            st.session_state.msgs.append({"role": "assistant", "content": translated_response})
+    .logo-container { display: flex; justify-content: center; align-items: center; padding: 20px 0; }
+    
+    .circular-s {
+        width: 120px; height: 120px; 
+        background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff) !important;
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        font-family: 'Orbitron', sans-serif; font-size: 50px; color: #ffffff !important;
+        border: 5px solid #ffffff !important;
+        box-shadow: 0 0 50px #ff007a, inset 0 0 20px #ffffff;
+        animation: rotateShua 4s infinite linear, lightningGlow 1.5s infinite alternate;
+    }
+    
+    @keyframes rotateShua {
+        0% { transform: perspective(1000px) rotateY(0deg); }
+        100% { transform: perspective(1000px) rotateY(360deg); }
+    }
+    @keyframes lightningGlow {
+        0%, 100% { box-shadow: 0 0 25px #2563eb, 0 0 50px #ff007a, inset 0 0 15px #ffffff; }
+        50% { box-shadow: 0 0 50px #ff007a, 0 0 80px #00d4ff, inset 0 0 25px #ffffff; }
+    }
+
+    .stButton>button { 
+        background: #000000 !important; 
+        color: white !important; 
+        border-radius: 12px !important; 
+        height: 55px; 
+        width: 100%; 
+        font-size: 20px; 
+        font-weight: bold; 
+        border: none; 
+    }
+    
+    [data-testid="stSidebar"] { 
+        background-color: #ffffff !important; 
+        border-right: 1px solid #e2e8f0; 
+    }
+    [data-testid="stSidebar"] * { 
+        color: #000000 !important; 
+        font-weight: bold !important; 
+    }
+    
+    div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input {
+        background-color: #f8fafc !important;
+        color: #0f172a !important;
+        border: 2px solid #cbd5e1 !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+        transition: all 0.3s ease !important;
+    }
+    div[data-baseweb="textarea"] textarea:focus, div[data-baseweb="input"] input:focus {
+        border-color: #00d4ff !important;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.2) !important;
+        background-color: #ffffff !important;
+    }
+    div[data-baseweb="textarea"] textarea::placeholder, div[data-baseweb="input"] input::placeholder {
+        color: #64748b !important;
+        opacity: 1 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.markdown('<div class="glow-title">SGLOWINA AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
+
+# Sidebar Settings (Rendered strictly once to avoid duplicate widget keys)
+st.sidebar.subheader("🎬 Video Settings")
+enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=enable_watermark)
+enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=enable_bg_music)
+
+# Sglowina Enterprise Center sidebar credits log
+st.sidebar.markdown("---")
+st.sidebar.subheader("👤 Sglowina Enterprise Center")
+st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
+u_sidebar_db = get_user_data(st.session_state.logged_in_user)
+if u_sidebar_db:
+    st.sidebar.write(f"Credits Remaining: **{u_sidebar_db['credits']}** 🪙")
+    st.sidebar.write(f"Plan: **{u_sidebar_db['plan']}**")
+else:
+    st.sidebar.write("Credits Remaining: **Guest Mode**")
+    st.sidebar.write("Plan: **Free Trial**")
 
 # -----------------
 # TAB 3: PRO MOVIE STUDIO
@@ -1423,7 +1484,7 @@ with tab_enterprise:
             
             # --- NEW: MASTER API KEY MANAGEMENT UI ---
             st.write("### 🔑 Sglowina Master API Key Configuration")
-            st.info("بطور ایڈمنسٹریٹر آپ یہاں اپنی پریمیم اے پی آئی کی (API Key) لگا کر ہمیشہ کے لیے سیو کر سکتے ہیں، تاکہ تمام صارفین بغیر اپنی کی درج کیے مستقل ویڈیو جنریٹ کر سکیں۔")
+            st.info("بطور ایڈمنسٹریٹر آپ یہاں اپنی پریمیم اے پی آئی کی (API Key) لگا کر ہمیشہ کے لیے سیو کر سکتے ہیں، تاکہ تمام صارفین بغیر اپنی کی درج کیے مستقل ویڈیو جنریٹ کر سکsound۔")
             
             conn = get_db_connection()
             cursor = conn.cursor()
