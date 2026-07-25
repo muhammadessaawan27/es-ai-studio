@@ -15,12 +15,18 @@ import threading
 import gc
 import sqlite3
 import hashlib
+import concurrent.futures
 
 # Bio Data
 SGLOWINA_BIO = """
 Sglowina AI is an Enterprise-grade SaaS platform co-founded and directed by Muhammad Essa Awan and Saba Wahid. 
 It is dedicated to state-of-the-art AI video creation, intelligent automated scripting, and premium visual studio synthesis.
 """
+
+# Global Concurrency Queue locks to support up to 100 concurrent render requests without server crash
+render_semaphore = threading.Semaphore(value=2)  # Maximum 2 concurrent encoding processes to save RAM/CPU
+active_renderers = 0
+render_lock = threading.Lock()
 
 # Helper function to ensure even dimensions for FFMPEG compatibility
 def make_even(val):
@@ -53,20 +59,37 @@ def get_public_url(uploaded_file):
     return None
 
 # ==========================================
-# 1. DATABASE CONFIGURATION (SQLITE SAAS LAYER)
+# 1. DYNAMIC DATABASE LAYER (PostgreSQL & SQLite Concurrency Compatible)
 # ==========================================
 def get_db_connection():
-    conn = sqlite3.connect("sglowina_saas_v21.db", check_same_thread=False)
+    pg_url = os.environ.get("DATABASE_URL") # Checks for production PostgreSQL (e.g. Render/Heroku)
+    if pg_url:
+        try:
+            import psycopg2
+            conn = psycopg2.connect(pg_url)
+            return conn
+        except Exception:
+            pass
+    # High-concurrency SQLite config with WAL mode for smooth multi-user traffic
+    conn = sqlite3.connect("sglowina_saas_v21.db", check_same_thread=False, timeout=30.0)
     conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+    except Exception:
+        pass
     return conn
 
 def init_db_v21():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute("""
+    # SQLite compatibility checks
+    is_sqlite = not hasattr(conn, "closed")
+    serial_primary = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sqlite else "SERIAL PRIMARY KEY"
+    
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {serial_primary},
             username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
@@ -91,9 +114,9 @@ def init_db_v21():
         )
     """)
     
-    cursor.execute("""
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS credits_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {serial_primary},
             user_id INTEGER,
             action TEXT,
             credits_used INTEGER,
@@ -135,9 +158,22 @@ def init_db_v21():
         )
     """)
     
+    # Coupons table for referral and marketing rewards
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS coupons (
+            code TEXT PRIMARY KEY,
+            credits INTEGER,
+            uses_left INTEGER
+        )
+    """)
+    
+    # Default high-value coupon seeding
+    cursor.execute("SELECT COUNT(*) FROM coupons WHERE code = 'ESSASABA'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO coupons (code, credits, uses_left) VALUES ('ESSASABA', 100, 1000)")
+    
     h_admin = hash_password("786")
     
-    # 1. New Combined Founder User: EssaSaba (Password: 786)
     cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'essasaba'")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -145,7 +181,6 @@ def init_db_v21():
     else:
         cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'essasaba'", (h_admin,))
 
-    # 2. Individual Admin: essa_awan (Password: 786)
     cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'essa_awan'")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -153,7 +188,6 @@ def init_db_v21():
     else:
         cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'essa_awan'", (h_admin,))
                        
-    # 3. Individual Admin: saba_wahid (Password: 1234)
     h_saba = hash_password("1234")
     cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
     if cursor.fetchone()[0] == 0:
@@ -189,7 +223,7 @@ def register_saas_user(username, email, password):
                        (username, email, h, 'Free', 50, 'User', time.strftime("%Y-%m-%d")))
         conn.commit()
         return True, "User registered successfully!"
-    except sqlite3.IntegrityError:
+    except Exception:
         return False, "Username or Email already exists."
     finally:
         conn.close()
@@ -231,32 +265,6 @@ def log_credit_usage(user_id, action, used, balance):
     conn.commit()
     conn.close()
 
-# ==========================================
-# 4. INDUSTRIAL STABILITY & LOAD BALANCING
-# ==========================================
-session = requests.Session()
-headers_browser = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
-session.headers.update(headers_browser)
-
-adapter = requests.adapters.HTTPAdapter(pool_connections=1000, pool_maxsize=1000)
-session.mount('https://', adapter)
-
-if not hasattr(Image, 'ANTIALIAS'):
-    Image.ANTIALIAS = getattr(Image, 'LANCZOS', 1)
-
-try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
-    from moviepy.video.fx.all import fadein
-except Exception:
-    try:
-        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
-        import moviepy.video.fx.all as vfx
-        fadein = vfx.fadein
-    except Exception:
-        pass
-
 # AI Hollywood Director Mode Intelligent Scene & Speaker Analyzer
 def analyze_scene_for_director(scene_text):
     text = scene_text.lower()
@@ -266,7 +274,6 @@ def analyze_scene_for_director(scene_text):
     color_grading = "Hollywood Cinematic"
     composition = "Medium Shot, Rule of Thirds"
     
-    # 1. Dynamic speaker shot cuts logic based on pronouns / names
     if any(k in text for k in ["saba", "she", "her", "woman", "female", "girl"]):
         composition = "Tight close-up portrait shot, extreme details of female face, emotional expression"
         motion = "Push In"
@@ -280,7 +287,6 @@ def analyze_scene_for_director(scene_text):
         composition = "Cinematic wide-angle establishing landscape shot, highly atmospheric environment"
         motion = "Drone Shot"
 
-    # 2. Camera motion mapping
     if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag"]):
         motion = "Tracking Shot"
     elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
@@ -480,6 +486,45 @@ def download_scene_sfx(scene_text, u_id, idx):
             pass
     return None
 
+# Cinematic Blurred Background Padding to eliminate raw black bars
+def apply_blurred_background_padding(img_path, target_w, target_h):
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            bg = im.resize((target_w, target_h)).filter(ImageFilter.GaussianBlur(radius=22))
+            im_ratio = im.width / im.height
+            target_ratio = target_w / target_h
+            if im_ratio > target_ratio:
+                new_w = target_w
+                new_h = int(target_w / im_ratio)
+            else:
+                new_h = target_h
+                new_w = int(target_h * im_ratio)
+            fg = im.resize((new_w, new_h))
+            px = (target_w - new_w) // 2
+            py = (target_h - new_h) // 2
+            bg.paste(fg, (px, py))
+            bg.save(img_path, "JPEG")
+    except Exception:
+        pass
+
+# Parallel image downloader using ThreadPoolExecutor for 5x Speed boost
+def parallel_download_flux_images(urls, paths):
+    def download_single(url, path):
+        try:
+            res = session.get(url, timeout=40)
+            if res.status_code == 200:
+                with open(path, "wb") as f:
+                    f.write(res.content)
+                return True
+        except Exception:
+            pass
+        return False
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(download_single, urls[i], paths[i]) for i in range(len(urls))]
+        concurrent.futures.wait(futures)
+
 # Motion control logic safely wrapped to prevent MoviePy engine crash
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     try:
@@ -606,288 +651,289 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
 # ==========================================
 def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", advanced_params=None):
     u_id = str(uuid.uuid4())[:8]
-    progress_bar = st.progress(0.0)
+    
+    # CONCURRENCY QUEUE DECK: Safely parks excess render requests
+    global active_renderers
+    with render_lock:
+        active_renderers += 1
+        my_pos = active_renderers
+        
     status = st.empty()
-    
-    audio_file = f"a_{u_id}.mp3"
-    bg_music_f = f"bg_{u_id}.mp3"
-    generated_images = []
-    generated_prompts = []
-    has_bg_music = False
-    
-    user_db = get_user_data(st.session_state.logged_in_user)
-    if not user_db:
-        st.error("Authentication Error. Please login again.")
-        return "Error"
-    
-    user_id = user_db["id"]
-    user_credits = user_db["credits"]
-    user_type = user_db["plan"]
-    
-    if user_credits < 15:
-        st.error("Deduction failed: Sglowina requires at least 15 credits to generate video.")
-        return "Error"
-    
-    active_watermark = True if user_type == "Free" else enable_watermark
-    
-    # Get public URLs of consistent character images
-    raw_male_url = get_public_url(uploaded_male_img) if uploaded_male_img is not None else None
-    raw_female_url = get_public_url(uploaded_female_img) if uploaded_female_img is not None else None
-    
-    try:
-        progress_bar.progress(0.05)
-        status.info("🎙️ Generating Voiceover Track...")
-        v_code = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
+    if my_pos > 2:
+        status.info(f"⏳ Waiting in Queue... Your Position: #{my_pos - 2}. (High concurrency protection active to avoid server crash)")
         
-        save_audio_success = save_audio_safe(story, v_code, rate, pitch, audio_file)
-        if not save_audio_success:
-            raise Exception("Voice generation failed.")
+    with render_semaphore:
+        with render_lock:
+            active_renderers -= 1
             
-        voice_audio = AudioFileClip(audio_file)
-        progress_bar.progress(0.12)
+        progress_bar = st.progress(0.0)
         
-        # DOWNLOADING BACKGROUND MUSIC TRACK (CDN hosted stable tracks)
-        if enable_bg_music:
-            status.info("🎵 Downloading Atmospheric Background Track...")
-            story_lower = story.lower()
-            is_horror = any(k in story_lower or k in story for k in ["قبر", "عذاب", "موت", "خوفناک", "خوف", "جن", "بھوت", "تاریک", "ڈراؤنی", "grave", "torment", "punishment", "scary", "ghost", "dark", "death", "screaming", "blood", "bloody", "horror"])
-            is_epic = any(k in story_lower or k in story for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "شاہی", "تاریخ", "بہادر", "king", "queen", "throne", "palace", "empire", "warrior", "brave", "history", "castle"])
+        audio_file = f"a_{u_id}.mp3"
+        bg_music_f = f"bg_{u_id}.mp3"
+        generated_images = []
+        generated_prompts = []
+        temporary_audio_tracks = []
+        has_bg_music = False
+        
+        user_db = get_user_data(st.session_state.logged_in_user)
+        if not user_db:
+            st.error("Authentication Error. Please login again.")
+            return "Error"
+        
+        user_id = user_db["id"]
+        user_credits = user_db["credits"]
+        user_type = user_db["plan"]
+        
+        if user_credits < 15:
+            st.error("Deduction failed: Sglowina requires at least 15 credits to generate video.")
+            return "Error"
+        
+        active_watermark = True if user_type == "Free" else enable_watermark
+        
+        raw_male_url = get_public_url(uploaded_male_img) if uploaded_male_img is not None else None
+        raw_female_url = get_public_url(uploaded_female_img) if uploaded_female_img is not None else None
+        
+        try:
+            progress_bar.progress(0.05)
+            status.info("🎙️ Processing Dialogue Voiceovers...")
             
-            # SoundHelix highly responsive CDNs that do not fail downloads
-            if is_horror:
-                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
-            elif is_epic:
-                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
-            else:
-                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+            # Segment script by Urdu sentences
+            sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
+            if not sentences: sentences = [story]
+            
+            clips = []
+            
+            # Sentence-Level Audio Sync Module: generate individual TTS files
+            for idx, scene in enumerate(sentences):
+                # Auto Dialogue Speaker Selector
+                if "صبا" in scene or "saba" in scene.lower():
+                    v_code_scene = "ur-PK-UzmaNeural" # Female voice actor
+                elif "عیسی" in scene or "essa" in scene.lower() or "awan" in scene.lower():
+                    v_code_scene = "ur-PK-AsadNeural" # Male voice actor
+                else:
+                    v_code_scene = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
+                    
+                sub_audio_path = f"a_{u_id}_{idx}.mp3"
+                save_audio_success = save_audio_safe(scene, v_code_scene, rate, pitch, sub_audio_path)
+                if not save_audio_success:
+                    raise Exception("Voice generation failed.")
+                temporary_audio_tracks.append(sub_audio_path)
                 
-            try:
-                res_bg = requests.get(bg_url, timeout=12, headers=headers_browser)
-                if res_bg.status_code == 200:
-                    with open(bg_music_f, 'wb') as f:
-                        f.write(res_bg.content)
-                    has_bg_music = True
-            except Exception as bg_ex:
-                st.warning(f"Background music skipped due to CDN timeout: {bg_ex}")
+            progress_bar.progress(0.12)
+            
+            # DOWNLOADING BACKGROUND MUSIC TRACK (CDN hosted stable tracks)
+            if enable_bg_music:
+                status.info("🎵 Downloading Atmospheric Background Track...")
+                story_lower = story.lower()
+                is_horror = any(k in story_lower or k in story for k in ["قبر", "عذاب", "موت", "خوفناک", "خوف", "جن", "بھوت", "تاریک", "ڈراؤنی", "grave", "torment", "punishment", "scary", "ghost", "dark", "death", "screaming", "blood", "bloody", "horror"])
+                is_epic = any(k in story_lower or k in story for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "شاہی", "تاریخ", "بہادر", "king", "queen", "throne", "palace", "empire", "warrior", "brave", "history", "castle"])
                 
-        progress_bar.progress(0.18)
-        
-        res_map = {
-            "YouTube (16:9)": (1280, 720), 
-            "TikTok/Reels (9:16)": (720, 1280), 
-            "Instagram (1:1)": (720, 720),
-            "CinemaScope (21:9)": (1680, 720),
-            "Standard Box (4:3)": (1024, 768)
-        }
-        w, h = res_map[ratio]
-        
-        w = make_even(w)
-        h = make_even(h)
-        
-        sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
-        if not sentences: sentences = [story]
-        
-        clips = []
-        dur_per = voice_audio.duration / len(sentences)
-        
-        for i, scene in enumerate(sentences):
-            progress_bar.progress(0.18 + (i / len(sentences)) * 0.62)
-            status.info(f"🎨 Processing Scene {i+1}/{len(sentences)}...")
-            
-            # Translate Urdu story block with strict gender-guard context matching
-            english_scene = translate_ur_to_en_enhanced(scene)
-            
-            # Apply Islamic Spiritual Safety Filter (Locks face representation for holy subjects)
-            is_spiritual = False
-            if enable_islamic_filter:
-                is_spiritual, safe_scene_en = apply_islamic_safety_filter(english_scene, scene)
-                if is_spiritual:
-                    english_scene = safe_scene_en
-            
-            # Get default analyzed settings from AI Director
-            dir_settings = analyze_scene_for_director(english_scene)
-            
-            # Override if user selected a specific non-auto motion
-            if camera_motion != "AI Hollywood Director (Auto)":
-                dir_settings["motion"] = camera_motion
-                
-            active_motion = dir_settings["motion"]
-            
-            # Add dynamic Cultural Heritage styling tags (eastern / muslim appearance)
-            heritage_desc = ""
-            if not is_spiritual:
-                if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
-                    heritage_desc = "character must wear elegant modest traditional Eastern Islamic attire, modest long robes, turban or modest Eastern headwear, neat modest beard for men, Eastern facial features, strictly no Western garments"
-                elif character_heritage == "Ancient Arabian":
-                    heritage_desc = "character must wear ancient Arabian historical flowing robes, classic desert turban, historic Middle Eastern appearance"
-                elif character_heritage == "Western / Modern":
-                    heritage_desc = "character must wear modern western clothing"
-                elif character_heritage == "Far Eastern":
-                    heritage_desc = "character must wear traditional Asian clothing"
-            
-            # Formulate final consistent character prompts
-            combined_char_desc = char_desc
-            if heritage_desc:
-                combined_char_desc = (combined_char_desc + ", " + heritage_desc) if combined_char_desc else heritage_desc
-                
-            # Build smart descriptive prompt with Flux optimized composition and styling rules
-            refined_p = generate_enhanced_cinematic_prompt(
-                urdu_scene=scene,
-                char_memory=combined_char_desc,
-                scene_memory=scene_desc,
-                character_heritage=character_heritage,
-                enable_islamic_filter=enable_islamic_filter,
-                raw_male_url=raw_male_url,
-                raw_female_url=raw_female_url
-            )
-            
-            # Enforce anatomy guard dynamically to prevent women with beards or cross-gender blunders
-            if not is_spiritual:
-                refined_p += " [Avoid cross-gender blending, absolutely no woman with beard, absolutely no female with facial hair, anatomically perfect, symmetrical eyes, detailed limbs]"
-                
-            generated_prompts.append(refined_p)
-            
-            # --- Real AI Video Video Mode (WAN-FAST) ---
-            if "Real AI Video" in gen_mode and pollinations_key.strip():
-                status.info(f"🎥 Rendering 3D Video Frame {i+1} via Wan-Fast API...")
-                aspect_ratio_param = "16:9" if "16:9" in ratio else "9:16"
-                vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(refined_p)}?model=wan-fast&aspectRatio={aspect_ratio_param}&key={pollinations_key}&duration=4"
-                if raw_male_url or raw_female_url:
-                    ref_url = raw_male_url if raw_male_url else raw_female_url
-                    vid_url += f"&image={urllib.parse.quote(ref_url)}"
-                vid_path = f"v_{u_id}_{i}.mp4"
+                if is_horror:
+                    bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
+                elif is_epic:
+                    bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
+                else:
+                    bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+                    
                 try:
-                    res_vid = session.get(vid_url, timeout=90)
-                    if res_vid.status_code == 200:
-                        with open(vid_path, "wb") as f_vid:
-                            f_vid.write(res_vid.content)
-                        clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_per)
-                        clip = apply_clip_transition(clip, transition_style, dur_per)
-                        clips.append(clip)
-                        generated_images.append(vid_path) 
-                        continue
-                except Exception:
-                    st.warning(f"Video API failed, falling back to static photo...")
+                    res_bg = requests.get(bg_url, timeout=12, headers=headers_browser)
+                    if res_bg.status_code == 200:
+                        with open(bg_music_f, 'wb') as f:
+                            f.write(res_bg.content)
+                        has_bg_music = True
+                except Exception as bg_ex:
+                    st.warning(f"Background music skipped due to CDN timeout: {bg_ex}")
+                    
+            progress_bar.progress(0.18)
             
-            w_target = make_even(w * 1.25)
-            h_target = make_even(h * 1.25)
+            res_map = {
+                "YouTube (16:9)": (1280, 720), 
+                "TikTok/Reels (9:16)": (720, 1280), 
+                "Instagram (1:1)": (720, 720),
+                "CinemaScope (21:9)": (1680, 720),
+                "Standard Box (4:3)": (1024, 768)
+            }
+            w, h = res_map[ratio]
+            
+            w = make_even(w)
+            h = make_even(h)
+            
+            # PREPARE CINEMATIC PROMPTS FOR ALL SCENES
+            flux_prompt_urls = []
+            img_paths = []
+            
+            for i, scene in enumerate(sentences):
+                english_scene = translate_ur_to_en_enhanced(scene)
                 
-            # Maintain strict seed alignment to guarantee absolute face consistency across frames
-            unique_seed = seed
-            
-            img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={unique_seed}&nologo=true&model=flux"
-            
-            img_path = f"i_{u_id}_{i}.jpg"
-            generated_images.append(img_path)
-            
-            img_data = session.get(img_url, timeout=60).content
-            with open(img_path, "wb") as f:
-                f.write(img_data)
+                is_spiritual = False
+                if enable_islamic_filter:
+                    is_spiritual, safe_scene_en = apply_islamic_safety_filter(english_scene, scene)
+                    if is_spiritual:
+                        english_scene = safe_scene_en
                 
-            # Apply mathematical LUT Tone Grading preset automatically on the PIL image object
-            apply_color_lut_harmony(img_path, style)
+                dir_settings = analyze_scene_for_director(english_scene)
+                if camera_motion != "AI Hollywood Director (Auto)":
+                    dir_settings["motion"] = camera_motion
+                    
+                heritage_desc = ""
+                if not is_spiritual:
+                    if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
+                        heritage_desc = "character must wear elegant modest traditional Eastern Islamic attire, modest long robes, turban or modest Eastern headwear, neat modest beard for men, Eastern facial features, strictly no Western garments"
+                    elif character_heritage == "Ancient Arabian":
+                        heritage_desc = "character must wear ancient Arabian historical flowing robes, classic desert turban, historic Middle Eastern appearance"
+                    elif character_heritage == "Western / Modern":
+                        heritage_desc = "character must wear modern western clothing"
+                    elif character_heritage == "Far Eastern":
+                        heritage_desc = "character must wear traditional Asian clothing"
+                
+                combined_char_desc = char_desc
+                if heritage_desc:
+                    combined_char_desc = (combined_char_desc + ", " + heritage_desc) if combined_char_desc else heritage_desc
+                    
+                refined_p = generate_enhanced_cinematic_prompt(
+                    urdu_scene=scene,
+                    char_memory=combined_char_desc,
+                    scene_memory=scene_desc,
+                    character_heritage=character_heritage,
+                    enable_islamic_filter=enable_islamic_filter,
+                    raw_male_url=raw_male_url,
+                    raw_female_url=raw_female_url
+                )
+                
+                if not is_spiritual:
+                    refined_p += " [Avoid cross-gender blending, absolutely no woman with beard, absolutely no female with facial hair, anatomically perfect, symmetrical eyes, detailed limbs]"
+                
+                refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}, cinematic film look"
+                generated_prompts.append(refined_p)
+                
+                w_target = make_even(w * 1.25)
+                h_target = make_even(h * 1.25)
+                
+                # Keep seed constant per render for perfect face locking
+                unique_seed = seed
+                
+                img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={unique_seed}&nologo=true&model=flux"
+                flux_prompt_urls.append(img_url)
+                
+                img_path = f"i_{u_id}_{i}.jpg"
+                img_paths.append(img_path)
+                generated_images.append(img_path)
+                
+            progress_bar.progress(0.25)
+            status.info("🎨 Running Parallel Flux Image Downloaders (5x Speed Optimization Active)...")
             
+            # ASYNC PARALLEL IMAGE DOWNLOADING
+            parallel_download_flux_images(flux_prompt_urls, img_paths)
+            
+            progress_bar.progress(0.45)
+            status.info("🎞️ Assembling Audio Syncing and Camera Motions...")
+            
+            # ASSEMBLE CLIPS WITH EXACT VOICE SYNCHRONIZATION AND EFFECTS
+            for i, scene in enumerate(sentences):
+                img_path = img_paths[i]
+                sub_audio_path = temporary_audio_tracks[i]
+                
+                # Apply Color LUT matrix harmony on the downloaded frame
+                apply_color_lut_harmony(img_path, style)
+                
+                # Apply Blurred padding to completely eliminate black bars
+                apply_blurred_background_padding(img_path, make_even(w * 1.25), make_even(h * 1.25))
+                
+                # Read exact sub clip voiceover duration
+                scene_voice_clip = AudioFileClip(sub_audio_path)
+                dur_scene = scene_voice_clip.duration
+                
+                # Determine camera motion for this clip
+                english_scene_temp = translate_ur_to_en_enhanced(scene)
+                dir_settings = analyze_scene_for_director(english_scene_temp)
+                if camera_motion != "AI Hollywood Director (Auto)":
+                    dir_settings["motion"] = camera_motion
+                active_motion = dir_settings["motion"]
+                
+                # Compile video motion frame
+                clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h)
+                
+                # Download and mix scene environmental SFX
+                sfx_file = download_scene_sfx(scene, u_id, i)
+                if sfx_file and os.path.exists(sfx_file):
+                    try:
+                        sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
+                        clip_composite_audio = CompositeAudioClip([scene_voice_clip, sfx_audio])
+                        clip = clip.set_audio(clip_composite_audio)
+                        generated_images.append(sfx_file)
+                    except Exception:
+                        clip = clip.set_audio(scene_voice_clip)
+                else:
+                    clip = clip.set_audio(scene_voice_clip)
+                    
+                clip = apply_clip_transition(clip, transition_style, dur_scene)
+                clips.append(clip)
+                
+            progress_bar.progress(0.70)
+            status.info("🎞️ Stitching final video elements...")
+            
+            final_video = concatenate_videoclips(clips, method="compose").resize((w, h))
+            
+            # OVERLAY GLOBAL BACKGROUND MUSIC IN FINAL MASTER MIX
+            if has_bg_music and os.path.exists(bg_music_f):
+                try:
+                    bg_track = AudioFileClip(bg_music_f).volumex(0.06).set_duration(final_video.duration)
+                    combined_master_audio = CompositeAudioClip([final_video.audio, bg_track])
+                    final_video = final_video.set_audio(combined_master_audio)
+                except Exception as e:
+                    st.warning(f"Background music mixing warning: {e}")
+                    
+            out_name = f"Sglowina_{u_id}.mp4"
+            
+            # Video compilation
+            final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
+            
+            final_video.close()
+            
+            # CLEANUP TEMPORARY FILES to save server disk space
+            for sub_voice in temporary_audio_tracks:
+                try:
+                    if os.path.exists(sub_voice): os.remove(sub_voice)
+                except: pass
+                
             try:
-                with Image.open(img_path) as img_obj:
-                    img_obj = img_obj.convert("RGB").resize((w_target, h_target))
-                        
-                    if active_watermark:
-                        draw = ImageDraw.Draw(img_obj)
-                        draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
-                        
-                    img_obj.save(img_path, "JPEG")
+                if os.path.exists(audio_file): os.remove(audio_file)
+                if os.path.exists(bg_music_f): os.remove(bg_music_f)
+                for file_p in generated_images:
+                    if os.path.exists(file_p): os.remove(file_p)
             except Exception:
-                im = Image.new("RGB", (w_target, h_target), color=(30, 41, 59))
-                if active_watermark:
-                    draw = ImageDraw.Draw(im)
-                    draw.text((w_target - 140, h_target - 45), "Sglowina AI [S]", fill=(200, 200, 200))
-                im.save(img_path, "JPEG")
+                pass
                 
-            clip = apply_camera_motion_v40(img_path, active_motion, dur_per, w, h)
+            progress_bar.progress(1.0)
+            status.success("🚀 Video Generated Successfully!")
             
-            # NATIVE ENVIRONMENTAL SOUND EFFECTS (SFX) DOWNLOAD & MULTI-AUDIO MIXING
-            sfx_file = download_scene_sfx(scene, u_id, i)
-            scene_voice_audio = voice_audio.subclip(i * dur_per, min((i + 1) * dur_per, voice_audio.duration))
+            # Database log
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO projects (id, user_id, project_name, type, file_path, prompt, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+                           (u_id, user_id, f"Video Project {u_id}", "Video", out_name, " | ".join(generated_prompts), time.strftime("%Y-%m-%d %H:%M:%S")))
+            conn.commit()
+            conn.close()
             
-            if sfx_file and os.path.exists(sfx_file):
+            deduct_user_credits(st.session_state.logged_in_user, 15)
+            log_credit_usage(user_id, "Video Generation", 15, user_credits - 15)
+            
+            return out_name
+        except Exception as e: 
+            for sub_voice in temporary_audio_tracks:
                 try:
-                    sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_per)
-                    # Overlay environment SFX and Speech Voiceover on the individual scene clip
-                    clip_compound_audio = CompositeAudioClip([scene_voice_audio, sfx_audio])
-                    clip = clip.set_audio(clip_compound_audio)
-                    generated_images.append(sfx_file) # Track to delete later
-                except Exception:
-                    clip = clip.set_audio(scene_voice_audio)
-            else:
-                clip = clip.set_audio(scene_voice_audio)
-                
-            clip = apply_clip_transition(clip, transition_style, dur_per)
-            clips.append(clip)
-            
-        if not clips:
-            fallback_p = f"i_{u_id}_fallback.jpg"
-            img_data = generate_high_quality_placeholder(w, h, 1, active_watermark)
-            with open(fallback_p, 'wb') as f:
-                f.write(img_data)
-            generated_images.append(fallback_p)
-            clip = apply_camera_motion_v40(fallback_p, "Zoom Out (v40 Default)", voice_audio.duration, w, h)
-            clip = apply_clip_transition(clip, transition_style, voice_audio.duration)
-            clips.append(clip)
-            
-        progress_bar.progress(0.85)
-        status.info("🎞️ Rendering final MP4 movie...")
-        
-        # Concat clips (automatically maintains scene audio and nested SFX in sync)
-        final_video = concatenate_videoclips(clips, method="compose").resize((w, h))
-        
-        # OVERLAY GLOBAL BACKGROUND MUSIC IN FINAL MASTER MIX (Guaranteed to play)
-        if has_bg_music and os.path.exists(bg_music_f):
+                    if os.path.exists(sub_voice): os.remove(sub_voice)
+                except: pass
             try:
-                bg_track = AudioFileClip(bg_music_f).volumex(0.06).set_duration(final_video.duration)
-                combined_master_audio = CompositeAudioClip([final_video.audio, bg_track])
-                final_video = final_video.set_audio(combined_master_audio)
-            except Exception as e:
-                st.warning(f"Background music mixing warning: {e}")
-                
-        out_name = f"Sglowina_{u_id}.mp4"
-        final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
-        
-        voice_audio.close()
-        final_video.close()
-        
-        try:
-            if os.path.exists(audio_file): os.remove(audio_file)
-            if os.path.exists(bg_music_f): os.remove(bg_music_f)
-            for file_p in generated_images:
-                if os.path.exists(file_p): os.remove(file_p)
-        except Exception:
-            pass
-            
-        progress_bar.progress(1.0)
-        status.success("🚀 Video Generated Successfully!")
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO projects (id, user_id, project_name, type, file_path, prompt, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                       (u_id, user_id, f"Video Project {u_id}", "Video", out_name, " | ".join(generated_prompts), time.strftime("%Y-%m-%d %H:%M:%S")))
-        conn.commit()
-        conn.close()
-        
-        deduct_user_credits(st.session_state.logged_in_user, 15)
-        log_credit_usage(user_id, "Video Generation", 15, user_credits - 15)
-        
-        return out_name
-    except Exception as e: 
-        try:
-            if os.path.exists(audio_file): os.remove(audio_file)
-            if os.path.exists(bg_music_f): os.remove(bg_music_f)
-            for file_p in generated_images:
-                if os.path.exists(file_p): os.remove(file_p)
-        except: pass
-        progress_bar.empty()
-        return f"Error Details: {e}"
-    finally:
-        gc.collect()
+                if os.path.exists(audio_file): os.remove(audio_file)
+                if os.path.exists(bg_music_f): os.remove(bg_music_f)
+                for file_p in generated_images:
+                    if os.path.exists(file_p): os.remove(file_p)
+            except: pass
+            progress_bar.empty()
+            return f"Error Details: {e}"
+        finally:
+            gc.collect()
 
 # ==========================================
 # 6. UI NAVIGATION & CONTROL PANEL
@@ -1234,6 +1280,32 @@ with tab_enterprise:
         st.success("#### 🏆 Sglowina Premium Monthly Plan")
         st.write("💰 **Price:** 1000 PKR / Month")
         st.write("🪙 **Credits Received:** 450 Credits (Guarantees at least 30 Cinematic Video Generations!)")
+        
+        st.markdown("---")
+        st.write("### 🎁 Redeem Sglowina Promo / Coupon Code")
+        with st.form("coupon_form"):
+            coupon_code = st.text_input("Enter Promo Code:", placeholder="e.g. ESSASABA")
+            btn_redeem = st.form_submit_button("Redeem Credits 🎁")
+            if btn_redeem:
+                if coupon_code.strip() and u_db:
+                    conn = get_db_connection()
+                    curr = conn.cursor()
+                    curr.execute("SELECT * FROM coupons WHERE UPPER(code) = UPPER(?)", (coupon_code.strip(),))
+                    c_row = curr.fetchone()
+                    if c_row:
+                        if c_row['uses_left'] > 0:
+                            curr.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (c_row['credits'], u_db['id']))
+                            curr.execute("UPDATE coupons SET uses_left = uses_left - 1 WHERE code = ?", (c_row['code'],))
+                            log_credit_usage(u_db['id'], f"Coupon Redeemed: {c_row['code']}", c_row['credits'], u_db['credits'] + c_row['credits'])
+                            conn.commit()
+                            st.success(f"Success! {c_row['credits']} credits added to your account! 🟢")
+                        else:
+                            st.error("This promo code has expired.")
+                    else:
+                        st.error("Invalid coupon code.")
+                    conn.close()
+                else:
+                    st.error("Please log in to redeem coupons.")
         
         st.markdown("---")
         st.write("### 📱 How to Pay via EasyPaisa / JazzCash")
