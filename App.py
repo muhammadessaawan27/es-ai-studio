@@ -257,154 +257,6 @@ except Exception:
     except Exception:
         pass
 
-# ==========================================
-# 5. UI & PREMIUM BRANDING STYLING (V2.1)
-# ==========================================
-st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V2.1", layout="wide", page_icon="🎬")
-
-st.sidebar.subheader("🎬 Video Settings")
-enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=True)
-enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=True)
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("👤 Sglowina Enterprise Center")
-st.sidebar.write(f"Logged in as: **{st.session_state.logged_in_user}**")
-u_sidebar_db = get_user_data(st.session_state.logged_in_user)
-if u_sidebar_db:
-    st.sidebar.write(f"Credits Remaining: **{u_sidebar_db['credits']}** 🪙")
-    st.sidebar.write(f"Plan: **{u_sidebar_db['plan']}**")
-else:
-    st.sidebar.write("Credits Remaining: **Guest Mode**")
-    st.sidebar.write("Plan: **Free Trial**")
-
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700;900&display=swap');
-    
-    .stApp { 
-        background-color: #ffffff !important; 
-        color: #000000 !important; 
-        font-family: 'Inter', sans-serif; 
-    }
-    
-    /* شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ ٹائٹل کے لیے (صحیح سائز میں فٹ) */
-    .glow-title { 
-        font-size: 2.2rem; 
-        font-weight: 900; 
-        text-align: center;
-        font-family: 'Orbitron', sans-serif;
-        background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-shadow: 0 0 15px rgba(255, 0, 122, 0.2);
-        margin-top: 15px;
-        margin-bottom: 5px;
-        letter-spacing: 2px;
-    }
-
-    .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
-    
-    .circular-s {
-        width: 120px; height: 120px; 
-        background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff) !important;
-        border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        font-family: 'Orbitron', sans-serif; font-size: 50px; color: #ffffff !important;
-        border: 5px solid #ffffff !important;
-        box-shadow: 0 0 50px #ff007a, inset 0 0 20px #ffffff;
-        animation: rotateShua 4s infinite linear, lightningGlow 1.5s infinite alternate;
-    }
-    
-    @keyframes rotateShua {
-        0% { transform: perspective(1000px) rotateY(0deg); }
-        100% { transform: perspective(1000px) rotateY(360deg); }
-    }
-    @keyframes lightningGlow {
-        0%, 100% { box-shadow: 0 0 25px #2563eb, 0 0 50px #ff007a, inset 0 0 15px #ffffff; }
-        50% { box-shadow: 0 0 50px #ff007a, 0 0 80px #00d4ff, inset 0 0 25px #ffffff; }
-    }
-
-    .stButton>button { 
-        background: #000000 !important; 
-        color: white !important; 
-        border-radius: 12px !important; 
-        height: 55px; 
-        width: 100%; 
-        font-size: 20px; 
-        font-weight: bold; 
-        border: none; 
-    }
-    
-    [data-testid="stSidebar"] { 
-        background-color: #ffffff !important; 
-        border-right: 1px solid #e2e8f0; 
-    }
-    [data-testid="stSidebar"] * { 
-        color: #000000 !important; 
-        font-weight: bold !important; 
-    }
-    
-    div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input {
-        background-color: #f8fafc !important;
-        color: #0f172a !important;
-        border: 2px solid #cbd5e1 !important;
-        border-radius: 12px !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
-        transition: all 0.3s ease !important;
-    }
-    div[data-baseweb="textarea"] textarea:focus, div[data-baseweb="input"] input:focus {
-        border-color: #00d4ff !important;
-        box-shadow: 0 0 10px rgba(0, 212, 255, 0.2) !important;
-        background-color: #ffffff !important;
-    }
-    div[data-baseweb="textarea"] textarea::placeholder, div[data-baseweb="input"] input::placeholder {
-        color: #64748b !important;
-        opacity: 1 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-st.markdown('<div class="glow-title">SGLOWINA AI</div>', unsafe_allow_html=True)
-st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
-
-# ==========================================
-# 6. SAAS INTEGRATED CORE ENGINE & UTILS
-# ==========================================
-def apply_canva_typography(image_path, text):
-    try:
-        with Image.open(image_path) as im:
-            draw = ImageDraw.Draw(im)
-            w, h = im.size
-            font_size = int(h * 0.06)
-            try:
-                font = ImageFont.truetype("arial.ttf", font_size)
-            except Exception:
-                font = ImageFont.load_default()
-            
-            text_width = len(text) * (font_size * 0.5)
-            x = int((w - text_width) / 2) if w > text_width else 20
-            y = int(h * 0.82)
-            
-            draw.text((x + 3, y + 3), text, fill=(0, 0, 0), font=font)
-            draw.text((x, y), text, fill=(255, 223, 0), font=font)
-            im.save(image_path, "JPEG")
-    except Exception:
-        pass
-
-def run_ai_prompt_assistant(story_text):
-    try:
-        instruction = (
-            "Analyze this story and breakdown into these exact fields: "
-            "1. Scene Breakdown, 2. Character Description, 3. Scene Memory, "
-            "4. Camera Prompt, 5. Image Prompt, 6. Video Prompt. Output only these six fields."
-        )
-        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Story: ' + story_text)}?model=openai"
-        res = session.get(url, timeout=20)
-        if res.status_code == 200:
-            return res.text
-    except Exception:
-        pass
-    return "Failed to analyze story."
-
 # AI Hollywood Director Mode Intelligent Scene Analyzer
 def analyze_scene_for_director(scene_text):
     text = scene_text.lower()
@@ -661,6 +513,18 @@ def fetch_img_failover(prompt, w, h, seed):
         pass
     return None
 
+# Text to speech async to sync wrapper
+def save_audio_safe(text, voice, rate, pitch, filename):
+    try:
+        async def amain():
+            communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
+            await communicate.save(filename)
+        asyncio.run(amain())
+        return True
+    except Exception as e:
+        st.error(f"Voice synthesis error: {e}")
+        return False
+
 # High quality placeholder generator 
 def generate_high_quality_placeholder(w, h, seed, active_watermark):
     try:
@@ -675,7 +539,7 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
         return b""
 
 # ==========================================
-# 7. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
+# 5. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
 # ==========================================
 def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", advanced_params=None):
     u_id = str(uuid.uuid4())[:8]
@@ -958,7 +822,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         gc.collect()
 
 # ==========================================
-# 8. UI NAVIGATION & CONTROL PANEL
+# 6. UI NAVIGATION & CONTROL PANEL
 # ==========================================
 tab_auth, tab_chat, tab_movie, tab_image, tab_enterprise = st.tabs([
     "🔑 Sign In & Registrations",
