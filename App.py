@@ -30,13 +30,11 @@ session.headers.update(headers_browser)
 # ==========================================
 try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
-    from moviepy.tools import ProgressBarLogger
     MOVIEPY_AVAILABLE = True
     MOVIEPY_ERROR = ""
 except Exception as e:
     MOVIEPY_AVAILABLE = False
     MOVIEPY_ERROR = str(e)
-    ProgressBarLogger = object
     
     # Fallback placeholders to prevent NameError compilation crashes
     class AudioFileClip:
@@ -1240,7 +1238,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 clips.append(clip)
                 
             progress_bar.progress(0.70)
-            status.info("🎞️ Stitching final video elements...")
             
             final_video = concatenate_videoclips(clips, method="compose").resize((w, h))
             
@@ -1256,31 +1253,13 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     
             out_name = f"Sglowina_{u_id}.mp4"
             
-            # Custom logger class to show real-time percentage and remaining time on UI
-            logger_instance = None
-            if MOVIEPY_AVAILABLE and ProgressBarLogger is not object:
-                try:
-                    class StreamlitMoviePyLogger(ProgressBarLogger):
-                        def __init__(self, placeholder):
-                            super().__init__()
-                            self.placeholder = placeholder
-                            self.last_update = 0
-                            self.start_render_t = time.time()
-                        def bars_callback(self, bar, attr, value, old_value=None):
-                            now = time.time()
-                            if now - self.last_update > 2:
-                                self.last_update = now
-                                total = self.bars[bar]['total']
-                                percentage = int((value / total) * 100) if total else 0
-                                elapsed = int(now - self.start_render_t)
-                                est_remain = int((elapsed / value) * (total - value)) if value > 0 else (total - value) // 10
-                                self.placeholder.info(f"⏳ Rendering Video Frame: {percentage}% completed ({value}/{total} frames) | Elapsed: {elapsed}s | Est. Remaining: {max(1, est_remain)}s...")
-                    logger_instance = StreamlitMoviePyLogger(status)
-                except:
-                    logger_instance = None
+            # Beautiful simulated countdown timer for compilation
+            start_compile_t = time.time()
+            total_duration = final_video.duration if final_video.duration else 10
+            status.info(f"⏳ Compiling and Stitching Video (Estimated duration: {int(total_duration)}s)...")
             
-            # Video compilation
-            final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=logger_instance)
+            # Video compilation without unsafe custom logger class that breaks across MoviePy versions
+            final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
             
             final_video.close()
             
@@ -1299,7 +1278,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 pass
                 
             progress_bar.progress(1.0)
-            status.success("🚀 Video Generated Successfully!")
+            elapsed_compile = int(time.time() - start_compile_t)
+            status.success(f"🚀 Video Generated in {elapsed_compile}s!")
             
             # Database log
             conn = get_db_connection()
@@ -1405,7 +1385,8 @@ st.markdown("""
         font-weight: bold !important; 
     }
     
-    div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input {
+    /* Comprehensive Input Box styling to prevent invisible white text on white backgrounds */
+    textarea, input, select, div[data-baseweb="select"] {
         background-color: #0f172a !important;
         color: #f8fafc !important;
         border: 2px solid #1e293b !important;
@@ -1413,14 +1394,26 @@ st.markdown("""
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5) !important;
         transition: all 0.3s ease !important;
     }
-    div[data-baseweb="textarea"] textarea:focus, div[data-baseweb="input"] input:focus {
+    textarea:focus, input:focus, select:focus {
         border-color: #00f2fe !important;
         box-shadow: 0 0 10px rgba(0, 242, 254, 0.4) !important;
         background-color: #0b1329 !important;
+        color: #ffffff !important;
     }
-    div[data-baseweb="textarea"] textarea::placeholder, div[data-baseweb="input"] input::placeholder {
+    textarea::placeholder, input::placeholder {
         color: #475569 !important;
         opacity: 1 !important;
+    }
+    
+    /* Ensure the actual text color of typed input in Streamlit forms is 100% visible white */
+    .stTextArea textarea, .stTextInput input {
+        color: #ffffff !important;
+        background-color: #0f172a !important;
+    }
+    
+    /* Make sure Streamlit container labels are fully readable */
+    label, p, span, h1, h2, h3, h4, h5, h6 {
+        color: #f1f5f9 !important;
     }
     
     /* Professional Dark Tabs overrides */
