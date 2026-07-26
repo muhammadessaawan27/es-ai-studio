@@ -476,6 +476,16 @@ def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
         return True, safe_prompt
     return False, scene_text_en
 
+# Fixed (CRITICAL): Added the missing function used in render loop
+def is_human_character_present(scene_text):
+    text = scene_text.lower()
+    human_indicators = [
+        "man", "male", "boy", "gentleman", "he", "him", "his", "brother", "father", "son", "king", "he", "him", "his", "adventurer",
+        "woman", "female", "girl", "lady", "she", "her", "hers", "sister", "mother", "daughter", "queen",
+        "مرد", "لڑکا", "بھائی", "ابو", "باپ", "بیٹا", "بادشاہ", "شہزادہ", "عورت", "لڑکی", "بہن", "امی", "ماں", "بیٹی", "ملکہ", "شہزادی", "انسان", "لوگ", "شخص"
+    ]
+    return any(k in text for k in human_indicators)
+
 # Universal Pronoun & Gender Subject Classifier (Strictly Generic - No Hardcoded Names)
 def get_scene_subjects_classified(scene_text):
     text = scene_text.lower()
