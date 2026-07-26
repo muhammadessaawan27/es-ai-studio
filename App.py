@@ -1,6 +1,5 @@
 import streamlit as st
 import asyncio
-import edge_tts
 import requests
 import urllib.parse
 import os
@@ -18,10 +17,76 @@ import hashlib
 import concurrent.futures
 
 # ==========================================
-# 1. STREAMLIT INITIALIZATION & GLOBAL STATES
+# PIL COMPATIBILITY MONKEYPATCH (Failsafe for Pillow >= 10)
+# ==========================================
+if not hasattr(Image, 'ANTIALIAS'):
+    try:
+        Image.ANTIALIAS = Image.Resampling.LANCZOS
+    except AttributeError:
+        Image.ANTIALIAS = Image.LANCZOS
+
+# ==========================================
+# 1. BROWSER SESSION STABILITY HEADERS (Guaranteed to load first)
+# ==========================================
+headers_browser = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+session = requests.Session()
+session.headers.update(headers_browser)
+
+# ==========================================
+# 2. MOVIEPY CINEMATIC IMPORTS WITH SAFE FALLBACK
+# ==========================================
+try:
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
+    MOVIEPY_AVAILABLE = True
+    MOVIEPY_ERROR = ""
+except Exception as e:
+    MOVIEPY_AVAILABLE = False
+    MOVIEPY_ERROR = str(e)
+    
+    # Fallback placeholders to prevent NameError compilation crashes
+    class AudioFileClip:
+        def __init__(self, *args, **kwargs):
+            raise NameError("MoviePy library is missing on this server. Please add 'moviepy' to your requirements.txt.")
+    class ImageClip:
+        def __init__(self, *args, **kwargs):
+            raise NameError("MoviePy library is missing on this server. Please add 'moviepy' to your requirements.txt.")
+    class VideoFileClip:
+        def __init__(self, *args, **kwargs):
+            raise NameError("MoviePy library is missing on this server. Please add 'moviepy' to your requirements.txt.")
+    def concatenate_videoclips(*args, **kwargs):
+        raise NameError("MoviePy library is missing on this server. Please add 'moviepy' to your requirements.txt.")
+    def CompositeAudioClip(*args, **kwargs):
+        raise NameError("MoviePy library is missing on this server. Please add 'moviepy' to your requirements.txt.")
+    def CompositeVideoClip(*args, **kwargs):
+        raise NameError("MoviePy library is missing on this server. Please add 'moviepy' to your requirements.txt.")
+
+# Try importing edge_tts safely
+try:
+    import edge_tts
+    EDGE_TTS_AVAILABLE = True
+except ImportError:
+    EDGE_TTS_AVAILABLE = False
+
+# ==========================================
+# 3. STREAMLIT CONFIGURATION & GLOBAL STATES
 # ==========================================
 # Streamlit page config MUST be the first Streamlit command called
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V2.1", layout="wide", page_icon="🎬")
+
+# Show warnings if critical libraries are missing
+if not MOVIEPY_AVAILABLE:
+    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to your requirements.txt file in GitHub.")
+if not EDGE_TTS_AVAILABLE:
+    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to your requirements.txt file in GitHub.")
+
+# Sglowina Platform Bio
+SGLOWINA_BIO = (
+    "Sglowina AI is a SaaS Enterprise platform designed and developed by Muhammad Essa Awan and Saba Wahid. "
+    "It is built to empower creators with highly advanced AI-driven video synthesis, image styling, "
+    "and intelligent automated director tools."
+)
 
 # Initialize global default settings in session state to prevent NameError scoping issues
 if "enable_watermark" not in st.session_state:
@@ -78,7 +143,7 @@ def get_public_url(uploaded_file):
     return None
 
 # ==========================================
-# 2. DYNAMIC DATABASE LAYER (PostgreSQL & SQLite Concurrency Compatible)
+# 4. DYNAMIC DATABASE LAYER (PostgreSQL & SQLite Concurrency Compatible)
 # ==========================================
 def get_db_connection():
     pg_url = os.environ.get("DATABASE_URL") # Checks for production PostgreSQL (e.g. Render/Heroku)
@@ -228,7 +293,7 @@ def init_db_v21():
 init_db_v21()
 
 # ==========================================
-# 3. ENTERPRISE AUTHENTICATION HELPERS
+# 5. ENTERPRISE AUTHENTICATION HELPERS
 # ==========================================
 def register_saas_user(username, email, password):
     username = username.strip().lower()
@@ -576,6 +641,8 @@ def parallel_download_flux_images(urls, paths):
 
 # Motion control logic safely wrapped to prevent MoviePy engine crash
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
+    if not MOVIEPY_AVAILABLE:
+        return None
     try:
         scale_factor = 1.30
         
@@ -707,9 +774,56 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
         return b""
 
 # ==========================================
+# ADVANCED CANVA TYPOGRAPHY WITH FROSTED GLASS EFFECT (International Grade)
+# ==========================================
+def apply_canva_typography(img_path, text):
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            draw = ImageDraw.Draw(im)
+            w, h = im.size
+            
+            # Smart Dynamic Font Sizing (4% of height)
+            font_size = int(h * 0.04) if h * 0.04 > 16 else 16
+            try:
+                font = ImageFont.load_default()
+            except Exception:
+                font = None
+                
+            # Create premium Frosted Glass / Glassmorphism visual container
+            overlay = Image.new('RGBA', im.size, (0, 0, 0, 0))
+            draw_overlay = ImageDraw.Draw(overlay)
+            
+            # Semi-transparent dark slate frosted box calculations
+            box_h = int(font_size * 2.5)
+            box_y = h - box_h - 25
+            
+            # Elegant rounded glass banner at bottom
+            draw_overlay.rounded_rectangle([30, box_y, w - 30, h - 25], radius=12, fill=(15, 23, 42, 200))
+            im = Image.alpha_composite(im.convert('RGBA'), overlay).convert('RGB')
+            draw = ImageDraw.Draw(im)
+            
+            # Advanced typography with clean dark drop-shadow for premium readability
+            text_x = 50
+            text_y = box_y + (box_h - font_size) // 2
+            
+            # Drop shadow
+            draw.text((text_x + 1, text_y + 1), text, fill=(0, 0, 0), font=font)
+            # Fore text
+            draw.text((text_x, text_y), text, fill=(255, 255, 255), font=font)
+            
+            im.save(img_path, "JPEG")
+    except Exception:
+        pass
+
+# ==========================================
 # 4. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", advanced_params=None):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast", advanced_params=None):
+    if not MOVIEPY_AVAILABLE:
+        st.error(f"MoviePy is not available on this server. Error: {MOVIEPY_ERROR}. Please check your requirements.txt file.")
+        return "Error"
+        
     u_id = str(uuid.uuid4())[:8]
     
     # CONCURRENCY QUEUE DECK: Safely parks excess render requests
@@ -807,7 +921,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
                     
                 try:
-                    res_bg = requests.get(bg_url, timeout=12, headers=headers_browser)
+                    res_bg = session.get(bg_url, timeout=12, verify=False)
                     if res_bg.status_code == 200:
                         with open(bg_music_f, 'wb') as f:
                             f.write(res_bg.content)
@@ -859,17 +973,25 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     raw_female_url=raw_female_url
                 )
                 
+                # Global Hollywood Film Directives injected dynamically to elevate image quality
                 if not is_spiritual:
                     refined_p += " [Avoid cross-gender blending, absolutely no woman with beard, absolutely no female with facial hair, anatomically perfect, symmetrical eyes, detailed limbs]"
                 
-                refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}, cinematic film look"
+                # Advanced rendering keywords for Arri Alexa look
+                refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}, shot on ARRI Alexa LF, 35mm lens, high-fashion realism, photorealistic texture"
                 generated_prompts.append(refined_p)
                 
                 # --- Real AI Video Video Mode (WAN-FAST & Image-to-Video References) ---
                 if "Real AI Video" in gen_mode and active_api_key:
-                    status.info(f"🎥 Rendering 3D Video Frame {i+1} via Wan-Fast API...")
+                    status.info(f"🎥 Rendering 3D Video Frame {i+1} via {video_model} API...")
                     aspect_ratio_param = "16:9" if "16:9" in ratio else "9:16"
-                    vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(refined_p)}?model=wan-fast&aspectRatio={aspect_ratio_param}&key={active_api_key}&duration=4"
+                    
+                    # AUTOMATIC HIGH-MOTION INJECTOR FOR REAL MOVEMENT IN FLUX/WAN
+                    motion_prompt = refined_p
+                    motion_prompt = re.sub(r'(portrait|standing|sitting|symmetrical face|still image|static)', '', motion_prompt, flags=re.IGNORECASE)
+                    motion_prompt = f"high motion, extreme 3D physics movement, character physically walking forward, head moving, eyes blinking, wind blowing, natural realistic animation, {motion_prompt}"
+                    
+                    vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt[:400])}?model={video_model}&aspectRatio={aspect_ratio_param}&key={active_api_key}&duration=4"
                     
                     # Direct starting frame reference injection for image to video
                     ref_url = None
@@ -887,13 +1009,33 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                         if res_vid.status_code == 200:
                             with open(vid_path, "wb") as f_vid:
                                 f_vid.write(res_vid.content)
-                            clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_per)
-                            clip = apply_clip_transition(clip, transition_style, dur_per)
+                            
+                            sub_audio_path = temporary_audio_tracks[i]
+                            scene_voice_clip = AudioFileClip(sub_audio_path)
+                            dur_scene = scene_voice_clip.duration
+                            
+                            clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_scene)
+                            
+                            # Download and mix scene environmental SFX
+                            sfx_file = download_scene_sfx(scene, u_id, i)
+                            if sfx_file and os.path.exists(sfx_file):
+                                try:
+                                    sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
+                                    # Boost dialogue to 1.2 and duck SFX to 0.12 (Broadcast Standard)
+                                    clip_composite_audio = CompositeAudioClip([scene_voice_clip.volumex(1.2), sfx_audio])
+                                    clip = clip.set_audio(clip_composite_audio)
+                                    generated_images.append(sfx_file)
+                                except Exception:
+                                    clip = clip.set_audio(scene_voice_clip.volumex(1.2))
+                            else:
+                                clip = clip.set_audio(scene_voice_clip.volumex(1.2))
+                                
+                            clip = apply_clip_transition(clip, transition_style, dur_scene)
                             clips.append(clip)
                             generated_images.append(vid_path) 
                             continue
-                    except Exception:
-                        st.warning(f"Video API failed, falling back to static photo...")
+                    except Exception as vid_ex:
+                        st.warning(f"Video API failed, falling back to static photo... Error: {vid_ex}")
                 
                 w_target = make_even(w * 1.25)
                 h_target = make_even(h * 1.25)
@@ -951,13 +1093,14 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 if sfx_file and os.path.exists(sfx_file):
                     try:
                         sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
-                        clip_composite_audio = CompositeAudioClip([scene_voice_clip, sfx_audio])
+                        # Dialogue is boosted and SFX is safely ducked
+                        clip_composite_audio = CompositeAudioClip([scene_voice_clip.volumex(1.2), sfx_audio])
                         clip = clip.set_audio(clip_composite_audio)
                         generated_images.append(sfx_file)
                     except Exception:
-                        clip = clip.set_audio(scene_voice_clip)
+                        clip = clip.set_audio(scene_voice_clip.volumex(1.2))
                 else:
-                    clip = clip.set_audio(scene_voice_clip)
+                    clip = clip.set_audio(scene_voice_clip.volumex(1.2))
                     
                 clip = apply_clip_transition(clip, transition_style, dur_scene)
                 clips.append(clip)
@@ -967,10 +1110,11 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             
             final_video = concatenate_videoclips(clips, method="compose").resize((w, h))
             
-            # OVERLAY GLOBAL BACKGROUND MUSIC IN FINAL MASTER MIX (Guaranteed to play)
+            # OVERLAY GLOBAL BACKGROUND MUSIC IN FINAL MASTER MIX (Automatic Ducking Mix)
             if has_bg_music and os.path.exists(bg_music_f):
                 try:
-                    bg_track = AudioFileClip(bg_music_f).volumex(0.06).set_duration(final_video.duration)
+                    # Ducked to 0.04 to give 100% voice clarity (Cinema Standard)
+                    bg_track = AudioFileClip(bg_music_f).volumex(0.04).set_duration(final_video.duration)
                     combined_master_audio = CompositeAudioClip([final_video.audio, bg_track])
                     final_video = final_video.set_audio(combined_master_audio)
                 except Exception as e:
@@ -1029,42 +1173,42 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             gc.collect()
 
 # ==========================================
-# 5. UI & PREMIUM BRANDING STYLING (V2.1)
+# 5. UI & PREMIUM CYBERPUNK SAAS STYLING (Streamlit Overrides)
 # ==========================================
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700;900&display=swap');
     
+    /* Professional Electric-Dark Cyberpunk Theme */
     .stApp { 
-        background-color: #ffffff !important; 
-        color: #000000 !important; 
+        background: radial-gradient(circle at top, #0f172a, #020617) !important; 
+        color: #f1f5f9 !important; 
         font-family: 'Inter', sans-serif; 
     }
     
-    /* شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ ٹائٹل کے لیے (صحیح سائز 2.2rem پر بحال) */
     .glow-title { 
-        font-size: 2.2rem; 
+        font-size: 2.5rem; 
         font-weight: 900; 
         text-align: center;
         font-family: 'Orbitron', sans-serif;
-        background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff);
+        background: linear-gradient(45deg, #00f2fe, #4facfe, #0072ff);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        text-shadow: 0 0 15px rgba(255, 0, 122, 0.2);
+        text-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
         margin-top: 15px;
         margin-bottom: 5px;
-        letter-spacing: 2px;
+        letter-spacing: 3px;
     }
 
     .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
     
     .circular-s {
         width: 120px; height: 120px; 
-        background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff) !important;
+        background: linear-gradient(135deg, #00f2fe, #0072ff) !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
         font-family: 'Orbitron', sans-serif; font-size: 50px; color: #ffffff !important;
-        border: 5px solid #ffffff !important;
-        box-shadow: 0 0 50px #ff007a, inset 0 0 20px #ffffff;
+        border: 4px solid #00f2fe !important;
+        box-shadow: 0 0 40px rgba(0, 242, 254, 0.6), inset 0 0 15px rgba(255, 255, 255, 0.5);
         animation: rotateShua 4s infinite linear, lightningGlow 1.5s infinite alternate;
     }
     
@@ -1073,45 +1217,52 @@ st.markdown("""
         100% { transform: perspective(1000px) rotateY(360deg); }
     }
     @keyframes lightningGlow {
-        0%, 100% { box-shadow: 0 0 25px #2563eb, 0 0 50px #ff007a, inset 0 0 15px #ffffff; }
-        50% { box-shadow: 0 0 50px #ff007a, 0 0 80px #00d4ff, inset 0 0 25px #ffffff; }
+        0%, 100% { box-shadow: 0 0 20px #0072ff, 0 0 40px #00f2fe, inset 0 0 15px #ffffff; }
+        50% { box-shadow: 0 0 40px #00f2fe, 0 0 60px #00d4ff, inset 0 0 20px #ffffff; }
     }
 
+    /* Premium Glow Button Styles */
     .stButton>button { 
-        background: #000000 !important; 
+        background: linear-gradient(90deg, #00f2fe, #0072ff) !important; 
         color: white !important; 
         border-radius: 12px !important; 
         height: 55px; 
         width: 100%; 
         font-size: 20px; 
         font-weight: bold; 
-        border: none; 
+        border: none;
+        box-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        box-shadow: 0 0 25px rgba(0, 242, 254, 0.8);
+        transform: scale(1.02);
     }
     
     [data-testid="stSidebar"] { 
-        background-color: #ffffff !important; 
-        border-right: 1px solid #e2e8f0; 
+        background-color: #0b1329 !important; 
+        border-right: 1px solid #1e293b; 
     }
     [data-testid="stSidebar"] * { 
-        color: #000000 !important; 
+        color: #f1f5f9 !important; 
         font-weight: bold !important; 
     }
     
     div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input {
-        background-color: #f8fafc !important;
-        color: #0f172a !important;
-        border: 2px solid #cbd5e1 !important;
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
+        border: 2px solid #1e293b !important;
         border-radius: 12px !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5) !important;
         transition: all 0.3s ease !important;
     }
     div[data-baseweb="textarea"] textarea:focus, div[data-baseweb="input"] input:focus {
-        border-color: #00d4ff !important;
-        box-shadow: 0 0 10px rgba(0, 212, 255, 0.2) !important;
-        background-color: #ffffff !important;
+        border-color: #00f2fe !important;
+        box-shadow: 0 0 10px rgba(0, 242, 254, 0.4) !important;
+        background-color: #0b1329 !important;
     }
     div[data-baseweb="textarea"] textarea::placeholder, div[data-baseweb="input"] input::placeholder {
-        color: #64748b !important;
+        color: #475569 !important;
         opacity: 1 !important;
     }
     </style>
@@ -1232,7 +1383,8 @@ with tab_movie:
     scene_desc = st.text_input("Scene Memory (جنگل، موسم، ماحول، جانور):", 
                               placeholder="Example: Deep green ancient forest, high realistic trees, thick foliage, dark stormy night")
 
-    mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9 = st.columns(9)
+    # Layout modified to include both Cultural Heritage and specific Video Model choices
+    mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9, mc10 = st.columns(10)
     with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
@@ -1269,7 +1421,8 @@ with tab_movie:
     ])
     with mc7: transition_style = st.selectbox("Transition Effect:", ["Cross Dissolve (Fade)", "Flash Transition (White Glow)", "Film Dissolve (Muted)", "Instant Cut"])
     with mc8: character_heritage = st.selectbox("Cultural Heritage (مشرقی یا مغربی لباس):", ["Automatic", "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)", "Ancient Arabian", "Western / Modern", "Far Eastern"])
-    with mc9: sd = st.number_input("Character Seed:", value=786)
+    with mc9: video_model = st.selectbox("AI Video Model:", ["wan-fast", "seedance", "veo"])
+    with mc10: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
         rate_val = mv_rate.split(" ")[0]
@@ -1302,6 +1455,7 @@ with tab_movie:
                 character_heritage=character_heritage,
                 gen_mode=gen_mode, 
                 pollinations_key=pollinations_key,
+                video_model=video_model,
                 advanced_params=None
             )
             
@@ -1629,4 +1783,4 @@ with tab_enterprise:
         else:
             st.error("Access Denied: Only database-defined Administrators can access this control panel.")
 
-st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.5 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #94a3b8;'>Sglowina AI Version 2.1 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
