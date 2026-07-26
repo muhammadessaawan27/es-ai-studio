@@ -22,9 +22,7 @@ if not hasattr(Image, 'ANTIALIAS'):
     try: Image.ANTIALIAS = Image.Resampling.LANCZOS
     except AttributeError: Image.ANTIALIAS = Image.LANCZOS
 
-headers_browser = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
+headers_browser = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 session = requests.Session()
 session.headers.update(headers_browser)
 
@@ -341,7 +339,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
             "Anime Art": "beautiful anime illustration, high-quality Japanese anime art style, detailed background",
             "Logo Design": "minimalist professional vector logo design, flat colors, icon style",
             "Historical Epic": "grand historical epic movie style, majestic ancient atmosphere, rich cultural heritage textures, cinematic golden hour",
-            "Rustic Village Life": "rustic traditional old village life, raw earthy tones, natural rustic lighting",
+            "Rustic Village Life": "rustic traditional old village life, raw earthy tones, authentic rural setting, natural rustic lighting",
             "Dark Gothic / Mystery": "moody dark gothic mystery, eerie misty atmosphere, shadows, dramatic cinematic suspense"
         }
         style_tag = style_boosters.get(style, "cinematic film style, highly detailed")
@@ -433,18 +431,37 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
             bg.save(img_path, "JPEG")
     except: pass
 
+# ==========================================
+# FAILOVER IMAGE EMERGENCY RECOVERY SYSTEM (Draw Cinematic Gradient instead of Basic MS-Paint Shapes)
+# ==========================================
 def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
     if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
         try:
-            base = Image.new("RGB", (w, h), color=(20, 30, 48))
+            # Generate a gorgeous cinematic dark nebula gradient background with soft noise instead of basic shapes
+            base = Image.new("RGB", (w, h), color=(15, 23, 42))
             draw = ImageDraw.Draw(base)
-            draw.ellipse([w//2 - 120, h//2 - 120, w//2 + 120, h//2 + 120], fill=(251, 146, 60))
-            draw.polygon([(0, h), (w//3, h//2), (w*2//3, h), (0, h)], fill=(30, 41, 59))
-            base = base.filter(ImageFilter.GaussianBlur(radius=5))
+            
+            # Draw soft expanding ambient glowing cosmic lights to simulate a professional nebula background
+            for r_offset in range(300, 0, -10):
+                draw.ellipse([w//2 - r_offset, h//2 - r_offset, w//2 + r_offset, h//2 + r_offset], 
+                             fill=(10 + int(90 * (1-r_offset/300)), 15, 30 + int(150 * (1-r_offset/300))))
+                draw.ellipse([w//3 - r_offset//2, h//3 - r_offset//2, w//3 + r_offset//2, h//3 + r_offset//2], 
+                             fill=(20, 10 + int(120 * (1-r_offset/300)), 40))
+            
+            base = base.filter(ImageFilter.GaussianBlur(radius=30))
+            
+            # Subtle artistic film noise overlay
+            np_im = np.array(base)
+            noise = np.random.normal(0, 3, np_im.shape).astype(np.int16)
+            np_im = np.clip(np_im.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+            base = Image.fromarray(np_im)
+            
             base.save(img_path, "JPEG")
-        except:
-            try: Image.new("RGB", (w, h), color=(30, 41, 59)).save(img_path, "JPEG")
-            except: pass
+        except Exception:
+            try:
+                Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
+            except:
+                pass
 
 def parallel_download_flux_images(urls, paths, sentences, w, h):
     def download_single(i):
@@ -520,6 +537,21 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
             "Dolly In": lambda: clip.resize(lambda t: 1.0 + 0.25 * (t / duration)).set_position('center'),
             "Dolly Out": lambda: clip.resize(lambda t: 1.25 - 0.25 * (t / duration)).set_position('center'),
             "Orbit Camera": lambda: clip.rotate(lambda t: -3 + 6 * (t / duration)).resize(lambda t: 1.1 + 0.1 * (t / duration)).set_position('center'),
+            "Crane Shot": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -2 * (t / duration)),
+            "Drone Shot": lambda: clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center'),
+            "Tracking Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5))))),
+            "Follow Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5))))),
+            "Handheld Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0)),
+            "Shoulder Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0)),
+            "Cinematic Reveal": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
+            "Whip Pan": lambda: clip.set_position(lambda t: (int((w - cw) * ((t / duration) ** 3)), 'center')),
+            "Tilt Up": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))),
+            "Tilt Down": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
+            "Roll Camera": lambda: clip.rotate(lambda t: 8 * (t / duration)).set_position('center'),
+            "Parallax Motion": lambda: clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
+            "Ken Burns Effect": lambda: clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
+            "Rack Focus": lambda: clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center'),
+            "Motion Blur": lambda: clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center')
         }
         animated_clip = motions_map.get(motion, motions_map["Zoom Out (v40 Default)"])()
         return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
@@ -650,6 +682,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             story_lower_all = story.lower()
             female_keywords = ["larki", "woman", "female", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ", "saba", "baji", "behn"]
             male_keywords = ["man", "male", "boy", "he", "him", "adventurer", "maseeha", "mushaf", "مرد", "لڑکا", "احمد", "علی", "بادشاہ", "essa", "awan", "bhai"]
+            animal_keywords = ["شیر", "چیتا", "ہاتھی", "گھڑیال", "مگرمچھ", "پرندہ", "پرندے", "حیوان", "جانور", "lion", "cheetah", "elephant", "crocodile", "alligator", "tiger", "bear", "wolf", "leopard"]
             
             story_has_female = any(k in story_lower_all for k in female_keywords)
             story_has_male = any(k in story_lower_all for k in male_keywords)
@@ -694,16 +727,26 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 dir_settings = analyze_scene_for_director(scene)
                 if camera_motion != "AI Hollywood Director (Auto)": dir_settings["motion"] = camera_motion
                 
-                local_char_present = is_human_character_present(scene)
-                character_present = local_char_present or (primary_gender is not None)
-                active_male_ref = raw_male_url if (character_present and (primary_gender == "male" or local_char_present)) else None
-                active_female_ref = raw_female_url if (character_present and (primary_gender == "female" or local_char_present)) else None
+                # --- STRICT SCENIC/ANIMAL SEPARATION FILTER ---
+                has_animals_locally = any(k in scene.lower() for k in animal_keywords)
+                local_human = is_human_character_present(scene)
+                
+                if has_animals_locally and not local_human:
+                    character_present = False
+                    # Optimize wildlife composition specifically
+                    style_modified = f"{style}, award-winning wild animals photography, deep majestic forest"
+                else:
+                    character_present = local_human or (primary_gender is not None)
+                    style_modified = style
+                
+                active_male_ref = raw_male_url if (character_present and (primary_gender == "male" or local_human)) else None
+                active_female_ref = raw_female_url if (character_present and (primary_gender == "female" or local_human)) else None
                 
                 active_heritage = character_heritage
                 if character_heritage == "Automatic" or not character_heritage:
                     active_heritage = "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)" if (any(k in scene.lower() for k in female_keywords + male_keywords) or primary_gender) else "Western / Modern"
                 
-                refined_p = generate_enhanced_cinematic_prompt(scene, style, active_heritage, enable_islamic_filter, active_male_ref, active_female_ref, attire_tag)
+                refined_p = generate_enhanced_cinematic_prompt(scene, style_modified, active_heritage, enable_islamic_filter, active_male_ref, active_female_ref, attire_tag if character_present else "")
                 if not is_spiritual and character_present:
                     refined_p += " [Avoid cross-gender blending, absolutely no woman with beard, detailed limbs, symmetrical eyes]"
                 refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}, {dir_settings['composition']}"
@@ -755,7 +798,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     if img_paths[idx]: generated_images.append(img_paths[idx])
             
             progress_bar.progress(0.45)
-            status.info("🎞️ Stitchingfinal elements together...")
+            status.info("🎞️ Stitching final elements together...")
             
             for i in range(total_scenes):
                 if clips[i] is not None: continue
@@ -844,20 +887,65 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700;900&display=swap');
+    
     .stApp { background: #f8fafc !important; color: #0f172a !important; font-family: 'Inter', sans-serif; }
+    
+    /* SHIMMERING GLOW PINK-BLUE GRADIENT METALLIC TITLE */
     .glow-title { 
-        font-size: 2.5rem; font-weight: 900; text-align: center; font-family: 'Orbitron', sans-serif;
-        background: linear-gradient(45deg, #2563eb, #3b82f6, #1d4ed8);
+        font-size: 3rem; font-weight: 900; text-align: center; font-family: 'Orbitron', sans-serif;
+        background: linear-gradient(135deg, #00f0ff, #ff007f, #00f0ff); background-size: 200% auto;
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        margin-top: 15px; margin-bottom: 5px; letter-spacing: 3px;
+        animation: shimmerGlow 3s infinite linear; margin-top: 15px; margin-bottom: 5px; letter-spacing: 5px;
+        filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
     }
+    
     .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
+    
+    /* RADIAL GLOW METALLIC SPINNING CONTAINER */
     .circular-s {
-        width: 120px; height: 120px; background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
+        width: 120px; height: 120px; background: radial-gradient(circle, #020617 40%, #1e1b4b 100%) !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        font-family: 'Orbitron', sans-serif; font-size: 50px; color: #ffffff !important;
-        border: 4px solid #3b82f6 !important; box-shadow: 0 4px 20px rgba(37, 99, 235, 0.3);
+        border: 4px solid #00f0ff !important; box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+        animation: rotateSpins 10s infinite linear, electricGlow 3s infinite alternate;
     }
+    
+    /* SHIMMERING GLOW METALLIC 'S' TEXT */
+    .metallic-s {
+        font-family: 'Orbitron', sans-serif; font-size: 65px; font-weight: 900;
+        background: linear-gradient(135deg, #ff007f, #00f0ff, #ff007f); background-size: 200% auto;
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.8)); animation: shimmerGlow 3s infinite linear;
+    }
+    
+    @keyframes rotateSpins {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    @keyframes electricGlow {
+        0%, 100% {
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.6), 0 0 40px rgba(255, 0, 127, 0.4);
+            border-color: #00f0ff !important;
+        }
+        50% {
+            box-shadow: 0 0 35px rgba(255, 0, 127, 0.9), 0 0 70px rgba(0, 240, 255, 0.7);
+            border-color: #ff007f !important;
+        }
+    }
+    @keyframes shimmerGlow {
+        0% {
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(255, 0, 127, 0.5);
+            background-position: 0% 50%;
+        }
+        50% {
+            text-shadow: 0 0 25px rgba(255, 0, 127, 1), 0 0 45px rgba(0, 240, 255, 0.8);
+            background-position: 100% 50%;
+        }
+        100% {
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(255, 0, 127, 0.5);
+            background-position: 0% 50%;
+        }
+    }
+    
     .stButton>button, .stFormSubmitButton>button { 
         background: linear-gradient(90deg, #2563eb, #1d4ed8) !important; color: white !important; 
         border-radius: 12px !important; height: 55px !important; width: 100% !important; 
@@ -873,7 +961,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.markdown('<div class="glow-title">SGLOWINA AI</div>', unsafe_allow_html=True)
-st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
+st.markdown('<div class="logo-container"><div class="circular-s"><span class="metallic-s">S</span></div></div>', unsafe_allow_html=True)
 
 # Tabs Initialization
 tab_auth, tab_chat, tab_movie, tab_image, tab_enterprise = st.tabs([
@@ -933,7 +1021,7 @@ with tab_movie:
     with mc3: mv_pitch = st.selectbox("Voice Pitch:", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    with mc6: camera_motion = st.selectbox("Camera Motion:", ["AI Hollywood Director (Auto)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out", "Orbit Camera"])
+    with mc6: camera_motion = st.selectbox("Camera Motion:", ["AI Hollywood Director (Auto)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out", "Orbit Camera", "Crane Shot", "Drone Shot", "Tracking Shot", "Follow Shot", "Handheld Camera", "Shoulder Camera", "Cinematic Reveal", "Whip Pan", "Tilt Up", "Tilt Down", "Roll Camera", "Parallax Motion", "Ken Burns Effect", "Rack Focus", "Motion Blur"])
     with mc7: transition_style = st.selectbox("Transition Effect:", ["Cross Dissolve (Fade)", "Instant Cut"])
     with mc8: character_heritage = st.selectbox("Cultural Heritage:", ["Automatic", "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)", "Ancient Arabian", "Western / Modern", "Far Eastern"])
     with mc9: video_model = st.selectbox("AI Video Model:", ["wan-fast", "seedance", "veo"])
