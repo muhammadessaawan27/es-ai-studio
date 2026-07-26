@@ -468,10 +468,23 @@ def build_ultra_cinematic_prompt(scene, style, char_desc, scene_desc, director_s
     return ", ".join(prompt_parts)[:500]
 
 # Enhanced Cinematic Prompt Mastermind incorporating dual reference image context & STRICT EASTERN STYLING
-def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
+def generate_enhanced_cinematic_prompt(urdu_scene, style, char_memory, scene_memory, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
     try:
         scene_lower = urdu_scene.lower()
         gender_booster = ""
+        
+        # PROMPT BOOSTER ENGINE: Style mappings and dynamic injection
+        style_boosters = {
+            "Realistic HD": "ultra photorealistic, 8k resolution, highly detailed, sharp focus, natural skin textures, professional studio lighting, shot on 35mm lens",
+            "Cinematic Film": "cinematic movie style, dramatic Hollywood cinematic lighting, Arri Alexa LF camera, deep shadows, cinematic color grade, depth of field",
+            "3D Cartoon": "3D cartoon animation style, Pixar and Disney style, smooth 3D renders, stylized charming characters, vibrant colorful environment, claymation textures, adorable animated movie aesthetic, beautiful 3D digital art",
+            "Anime Art": "beautiful anime illustration, high-quality Japanese anime art style, clean lines, vibrant cel shading, detailed background, Makoto Shinkai or Kyoto Animation aesthetic",
+            "Logo Design": "minimalist professional vector logo design, clean graphic art, solid flat colors, high contrast, elegant emblem, icon style",
+            "Historical Epic": "grand historical epic movie style, majestic ancient atmosphere, rich cultural heritage textures, cinematic golden hour lighting, dramatic historical film frame",
+            "Rustic Village Life": "rustic traditional old village life aesthetic, raw earthy tones, authentic rural setting, natural rustic lighting, historical simplicity",
+            "Dark Gothic / Mystery": "moody dark gothic mystery aesthetic, eerie misty atmosphere, shadows and contrast, dramatic cinematic suspense look, dark fantasy style"
+        }
+        style_tag = style_boosters.get(style, "cinematic film style, highly detailed")
         
         # PROMPT BOOSTER ENGINE: Forcefully overrides default Western biases
         if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
@@ -479,13 +492,13 @@ def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, ch
                 gender_booster = (
                     "beautiful elegant Eastern Pakistani Punjabi Pathan woman, realistic South Asian sharp facial features, "
                     "wearing traditional modest cotton Shalwar Kameez with a clean modest Dupatta elegantly draped over her head as a hijab, "
-                    "extremely realistic, 8k resolution, highly detailed, strictly no western look, modest posture"
+                    "strictly no western look, modest posture"
                 )
             elif "عیسی" in scene_lower or "essa" in scene_lower or "man" in scene_lower or "male" in scene_lower or "boy" in scene_lower:
                 gender_booster = (
                     "handsome majestic Eastern Pakistani Punjabi Pathan man, highly realistic South Asian facial structure, "
                     "wearing a traditional modest cotton Shalwar Kameez with high collar, neat short Islamic beard, "
-                    "strictly no western look, photorealistic, 8k resolution"
+                    "strictly no western look"
                 )
             else:
                 gender_booster = (
@@ -501,19 +514,21 @@ def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, ch
 
         instruction = (
             "You are an expert Hollywood visual artist and prompt engineer. "
-            "Analyze the Urdu scene and write a highly detailed visual English image prompt for the Flux model. \n"
+            "Analyze the Urdu scene and write a highly detailed visual English image prompt matching the specified style. \n"
             "CRITICAL INSTRUCTIONS:\n"
-            "1. If 'Islamic Safety Filter' is Active and the text contains Islamic holy names (like Prophets/انبیاء, Sahaba/صحابہ, Auliya, Allah, Quran, or grave, heaven, hell), you MUST strictly avoid generating any human face or human body. Instead, generate a highly spiritual scene depicting glorious volumetric white and golden divine light rays emanating from a cosmic night sky, beautiful natural mountains, or ancient desert paths. No human silhouettes.\n"
-            "2. For human characters, strictly enforce gender separation. Do NOT mix genders. A female character (e.g. Saba) must have a beautiful, clean, feminine Eastern face. Absolutely NO facial hair, NO beards, and NO mustaches on females.\n"
-            "3. A male character (e.g. Essa) must have a handsome, masculine face with a neat short black beard.\n"
-            "4. All human characters must have realistic Middle Eastern, Pakistani, or Arabian features (no western default faces) and wear traditional modest clothing based on the heritage style.\n"
-            "5. STRICT CHARACTER CONSISTENCY: Keep the characters' face, hair, and look completely identical across scenes. If a male reference image URL is provided, copy the face and features of: {raw_male_url}. If a female reference image URL is provided, copy the face and features of: {raw_female_url}.\n"
-            "6. If both characters are mentioned, depict them as a distinct couple (one bearded man and one modest woman) interacting. Do NOT merge them into one body.\n"
-            "7. Describe the scene's exact environment (e.g. deep green jungle, flowing river, mud-houses, rain, storms, animals like lions/snakes in the foreground) with strong descriptive words so the image generator produces it precisely.\n"
-            "8. Write ONLY the final English prompt, with no conversational preamble or extra text."
+            "1. STRICT VISUAL STYLE ENFORCEMENT: You must generate the prompt matching the style specified in 'VISUAL STYLE TAGS'. If the style is '3D Cartoon', you must strictly describe a Disney/Pixar cartoon aesthetic (smooth 3D renders, stylized, cute characters, animated look), NOT a realistic photo. If the style is 'Anime Art', describe a Japanese anime style. If the style is 'Cinematic Film', describe a live-action film style.\n"
+            "2. If 'Islamic Safety Filter' is Active and the text contains Islamic holy names (like Prophets/انبیاء, Sahaba/صحابہ, Auliya, Allah, Quran, or grave, heaven, hell), you MUST strictly avoid generating any human face or human body. Instead, generate a highly spiritual scene depicting glorious volumetric white and golden divine light rays emanating from a cosmic night sky, beautiful natural mountains, or ancient desert paths. No human silhouettes.\n"
+            "3. For human characters, strictly enforce gender separation. Do NOT mix genders. A female character (e.g. Saba) must have a beautiful, clean, feminine Eastern face. Absolutely NO facial hair, NO beards, and NO mustaches on females.\n"
+            "4. A male character (e.g. Essa) must have a handsome, masculine face with a neat short black beard.\n"
+            "5. All human characters must have realistic Middle Eastern, Pakistani, or Arabian features (no western default faces) and wear traditional modest clothing based on the heritage style.\n"
+            "6. STRICT CHARACTER CONSISTENCY: Keep the characters' face, hair, and look completely identical across scenes. If a male reference image URL is provided, copy the face and features of: {raw_male_url}. If a female reference image URL is provided, copy the face and features of: {raw_female_url}.\n"
+            "7. If both characters are mentioned, depict them as a distinct couple (one bearded man and one modest woman) interacting. Do NOT merge them into one body.\n"
+            "8. Describe the scene's exact environment (e.g. deep green jungle, flowing river, mud-houses, rain, storms, animals like lions/snakes in the foreground) with strong descriptive words so the image generator produces it precisely.\n"
+            "9. Write ONLY the final English prompt, with no conversational preamble or extra text."
         )
         
         prompt_input = f"Urdu Scene: {urdu_scene}\n"
+        prompt_input += f"VISUAL STYLE TAGS: {style_tag}\n"
         if char_memory:
             prompt_input += f"Character Memory/Appearance override: {char_memory}\n"
         if gender_booster:
@@ -536,10 +551,11 @@ def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, ch
         if res.status_code == 200:
             refined_p = res.text.strip()
             refined_p = re.sub(r'^(prompt:|visual prompt:|cinematic prompt:)\s*', '', refined_p, flags=re.IGNORECASE)
+            refined_p = f"{refined_p}, visual style: {style_tag}"
             return refined_p
     except Exception:
         pass
-    return f"Cinematic film scene: {urdu_scene}, highly detailed, 8k"
+    return f"Cinematic film scene: {urdu_scene}, style: {style_tag}, highly detailed, 8k"
 
 # Post-Processing Color LUT Grading Matrix Harmony
 def apply_color_lut_harmony(img_path, style_preset):
@@ -623,30 +639,36 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
         pass
 
 # ==========================================
-# FAILOVER IMAGE EMERGENCY RECOVERY SYSTEM (Guarantees File Existence)
+# FAILOVER IMAGE EMERGENCY RECOVERY SYSTEM (Strictly No Text Overlay & No Pitch Black)
 # ==========================================
 def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
     if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
         try:
-            # Create a sophisticated slate-dark fallback gradient card
-            base = Image.new("RGB", (w, h), color=(15, 23, 42))
+            # Generate a gorgeous cinematic abstract bokeh gradient instead of black screen
+            base = Image.new("RGB", (w, h), color=(10, 15, 30))
             draw = ImageDraw.Draw(base)
             
-            # Draw sleek futuristic grid borders
-            draw.rectangle([15, 15, w - 15, h - 15], outline=(30, 41, 59), width=3)
-            
-            try:
-                font = ImageFont.load_default()
-            except Exception:
-                font = None
+            # Draw beautiful blurred glowing circles to replicate camera lens bokeh lights
+            for _ in range(8):
+                cx = random.randint(0, w)
+                cy = random.randint(0, h)
+                r = random.randint(150, 350)
                 
-            draw.text((45, h // 2 - 20), "Sglowina AI Studio - Scene Visualization Frame", fill=(0, 242, 254), font=font)
-            draw.text((45, h // 2 + 10), f"Story Scene: {scene_text[:55]}...", fill=(148, 163, 184), font=font)
+                color_choices = [
+                    (random.randint(15, 45), random.randint(30, 90), random.randint(60, 140)), # Deep Teal Blue
+                    (random.randint(40, 90), random.randint(20, 50), random.randint(15, 45)), # Deep Amber Gold
+                    (random.randint(25, 65), random.randint(15, 45), random.randint(50, 110)) # Purple Indigo
+                ]
+                color = random.choice(color_choices)
+                draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=color)
+                
+            # Apply strong Gaussian blur to make it super smooth and premium look (No writing drawn!)
+            base = base.filter(ImageFilter.GaussianBlur(radius=40))
             base.save(img_path, "JPEG")
         except Exception:
             try:
-                # Absolute baseline black card fallback
-                im = Image.new("RGB", (w, h), color=(0, 0, 0))
+                # Absolute baseline minimal card fallback (Strict Dark Blue Palette instead of pure black)
+                im = Image.new("RGB", (w, h), color=(15, 23, 42))
                 im.save(img_path, "JPEG")
             except:
                 pass
@@ -657,20 +679,37 @@ def parallel_download_flux_images(urls, paths, sentences, w, h):
         url = urls[i]
         path = paths[i]
         scene_text = sentences[i]
+        
+        # Retry logic up to 3 times for connection drops
+        for attempt in range(3):
+            try:
+                res = session.get(url, timeout=30)
+                if res.status_code == 200 and len(res.content) > 2000:
+                    with open(path, "wb") as f:
+                        f.write(res.content)
+                    return True
+            except Exception:
+                pass
+            time.sleep(1)
+            
+        # Try simplified prompt download fallback before generating abstract card
         try:
-            res = session.get(url, timeout=40)
-            if res.status_code == 200 and len(res.content) > 1000:
+            simple_prompt = urllib.parse.quote(f"cinematic beautiful scene: {scene_text[:60]}")
+            fallback_url = f"https://image.pollinations.ai/prompt/{simple_prompt}?width={w}&height={h}&nologo=true"
+            res = session.get(fallback_url, timeout=15)
+            if res.status_code == 200 and len(res.content) > 2000:
                 with open(path, "wb") as f:
                     f.write(res.content)
                 return True
         except Exception:
             pass
-        # Failover generation on same path if download failed
+            
+        # Ultimate failover: create beautiful abstract cinematic gradient with no text!
         ensure_image_exists(path, w, h, scene_text)
         return False
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        executor.map(download_single, range(len(urls)))
+        list(executor.map(download_single, range(len(urls))))
 
 # Motion control logic safely wrapped to prevent MoviePy engine crash
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
@@ -999,9 +1038,10 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     
                 active_motion = dir_settings["motion"]
                 
-                # Build smart descriptive prompt with Flux optimized composition, dual reference images, and heritage override rules
+                # Build smart descriptive prompt with Flux optimized composition, style tags, reference images
                 refined_p = generate_enhanced_cinematic_prompt(
                     urdu_scene=scene,
+                    style=style,
                     char_memory=char_desc,
                     scene_memory=scene_desc,
                     character_heritage=character_heritage,
@@ -1128,7 +1168,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 # Compile video motion frame
                 clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h)
                 
-                # If everything fails, guarantee a black-block backup clip to stop downstream errors
+                # If everything fails, guarantee a background backup clip to stop downstream errors
                 if clip is None:
                     clip = ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).set_duration(dur_scene)
                 
@@ -1570,8 +1610,24 @@ with tab_image:
                 for idx, single_p in enumerate(prompt_list):
                     for q in range(count):
                         final_p = single_p
+                        
+                        style_boosters_img = {
+                            "Realistic HD": "ultra photorealistic, 8k resolution, highly detailed, sharp focus, natural skin textures, professional studio lighting, shot on 35mm lens",
+                            "Cinematic Film": "cinematic movie style, dramatic Hollywood cinematic lighting, Arri Alexa LF camera, deep shadows, cinematic color grade, depth of field",
+                            "3D Cartoon": "3D cartoon animation style, Pixar and Disney style, smooth 3D renders, stylized charming characters, vibrant colorful environment, claymation textures, adorable animated movie aesthetic, beautiful 3D digital art",
+                            "Anime Art": "beautiful anime illustration, high-quality Japanese anime art style, clean lines, vibrant cel shading, detailed background, Makoto Shinkai or Kyoto Animation aesthetic",
+                            "Logo Design": "minimalist professional vector logo design, clean graphic art, solid flat colors, high contrast, elegant emblem, icon style",
+                            "Historical Epic": "grand historical epic movie style, majestic ancient atmosphere, rich cultural heritage textures, cinematic golden hour lighting, dramatic historical film frame",
+                            "Rustic Village Life": "rustic traditional old village life aesthetic, raw earthy tones, authentic rural setting, natural rustic lighting, historical simplicity",
+                            "Dark Gothic / Mystery": "moody dark gothic mystery aesthetic, eerie misty atmosphere, shadows and contrast, dramatic cinematic suspense look, dark fantasy style"
+                        }
+                        style_tag_img = style_boosters_img.get(i_style, "")
+                        
                         if char_desc_img.strip():
                             final_p = f"Character is {char_desc_img.strip()}. Action/Scene: {single_p}"
+                            
+                        if style_tag_img:
+                            final_p = f"{final_p}, visual style: {style_tag_img}"
                             
                         img_data = fetch_img_failover(final_p, w, h, random.randint(1,999999))
                         if img_data:
@@ -1614,6 +1670,16 @@ with tab_image:
                 if u_db and u_db['credits'] >= 5:
                     with st.spinner("Modifying image..."):
                         img_name = translate_ur_to_en_enhanced(modify_prompt)
+                        
+                        style_boosters_mod = {
+                            "Realistic HD": "ultra photorealistic, 8k resolution, highly detailed, sharp focus, natural skin textures, professional studio lighting",
+                            "Cinematic Film": "cinematic movie style, dramatic Hollywood cinematic lighting, Arri Alexa, deep shadows, depth of field",
+                            "3D Cartoon": "3D cartoon animation style, Pixar and Disney style, smooth 3D renders, claymation textures"
+                        }
+                        style_tag_mod = style_boosters_mod.get(i_style_mod, "")
+                        if style_tag_mod:
+                            img_name = f"{img_name}, visual style: {style_tag_mod}"
+                            
                         img_data = fetch_img_failover(img_name, 1024, 1024, random.randint(1,999999))
                         if img_data:
                             img_path_temp_mod = "temp_canvas_mod.jpg"
