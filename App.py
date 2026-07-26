@@ -17,6 +17,15 @@ import hashlib
 import concurrent.futures
 
 # ==========================================
+# PIL MONKEYPATCH FOR PIL.IMAGE.ANTIALIAS COMPATIBILITY (Failsafe for Pillow >= 10)
+# ==========================================
+if not hasattr(Image, 'ANTIALIAS'):
+    try:
+        Image.ANTIALIAS = Image.Resampling.LANCZOS
+    except AttributeError:
+        Image.ANTIALIAS = Image.LANCZOS
+
+# ==========================================
 # 1. BROWSER SESSION STABILITY HEADERS (Guaranteed to load first)
 # ==========================================
 headers_browser = {
@@ -63,6 +72,7 @@ except ImportError:
 # ==========================================
 # 3. STREAMLIT CONFIGURATION & GLOBAL STATES
 # ==========================================
+# Streamlit page config MUST be the first Streamlit command called
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V2.1", layout="wide", page_icon="🎬")
 
 # Show warnings if critical libraries are missing
@@ -464,6 +474,7 @@ def analyze_urdu_motion_verbs(scene_text):
     text = scene_text.lower()
     motion_directives = []
     
+    # Urdu/English movement triggers mapping
     if any(k in text for k in ["چل", "چلنے", "چلتے", "walk", "stride", "قریب"]):
         motion_directives.append("character physically walking towards the camera, natural walking pace, moving step by step")
     if any(k in text for k in ["بھاگ", "بھاگنے", "بھاگتے", "دوڑ", "run", "chase", "flee"]):
@@ -778,11 +789,13 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
         elif motion == "Drone Shot":
             animated_clip = clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center')
         elif motion == "Tracking Shot" or motion == "Follow Shot":
+            # Tracking with micro vibration shake
             animated_clip = clip.set_position(lambda t: (
                 int((w - cw) * (t / duration)),
                 int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5)))
             ))
         elif motion == "Handheld Camera" or motion == "Shoulder Camera":
+            # Pure manual handheld camera shake calculations
             animated_clip = clip.set_position(lambda t: (
                 int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))),
                 int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7)))
@@ -1048,6 +1061,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                             
                             clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_scene)
                             
+                            # Download and mix scene environmental SFX
                             sfx_file, sfx_display_name = download_scene_sfx(scene, u_id, i)
                             if sfx_file and os.path.exists(sfx_file):
                                 try:
@@ -1081,6 +1095,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 
             progress_bar.progress(0.25)
             
+            # Image Download Loop with strict Failover generation
             start_t = time.time()
             total_images = len(flux_prompt_urls)
             for idx, img_url in enumerate(flux_prompt_urls):
@@ -1097,11 +1112,13 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 except Exception:
                     pass
                 
+                # Safeguard: If download fails or times out, immediately generate elegant local slate card
                 ensure_image_exists(img_path, w, h, sentences[idx])
             
             progress_bar.progress(0.45)
             status.info("🎞️ Assembling Audio Syncing and Camera Motions...")
             
+            # ASSEMBLE CLIPS WITH EXACT VOICE SYNCHRONIZATION AND EFFECTS
             for i, scene in enumerate(sentences):
                 if len(clips) > i:
                     continue
@@ -1109,28 +1126,39 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 img_path = img_paths[i]
                 sub_audio_path = temporary_audio_tracks[i]
                 
+                # Double-check safety net right before MoviePy parsing
                 ensure_image_exists(img_path, w, h, scene)
+                
+                # Apply Color LUT matrix harmony on the downloaded frame
                 apply_color_lut_harmony(img_path, style)
+                
+                # Apply Blurred padding to completely eliminate black bars
                 apply_blurred_background_padding(img_path, make_even(w * 1.25), make_even(h * 1.25))
                 
+                # Read exact sub clip voiceover duration
                 scene_voice_clip = AudioFileClip(sub_audio_path)
                 dur_scene = scene_voice_clip.duration
                 
+                # Determine camera motion for this clip
                 english_scene_temp = translate_ur_to_en_enhanced(scene)
                 dir_settings = analyze_scene_for_director(english_scene_temp)
                 if camera_motion != "AI Hollywood Director (Auto)":
                     dir_settings["motion"] = camera_motion
                 active_motion = dir_settings["motion"]
                 
+                # Compile video motion frame
                 clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h)
                 
                 if clip is None:
+                    # In case of absolute disaster, create an active slate fallback clip
                     clip = ImageClip(img_path).set_duration(dur_scene).resize((w, h))
                 
+                # Download and mix scene environmental SFX
                 sfx_file, sfx_display_name = download_scene_sfx(scene, u_id, i)
                 if sfx_file and os.path.exists(sfx_file):
                     try:
                         sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
+                        # Dialogue is boosted and SFX is safely ducked
                         clip_composite_audio = CompositeAudioClip([scene_voice_clip.volumex(1.2), sfx_audio])
                         clip = clip.set_audio(clip_composite_audio)
                         generated_images.append(sfx_file)
@@ -1146,8 +1174,10 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             
             final_video = concatenate_videoclips(clips, method="compose").resize((w, h))
             
+            # OVERLAY GLOBAL BACKGROUND MUSIC IN FINAL MASTER MIX (Automatic Ducking Mix)
             if has_bg_music and os.path.exists(bg_music_f):
                 try:
+                    # Ducked to 0.04 to give 100% voice clarity (Cinema Standard)
                     bg_track = AudioFileClip(bg_music_f).volumex(0.04).set_duration(final_video.duration)
                     combined_master_audio = CompositeAudioClip([final_video.audio, bg_track])
                     final_video = final_video.set_audio(combined_master_audio)
@@ -1156,10 +1186,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     
             out_name = f"Sglowina_{u_id}.mp4"
             
+            # Beautiful simulated countdown timer for compilation
             start_compile_t = time.time()
             total_duration = final_video.duration if final_video.duration else 10
             status.info(f"⏳ Compiling and Stitching Video (Estimated duration: {int(total_duration)}s)...")
             
+            # Video compilation without unsafe custom logger class that breaks across MoviePy versions
             write_kwargs = {"codec": "libx264", "audio_codec": "aac", "fps": 24, "ffmpeg_params": ["-pix_fmt", "yuv420p"]}
             try:
                 final_video.write_videofile(out_name, logger=None, **write_kwargs)
@@ -1171,6 +1203,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             
             final_video.close()
             
+            # CLEANUP TEMPORARY FILES to save server disk space
             for sub_voice in temporary_audio_tracks:
                 try:
                     if os.path.exists(sub_voice): os.remove(sub_voice)
@@ -1188,6 +1221,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             elapsed_compile = int(time.time() - start_compile_t)
             status.success(f"🚀 Video Generated in {elapsed_compile}s!")
             
+            # Database log
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("INSERT INTO projects (id, user_id, project_name, type, file_path, prompt, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", 
@@ -1222,6 +1256,7 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700;900&display=swap');
     
+    /* Professional Electric-Dark Cyberpunk Theme */
     .stApp { 
         background: radial-gradient(circle at top, #0f172a, #020617) !important; 
         color: #f1f5f9 !important; 
@@ -1263,6 +1298,7 @@ st.markdown("""
         50% { box-shadow: 0 0 40px #00f2fe, 0 0 60px #00d4ff, inset 0 0 20px #ffffff; }
     }
 
+    /* Premium Glow Button Styles */
     .stButton>button { 
         background: linear-gradient(90deg, #00f2fe, #0072ff) !important; 
         color: white !important; 
@@ -1289,6 +1325,7 @@ st.markdown("""
         font-weight: bold !important; 
     }
     
+    /* Comprehensive Input Box styling to prevent invisible white text on white backgrounds */
     textarea, input, select, div[data-baseweb="select"] {
         background-color: #1e293b !important;
         color: #ffffff !important;
@@ -1308,15 +1345,18 @@ st.markdown("""
         opacity: 1 !important;
     }
     
+    /* Ensure the actual text color of typed input in Streamlit forms is 100% visible white */
     .stTextArea textarea, .stTextInput input {
         color: #ffffff !important;
         background-color: #1e293b !important;
     }
     
+    /* Make sure Streamlit container labels are fully readable */
     label, p, span, h1, h2, h3, h4, h5, h6 {
         color: #f1f5f9 !important;
     }
     
+    /* Professional Dark Tabs overrides */
     .stTabs [data-baseweb="tab-list"] {
         background-color: #0b1329;
         border-radius: 12px;
@@ -1621,7 +1661,7 @@ with tab_enterprise:
                     st.code(proj['prompt'], language="text")
                     st.markdown("---")
         else:
-            st.warning("Please login first.")
+            st.sidebar.warning("Please login first.")
                 
     with ent_tab_billing:
         st.write("### 💳 Subscription Plans & Credit Packages (Pakistani Local Payment Integration)")
