@@ -39,6 +39,19 @@ AUDIO_CACHE_DIR = "audio_cache"
 os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
 DB_BACKUP_FILE = "sglowina_saas_backup.json"
 
+# Urdu to English Dictionary for Fallback Mechanism
+UR_EN_DICT = {
+    "درخت": "trees", "جنگل": "forest", "باغ": "garden", "باغات": "gardens",
+    "پرندے": "birds", "پرندہ": "bird", "بارش": "rain", "طوفان": "storm",
+    "بادل": "clouds", "ہوا": "wind", "آگ": "fire", "پانی": "water",
+    "لڑکا": "boy", "لڑکی": "girl", "عورت": "woman", "مرد": "man",
+    "بادشاہ": "king", "ملکہ": "queen", "محل": "palace", "تخت": "throne",
+    "شیر": "lion", "تلوار": "sword", "جنگ": "war", "قبر": "grave",
+    "خوفناک": "scary", "جن": "ghost", "اندھیرا": "dark", "موت": "death",
+    "خوبصورت": "beautiful", "جادو": "magic", "جادوئی": "magical",
+    "مسجد": "mosque", "نماز": "prayer", "دعا": "pray", "نور": "holy light"
+}
+
 # ==========================================
 # 2. MOVIEPY CINEMATIC IMPORTS WITH SAFE FALLBACK
 # ==========================================
@@ -370,7 +383,7 @@ def log_credit_usage(user_id, action, used, balance):
     conn.commit()
     conn.close()
 
-# AI Hollywood Director Mode Intelligent Scene & Speaker Analyzer
+# AI Hollywood Director Mode Intelligent Scene & Speaker Analyzer (Fixed: Urdu & English Keywords Support)
 def analyze_scene_for_director(scene_text):
     text = scene_text.lower()
     
@@ -379,23 +392,30 @@ def analyze_scene_for_director(scene_text):
     color_grading = "Hollywood Cinematic"
     composition = "Cinematic Wide Shot" # Default to wide shot to capture forests, magic, ruins, and birds
     
-    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag"]):
+    # Action / Fast Movement
+    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag", "بھاگ", "دوڑ", "تیز"]):
         motion = "Tracking Shot"
-    elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
+    # Horror / Scary
+    elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared", "قبر", "خوف", "جن", "بھوت", "تاریک", "ڈرا", "موت"]):
         motion = "Dolly In"
         lighting = "Dark Cinematic, Shadows"
         color_grading = "Horror Green"
-    elif any(k in text for k in ["fight", "battle", "sword", "war"]):
+    # Combat / Swordfight
+    elif any(k in text for k in ["fight", "battle", "sword", "war", "تلوار", "جنگ", "لڑائی"]):
         motion = "Handheld Camera"
-    elif any(k in text for k in ["walk", "stroll"]):
+    # Walk / Stroll
+    elif any(k in text for k in ["walk", "stroll", "چلنا", "گھوم", "سیر"]):
         motion = "Follow Shot"
-    elif any(k in text for k in ["think", "silent", "quiet", "meditate"]):
+    # Thoughtful / Peaceful
+    elif any(k in text for k in ["think", "silent", "quiet", "meditate", "سوچ", "خاموش"]):
         motion = "Ken Burns Effect"
         
-    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine"]):
+    # Religious / Holy Scenery
+    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine", "مسجد", "دعا", "نماز", "پاک", "نور"]):
         lighting = "Golden Hour"
         color_grading = "Warm"
-    elif any(k in text for k in ["night", "midnight", "moon"]):
+    # Nighttime Scenery
+    elif any(k in text for k in ["night", "midnight", "moon", "رات", "چاند", "اندھیرا"]):
         lighting = "Moonlight"
         color_grading = "Cold Blue"
         
@@ -419,11 +439,20 @@ def translate_ur_to_en_enhanced(text):
         )
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
         res = session.get(url, timeout=15)
-        if res.status_code == 200:
+        if res.status_code == 200 and len(res.text.strip()) > 5:
             return res.text.strip()
     except Exception:
         pass
-    return text
+    
+    # Robust Fallback Dictionary Matcher to avoid raw Urdu to Flux
+    words = re.findall(r'[\u0600-\u06FF]+', text)
+    translated_words = []
+    for w in words:
+        if w in UR_EN_DICT:
+            translated_words.append(UR_EN_DICT[w])
+    if translated_words:
+        return f"Cinematic scene depicting {', '.join(translated_words)}, cinematic lighting, masterpiece photography"
+    return "Beautiful cinematic scenery, highly detailed, masterpieces, 4k"
 
 def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
     combined_text = (scene_text_en + " " + scene_text_ur).lower()
@@ -444,6 +473,14 @@ def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
         )
         return True, safe_prompt
     return False, scene_text_en
+
+def is_human_character_present(scene):
+    scene_l = scene.lower()
+    human_indicators = [
+        "man", "male", "boy", "he", "him", "adventurer", "maseeha", "mushaf", "مرد", "لڑکا", "احمد", "علی", "بادشاہ", "essa", "awan", "bhai",
+        "larki", "woman", "female", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ", "saba", "baji", "behn"
+    ]
+    return any(k in scene_l for k in human_indicators)
 
 # 100% Universal Pure story-driven prompt mastermind containing no hardcoded Essa/Saba defaults
 def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
@@ -693,18 +730,18 @@ def get_cached_bg_music(is_horror, is_epic):
         pass
     return None
 
-# Non-blocking Stream Video Downloader
+# Fixed: Extended Timeout for safe 3D Video processing
 def download_video_safely(url, dest_path, progress_status):
     try:
-        with session.get(url, stream=True, timeout=45) as r:
+        with session.get(url, stream=True, timeout=120) as r:
             if r.status_code == 200:
                 with open(dest_path, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=1024*1024):
                         if chunk:
                             f.write(chunk)
                 return True
-    except Exception:
-        progress_status.warning("Video stream connection dropped. Falling back to Cinematic Zoom...")
+    except Exception as e:
+        progress_status.warning(f"Video stream connection dropped/timeout ({e}). Falling back to Cinematic Zoom...")
     return False
 
 # Motion control logic safely wrapped to prevent MoviePy engine crash
@@ -938,7 +975,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             progress_bar.progress(0.05)
             status.info("🎙️ Processing Dialogue Voiceovers...")
             
-            sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
+            # Fixed: Splitting sentences beautifully with advanced regex
+            sentences = [s.strip() for s in re.split(r'[۔\n.!|?()؛;]', story) if len(s.strip()) > 3]
             if not sentences: sentences = [story]
             
             clips = []
@@ -998,25 +1036,30 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     if is_spiritual:
                         english_scene = safe_scene_en
                 
-                dir_settings = analyze_scene_for_director(english_scene)
+                dir_settings = analyze_scene_for_director(scene) # Scans both translated and original scene text
                 if camera_motion != "AI Hollywood Director (Auto)":
                     dir_settings["motion"] = camera_motion
                     
                 active_motion = dir_settings["motion"]
+                
+                # Check if a human character is actually present in the current scene context
+                character_present = is_human_character_present(scene)
+                active_male_ref = raw_male_url if character_present else None
+                active_female_ref = raw_female_url if character_present else None
                 
                 refined_p = generate_enhanced_cinematic_prompt(
                     urdu_scene=scene,
                     style=style,
                     character_heritage=character_heritage,
                     enable_islamic_filter=enable_islamic_filter,
-                    raw_male_url=raw_male_url,
-                    raw_female_url=raw_female_url
+                    raw_male_url=active_male_ref,
+                    raw_female_url=active_female_ref
                 )
                 
-                if not is_spiritual:
+                if not is_spiritual and character_present:
                     refined_p += " [Avoid cross-gender blending, absolutely no woman with beard, absolutely no female with facial hair, anatomically perfect, symmetrical eyes, detailed limbs]"
                 
-                refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}, shot on ARRI Alexa LF, 35mm lens, high-fashion realism, photorealistic texture"
+                refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}, shot on ARRI Alexa LF, 35mm lens, high-fashion realism, photorealistic texture, {dir_settings['composition']}"
                 generated_prompts.append(refined_p)
                 
                 # --- Non-blocking AI Video Motion API ---
@@ -1031,17 +1074,18 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt[:400])}?model={video_model}&aspectRatio={aspect_ratio_param}&key={active_api_key}&duration=4"
                     
                     ref_url = None
-                    if any(k in scene or k in scene.lower() for k in ["larki", "woman", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ"]):
-                        ref_url = raw_female_url if raw_female_url else raw_male_url
-                    else:
-                        ref_url = raw_male_url if raw_male_url else raw_female_url
+                    if character_present:
+                        if any(k in scene or k in scene.lower() for k in ["larki", "woman", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ"]):
+                            ref_url = raw_female_url if raw_female_url else raw_male_url
+                        else:
+                            ref_url = raw_male_url if raw_male_url else raw_female_url
                         
                     if ref_url:
                         vid_url += f"&image={urllib.parse.quote(ref_url)}"
                         
                     vid_path = f"v_{u_id}_{i}.mp4"
                     
-                    # Call safe non-blocking downloader
+                    # Call safe non-blocking downloader with extended timeout
                     video_success = download_video_safely(vid_url, vid_path, status)
                     if video_success:
                         try:
@@ -1073,7 +1117,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 w_target = make_even(w * 1.25)
                 h_target = make_even(h * 1.25)
                 
-                unique_seed = seed
+                # Fixed: Dynamic Unique seed to prevent repetitive frames
+                unique_seed = seed + i * 17
                 
                 img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={unique_seed}&nologo=true&model=flux"
                 flux_prompt_urls.append(img_url)
@@ -1104,8 +1149,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 scene_voice_clip = AudioFileClip(sub_audio_path)
                 dur_scene = scene_voice_clip.duration
                 
-                english_scene_temp = translate_ur_to_en_enhanced(scene)
-                dir_settings = analyze_scene_for_director(english_scene_temp)
+                dir_settings = analyze_scene_for_director(scene)
                 if camera_motion != "AI Hollywood Director (Auto)":
                     dir_settings["motion"] = camera_motion
                 active_motion = dir_settings["motion"]
