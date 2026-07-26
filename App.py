@@ -438,17 +438,15 @@ def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
     if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
         try:
             # Generate a gorgeous cinematic dark nebula gradient background with soft noise instead of basic shapes
-            base = Image.new("RGB", (w, h), color=(15, 23, 42))
+            base = Image.new("RGB", (w, h), color=(10, 15, 30))
             draw = ImageDraw.Draw(base)
             
             # Draw soft expanding ambient glowing cosmic lights to simulate a professional nebula background
-            for r_offset in range(300, 0, -10):
+            for r_offset in range(250, 0, -15):
                 draw.ellipse([w//2 - r_offset, h//2 - r_offset, w//2 + r_offset, h//2 + r_offset], 
-                             fill=(10 + int(90 * (1-r_offset/300)), 15, 30 + int(150 * (1-r_offset/300))))
-                draw.ellipse([w//3 - r_offset//2, h//3 - r_offset//2, w//3 + r_offset//2, h//3 + r_offset//2], 
-                             fill=(20, 10 + int(120 * (1-r_offset/300)), 40))
+                             fill=(10 + int(90 * (1-r_offset/250)), 15, 30 + int(150 * (1-r_offset/250))))
             
-            base = base.filter(ImageFilter.GaussianBlur(radius=30))
+            base = base.filter(ImageFilter.GaussianBlur(radius=25))
             
             # Subtle artistic film noise overlay
             np_im = np.array(base)
@@ -466,23 +464,39 @@ def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
 def parallel_download_flux_images(urls, paths, sentences, w, h):
     def download_single(i):
         url, path, scene_text = urls[i], paths[i], sentences[i]
-        for attempt in range(3):
+        
+        # Attempt 1: Full Cinematic Prompt
+        for attempt in range(2):
             try:
-                res = session.get(url, timeout=30)
-                if res.status_code == 200 and len(res.content) > 2000:
+                res = session.get(url, timeout=20)
+                if res.status_code == 200 and len(res.content) > 5000:
                     with open(path, "wb") as f: f.write(res.content)
                     return True
             except: pass
-            time.sleep(1)
-        try:
-            fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('cinematic scene: ' + scene_text[:60])}?width={w}&height={h}&nologo=true"
-            res = session.get(fallback_url, timeout=15)
-            if res.status_code == 200 and len(res.content) > 2000:
-                with open(path, "wb") as f: f.write(res.content)
-                return True
-        except: pass
+            time.sleep(0.5)
+            
+        # Attempt 2: Smart Scenic Fallback Prompt (Instantly returns cached beautifully matching wildlife/rain visuals)
+        simplified = "cinematic atmospheric scenic landscape photography, 8k resolution"
+        if any(k in scene_text.lower() for k in ["بارش", "سیلاب", "پانی", "rain", "flood", "water"]):
+            simplified = "powerful stormy river flood rushing inside deep dark jungle, heavy storm rain, cinematic lighting, 8k resolution"
+        elif any(k in scene_text.lower() for k in ["جنگل", "شیر", "چیتا", "ہاتھی", "حیوان", "جانور", "jungle", "forest", "animals"]):
+            simplified = "majestic cinematic wild jungle landscape with deep trees, misty atmosphere, sunset wildlife backdrop"
+        elif any(k in scene_text.lower() for k in ["بہادری", "اتحاد", "بچاؤ", "unity", "brave"]):
+            simplified = "beautiful cinematic golden sunset after heavy storm, shining sun rays over lush green forest, peaceful dynamic landscape"
+            
+        fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(simplified)}?width={w}&height={h}&nologo=true"
+        for attempt in range(2):
+            try:
+                res = session.get(fallback_url, timeout=15)
+                if res.status_code == 200 and len(res.content) > 5000:
+                    with open(path, "wb") as f: f.write(res.content)
+                    return True
+            except: pass
+            
+        # Attempt 3: Failsafe cinematic nebula reredner
         ensure_image_exists(path, w, h, scene_text)
         return False
+        
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         list(executor.map(download_single, range(len(urls))))
 
@@ -890,13 +904,30 @@ st.markdown("""
     
     .stApp { background: #f8fafc !important; color: #0f172a !important; font-family: 'Inter', sans-serif; }
     
-    /* SHIMMERING GLOW PINK-BLUE GRADIENT METALLIC TITLE */
+    /* SHIMMERING SOFT BORDER DUAL-GLOW TITLE (EASY READABILITY) */
+    .title-container {
+        text-align: center;
+        margin: 15px auto;
+        display: table;
+        padding: 8px 35px;
+        border: 3px solid #00f0ff;
+        border-radius: 12px;
+        box-shadow: 0 0 12px rgba(0, 240, 255, 0.4), 0 0 12px rgba(255, 0, 127, 0.4);
+        animation: borderGlow 4s infinite alternate;
+    }
+    @keyframes borderGlow {
+        0% { border-color: #00f0ff; box-shadow: 0 0 12px rgba(0, 240, 255, 0.4); }
+        100% { border-color: #ff007f; box-shadow: 0 0 12px rgba(255, 0, 127, 0.4); }
+    }
+    
     .glow-title { 
-        font-size: 3rem; font-weight: 900; text-align: center; font-family: 'Orbitron', sans-serif;
-        background: linear-gradient(135deg, #00f0ff, #ff007f, #00f0ff); background-size: 200% auto;
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        animation: shimmerGlow 3s infinite linear; margin-top: 15px; margin-bottom: 5px; letter-spacing: 5px;
-        filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
+        font-size: 2.6rem; 
+        font-weight: 900; 
+        font-family: 'Orbitron', sans-serif;
+        color: #0f172a !important;
+        -webkit-text-fill-color: #0f172a !important;
+        letter-spacing: 5px;
+        margin: 0;
     }
     
     .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
@@ -960,7 +991,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="glow-title">SGLOWINA AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="title-container"><div class="glow-title">SGLOWINA AI</div></div>', unsafe_allow_html=True)
 st.markdown('<div class="logo-container"><div class="circular-s"><span class="metallic-s">S</span></div></div>', unsafe_allow_html=True)
 
 # Tabs Initialization
@@ -981,7 +1012,11 @@ with tab_auth:
             if auth_mode == "Sign In":
                 if authenticate_user(u_name, p_word):
                     st.session_state.logged_in_user = u_name.strip().lower()
-                    st.success(f"Successfully signed in as {u_name}!")
+                    if st.session_state.logged_in_user in ["essasaba", "essa_awan", "saba_wahid"]:
+                        st.success("خوش آمدید! Sglowina AI پر دوبارہ آمد مبارک ہو، محمد عیسیٰ اعوان اور صبا واحد! (Admin Authorized) 🟢")
+                    else:
+                        st.success(f"السلام علیکم! Sglowina AI پر خوش آمدید، {u_name}! 🟢")
+                    time.sleep(1.5)
                     st.rerun()
                 else: st.error("Invalid credentials.")
             else:
