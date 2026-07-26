@@ -63,7 +63,6 @@ except ImportError:
 # ==========================================
 # 3. STREAMLIT CONFIGURATION & GLOBAL STATES
 # ==========================================
-# Streamlit page config MUST be the first Streamlit command called
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V2.1", layout="wide", page_icon="🎬")
 
 # Show warnings if critical libraries are missing
@@ -465,7 +464,6 @@ def analyze_urdu_motion_verbs(scene_text):
     text = scene_text.lower()
     motion_directives = []
     
-    # Urdu/English movement triggers mapping
     if any(k in text for k in ["چل", "چلنے", "چلتے", "walk", "stride", "قریب"]):
         motion_directives.append("character physically walking towards the camera, natural walking pace, moving step by step")
     if any(k in text for k in ["بھاگ", "بھاگنے", "بھاگتے", "دوڑ", "run", "chase", "flee"]):
@@ -486,15 +484,14 @@ def analyze_urdu_motion_verbs(scene_text):
     return "natural body language, realistic head turns, breathing animation, blinking eyes"
 
 # ==========================================
-# SEMANTIC BACKGROUND MUSIC POOLING ENGINE
+# SEMANTIC BACKGROUND MUSIC POOLING ENGINE (Soothing Premium Ambient Piano Tracks)
 # ==========================================
 def get_adaptive_bg_music(story_text):
     story_lower = story_text.lower()
     
-    # Secure pool of stable copyright-free CDN music tracks
+    # Highly stable, soft soothing ambient piano background tracks (No loud synths!)
     horror_tracks = [
         "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3",
         "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3"
     ]
     comedy_tracks = [
@@ -511,11 +508,9 @@ def get_adaptive_bg_music(story_text):
     ]
     neutral_tracks = [
         "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
     ]
     
-    # Scan keywords to detect story genre dynamically
     is_horror = any(k in story_lower or k in story_text for k in ["چڑیل", "خوفناک", "خوف", "جن", "بھوت", "تاریک", "ڈراؤنی", "قبر", "عذاب", "موت", "grave", "torment", "scary", "ghost", "dark", "death", "screaming", "horror"])
     is_comedy = any(k in story_lower or k in story_text for k in ["مذاق", "فنی", "ہنسنا", "بیوقوف", "شریر", "funny", "joke", "laugh", "comedy"])
     is_sad = any(k in story_lower or k in story_text for k in ["غم", "رونا", "آنسو", "جدائی", "اداس", "sad", "cry", "grief", "melancholy"])
@@ -614,7 +609,6 @@ def apply_color_lut_harmony(img_path, style_preset):
             # Apply color tinting based on style preset mathematically
             if style_preset in ["Realistic HD", "Cinematic Film"]:
                 r, g, b = im.split()
-                # Warm highlights, cool shadows (Teal & Orange cinematic grade)
                 r = r.point(lambda i: int(i * 1.05))
                 b = b.point(lambda i: int(i * 0.95))
                 im = Image.merge("RGB", (r, g, b))
@@ -630,7 +624,6 @@ def apply_color_lut_harmony(img_path, style_preset):
                 b = b.point(lambda i: int(i * 0.90))
                 im = Image.merge("RGB", (r, g, b))
             
-            # Pop contrast slightly for cinema density
             im = ImageEnhance.Contrast(im).enhance(1.08)
             im.save(img_path, "JPEG")
     except Exception:
@@ -720,29 +713,18 @@ def parallel_download_flux_images(urls, paths):
         concurrent.futures.wait(futures)
 
 # ==========================================
-# FAILOVER IMAGE EMERGENCY RECOVERY SYSTEM (Guarantees File Existence)
+# FAILOVER IMAGE EMERGENCY RECOVERY SYSTEM (Saves beautifully)
 # ==========================================
 def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
     if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
         try:
-            # Create a sophisticated slate-dark fallback gradient card
+            # Elegant minimalist landscape card
             base = Image.new("RGB", (w, h), color=(15, 23, 42))
             draw = ImageDraw.Draw(base)
-            
-            # Draw sleek futuristic grid borders
             draw.rectangle([15, 15, w - 15, h - 15], outline=(30, 41, 59), width=3)
-            
-            try:
-                font = ImageFont.load_default()
-            except Exception:
-                font = None
-                
-            draw.text((45, h // 2 - 20), "Sglowina AI Studio - Scene Visualization Frame", fill=(0, 242, 254), font=font)
-            draw.text((45, h // 2 + 10), f"Story Scene: {scene_text[:55]}...", fill=(148, 163, 184), font=font)
             base.save(img_path, "JPEG")
         except Exception:
             try:
-                # Absolute baseline black card fallback
                 im = Image.new("RGB", (w, h), color=(0, 0, 0))
                 im.save(img_path, "JPEG")
             except:
@@ -753,7 +735,6 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
     if not MOVIEPY_AVAILABLE:
         return None
         
-    # Safeguard file availability on local disk before MoviePy processing
     ensure_image_exists(img_path, w, h, "Visualizing scene...")
     
     try:
@@ -797,13 +778,11 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
         elif motion == "Drone Shot":
             animated_clip = clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center')
         elif motion == "Tracking Shot" or motion == "Follow Shot":
-            # Tracking with micro vibration shake
             animated_clip = clip.set_position(lambda t: (
                 int((w - cw) * (t / duration)),
                 int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5)))
             ))
         elif motion == "Handheld Camera" or motion == "Shoulder Camera":
-            # Pure manual handheld camera shake calculations
             animated_clip = clip.set_position(lambda t: (
                 int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))),
                 int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7)))
@@ -830,11 +809,10 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
     except Exception as ex:
         st.warning(f"Error applying camera motion '{motion}': {ex}. Falling back to default centering.")
         
-    # Emergency fallback to static resized ImageClip (absolutely crash-proof)
     try:
         return ImageClip(img_path).set_duration(duration).resize((w, h))
-    except Exception as e_inner:
-        st.error(f"Fallback ImageClip failed: {e_inner}")
+    except:
+        pass
         
     return None
 
@@ -890,49 +868,6 @@ def generate_high_quality_placeholder(w, h, seed, active_watermark):
         return b""
 
 # ==========================================
-# ADVANCED CANVA TYPOGRAPHY WITH FROSTED GLASS EFFECT (International Grade)
-# ==========================================
-def apply_canva_typography(img_path, text):
-    try:
-        with Image.open(img_path) as im:
-            im = im.convert("RGB")
-            draw = ImageDraw.Draw(im)
-            w, h = im.size
-            
-            # Smart Dynamic Font Sizing (4% of height)
-            font_size = int(h * 0.04) if h * 0.04 > 16 else 16
-            try:
-                font = ImageFont.load_default()
-            except Exception:
-                font = None
-                
-            # Create premium Frosted Glass / Glassmorphism visual container
-            overlay = Image.new('RGBA', im.size, (0, 0, 0, 0))
-            draw_overlay = ImageDraw.Draw(overlay)
-            
-            # Semi-transparent dark slate frosted box calculations
-            box_h = int(font_size * 2.5)
-            box_y = h - box_h - 25
-            
-            # Elegant rounded glass banner at bottom
-            draw_overlay.rounded_rectangle([30, box_y, w - 30, h - 25], radius=12, fill=(15, 23, 42, 200))
-            im = Image.alpha_composite(im.convert('RGBA'), overlay).convert('RGB')
-            draw = ImageDraw.Draw(im)
-            
-            # Advanced typography with clean dark drop-shadow for premium readability
-            text_x = 50
-            text_y = box_y + (box_h - font_size) // 2
-            
-            # Drop shadow
-            draw.text((text_x + 1, text_y + 1), text, fill=(0, 0, 0), font=font)
-            # Fore text
-            draw.text((text_x, text_y), text, fill=(255, 255, 255), font=font)
-            
-            im.save(img_path, "JPEG")
-    except Exception:
-        pass
-
-# ==========================================
 # 4. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
 # ==========================================
 def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast", advanced_params=None):
@@ -942,7 +877,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         
     u_id = str(uuid.uuid4())[:8]
     
-    # CONCURRENCY QUEUE DECK: Safely parks excess render requests
     global active_renderers
     with render_lock:
         active_renderers += 1
@@ -983,7 +917,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         raw_male_url = get_public_url(uploaded_male_img) if uploaded_male_img is not None else None
         raw_female_url = get_public_url(uploaded_female_img) if uploaded_female_img is not None else None
         
-        # MASTER API KEY RESOLVER: Auto fetches Master Key if user didn't enter one
         active_api_key = pollinations_key.strip()
         if not active_api_key:
             conn = get_db_connection()
@@ -998,19 +931,16 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             progress_bar.progress(0.05)
             status.info("🎙️ Processing Dialogue Voiceovers...")
             
-            # Segment script by Urdu sentences
             sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
             if not sentences: sentences = [story]
             
             clips = []
             
-            # Sentence-Level Audio Sync Module: generate individual TTS files
             for idx, scene in enumerate(sentences):
-                # Auto Dialogue Speaker Selector
                 if "صبا" in scene or "saba" in scene.lower():
-                    v_code_scene = "ur-PK-UzmaNeural" # Female voice actor
+                    v_code_scene = "ur-PK-UzmaNeural"
                 elif "عیسی" in scene or "essa" in scene.lower() or "awan" in scene.lower():
-                    v_code_scene = "ur-PK-AsadNeural" # Male voice actor
+                    v_code_scene = "ur-PK-AsadNeural"
                 else:
                     v_code_scene = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
                     
@@ -1022,7 +952,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 
             progress_bar.progress(0.12)
             
-            # DOWNLOADING ADAPTIVE BACKGROUND MUSIC TRACK
             if enable_bg_music:
                 bg_url, bg_genre_name = get_adaptive_bg_music(story)
                 status.info(f"🎵 Downloading {bg_genre_name} Atmospheric Background Track...")
@@ -1050,7 +979,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             w = make_even(w)
             h = make_even(h)
             
-            # PREPARE CINEMATIC PROMPTS FOR ALL SCENES
             flux_prompt_urls = []
             img_paths = []
             
@@ -1069,7 +997,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     
                 active_motion = dir_settings["motion"]
                 
-                # Build smart descriptive prompt with Flux optimized composition, dual reference images, and heritage override rules
                 refined_p = generate_enhanced_cinematic_prompt(
                     urdu_scene=scene,
                     char_memory=char_desc,
@@ -1080,13 +1007,11 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     raw_female_url=raw_female_url
                 )
                 
-                # Dynamic Character Motion injector (Analyze movement from script text)
                 char_motion_directive = analyze_urdu_motion_verbs(scene)
                 
                 if not is_spiritual:
                     refined_p += f" [Avoid cross-gender blending, absolutely no woman with beard, absolutely no female with facial hair, anatomically perfect, symmetrical eyes, detailed limbs, motion: {char_motion_directive}]"
                 
-                # Advanced rendering keywords for Arri Alexa look
                 refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}, shot on ARRI Alexa LF, 35mm lens, high-fashion realism, photorealistic texture"
                 generated_prompts.append(refined_p)
                 
@@ -1095,14 +1020,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     status.info(f"🎥 Rendering 3D Video Frame {i+1} via {video_model} API...")
                     aspect_ratio_param = "16:9" if "16:9" in ratio else "9:16"
                     
-                    # AUTOMATIC HIGH-MOTION INJECTOR FOR REAL MOVEMENT IN FLUX/WAN
                     motion_prompt = refined_p
                     motion_prompt = re.sub(r'(portrait|standing|sitting|symmetrical face|still image|static)', '', motion_prompt, flags=re.IGNORECASE)
                     motion_prompt = f"high motion, extreme 3D physics movement, character physically walking forward, head moving, eyes blinking, wind blowing, natural realistic animation, {motion_prompt}"
                     
                     vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt[:400])}?model={video_model}&aspectRatio={aspect_ratio_param}&key={active_api_key}&duration=4"
                     
-                    # Direct starting frame reference injection for image to video
                     ref_url = None
                     if "Saba" in scene or "saba" in scene.lower() or "female" in scene.lower():
                         ref_url = raw_female_url if raw_female_url else raw_male_url
@@ -1125,12 +1048,10 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                             
                             clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_scene)
                             
-                            # Download and mix scene environmental SFX
                             sfx_file, sfx_display_name = download_scene_sfx(scene, u_id, i)
                             if sfx_file and os.path.exists(sfx_file):
                                 try:
                                     sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
-                                    # Boost dialogue to 1.2 and duck SFX to 0.12 (Broadcast Standard)
                                     clip_composite_audio = CompositeAudioClip([scene_voice_clip.volumex(1.2), sfx_audio])
                                     clip = clip.set_audio(clip_composite_audio)
                                     generated_images.append(sfx_file)
@@ -1149,7 +1070,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 w_target = make_even(w * 1.25)
                 h_target = make_even(h * 1.25)
                 
-                # Maintain strict seed alignment to guarantee absolute face consistency across frames
                 unique_seed = seed
                 
                 img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={unique_seed}&nologo=true&model=flux"
@@ -1161,7 +1081,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 
             progress_bar.progress(0.25)
             
-            # Image Download Loop with strict Failover generation
             start_t = time.time()
             total_images = len(flux_prompt_urls)
             for idx, img_url in enumerate(flux_prompt_urls):
@@ -1178,54 +1097,40 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 except Exception:
                     pass
                 
-                # Safeguard: If download fails or times out, immediately generate elegant local slate card
                 ensure_image_exists(img_path, w, h, sentences[idx])
             
             progress_bar.progress(0.45)
             status.info("🎞️ Assembling Audio Syncing and Camera Motions...")
             
-            # ASSEMBLE CLIPS WITH EXACT VOICE SYNCHRONIZATION AND EFFECTS
             for i, scene in enumerate(sentences):
-                # Skip if already rendered as real AI video above
                 if len(clips) > i:
                     continue
                     
                 img_path = img_paths[i]
                 sub_audio_path = temporary_audio_tracks[i]
                 
-                # Double-check safety net right before MoviePy parsing
                 ensure_image_exists(img_path, w, h, scene)
-                
-                # Apply Color LUT matrix harmony on the downloaded frame
                 apply_color_lut_harmony(img_path, style)
-                
-                # Apply Blurred padding to completely eliminate black bars
                 apply_blurred_background_padding(img_path, make_even(w * 1.25), make_even(h * 1.25))
                 
-                # Read exact sub clip voiceover duration
                 scene_voice_clip = AudioFileClip(sub_audio_path)
                 dur_scene = scene_voice_clip.duration
                 
-                # Determine camera motion for this clip
                 english_scene_temp = translate_ur_to_en_enhanced(scene)
                 dir_settings = analyze_scene_for_director(english_scene_temp)
                 if camera_motion != "AI Hollywood Director (Auto)":
                     dir_settings["motion"] = camera_motion
                 active_motion = dir_settings["motion"]
                 
-                # Compile video motion frame
                 clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h)
                 
                 if clip is None:
-                    # In case of absolute disaster, create an active slate fallback clip
                     clip = ImageClip(img_path).set_duration(dur_scene).resize((w, h))
                 
-                # Download and mix scene environmental SFX
                 sfx_file, sfx_display_name = download_scene_sfx(scene, u_id, i)
                 if sfx_file and os.path.exists(sfx_file):
                     try:
                         sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
-                        # Dialogue is boosted and SFX is safely ducked
                         clip_composite_audio = CompositeAudioClip([scene_voice_clip.volumex(1.2), sfx_audio])
                         clip = clip.set_audio(clip_composite_audio)
                         generated_images.append(sfx_file)
@@ -1241,10 +1146,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             
             final_video = concatenate_videoclips(clips, method="compose").resize((w, h))
             
-            # OVERLAY GLOBAL BACKGROUND MUSIC IN FINAL MASTER MIX (Automatic Ducking Mix)
             if has_bg_music and os.path.exists(bg_music_f):
                 try:
-                    # Ducked to 0.04 to give 100% voice clarity (Cinema Standard)
                     bg_track = AudioFileClip(bg_music_f).volumex(0.04).set_duration(final_video.duration)
                     combined_master_audio = CompositeAudioClip([final_video.audio, bg_track])
                     final_video = final_video.set_audio(combined_master_audio)
@@ -1253,17 +1156,21 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     
             out_name = f"Sglowina_{u_id}.mp4"
             
-            # Beautiful simulated countdown timer for compilation
             start_compile_t = time.time()
             total_duration = final_video.duration if final_video.duration else 10
             status.info(f"⏳ Compiling and Stitching Video (Estimated duration: {int(total_duration)}s)...")
             
-            # Video compilation without unsafe custom logger class that breaks across MoviePy versions
-            final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
+            write_kwargs = {"codec": "libx264", "audio_codec": "aac", "fps": 24, "ffmpeg_params": ["-pix_fmt", "yuv420p"]}
+            try:
+                final_video.write_videofile(out_name, logger=None, **write_kwargs)
+            except TypeError:
+                try:
+                    final_video.write_videofile(out_name, verbose=False, **write_kwargs)
+                except:
+                    final_video.write_videofile(out_name, **write_kwargs)
             
             final_video.close()
             
-            # CLEANUP TEMPORARY FILES to save server disk space
             for sub_voice in temporary_audio_tracks:
                 try:
                     if os.path.exists(sub_voice): os.remove(sub_voice)
@@ -1281,7 +1188,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             elapsed_compile = int(time.time() - start_compile_t)
             status.success(f"🚀 Video Generated in {elapsed_compile}s!")
             
-            # Database log
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("INSERT INTO projects (id, user_id, project_name, type, file_path, prompt, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", 
@@ -1316,7 +1222,6 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700;900&display=swap');
     
-    /* Professional Electric-Dark Cyberpunk Theme */
     .stApp { 
         background: radial-gradient(circle at top, #0f172a, #020617) !important; 
         color: #f1f5f9 !important; 
@@ -1358,7 +1263,6 @@ st.markdown("""
         50% { box-shadow: 0 0 40px #00f2fe, 0 0 60px #00d4ff, inset 0 0 20px #ffffff; }
     }
 
-    /* Premium Glow Button Styles */
     .stButton>button { 
         background: linear-gradient(90deg, #00f2fe, #0072ff) !important; 
         color: white !important; 
@@ -1385,11 +1289,10 @@ st.markdown("""
         font-weight: bold !important; 
     }
     
-    /* Comprehensive Input Box styling to prevent invisible white text on white backgrounds */
     textarea, input, select, div[data-baseweb="select"] {
-        background-color: #0f172a !important;
-        color: #f8fafc !important;
-        border: 2px solid #1e293b !important;
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+        border: 2px solid #334155 !important;
         border-radius: 12px !important;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5) !important;
         transition: all 0.3s ease !important;
@@ -1397,26 +1300,23 @@ st.markdown("""
     textarea:focus, input:focus, select:focus {
         border-color: #00f2fe !important;
         box-shadow: 0 0 10px rgba(0, 242, 254, 0.4) !important;
-        background-color: #0b1329 !important;
+        background-color: #0f172a !important;
         color: #ffffff !important;
     }
     textarea::placeholder, input::placeholder {
-        color: #475569 !important;
+        color: #64748b !important;
         opacity: 1 !important;
     }
     
-    /* Ensure the actual text color of typed input in Streamlit forms is 100% visible white */
     .stTextArea textarea, .stTextInput input {
         color: #ffffff !important;
-        background-color: #0f172a !important;
+        background-color: #1e293b !important;
     }
     
-    /* Make sure Streamlit container labels are fully readable */
     label, p, span, h1, h2, h3, h4, h5, h6 {
         color: #f1f5f9 !important;
     }
     
-    /* Professional Dark Tabs overrides */
     .stTabs [data-baseweb="tab-list"] {
         background-color: #0b1329;
         border-radius: 12px;
@@ -1525,30 +1425,22 @@ with tab_movie:
             """)
 
     m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
+    enable_islamic_filter = st.checkbox("Enable Islamic & Spiritual Safety Filter (حرمتِ انبیاء و اولیاء فلٹر) 🛡️", value=True)
+    char_desc = st.text_input("Character Memory (مرد یا عورت کا تفصیلی حلیہ):", placeholder="Example: Saba is a 25-year-old beautiful Eastern woman wearing a modest dark blue hijab")
     
-    # Islamic and Spiritual Safety Filter Toggle
-    enable_islamic_filter = st.checkbox("Enable Islamic & Spiritual Safety Filter (حرمتِ انبیاء و اولیاء فلٹر) 🛡️", value=True, help="اگر کہانی میں اولیاء اللہ، انبیاء، قبر، جنت، جہنم یا صحابہ کا ذکر ہو تو یہ فلٹر خودکار طور پر چہرے بنانے کے بجائے روحانی نور اور تجلی دکھائے گا تا کہ بے ادبی نہ ہو۔")
-    
-    # Simple, high-impact Character & Scene Memory override inputs
-    char_desc = st.text_input("Character Memory (مرد یا عورت کا تفصیلی حلیہ):", 
-                              placeholder="Example: Saba is a 25-year-old beautiful Eastern woman wearing a modest dark blue hijab")
-    
-    # DUAL IMAGE UPLOADERS: Male and Female characters separately
-    st.write("##### 👤 Consistent Character Identity References (کرداروں کے چہروں کی تصاویر)")
+    st.write("##### 👤 Consistent Character Identity References")
     col_up1, col_up2 = st.columns(2)
     with col_up1:
-        uploaded_male_img = st.file_uploader("Upload Male Character Reference Image (مرد کردار کی تصویر):", type=["jpg", "png", "jpeg"])
+        uploaded_male_img = st.file_uploader("Upload Male Character Reference Image:", type=["jpg", "png", "jpeg"])
         if uploaded_male_img is not None:
             st.image(uploaded_male_img, caption="Male Identity Loaded ✅", width=120)
     with col_up2:
-        uploaded_female_img = st.file_uploader("Upload Female Character Reference Image (عورت کردار کی تصویر):", type=["jpg", "png", "jpeg"])
+        uploaded_female_img = st.file_uploader("Upload Female Character Reference Image:", type=["jpg", "png", "jpeg"])
         if uploaded_female_img is not None:
             st.image(uploaded_female_img, caption="Female Identity Loaded ✅", width=120)
         
-    scene_desc = st.text_input("Scene Memory (جنگل، موسم، ماحول، جانور):", 
-                              placeholder="Example: Deep green ancient forest, high realistic trees, thick foliage, dark stormy night")
+    scene_desc = st.text_input("Scene Memory (جنگل، موسم، ماحول، جانور):", placeholder="Example: Deep green ancient forest, high realistic trees, thick foliage, dark stormy night")
 
-    # Layout modified to include both Cultural Heritage and specific Video Model choices
     mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9, mc10 = st.columns(10)
     with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
@@ -1556,42 +1448,18 @@ with tab_movie:
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
     with mc6: camera_motion = st.selectbox("Camera Motion:", [
-        "AI Hollywood Director (Auto)",
-        "Zoom Out (v40 Default)",
-        "Zoom In",
-        "Pan Left",
-        "Pan Right",
-        "Pan Up",
-        "Pan Down",
-        "Dolly In",
-        "Dolly Out",
-        "Orbit Camera",
-        "Crane Shot",
-        "Drone Shot",
-        "Tracking Shot",
-        "Follow Shot",
-        "Push In",
-        "Pull Out",
-        "Arc Shot",
-        "Handheld Camera",
-        "Shoulder Camera",
-        "Cinematic Reveal",
-        "Whip Pan",
-        "Tilt Up",
-        "Tilt Down",
-        "Roll Camera",
-        "Parallax Motion",
-        "Ken Burns Effect",
-        "Rack Focus"
+        "AI Hollywood Director (Auto)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down",
+        "Dolly In", "Dolly Out", "Orbit Camera", "Crane Shot", "Drone Shot", "Tracking Shot", "Follow Shot", "Push In",
+        "Pull Out", "Arc Shot", "Handheld Camera", "Shoulder Camera", "Cinematic Reveal", "Whip Pan", "Tilt Up", "Tilt Down",
+        "Roll Camera", "Parallax Motion", "Ken Burns Effect", "Rack Focus"
     ])
     with mc7: transition_style = st.selectbox("Transition Effect:", ["Cross Dissolve (Fade)", "Flash Transition (White Glow)", "Film Dissolve (Muted)", "Instant Cut"])
-    with mc8: character_heritage = st.selectbox("Cultural Heritage (مشرقی یا مغربی لباس):", ["Automatic", "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)", "Ancient Arabian", "Western / Modern", "Far Eastern"])
+    with mc8: character_heritage = st.selectbox("Cultural Heritage:", ["Automatic", "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)", "Ancient Arabian", "Western / Modern", "Far Eastern"])
     with mc9: video_model = st.selectbox("AI Video Model:", ["wan-fast", "seedance", "veo"])
     with mc10: sd = st.number_input("Character Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
         rate_val = mv_rate.split(" ")[0]
-        
         pitch_map = {
             "Normal (نارمل)": "+0Hz",
             "Deep (بھاری آواز)": "-15Hz",
@@ -1635,17 +1503,11 @@ with tab_movie:
 # -----------------
 with tab_image:
     st.write("### 🎨 Industrial HD Visual Studio")
-    
     tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Upload"])
     
     with tab_txt:
         p_i = st.text_area("Describe Image (One per line for batch):", height=150)
-        
-        char_desc_img = st.text_input("Consistent Character Description:", 
-                                      placeholder="Example: A young girl, blue eyes, brown braided hair, red scarf")
-        
-        canva_overlay_text = st.text_input("Canva Text Overlay (Text overlay on image):", placeholder="Example: Sglowina Studio V1.5")
-                                      
+        char_desc_img = st.text_input("Consistent Character Description:", placeholder="Example: A young girl, blue eyes, red scarf")
         ic1, ic2, ic3 = st.columns(3)
         with ic1: i_style = st.selectbox("Art Style:", ["Realistic HD", "Cinematic Film", "Anime Art", "Logo Design", "3D Cartoon", "Rustic Village Life", "Historical Epic"])
         with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok", "CinemaScope (21:9)", "Standard Box (4:3)"])
@@ -1655,11 +1517,8 @@ with tab_image:
             u_db = get_user_data(st.session_state.logged_in_user)
             if u_db and u_db['credits'] >= 2 * count:
                 dim = {
-                    "Square (1:1)": (1024, 1024), 
-                    "YouTube HD": (1280, 720), 
-                    "TikTok": (720, 1280),
-                    "CinemaScope (21:9)": (1680, 720),
-                    "Standard Box (4:3)": (1024, 768)
+                    "Square (1:1)": (1024, 1024), "YouTube HD": (1280, 720), "TikTok": (720, 1280),
+                    "CinemaScope (21:9)": (1680, 720), "Standard Box (4:3)": (1024, 768)
                 }
                 w, h = dim[i_size]
                 prompt_list = [line.strip() for line in p_i.split('\n') if line.strip()]
@@ -1675,18 +1534,12 @@ with tab_image:
                             with open(img_path_temp, "wb") as f_temp:
                                 f_temp.write(img_data)
                                 
-                            if canva_overlay_text.strip():
-                                ensure_image_exists(img_path_temp, w, h, canva_overlay_text)
-                                apply_canva_typography(img_path_temp, canva_overlay_text.strip())
-                                
                             with Image.open(img_path_temp) as im:
                                 st.image(im, caption=f"Prompt: {single_p[:30]}...")
                                 
                             try:
-                                if os.path.exists(img_path_temp):
-                                    os.remove(img_path_temp)
-                            except Exception:
-                                pass
+                                if os.path.exists(img_path_temp): os.remove(img_path_temp)
+                            except: pass
                                 
                             deduct_user_credits(st.session_state.logged_in_user, 2)
                             log_credit_usage(u_db['id'], "Image Generation", 2, u_db['credits'] - 2)
@@ -1703,8 +1556,6 @@ with tab_image:
         modify_prompt = st.text_input("Modification Instructions:", placeholder="Example: Make the background dark green, add cinematic volumetric light")
         i_style_mod = st.selectbox("Modification Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon"])
         
-        canva_overlay_text_mod = st.text_input("Canva Text Overlay for Modified Image:", placeholder="Example: Sglowina Studio V1.5")
-        
         if st.button("Modify & Re-render Image 🎨"):
             if uploaded_file and modify_prompt:
                 u_db = get_user_data(st.session_state.logged_in_user)
@@ -1717,25 +1568,19 @@ with tab_image:
                             with open(img_path_temp_mod, "wb") as f_temp_mod:
                                 f_temp_mod.write(img_data)
                                 
-                            if canva_overlay_text_mod.strip():
-                                ensure_image_exists(img_path_temp_mod, 1024, 1024, canva_overlay_text_mod)
-                                apply_canva_typography(img_path_temp_mod, canva_overlay_text_mod.strip())
-                                
                             with Image.open(img_path_temp_mod) as im:
                                 st.image(im, caption="Modified Masterpiece")
                                 
                             try:
-                                if os.path.exists(img_path_temp_mod):
-                                    os.remove(img_path_temp_mod)
-                            except Exception:
-                                pass
+                                if os.path.exists(img_path_temp_mod): os.remove(img_path_temp_mod)
+                            except: pass
                                 
                             deduct_user_credits(st.session_state.logged_in_user, 5)
                             log_credit_usage(u_db['id'], "Image Modification", 5, u_db['credits'] - 5)
                         else:
                             st.error("Modification failed.")
                 else:
-                    st.error("Deduction failed: Sglowina requires 5 credits to modify images (or please sign in).")
+                    st.error("Deduction failed: Sglowina requires 5 credits to modify images.")
             else:
                 st.warning("Please upload an image and write instructions first.")
 
@@ -1744,9 +1589,7 @@ with tab_image:
 # -----------------
 with tab_enterprise:
     st.write("### 👤 Sglowina Enterprise Administration Center")
-    
     ent_tab_user, ent_tab_history, ent_tab_billing, ent_tab_admin = st.tabs(["👤 User Profile", "📁 Saved Projects", "💳 Billing & Subscription Plans", "🔒 Admin Control Panel"])
-    
     u_db = get_user_data(st.session_state.logged_in_user)
     
     with ent_tab_user:
@@ -1782,7 +1625,6 @@ with tab_enterprise:
                 
     with ent_tab_billing:
         st.write("### 💳 Subscription Plans & Credit Packages (Pakistani Local Payment Integration)")
-        
         st.success("#### 🏆 Sglowina Premium Monthly Plan")
         st.write("💰 **Price:** 1000 PKR / Month")
         st.write("🪙 **Credits Received:** 450 Credits (Guarantees at least 30 Cinematic Video Generations!)")
@@ -1856,7 +1698,6 @@ with tab_enterprise:
         if u_db and u_db['role'] == 'Admin':
             st.success("Access Granted: Administrator Mode Activated")
             
-            # --- NEW: MASTER API KEY MANAGEMENT UI ---
             st.write("### 🔑 Sglowina Master API Key Configuration")
             st.info("بطور ایڈمنسٹریٹر آپ یہاں اپنی پریمیم اے پی آئی کی (API Key) لگا کر ہمیشہ کے لیے سیو کر سکتے ہیں، تاکہ تمام صارفین بغیر اپنی کی درج کیے مستقل ویڈیو جنریٹ کر سکیں۔")
             
