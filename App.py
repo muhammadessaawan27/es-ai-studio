@@ -30,6 +30,7 @@ AUDIO_CACHE_DIR = "audio_cache"
 os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
 DB_BACKUP_FILE = "sglowina_saas_backup.json"
 
+# Expanded Urdu to English Dictionary for High Accuracy Fallbacks
 UR_EN_DICT = {
     "درخت": "trees", "جنگل": "forest", "باغ": "garden", "باغات": "gardens",
     "پرندے": "birds", "پرندہ": "bird", "بارش": "rain", "طوفان": "storm",
@@ -39,7 +40,11 @@ UR_EN_DICT = {
     "شیر": "lion", "تلوار": "sword", "جنگ": "war", "قبر": "grave",
     "خوفناک": "scary", "جن": "ghost", "اندھیرا": "dark", "موت": "death",
     "خوبصورت": "beautiful", "جادو": "magic", "جادوئی": "magical",
-    "مسجد": "mosque", "نماز": "prayer", "دعا": "pray", "نور": "holy light"
+    "مسجد": "mosque", "نماز": "prayer", "دعا": "pray", "نور": "holy light",
+    "چوزہ": "cute fluffy yellow chick", "چوزے": "cute fluffy yellow chicks",
+    "بلی": "cute cat", "بندر": "funny monkey", "طوطا": "colorful parrot",
+    "خرگوش": "fluffy rabbit", "بالٹی": "bucket", "سر": "head", "چوہا": "cute mouse",
+    "سپر ہیرو": "superhero", "ہنستے": "laughing", "لوٹ پوٹ": "hilariously rolling and laughing"
 }
 
 try:
@@ -78,8 +83,7 @@ enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=s
 st.session_state.enable_watermark = enable_watermark
 st.session_state.enable_bg_music = enable_bg_music
 
-# --- CONCURRENCY BOOST: Allow 3 concurrent compiles for 1000+ users ---
-render_semaphore = threading.Semaphore(value=3)
+render_semaphore = threading.Semaphore(value=1)
 active_renderers = 0
 render_lock = threading.Lock()
 
@@ -288,8 +292,8 @@ def translate_ur_to_en_enhanced(text):
         instruction = (
             "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into highly descriptive English visual instructions. \n"
             "CRITICAL RULES: \n"
-            "1. Explicitly identify the main subjects (e.g., 'a single male', 'a single female'). \n"
-            "2. Do NOT blend opposite genders. \n"
+            "1. Explicitly identify the main subjects (e.g., 'a cute chick', 'a cat', 'a monkey'). \n"
+            "2. Do NOT blend opposite genders or mismatch subjects.\n"
             "3. Output ONLY the English translation and detailed visual descriptions."
         )
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
@@ -301,8 +305,8 @@ def translate_ur_to_en_enhanced(text):
     words = re.findall(r'[\u0600-\u06FF]+', text)
     translated_words = [UR_EN_DICT[w] for w in words if w in UR_EN_DICT]
     if translated_words:
-        return f"Cinematic scene depicting {', '.join(translated_words)}, cinematic lighting, masterpiece photography"
-    return "Beautiful cinematic scenery, highly detailed, masterpieces, 4k"
+        return f"Cinematic scene depicting {', '.join(translated_words)}, vibrant lighting, masterpiece illustration"
+    return "Beautiful cartoon scenery, highly detailed, masterpieces, 4k"
 
 def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
     combined_text = (scene_text_en + " " + scene_text_ur).lower()
@@ -328,7 +332,18 @@ def is_human_character_present(scene):
     ]
     return any(k in scene_l for k in human_indicators)
 
-def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url, attire_desc=""):
+# Smart Consistent Character Identification Memory
+def analyze_consistent_subject(story_text):
+    story_l = story_text.lower()
+    if any(k in story_l for k in ["چوزا", "chick", "چوزے"]):
+        return "a cute fluffy little yellow 3D cartoon chick wearing an upside-down metallic bucket on its head as a funny superhero helmet"
+    if any(k in story_l for k in ["چوہا", "mouse", "rat"]):
+        return "a cute tiny little 3D cartoon brown mouse wearing superhero attire"
+    if any(k in story_l for k in ["بندر", "monkey"]):
+        return "a funny goofy 3D cartoon brown monkey"
+    return ""
+
+def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url, attire_desc="", consistent_char_memory=""):
     try:
         scene_lower = urdu_scene.lower()
         gender_booster = ""
@@ -336,7 +351,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         style_boosters = {
             "Realistic HD": "ultra photorealistic, 8k resolution, highly detailed, sharp focus, natural skin textures, shot on 35mm lens",
             "Cinematic Film": "cinematic movie style, dramatic Hollywood cinematic lighting, Arri Alexa LF, deep shadows, cinematic color grade",
-            "3D Cartoon": "3D cartoon animation style, Pixar style, stylized characters, stylized environment, adorable animated aesthetic",
+            "3D Cartoon": "3D cartoon animation style, Pixar style, Disney animation style, vibrant colors, stylized cute characters, playful environment, no realism",
             "Anime Art": "beautiful anime illustration, high-quality Japanese anime art style, detailed background",
             "Logo Design": "minimalist professional vector logo design, flat colors, icon style",
             "Historical Epic": "grand historical epic movie style, majestic ancient atmosphere, rich cultural heritage textures, cinematic golden hour",
@@ -358,15 +373,15 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
             gender_booster = f"traditional East Asian oriental attire {attire_desc}"
 
         instruction = (
-            "You are an expert Hollywood visual artist. Translate and expand the Urdu scene into a detailed English prompt for Flux AI. \n"
+            "You are an expert visual prompt writer. Translate and expand the Urdu scene into a detailed English prompt for Flux AI. \n"
             "RULES:\n"
-            "1. Depict exactly what is written. If no humans are mentioned, do not generate any human figures!\n"
-            "2. No gender overlapping. Anatomically perfect.\n"
-            "3. Wide-angle, long shot, or medium shot.\n"
-            "4. Follow the cultural setting. If reference URLs are provided, align faces to: Male {raw_male_url}, Female {raw_female_url}.\n"
-            "5. Output ONLY the prompt text, no intro."
+            "1. Strictly enforce the chosen visual style. If style is 3D Cartoon, do NOT generate any realistic elements, keep it purely Pixar/Disney cartoon!\n"
+            "2. Keep character consistent: if the consistent character description is provided, make sure that character is present and active in the scene.\n"
+            "3. Describe actions, expressions, and environment clearly. Output ONLY the refined prompt text, no intro."
         )
         prompt_input = f"Urdu Scene: {urdu_scene}\nStyle: {style_tag}\n"
+        if consistent_char_memory:
+            prompt_input += f"Consistent Subject Memory (Always present this character): {consistent_char_memory}\n"
         if gender_booster: prompt_input += f"Attire/Gender Tags: {gender_booster}\n"
         
         formatted_instruction = instruction.replace("{raw_male_url}", raw_male_url or "None").replace("{raw_female_url}", raw_female_url or "None")
@@ -377,7 +392,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
             refined_p = re.sub(r'^(prompt:|visual prompt:|cinematic prompt:)\s*', '', refined_p, flags=re.IGNORECASE)
             return f"{refined_p}, visual style: {style_tag}"
     except: pass
-    return f"Cinematic film scene: {urdu_scene}, style: {style}, highly detailed, 8k"
+    return f"3D cartoon scene, {urdu_scene}, style: {style}, cute, highly detailed"
 
 def apply_color_lut_harmony(img_path, style_preset):
     try:
@@ -433,41 +448,30 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
     except: pass
 
 # ==========================================
-# FAILOVER IMAGE EMERGENCY RECOVERY SYSTEM (Draw Beautiful Stylized Night Forest instead of Orbs)
+# FAILOVER IMAGE EMERGENCY RECOVERY SYSTEM (Draw Cinematic Gradient instead of Basic MS-Paint Shapes)
 # ==========================================
 def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
     if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
         try:
-            # Create a gorgeous misty nighttime silhouette forest
             base = Image.new("RGB", (w, h), color=(10, 15, 30))
             draw = ImageDraw.Draw(base)
-            
-            # Soft atmospheric blue glow gradient
-            for y in range(h):
-                mist_intensity = int(35 * (y / h))
-                draw.line([(0, y), (w, y)], fill=(10, 15 + mist_intensity, 30 + mist_intensity))
-            
-            # Soft glowing pale moon in sky
-            draw.ellipse([w//2 - 50, h//4 - 50, w//2 + 50, h//4 + 50], fill=(230, 240, 255))
-            base = base.filter(ImageFilter.GaussianBlur(radius=8))
-            draw = ImageDraw.Draw(base)
-            
-            # Stylized black silhouette mountains
-            draw.polygon([(0, h), (w//4, h - 150), (w//2, h), (0, h)], fill=(5, 8, 15))
-            draw.polygon([(w//4, h), (w*3//4, h - 200), (w, h), (w//4, h)], fill=(2, 4, 8))
-            
+            for r_offset in range(250, 0, -15):
+                draw.ellipse([w//2 - r_offset, h//2 - r_offset, w//2 + r_offset, h//2 + r_offset], 
+                             fill=(10 + int(90 * (1-r_offset/250)), 15, 30 + int(150 * (1-r_offset/250))))
+            base = base.filter(ImageFilter.GaussianBlur(radius=25))
+            np_im = np.array(base)
+            noise = np.random.normal(0, 3, np_im.shape).astype(np.int16)
+            np_im = np.clip(np_im.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+            base = Image.fromarray(np_im)
             base.save(img_path, "JPEG")
         except Exception:
-            try:
-                Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
-            except:
-                pass
+            try: Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
+            except: pass
 
 def parallel_download_flux_images(urls, paths, sentences, w, h):
     def download_single(i):
         url, path, scene_text = urls[i], paths[i], sentences[i]
         
-        # Attempt 1: Full Cinematic Prompt
         for attempt in range(2):
             try:
                 res = session.get(url, timeout=20)
@@ -477,14 +481,14 @@ def parallel_download_flux_images(urls, paths, sentences, w, h):
             except: pass
             time.sleep(0.5)
             
-        # Attempt 2: Smart Scenic Fallback Prompt (Instantly returns cached beautifully matching wildlife/rain visuals)
-        simplified = "cinematic atmospheric scenic landscape photography, 8k resolution"
-        if any(k in scene_text.lower() for k in ["بارش", "سیلاب", "پانی", "rain", "flood", "water"]):
-            simplified = "powerful stormy river flood rushing inside deep dark jungle, heavy storm rain, cinematic lighting, 8k resolution"
-        elif any(k in scene_text.lower() for k in ["جنگل", "شیر", "چیتا", "ہاتھی", "حیوان", "جانور", "jungle", "forest", "animals"]):
-            simplified = "majestic cinematic wild jungle landscape with deep trees, misty atmosphere, sunset wildlife backdrop"
-        elif any(k in scene_text.lower() for k in ["بہادری", "اتحاد", "بچاؤ", "unity", "brave"]):
-            simplified = "beautiful cinematic golden sunset after heavy storm, shining sun rays over lush green forest, peaceful landscape"
+        # Smart Cartoon Fallback Prompt System
+        simplified = "3D Pixar Disney style cartoon, colorful cute characters, bright happy environment, 8k"
+        if any(k in scene_text.lower() for k in ["چوزا", "chick", "بالٹی", "superhero"]):
+            simplified = "3D Pixar cute fluffy yellow chick wearing an upside-down red bucket on its head as superhero helmet, bright cartoon background"
+        elif any(k in scene_text.lower() for k in ["بلی", "cat", "بندر", "monkey", "طوطا", "parrot"]):
+            simplified = "3D cartoon scene with a funny monkey, a cute cat, and a colorful parrot laughing together, stylized forest"
+        elif any(k in scene_text.lower() for k in ["ہنستے", "لوٹ پوٹ", "خرگوش", "rabbit"]):
+            simplified = "3D Pixar cartoon of animals laughing and rolling with joy in a beautiful bright green pasture, sunny day"
             
         fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(simplified)}?width={w}&height={h}&nologo=true"
         for attempt in range(2):
@@ -495,7 +499,6 @@ def parallel_download_flux_images(urls, paths, sentences, w, h):
                     return True
             except: pass
             
-        # Attempt 3: Failsafe cinematic night forest silhouette
         ensure_image_exists(path, w, h, scene_text)
         return False
         
@@ -517,8 +520,7 @@ def get_cached_bg_music(is_horror, is_epic):
 
 def download_video_safely(url, dest_path, progress_status):
     try:
-        # --- FIX: Reduced remote download timeout to 45 seconds to prevent server freeze ---
-        with session.get(url, stream=True, timeout=45) as r:
+        with session.get(url, stream=True, timeout=120) as r:
             if r.status_code == 200:
                 with open(dest_path, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=1024*1024):
@@ -543,7 +545,6 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
         cw, ch = int(w * scale_factor), int(h * scale_factor)
         clip = base_clip.resize((cw, ch))
         
-        # Dictionary-based lambda mapping to strictly avoid code limit cuts
         motions_map = {
             "Zoom In": lambda: clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center'),
             "Zoom Out (v40 Default)": lambda: clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center'),
@@ -570,8 +571,11 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
             "Rack Focus": lambda: clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center'),
             "Motion Blur": lambda: clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center')
         }
-        animated_clip = motions_map.get(motion, motions_map["Zoom Out (v40 Default)"])()
-        return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
+        try:
+            animated_clip = motions_map.get(motion, motions_map["Zoom Out (v40 Default)"])()
+            return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
+        except Exception:
+            return ImageClip(img_path).set_duration(duration).resize((w, h))
     except Exception as ex:
         st.warning(f"Motion error '{motion}': {ex}. Falling back.")
     try: return ImageClip(img_path).set_duration(duration).resize((w, h))
@@ -699,20 +703,15 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             story_lower_all = story.lower()
             female_keywords = ["larki", "woman", "female", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ", "saba", "baji", "behn"]
             male_keywords = ["man", "male", "boy", "he", "him", "adventurer", "maseeha", "mushaf", "مرد", "لڑکا", "احمد", "علی", "بادشاہ", "essa", "awan", "bhai"]
-            animal_keywords = ["شیر", "چیتا", "ہاتھی", "گھڑیال", "مگرمچھ", "پرندہ", "پرندے", "حیوان", "جانور", "lion", "cheetah", "elephant", "crocodile", "alligator", "tiger", "bear", "wolf", "leopard"]
             
             story_has_female = any(k in story_lower_all for k in female_keywords)
             story_has_male = any(k in story_lower_all for k in male_keywords)
-            
-            # --- STRICT SCENIC/ANIMAL SEPARATION FILTER ---
-            story_has_animals = any(k in story_lower_all for k in animal_keywords)
-            story_has_humans = any(k in story_lower_all for k in female_keywords + male_keywords)
-            strictly_animals_only = story_has_animals and not story_has_humans
-            
             primary_gender = "female" if (story_has_female and not story_has_male) else ("male" if (story_has_male and not story_has_female) else None)
             
-            # Lock constant attire style across the story
             attire_tag = "wearing clean bright red and green cotton clothing" if primary_gender == "female" else "wearing elegant white historical cotton dress"
+            
+            # Smart Consistent Subject Memory Injection
+            consistent_char_desc = analyze_consistent_subject(story)
             
             for idx, scene in enumerate(sentences):
                 is_female_voice = any(k in scene or k in scene.lower() for k in female_keywords)
@@ -750,14 +749,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 dir_settings = analyze_scene_for_director(scene)
                 if camera_motion != "AI Hollywood Director (Auto)": dir_settings["motion"] = camera_motion
                 
-                # Apply absolute animal restriction across scenes
-                if strictly_animals_only:
-                    character_present = False
-                    style_modified = f"{style}, award-winning wild animals photography, deep majestic forest, no humans, no people, only wild animals"
-                else:
-                    local_human = is_human_character_present(scene)
-                    character_present = local_human or (primary_gender is not None)
-                    style_modified = style
+                local_human = is_human_character_present(scene)
+                character_present = local_human or (primary_gender is not None)
                 
                 active_male_ref = raw_male_url if (character_present and (primary_gender == "male" or local_human)) else None
                 active_female_ref = raw_female_url if (character_present and (primary_gender == "female" or local_human)) else None
@@ -766,12 +759,10 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 if character_heritage == "Automatic" or not character_heritage:
                     active_heritage = "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)" if (any(k in scene.lower() for k in female_keywords + male_keywords) or primary_gender) else "Western / Modern"
                 
-                refined_p = generate_enhanced_cinematic_prompt(scene, style_modified, active_heritage, enable_islamic_filter, active_male_ref, active_female_ref, attire_tag if character_present else "")
+                # Generated Prompts perfectly preserve 'style' without animal override bugs
+                refined_p = generate_enhanced_cinematic_prompt(scene, style, active_heritage, enable_islamic_filter, active_male_ref, active_female_ref, attire_tag if character_present else "", consistent_char_desc)
                 if not is_spiritual and character_present:
-                    refined_p += " [Avoid cross-gender blending, absolutely no woman with beard, detailed limbs, symmetrical eyes]"
-                elif strictly_animals_only or not character_present:
-                    refined_p += " [STRICTLY NO humans, NO people, NO soldiers, NO faces, NO man, NO woman, only animals and nature]"
-                
+                    refined_p += " [Avoid cross-gender blending, anatomically correct]"
                 refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}, {dir_settings['composition']}"
                 generated_prompts[i] = refined_p
                 
@@ -905,7 +896,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
         finally: gc.collect()
 
 # ==========================================
-# 5. UI SYSTEM STYLE (Streamlit Light Theme Sync)
+# 5. UI SYSTEM STYLE (Streamlit Light Theme Sync with Custom Glow Borders)
 # ==========================================
 st.markdown("""
     <style>
@@ -913,63 +904,57 @@ st.markdown("""
     
     .stApp { background: #f8fafc !important; color: #0f172a !important; font-family: 'Inter', sans-serif; }
     
-    /* COMPACT SUBTLE DOUBLE-GLOW TITLE (EASY READABILITY) */
-    .title-container {
+    /* DOUBLE BORDER GLOW METALLIC TITLE DESIGN (highly readable text) */
+    .glow-container {
+        border: 4px solid #00f0ff;
+        border-radius: 15px;
+        padding: 10px 20px;
+        margin: 20px auto;
+        max-width: 600px;
         text-align: center;
-        margin: 10px auto;
-        display: table;
-        padding: 6px 25px;
-        border: 2px solid #00f0ff;
-        border-radius: 8px;
-        box-shadow: 0 0 8px rgba(0, 240, 255, 0.3), 0 0 8px rgba(255, 0, 127, 0.3);
-        animation: borderGlow 4s infinite alternate;
+        background: #0f172a;
+        box-shadow: 0 0 15px rgba(0, 240, 255, 0.4), inset 0 0 15px rgba(255, 0, 127, 0.3);
+        animation: borderShimmer 5s infinite alternate;
     }
-    @keyframes borderGlow {
-        0% { border-color: #00f0ff; box-shadow: 0 0 8px rgba(0, 240, 255, 0.3); }
-        100% { border-color: #ff007f; box-shadow: 0 0 8px rgba(255, 0, 127, 0.3); }
-    }
-    
     .glow-title { 
-        font-size: 1.8rem; /* Compact size */
-        font-weight: 800; 
-        font-family: 'Orbitron', sans-serif;
-        color: #0f172a !important;
-        -webkit-text-fill-color: #0f172a !important;
-        letter-spacing: 3px;
-        margin: 0;
+        font-size: 2.8rem; font-weight: 900; font-family: 'Orbitron', sans-serif;
+        color: #ffffff !important; letter-spacing: 6px;
+        text-shadow: 0 0 8px rgba(0, 240, 255, 0.8), 0 0 15px rgba(255, 0, 127, 0.6);
     }
     
-    .logo-container { display: flex; justify-content: center; align-items: center; padding: 10px 0; }
+    .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
     
-    /* SMALL STATIC/SOFT METALLIC 'S' CONTAINER */
     .circular-s {
-        width: 70px; height: 70px; /* Small layout size */
-        background: #0f172a !important;
+        width: 110px; height: 110px; background: radial-gradient(circle, #020617 40%, #1e1b4b 100%) !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        border: 2px solid #00f0ff !important; box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
-        animation: rotateSpins 15s infinite linear, softGlow 4s infinite alternate;
+        border: 4px solid #00f0ff !important; box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+        animation: rotateSpins 15s infinite linear, electricGlow 4s infinite alternate;
     }
     
-    /* SHIMMERING SOFT METALLIC 'S' TEXT */
     .metallic-s {
-        font-family: 'Orbitron', sans-serif; font-size: 35px; font-weight: 900;
-        background: linear-gradient(135deg, #ff007f, #00f0ff); background-size: 200% auto;
+        font-family: 'Orbitron', sans-serif; font-size: 60px; font-weight: 900;
+        background: linear-gradient(135deg, #ff007f, #00f0ff, #ff007f); background-size: 200% auto;
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        animation: shimmerGlow 3s infinite linear;
+        filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.8));
     }
     
+    @keyframes borderShimmer {
+        0% { border-color: #00f0ff; box-shadow: 0 0 15px rgba(0, 240, 255, 0.4); }
+        100% { border-color: #ff007f; box-shadow: 0 0 15px rgba(255, 0, 127, 0.4); }
+    }
     @keyframes rotateSpins {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
-    @keyframes softGlow {
-        0% { border-color: #00f0ff; box-shadow: 0 0 8px rgba(0, 240, 255, 0.3); }
-        100% { border-color: #ff007f; box-shadow: 0 0 8px rgba(255, 0, 127, 0.3); }
-    }
-    @keyframes shimmerGlow {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
+    @keyframes electricGlow {
+        0%, 100% {
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.6), 0 0 40px rgba(255, 0, 127, 0.4);
+            border-color: #00f0ff !important;
+        }
+        50% {
+            box-shadow: 0 0 35px rgba(255, 0, 127, 0.9), 0 0 70px rgba(0, 240, 255, 0.7);
+            border-color: #ff007f !important;
+        }
     }
     
     .stButton>button, .stFormSubmitButton>button { 
@@ -986,8 +971,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="title-container"><div class="glow-title">SGLOWINA AI</div></div>', unsafe_allow_html=True)
+st.markdown('<div class="glow-container"><div class="glow-title">SGLOWINA AI</div></div>', unsafe_allow_html=True)
 st.markdown('<div class="logo-container"><div class="circular-s"><span class="metallic-s">S</span></div></div>', unsafe_allow_html=True)
+
+# Personalised Multi-user greetings
+if st.session_state.logged_in_user in ["essasaba", "essa_awan", "saba_wahid"]:
+    st.success("خوش آمدید! Sglowina AI پر دوبارہ آمد مبارک ہو، محمد عیسیٰ اعوان اور صبا واحد! 🟢")
+else:
+    st.success(f"السلام علیکم! Sglowina AI پر خوش آمدید! 🟢 (موجودہ صارف: {st.session_state.logged_in_user})")
 
 # Tabs Initialization
 tab_auth, tab_chat, tab_movie, tab_image, tab_enterprise = st.tabs([
@@ -1007,11 +998,7 @@ with tab_auth:
             if auth_mode == "Sign In":
                 if authenticate_user(u_name, p_word):
                     st.session_state.logged_in_user = u_name.strip().lower()
-                    if st.session_state.logged_in_user in ["essasaba", "essa_awan", "saba_wahid"]:
-                        st.success("خوش آمدید! Sglowina AI پر دوبارہ آمد مبارک ہو، محمد عیسیٰ اعوان اور صبا واحد! (Admin Authorized) 🟢")
-                    else:
-                        st.success(f"السلام علیکم! Sglowina AI پر خوش آمدید، {u_name}! 🟢")
-                    time.sleep(1.5)
+                    st.success(f"Successfully signed in as {u_name}!")
                     st.rerun()
                 else: st.error("Invalid credentials.")
             else:
@@ -1027,7 +1014,7 @@ with tab_chat:
     if p := st.chat_input("How can I help you today?"):
         st.session_state.msgs.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
-        res = SGLOWINA_BIO if any(k in p.lower() for k in ["owner", "essa", "saba", "who made"]) else requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true").text
+        res = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true").text
         translated_res = res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
         with st.chat_message("assistant"):
             st.write(translated_res)
@@ -1047,10 +1034,10 @@ with tab_movie:
 
     mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9, mc10 = st.columns(10)
     with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
-    with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
+    with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch:", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
+    with mc5: ms = st.selectbox("Style:", ["3D Cartoon", "Realistic HD", "Cinematic Film", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
     with mc6: camera_motion = st.selectbox("Camera Motion:", ["AI Hollywood Director (Auto)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out", "Orbit Camera", "Crane Shot", "Drone Shot", "Tracking Shot", "Follow Shot", "Handheld Camera", "Shoulder Camera", "Cinematic Reveal", "Whip Pan", "Tilt Up", "Tilt Down", "Roll Camera", "Parallax Motion", "Ken Burns Effect", "Rack Focus", "Motion Blur"])
     with mc7: transition_style = st.selectbox("Transition Effect:", ["Cross Dissolve (Fade)", "Instant Cut"])
     with mc8: character_heritage = st.selectbox("Cultural Heritage:", ["Automatic", "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)", "Ancient Arabian", "Western / Modern", "Far Eastern"])
@@ -1079,7 +1066,7 @@ with tab_image:
     char_desc_img = st.text_input("Consistent Character Description:", placeholder="e.g. A young girl with blue eyes")
     canva_overlay_text = st.text_input("Canva Text Overlay:", placeholder="e.g. Studio Title")
     ic1, ic2, ic3 = st.columns(3)
-    with ic1: i_style = st.selectbox("Art Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Anime Art", "Logo Design"])
+    with ic1: i_style = st.selectbox("Art Style:", ["3D Cartoon", "Realistic HD", "Cinematic Film", "Anime Art", "Logo Design"])
     with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok"])
     with ic3: count = st.slider("Quantity:", 1, 5, 1)
     
