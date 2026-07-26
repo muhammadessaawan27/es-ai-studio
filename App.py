@@ -622,27 +622,64 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
     except Exception:
         pass
 
+# ==========================================
+# FAILOVER IMAGE EMERGENCY RECOVERY SYSTEM (Guarantees File Existence)
+# ==========================================
+def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
+    if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
+        try:
+            # Create a sophisticated slate-dark fallback gradient card
+            base = Image.new("RGB", (w, h), color=(15, 23, 42))
+            draw = ImageDraw.Draw(base)
+            
+            # Draw sleek futuristic grid borders
+            draw.rectangle([15, 15, w - 15, h - 15], outline=(30, 41, 59), width=3)
+            
+            try:
+                font = ImageFont.load_default()
+            except Exception:
+                font = None
+                
+            draw.text((45, h // 2 - 20), "Sglowina AI Studio - Scene Visualization Frame", fill=(0, 242, 254), font=font)
+            draw.text((45, h // 2 + 10), f"Story Scene: {scene_text[:55]}...", fill=(148, 163, 184), font=font)
+            base.save(img_path, "JPEG")
+        except Exception:
+            try:
+                # Absolute baseline black card fallback
+                im = Image.new("RGB", (w, h), color=(0, 0, 0))
+                im.save(img_path, "JPEG")
+            except:
+                pass
+
 # Parallel image downloader using ThreadPoolExecutor for 5x Speed boost
-def parallel_download_flux_images(urls, paths):
-    def download_single(url, path):
+def parallel_download_flux_images(urls, paths, sentences, w, h):
+    def download_single(i):
+        url = urls[i]
+        path = paths[i]
+        scene_text = sentences[i]
         try:
             res = session.get(url, timeout=40)
-            if res.status_code == 200:
+            if res.status_code == 200 and len(res.content) > 1000:
                 with open(path, "wb") as f:
                     f.write(res.content)
                 return True
         except Exception:
             pass
+        # Failover generation on same path if download failed
+        ensure_image_exists(path, w, h, scene_text)
         return False
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(download_single, urls[i], paths[i]) for i in range(len(urls))]
-        concurrent.futures.wait(futures)
+        executor.map(download_single, range(len(urls)))
 
 # Motion control logic safely wrapped to prevent MoviePy engine crash
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     if not MOVIEPY_AVAILABLE:
         return None
+    
+    # Ensure image exists before Processing to prevent moviepy FileNotFoundError crashes
+    ensure_image_exists(img_path, w, h, "Visualizing scene...")
+    
     try:
         scale_factor = 1.30
         
@@ -719,8 +756,8 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
     try:
         return ImageClip(img_path).set_duration(duration).resize((w, h))
     except Exception:
-        pass
-    return None
+        # Guaranteed baseline emergency block to prevent NoneType attribute set_audio errors
+        return ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).set_duration(duration)
 
 # Safe transitions renderer
 def apply_clip_transition(clip, transition, duration):
@@ -1053,8 +1090,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             progress_bar.progress(0.25)
             status.info("🎨 Running Parallel Flux Image Downloaders (5x Speed Optimization Active)...")
             
-            # ASYNC PARALLEL IMAGE DOWNLOADING
-            parallel_download_flux_images(flux_prompt_urls, img_paths)
+            # ASYNC PARALLEL IMAGE DOWNLOADING (Strict Failsafe Added)
+            parallel_download_flux_images(flux_prompt_urls, img_paths, sentences, w, h)
             
             progress_bar.progress(0.45)
             status.info("🎞️ Assembling Audio Syncing and Camera Motions...")
@@ -1067,6 +1104,9 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     
                 img_path = img_paths[i]
                 sub_audio_path = temporary_audio_tracks[i]
+                
+                # Rigid fallback protection to ensure local file is always readable
+                ensure_image_exists(img_path, w, h, scene)
                 
                 # Apply Color LUT matrix harmony on the downloaded frame
                 apply_color_lut_harmony(img_path, style)
@@ -1087,6 +1127,10 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 
                 # Compile video motion frame
                 clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h)
+                
+                # If everything fails, guarantee a black-block backup clip to stop downstream errors
+                if clip is None:
+                    clip = ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).set_duration(dur_scene)
                 
                 # Download and mix scene environmental SFX
                 sfx_file = download_scene_sfx(scene, u_id, i)
@@ -1122,8 +1166,15 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     
             out_name = f"Sglowina_{u_id}.mp4"
             
-            # Video compilation
-            final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
+            # Video compilation with robust kwargs fallback for legacy systems
+            write_kwargs = {"codec": "libx264", "audio_codec": "aac", "fps": 24, "ffmpeg_params": ["-pix_fmt", "yuv420p"]}
+            try:
+                final_video.write_videofile(out_name, logger=None, **write_kwargs)
+            except TypeError:
+                try:
+                    final_video.write_videofile(out_name, verbose=False, **write_kwargs)
+                except Exception:
+                    final_video.write_videofile(out_name, **write_kwargs)
             
             final_video.close()
             
@@ -1248,22 +1299,40 @@ st.markdown("""
         font-weight: bold !important; 
     }
     
-    div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input {
-        background-color: #0f172a !important;
-        color: #f8fafc !important;
-        border: 2px solid #1e293b !important;
+    /* FORCE HEAVY CONTRAST FOR ALL INPUT FIELDS & TEXTAREAS (Invisible text fix) */
+    textarea, input, select, div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input, .stTextArea textarea, .stTextInput input {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+        border: 2px solid #334155 !important;
         border-radius: 12px !important;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5) !important;
-        transition: all 0.3s ease !important;
     }
-    div[data-baseweb="textarea"] textarea:focus, div[data-baseweb="input"] input:focus {
+    textarea:focus, input:focus, select:focus {
         border-color: #00f2fe !important;
         box-shadow: 0 0 10px rgba(0, 242, 254, 0.4) !important;
-        background-color: #0b1329 !important;
+        background-color: #0f172a !important;
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
     }
-    div[data-baseweb="textarea"] textarea::placeholder, div[data-baseweb="input"] input::placeholder {
-        color: #475569 !important;
+    textarea::placeholder, input::placeholder {
+        color: #64748b !important;
         opacity: 1 !important;
+    }
+    
+    /* Professional Dark Tabs overrides */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #0b1329;
+        border-radius: 12px;
+        padding: 5px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: #94a3b8 !important;
+        font-weight: 600 !important;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #00f2fe !important;
+        border-bottom-color: #00f2fe !important;
     }
     </style>
     """, unsafe_allow_html=True)
