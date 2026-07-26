@@ -39,7 +39,7 @@ AUDIO_CACHE_DIR = "audio_cache"
 os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
 DB_BACKUP_FILE = "sglowina_saas_backup.json"
 
-# Urdu to English Dictionary for Fallback Mechanism (Fixed: Avoid raw Urdu to Flux)
+# Extensive Urdu-English Translation Dictionary for Fallback Mechanism
 UR_EN_DICT = {
     "درخت": "trees", "جنگل": "forest", "باغ": "garden", "باغات": "gardens",
     "پرندے": "birds", "پرندہ": "bird", "بارش": "rain", "طوفان": "storm",
@@ -49,7 +49,9 @@ UR_EN_DICT = {
     "شیر": "lion", "تلوار": "sword", "جنگ": "war", "قبر": "grave",
     "خوفناک": "scary", "جن": "ghost", "اندھیرا": "dark", "موت": "death",
     "خوبصورت": "beautiful", "جادو": "magic", "جادوئی": "magical",
-    "مسجد": "mosque", "نماز": "prayer", "دعا": "pray", "نور": "holy light"
+    "مسجد": "mosque", "نماز": "prayer", "دعا": "pray", "نور": "holy light",
+    "جنت": "paradise", "دوزخ": "hell", "آسمان": "sky", "زمین": "earth",
+    "پہاڑ": "mountains", "نہر": "river", "خزانہ": "treasure", "کھنڈر": "ruins"
 }
 
 # ==========================================
@@ -411,11 +413,11 @@ def analyze_scene_for_director(scene_text):
         motion = "Ken Burns Effect"
         
     # Religious / Holy Scenery
-    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine", "مسجد", "دعا", "نماز", "پاک", "نور"]):
+    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine", "مسجد", "دعا", "نماز", "پاک", "نور", "جنت"]):
         lighting = "Golden Hour"
         color_grading = "Warm"
     # Nighttime Scenery
-    elif any(k in text for k in ["night", "midnight", "moon", "رات", "چاند", "اندھیرا"]):
+    elif any(k in text for k in ["night", "midnight", "moon", "رات", "چاند", "اندھیرا", "دوزخ"]):
         lighting = "Moonlight"
         color_grading = "Cold Blue"
         
@@ -460,7 +462,7 @@ def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
     spiritual_keywords = [
         "prophet", "sahaba", "saint", "angel", "god", "allah", "messenger", "nooh", "musa", "isa", "ibrahim", "yousuf", "muhammad", 
         "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر",
-        "grave", "shroud", "hell", "heaven", "paradise", "pious", "aulia", "angels", "holy dome", "mosque"
+        "grave", "shroud", "hell", "heaven", "paradise", "pious", "aulia", "angels", "holy dome", "mosque", "دوزخ"
     ]
     
     if any(k in combined_text for k in spiritual_keywords):
@@ -474,13 +476,17 @@ def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
         return True, safe_prompt
     return False, scene_text_en
 
-def is_human_character_present(scene):
-    scene_l = scene.lower()
-    human_indicators = [
-        "man", "male", "boy", "he", "him", "adventurer", "maseeha", "mushaf", "مرد", "لڑکا", "احمد", "علی", "بادشاہ", "essa", "awan", "bhai",
-        "larki", "woman", "female", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ", "saba", "baji", "behn"
-    ]
-    return any(k in scene_l for k in human_indicators)
+# Universal Pronoun & Gender Subject Classifier (Strictly Generic - No Hardcoded Names)
+def get_scene_subjects_classified(scene_text):
+    text = scene_text.lower()
+    
+    male_words = ["man", "male", "boy", "gentleman", "he", "him", "his", "brother", "father", "son", "king", "مرد", "لڑکا", "بھائی", "ابو", "باپ", "بیٹا", "بادشاہ", "شہزادہ"]
+    female_words = ["woman", "female", "girl", "lady", "she", "her", "hers", "sister", "mother", "daughter", "queen", "عورت", "لڑکی", "بہن", "امی", "ماں", "بیٹی", "ملکہ", "شہزادی"]
+    
+    has_male = any(k in text for k in male_words)
+    has_female = any(k in text for k in female_words)
+    
+    return has_male, has_female
 
 # 100% Universal Pure story-driven prompt mastermind containing no hardcoded Essa/Saba defaults
 def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
@@ -500,24 +506,32 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         }
         style_tag = style_boosters.get(style, "cinematic film style, highly detailed")
         
+        has_male, has_female = get_scene_subjects_classified(urdu_scene)
+
         # UNIVERSAL CULTURAL STYLING BASED SOLELY ON ACTIVE CONTEXT
         if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
-            if any(k in scene_lower for k in ["larki", "woman", "female", "girl", "عورت", "لڑکی", "زارا", "سارہ"]):
+            if has_female and not has_male:
                 gender_booster = (
-                    "beautiful elegant Eastern Pakistani Punjabi Pathan woman, realistic South Asian sharp facial features, "
+                    "beautiful elegant Eastern woman, realistic South Asian facial features, "
                     "wearing traditional modest cotton Shalwar Kameez with a clean modest Dupatta elegantly draped over her head as a hijab, "
                     "strictly no western look, modest posture"
                 )
-            elif any(k in scene_lower for k in ["man", "male", "boy", "مرد", "لڑکا", "احمد", "علی", "بادشاہ"]):
+            elif has_male and not has_female:
                 gender_booster = (
-                    "handsome majestic Eastern Pakistani Punjabi Pathan man, highly realistic South Asian facial structure, "
+                    "handsome majestic Eastern man, highly realistic South Asian facial structure, "
                     "wearing a traditional modest cotton Shalwar Kameez with high collar, neat short Islamic beard, "
                     "strictly no western look"
                 )
         elif character_heritage == "Ancient Arabian":
-            gender_booster = "wearing ancient traditional Arabian flowing historical robes, classic desert turban, historic Middle Eastern facial features"
+            if has_female and not has_male:
+                gender_booster = "wearing ancient traditional Arabian flowing historical robes and hijab, classic Middle Eastern facial features"
+            elif has_male and not has_female:
+                gender_booster = "wearing ancient traditional Arabian flowing historical robes, classic desert turban, historic Middle Eastern facial features"
         elif character_heritage == "Western / Modern":
-            gender_booster = "modern stylish contemporary Western clothing, jeans and jacket"
+            if has_female and not has_male:
+                gender_booster = "modern stylish contemporary woman wearing jeans and jacket"
+            elif has_male and not has_female:
+                gender_booster = "modern stylish contemporary man wearing jeans and jacket"
         elif character_heritage == "Far Eastern":
             gender_booster = "traditional East Asian oriental attire"
 
@@ -526,12 +540,12 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
             "Analyze the provided Urdu scene sentence and translate/expand it into a highly detailed visual English image prompt for the Flux AI model. \n"
             "STRICT CULTURAL AND ENVIRONMENTAL RULES:\n"
             "1. VISUAL ACCURACY: You must depict EXACTLY what is written in the Urdu text. "
-            "If it describes birds, trees, gardens, magic, ruins, landscapes, or spiritual elements (heaven, hell, graves), make them the absolute focus. "
+            "If it describes birds, trees, gardens, magic, ruins, landscapes, mountains, animals, heaven, hell, or spiritual elements, make them the absolute focus. "
             "If no humans are explicitly mentioned in the Urdu text, do NOT generate any human figures or faces at all! Show only the beautiful scenery.\n"
             "2. NO GENDER OVERLAPPING OR HALLUCINATIONS: If the sentence describes a male character, generate ONLY a single male. "
             "If it describes a female character, generate ONLY a single female. Never generate or mix opposite genders unless both are mentioned in that specific scene.\n"
             "3. ENVIRONMENT-DOMINANT SCALE: Never generate close-up faces. Always place the characters in a wide-angle, long shot, or medium-full shot so the complete beautiful surrounding environment, background, trees, weather, animals, or objects occupy the majority of the screen.\n"
-            "4. CULTURAL DIVERSITY: Follow the cultural setting described in the Urdu text. If it is an Eastern/traditional setting, depict the characters wearing modest regional clothing (like Shalwar Kameez or traditional robes).\n"
+            "4. CULTURAL DIVERSITY: Follow the cultural setting described in the Urdu text. If it is an Eastern/traditional setting, depict the characters wearing modest regional clothing.\n"
             "5. HOLY FIGURES SAFE GUARD: If the scene mentions any holy figures, prophets, angels, or sacred elements (and 'Islamic Safety Filter' is active), strictly avoid any human faces, shapes, or silhouettes. Instead, depict divine volumetric golden and white light beams in majestic ancient deserts or cosmic skies.\n"
             "6. CHARACTER REFS: If reference URLs are provided, keep character faces aligned to them: Male {raw_male_url}, Female {raw_female_url}.\n"
             "7. Output ONLY the English prompt with absolutely no introductory or conversational text."
@@ -643,7 +657,6 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
 def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
     if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
         try:
-            # Replaced dark purple abstract gradient with a beautiful artistic sunrise over mountains
             base = Image.new("RGB", (w, h), color=(20, 30, 48))
             draw = ImageDraw.Draw(base)
             
@@ -739,7 +752,7 @@ def download_video_safely(url, dest_path, progress_status):
         progress_status.warning(f"Video stream connection dropped/timeout ({e}). Falling back to Cinematic Zoom...")
     return False
 
-# Motion control logic safely wrapped to prevent MoviePy engine crash (Fixed: Fallback safely to static ImageClip instead of Pitch Black np.zeros)
+# Motion control logic safely wrapped to prevent MoviePy engine crash
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     if not MOVIEPY_AVAILABLE:
         return None
@@ -983,12 +996,11 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             
             for idx, scene in enumerate(sentences):
                 # UNIVERSAL DYNAMIC SPEAKER SELECTION (No Saba/Essa hardcoding)
-                is_female_voice = any(k in scene or k in scene.lower() for k in ["larki", "woman", "female", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ"])
-                is_male_voice = any(k in scene or k in scene.lower() for k in ["man", "male", "boy", "he", "him", "adventurer", "maseeha", "mushaf", "مرد", "لڑکا", "احمد", "علی", "بادشاہ"])
+                has_male_voice, has_female_voice = get_scene_subjects_classified(scene)
                 
-                if is_female_voice and not is_male_voice:
+                if has_female_voice and not has_male_voice:
                     v_code_scene = "ur-PK-UzmaNeural"
-                elif is_male_voice:
+                elif has_male_voice and not has_female_voice:
                     v_code_scene = "ur-PK-AsadNeural"
                 else:
                     v_code_scene = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
@@ -1044,13 +1056,15 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 
                 # Check if a human character is actually present in the current scene context
                 character_present = is_human_character_present(scene)
-                active_male_ref = raw_male_url if character_present else None
-                active_female_ref = raw_female_url if character_present else None
+                has_male_subj, has_female_subj = get_scene_subjects_classified(scene)
                 
-                # Fixed: Handle Automatic Heritage Dynamic Detection
+                # Assign references strictly by active matching of gender to avoid mix-up
+                active_male_ref = raw_male_url if (character_present and has_male_subj and not has_female_subj) else None
+                active_female_ref = raw_female_url if (character_present and has_female_subj and not has_male_subj) else None
+                
+                # Handle Automatic Heritage Dynamic Detection
                 if character_heritage == "Automatic" or not character_heritage:
-                    scene_lower_text = scene.lower()
-                    if any(k in scene_lower_text for k in ["larki", "woman", "female", "girl", "عورت", "لڑکی", "زارا", "سارہ", "man", "male", "boy", "مرد", "لڑکا", "احمد", "علی"]):
+                    if character_present:
                         active_heritage = "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)"
                     else:
                         active_heritage = "Western / Modern"
@@ -1066,8 +1080,14 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     raw_female_url=active_female_ref
                 )
                 
-                if not is_spiritual and character_present:
-                    refined_p += " [Avoid cross-gender blending, absolutely no woman with beard, absolutely no female with facial hair, anatomically perfect, symmetrical eyes, detailed limbs]"
+                if not is_spiritual:
+                    if character_present:
+                        if has_male_subj and not has_female_subj:
+                            refined_p += " [strictly male subject only, no females, no female facial features, anatomically correct, symmetrical eyes]"
+                        elif has_female_subj and not has_male_subj:
+                            refined_p += " [strictly female subject only, no males, no facial hair, no beard, anatomically perfect]"
+                    else:
+                        refined_p += " [strictly no humans, no people, no faces, only scenery, beautiful environment, nature dominant]"
                 
                 refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}, shot on ARRI Alexa LF, 35mm lens, high-fashion realism, photorealistic texture, {dir_settings['composition']}"
                 generated_prompts.append(refined_p)
@@ -1085,7 +1105,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     
                     ref_url = None
                     if character_present:
-                        if any(k in scene or k in scene.lower() for k in ["larki", "woman", "female", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ"]):
+                        if has_female_subj and not has_male_subj:
                             ref_url = raw_female_url if raw_female_url else raw_male_url
                         else:
                             ref_url = raw_male_url if raw_male_url else raw_female_url
@@ -1127,7 +1147,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 w_target = make_even(w * 1.25)
                 h_target = make_even(h * 1.25)
                 
-                # Fixed: Dynamic Unique seed to prevent repetitive frames
+                # Dynamic Unique seed to prevent repetitive frames
                 unique_seed = seed + i * 17
                 
                 img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={unique_seed}&nologo=true&model=flux"
@@ -1166,7 +1186,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 
                 clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h)
                 
-                # Fixed: Fallback to static ImageClip instead of failing with black screen
+                # Fallback to static ImageClip instead of failing with black screen
                 if clip is None:
                     try:
                         clip = ImageClip(img_path).set_duration(dur_scene).resize((w, h))
