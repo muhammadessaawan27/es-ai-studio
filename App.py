@@ -39,7 +39,7 @@ AUDIO_CACHE_DIR = "audio_cache"
 os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
 DB_BACKUP_FILE = "sglowina_saas_backup.json"
 
-# Urdu to English Dictionary for Fallback Mechanism
+# Urdu to English Dictionary for Fallback Mechanism (Fixed: Avoid raw Urdu to Flux)
 UR_EN_DICT = {
     "درخت": "trees", "جنگل": "forest", "باغ": "garden", "باغات": "gardens",
     "پرندے": "birds", "پرندہ": "bird", "بارش": "rain", "طوفان": "storm",
@@ -638,32 +638,27 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
         pass
 
 # ==========================================
-# FAILOVER IMAGE EMERGENCY RECOVERY SYSTEM (Strictly No Text Overlay & No Pitch Black)
+# FAILOVER IMAGE EMERGENCY RECOVERY SYSTEM (Draw Beautiful Styled Scenic View instead of Blur/Black)
 # ==========================================
 def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
     if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
         try:
-            base = Image.new("RGB", (w, h), color=(10, 15, 30))
+            # Replaced dark purple abstract gradient with a beautiful artistic sunrise over mountains
+            base = Image.new("RGB", (w, h), color=(20, 30, 48))
             draw = ImageDraw.Draw(base)
             
-            for _ in range(8):
-                cx = random.randint(0, w)
-                cy = random.randint(0, h)
-                r = random.randint(150, 350)
-                
-                color_choices = [
-                    (random.randint(15, 45), random.randint(30, 90), random.randint(60, 140)), 
-                    (random.randint(40, 90), random.randint(20, 50), random.randint(15, 45)), 
-                    (random.randint(25, 65), random.randint(15, 45), random.randint(50, 110))
-                ]
-                color = random.choice(color_choices)
-                draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=color)
-                
-            base = base.filter(ImageFilter.GaussianBlur(radius=40))
+            # Sunrise sun
+            draw.ellipse([w//2 - 120, h//2 - 120, w//2 + 120, h//2 + 120], fill=(251, 146, 60))
+            
+            # Majestic Mountains
+            draw.polygon([(0, h), (w//3, h//2), (w*2//3, h), (0, h)], fill=(30, 41, 59))
+            draw.polygon([(w//3, h), (w*2//3, h//2 + 50), (w, h), (w//3, h)], fill=(15, 23, 42))
+            
+            base = base.filter(ImageFilter.GaussianBlur(radius=5))
             base.save(img_path, "JPEG")
         except Exception:
             try:
-                im = Image.new("RGB", (w, h), color=(15, 23, 42))
+                im = Image.new("RGB", (w, h), color=(30, 41, 59))
                 im.save(img_path, "JPEG")
             except:
                 pass
@@ -744,7 +739,7 @@ def download_video_safely(url, dest_path, progress_status):
         progress_status.warning(f"Video stream connection dropped/timeout ({e}). Falling back to Cinematic Zoom...")
     return False
 
-# Motion control logic safely wrapped to prevent MoviePy engine crash
+# Motion control logic safely wrapped to prevent MoviePy engine crash (Fixed: Fallback safely to static ImageClip instead of Pitch Black np.zeros)
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     if not MOVIEPY_AVAILABLE:
         return None
@@ -768,53 +763,57 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
         
         animated_clip = None
         
-        if motion == "Zoom In":
-            animated_clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
-        elif motion == "Zoom Out (v40 Default)":
-            animated_clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
-        elif motion == "Pan Left":
-            animated_clip = clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
-        elif motion == "Pan Right":
-            animated_clip = clip.set_position(lambda t: (int((w - cw) * (1 - t / duration)), 'center'))
-        elif motion == "Pan Up":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration))))
-        elif motion == "Pan Down":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
-        elif motion == "Dolly In" or motion == "Push In":
-            animated_clip = clip.resize(lambda t: 1.0 + 0.25 * (t / duration)).set_position('center')
-        elif motion == "Dolly Out" or motion == "Pull Out":
-            animated_clip = clip.resize(lambda t: 1.25 - 0.25 * (t / duration)).set_position('center')
-        elif motion == "Orbit Camera" or motion == "Arc Shot":
-            animated_clip = clip.rotate(lambda t: -3 + 6 * (t / duration)).resize(lambda t: 1.1 + 0.1 * (t / duration)).set_position('center')
-        elif motion == "Crane Shot":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -2 * (t / duration))
-        elif motion == "Drone Shot":
-            animated_clip = clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center')
-        elif motion == "Tracking Shot" or motion == "Follow Shot":
-            animated_clip = clip.set_position(lambda t: (
-                int((w - cw) * (t / duration)),
-                int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5)))
-            ))
-        elif motion == "Handheld Camera" or motion == "Shoulder Camera":
-            animated_clip = clip.set_position(lambda t: (
-                int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))),
-                int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7)))
-            )).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0))
-        elif motion == "Cinematic Reveal":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
-        elif motion == "Whip Pan":
-            animated_clip = clip.set_position(lambda t: (int((w - cw) * ((t / duration) ** 3)), 'center'))
-        elif motion == "Tilt Up":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration))))
-        elif motion == "Tilt Down":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
-        elif motion == "Roll Camera":
-            animated_clip = clip.rotate(lambda t: 8 * (t / duration)).set_position('center')
-        elif motion == "Parallax Motion" or motion == "Ken Burns Effect":
-            animated_clip = clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
-        elif motion == "Rack Focus" or motion == "Motion Blur":
-            animated_clip = clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center')
-        else:
+        try:
+            if motion == "Zoom In":
+                animated_clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
+            elif motion == "Zoom Out (v40 Default)":
+                animated_clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
+            elif motion == "Pan Left":
+                animated_clip = clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
+            elif motion == "Pan Right":
+                animated_clip = clip.set_position(lambda t: (int((w - cw) * (1 - t / duration)), 'center'))
+            elif motion == "Pan Up":
+                animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration))))
+            elif motion == "Pan Down":
+                animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
+            elif motion == "Dolly In" or motion == "Push In":
+                animated_clip = clip.resize(lambda t: 1.0 + 0.25 * (t / duration)).set_position('center')
+            elif motion == "Dolly Out" or motion == "Pull Out":
+                animated_clip = clip.resize(lambda t: 1.25 - 0.25 * (t / duration)).set_position('center')
+            elif motion == "Orbit Camera" or motion == "Arc Shot":
+                animated_clip = clip.rotate(lambda t: -3 + 6 * (t / duration)).resize(lambda t: 1.1 + 0.1 * (t / duration)).set_position('center')
+            elif motion == "Crane Shot":
+                animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -2 * (t / duration))
+            elif motion == "Drone Shot":
+                animated_clip = clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center')
+            elif motion == "Tracking Shot" or motion == "Follow Shot":
+                animated_clip = clip.set_position(lambda t: (
+                    int((w - cw) * (t / duration)),
+                    int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5)))
+                ))
+            elif motion == "Handheld Camera" or motion == "Shoulder Camera":
+                animated_clip = clip.set_position(lambda t: (
+                    int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))),
+                    int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7)))
+                )).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0))
+            elif motion == "Cinematic Reveal":
+                animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
+            elif motion == "Whip Pan":
+                animated_clip = clip.set_position(lambda t: (int((w - cw) * ((t / duration) ** 3)), 'center'))
+            elif motion == "Tilt Up":
+                animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration))))
+            elif motion == "Tilt Down":
+                animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
+            elif motion == "Roll Camera":
+                animated_clip = clip.rotate(lambda t: 8 * (t / duration)).set_position('center')
+            elif motion == "Parallax Motion" or motion == "Ken Burns Effect":
+                animated_clip = clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
+            elif motion == "Rack Focus" or motion == "Motion Blur":
+                animated_clip = clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center')
+            else:
+                animated_clip = clip.set_position('center')
+        except Exception:
+            # Fallback cleanly to static positioning instead of crashing inside lambda operations
             animated_clip = clip.set_position('center')
 
         final_clip = CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
@@ -826,15 +825,16 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
     except Exception:
         return ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).set_duration(duration)
 
-# Safe transitions renderer
+# Safe transitions renderer (Fixed: Dynamic Scaled Fade to prevent Pitch Black short clips)
 def apply_clip_transition(clip, transition, duration):
     try:
+        fade_dur = min(0.3, duration / 3.0)
         if transition == "Cross Dissolve (Fade)":
-            return clip.fadein(0.5).fadeout(0.5)
+            return clip.fadein(fade_dur).fadeout(fade_dur)
         elif transition == "Flash Transition (White Glow)":
-            return clip.fadein(0.3).fadeout(0.3)
+            return clip.fadein(fade_dur).fadeout(fade_dur)
         elif transition == "Film Dissolve (Muted)":
-            return clip.fadein(0.4).fadeout(0.4)
+            return clip.fadein(fade_dur).fadeout(fade_dur)
         elif transition == "Instant Cut":
             return clip
     except Exception:
@@ -983,7 +983,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             
             for idx, scene in enumerate(sentences):
                 # UNIVERSAL DYNAMIC SPEAKER SELECTION (No Saba/Essa hardcoding)
-                is_female_voice = any(k in scene or k in scene.lower() for k in ["larki", "woman", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ"])
+                is_female_voice = any(k in scene or k in scene.lower() for k in ["larki", "woman", "female", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ"])
                 is_male_voice = any(k in scene or k in scene.lower() for k in ["man", "male", "boy", "he", "him", "adventurer", "maseeha", "mushaf", "مرد", "لڑکا", "احمد", "علی", "بادشاہ"])
                 
                 if is_female_voice and not is_male_voice:
@@ -1047,10 +1047,20 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 active_male_ref = raw_male_url if character_present else None
                 active_female_ref = raw_female_url if character_present else None
                 
+                # Fixed: Handle Automatic Heritage Dynamic Detection
+                if character_heritage == "Automatic" or not character_heritage:
+                    scene_lower_text = scene.lower()
+                    if any(k in scene_lower_text for k in ["larki", "woman", "female", "girl", "عورت", "لڑکی", "زارا", "سارہ", "man", "male", "boy", "مرد", "لڑکا", "احمد", "علی"]):
+                        active_heritage = "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)"
+                    else:
+                        active_heritage = "Western / Modern"
+                else:
+                    active_heritage = character_heritage
+
                 refined_p = generate_enhanced_cinematic_prompt(
                     urdu_scene=scene,
                     style=style,
-                    character_heritage=character_heritage,
+                    character_heritage=active_heritage,
                     enable_islamic_filter=enable_islamic_filter,
                     raw_male_url=active_male_ref,
                     raw_female_url=active_female_ref
@@ -1075,7 +1085,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     
                     ref_url = None
                     if character_present:
-                        if any(k in scene or k in scene.lower() for k in ["larki", "woman", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ"]):
+                        if any(k in scene or k in scene.lower() for k in ["larki", "woman", "female", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ"]):
                             ref_url = raw_female_url if raw_female_url else raw_male_url
                         else:
                             ref_url = raw_male_url if raw_male_url else raw_female_url
@@ -1156,8 +1166,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 
                 clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h)
                 
+                # Fixed: Fallback to static ImageClip instead of failing with black screen
                 if clip is None:
-                    clip = ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).set_duration(dur_scene)
+                    try:
+                        clip = ImageClip(img_path).set_duration(dur_scene).resize((w, h))
+                    except Exception:
+                        clip = ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).set_duration(dur_scene)
                 
                 sfx_file = download_scene_sfx(scene, u_id, i)
                 if sfx_file and os.path.exists(sfx_file):
@@ -1249,10 +1263,10 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700;900&display=swap');
     
-    /* Professional Steel Blue-Gray & Dark Slate Theme */
+    /* Professional Light Theme - Aligned to Streamlit Native Look */
     .stApp { 
-        background: radial-gradient(circle at top, #1e293b, #0f172a) !important; 
-        color: #f8fafc !important; 
+        background: #f8fafc !important; 
+        color: #0f172a !important; 
         font-family: 'Inter', sans-serif; 
     }
     
@@ -1261,10 +1275,10 @@ st.markdown("""
         font-weight: 900; 
         text-align: center;
         font-family: 'Orbitron', sans-serif;
-        background: linear-gradient(45deg, #00f2fe, #4facfe, #0072ff);
+        background: linear-gradient(45deg, #2563eb, #3b82f6, #1d4ed8);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        text-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
+        animation: shimmerGlow 2s infinite alternate;
         margin-top: 15px;
         margin-bottom: 5px;
         letter-spacing: 3px;
@@ -1274,24 +1288,28 @@ st.markdown("""
     
     .circular-s {
         width: 120px; height: 120px; 
-        background: linear-gradient(135deg, #00f2fe, #0072ff) !important;
+        background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
         font-family: 'Orbitron', sans-serif; font-size: 50px; color: #ffffff !important;
-        border: 4px solid #00f2fe !important;
-        box-shadow: 0 0 40px rgba(0, 242, 254, 0.6), inset 0 0 15px rgba(255, 255, 255, 0.5);
-        animation: rotateShua 4s infinite linear, lightningGlow 1.5s infinite alternate;
+        border: 4px solid #3b82f6 !important;
+        box-shadow: 0 4px 20px rgba(37, 99, 235, 0.3);
+        animation: rotateSpins 6s infinite linear, glowingPulse 2s infinite alternate;
     }
     
-    @keyframes rotateShua {
-        0% { transform: perspective(1000px) rotateY(0deg); }
-        100% { transform: perspective(1000px) rotateY(360deg); }
+    @keyframes rotateSpins {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
     }
-    @keyframes lightningGlow {
-        0%, 100% { box-shadow: 0 0 20px #0072ff, 0 0 40px #00f2fe, inset 0 0 15px #ffffff; }
-        50% { box-shadow: 0 0 40px #00f2fe, 0 0 60px #00d4ff, inset 0 0 20px #ffffff; }
+    @keyframes glowingPulse {
+        0%, 100% { box-shadow: 0 0 15px rgba(37, 99, 235, 0.4); }
+        50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.7); }
+    }
+    @keyframes shimmerGlow {
+        0% { text-shadow: 0 0 10px rgba(37, 99, 235, 0.2); }
+        100% { text-shadow: 0 0 25px rgba(37, 99, 235, 0.6); }
     }
 
-    /* Premium Glow Button Styles */
+    /* Premium Button Styles */
     .stButton>button, .stFormSubmitButton>button { 
         background: linear-gradient(90deg, #2563eb, #1d4ed8) !important; 
         color: white !important; 
@@ -1301,105 +1319,104 @@ st.markdown("""
         font-size: 20px !important; 
         font-weight: bold !important; 
         border: 1px solid #3b82f6 !important;
-        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4) !important;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.2) !important;
         transition: all 0.3s ease !important;
     }
     .stButton>button:hover, .stFormSubmitButton>button:hover {
-        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.7) !important;
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4) !important;
         transform: scale(1.02) !important;
     }
     
     [data-testid="stSidebar"] { 
-        background-color: #0b1329 !important; 
-        border-right: 1px solid #1e293b; 
+        background-color: #f1f5f9 !important; 
+        border-right: 1px solid #cbd5e1; 
     }
     [data-testid="stSidebar"] * { 
-        color: #f1f5f9 !important; 
+        color: #0f172a !important; 
         font-weight: bold !important; 
     }
     
-    /* FIXED: HIGH-CONTRAST INPUT BOXES WITH BRIGHT TYPING TEXT */
+    /* HIGH-CONTRAST LIGHT INPUT BOXES WITH BRIGHT TYPING TEXT */
     textarea, input, select, div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input, .stTextArea textarea, .stTextInput input {
-        background-color: #0f172a !important; /* Rich Dark Slate background */
-        color: #ffffff !important; /* Bright White Typing Text */
-        -webkit-text-fill-color: #ffffff !important;
-        border: 2px solid #3b82f6 !important; /* Strong Blue borders for high contrast */
+        background-color: #ffffff !important; 
+        color: #0f172a !important; 
+        -webkit-text-fill-color: #0f172a !important;
+        border: 2px solid #cbd5e1 !important; 
         border-radius: 10px !important;
         font-size: 16px !important;
     }
     textarea:focus, input:focus, select:focus {
-        border-color: #00f2fe !important;
-        box-shadow: 0 0 10px rgba(0, 242, 254, 0.6) !important;
-        background-color: #1e293b !important;
+        border-color: #2563eb !important;
+        box-shadow: 0 0 10px rgba(37, 99, 235, 0.2) !important;
+        background-color: #ffffff !important;
     }
     textarea::placeholder, input::placeholder {
-        color: #94a3b8 !important;
+        color: #64748b !important;
         opacity: 1 !important;
     }
     
-    /* FIXED: Option names (labels) on top of input fields are now beautifully bright and glowing */
+    /* Option names (labels) are now clean and highly legible */
     label, [data-testid="stWidgetLabel"] p, .stWidgetLabel {
-        color: #93c5fd !important; /* Radiant soft blue labels */
-        -webkit-text-fill-color: #93c5fd !important;
+        color: #1e3a8a !important; 
+        -webkit-text-fill-color: #1e3a8a !important;
         font-weight: 700 !important;
         font-size: 1.05rem !important;
-        text-shadow: 0 0 10px rgba(147, 197, 253, 0.2);
     }
     
     /* Headers, subheaders, and Markdown text fixes */
     h1, h2, h3, h4, h5, h6, .stSubheader, .stCaption {
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
+        color: #0f172a !important;
+        -webkit-text-fill-color: #0f172a !important;
     }
     .stMarkdown p {
-        color: #f1f5f9 !important;
-        -webkit-text-fill-color: #f1f5f9 !important;
+        color: #334155 !important;
+        -webkit-text-fill-color: #334155 !important;
     }
     
-    /* Dark Tabs Styling - HIGH CONTRAST ALWAYS VISIBLE */
+    /* Light Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #0f172a !important;
+        background-color: #f1f5f9 !important;
         border-radius: 12px !important;
         padding: 6px !important;
-        border: 1px solid #1e293b !important;
+        border: 1px solid #cbd5e1 !important;
     }
     .stTabs [data-baseweb="tab"] {
-        background-color: #1e293b !important; /* Visible slate blue tab containers */
-        border: 1px solid #334155 !important;
+        background-color: #ffffff !important; 
+        border: 1px solid #cbd5e1 !important;
         border-radius: 8px 8px 0 0 !important;
         margin: 2px !important;
         padding: 10px 18px !important;
     }
     .stTabs [data-baseweb="tab"] p {
-        color: #cbd5e1 !important; /* Extremely readable light slate inactive text */
-        -webkit-text-fill-color: #cbd5e1 !important;
+        color: #475569 !important; 
+        -webkit-text-fill-color: #475569 !important;
         font-weight: 700 !important;
         font-size: 15px !important;
     }
     .stTabs [data-baseweb="tab"]:hover p {
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
+        color: #0f172a !important;
+        -webkit-text-fill-color: #0f172a !important;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #2563eb !important; /* Electrifying Blue background for active tab */
-        border-color: #3b82f6 !important;
+        background-color: #2563eb !important; 
+        border-color: #1d4ed8 !important;
     }
     .stTabs [aria-selected="true"] p {
-        color: #ffffff !important; /* Pure white active tab text */
+        color: #ffffff !important; 
         -webkit-text-fill-color: #ffffff !important;
     }
 
-    /* Fixed File Uploader Invisible Text and Icons */
+    /* Fixed File Uploader */
     [data-testid="stFileUploader"] {
-        background-color: #0f172a !important;
-        border: 2px dashed #3b82f6 !important;
+        background-color: #ffffff !important;
+        border: 2px dashed #cbd5e1 !important;
         border-radius: 12px !important;
         padding: 15px !important;
         text-align: center !important;
     }
     [data-testid="stFileUploader"] * {
-        color: #ffffff !important; /* Force all file uploader text and buttons to be fully white */
-        -webkit-text-fill-color: #ffffff !important;
+        color: #0f172a !important; 
+        -webkit-text-fill-color: #0f172a !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -1935,4 +1952,4 @@ with tab_enterprise:
         else:
             st.error("Access Denied: Only database-defined Administrators can access this control panel.")
 
-st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #94a3b8;'>Sglowina AI Version 2.1 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #475569;'>Sglowina AI Version 2.1 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
