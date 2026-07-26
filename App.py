@@ -445,7 +445,7 @@ def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
         return True, safe_prompt
     return False, scene_text_en
 
-# Pure story-driven prompt mastermind containing no external independent variables
+# 100% Universal Pure story-driven prompt mastermind containing no hardcoded Essa/Saba defaults
 def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
     try:
         scene_lower = urdu_scene.lower()
@@ -463,15 +463,15 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         }
         style_tag = style_boosters.get(style, "cinematic film style, highly detailed")
         
-        # SENSE ORIENTED CULTURAL STYLING (No hardcoded Saba/Essa overrides unless matched directly)
+        # UNIVERSAL CULTURAL STYLING BASED SOLELY ON ACTIVE CONTEXT
         if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
-            if any(k in scene_lower for k in ["صبا", "saba", "woman", "female", "girl", "larki"]):
+            if any(k in scene_lower for k in ["larki", "woman", "female", "girl", "عورت", "لڑکی", "زارا", "سارہ"]):
                 gender_booster = (
                     "beautiful elegant Eastern Pakistani Punjabi Pathan woman, realistic South Asian sharp facial features, "
                     "wearing traditional modest cotton Shalwar Kameez with a clean modest Dupatta elegantly draped over her head as a hijab, "
                     "strictly no western look, modest posture"
                 )
-            elif any(k in scene_lower for k in ["عیسی", "essa", "awan", "احمد", "ahmad", "man", "male", "boy"]):
+            elif any(k in scene_lower for k in ["man", "male", "boy", "مرد", "لڑکا", "احمد", "علی", "بادشاہ"]):
                 gender_booster = (
                     "handsome majestic Eastern Pakistani Punjabi Pathan man, highly realistic South Asian facial structure, "
                     "wearing a traditional modest cotton Shalwar Kameez with high collar, neat short Islamic beard, "
@@ -486,17 +486,18 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
 
         instruction = (
             "You are an expert Hollywood visual artist and prompt engineer. "
-            "Analyze the Urdu scene sentence and write a highly detailed visual English image prompt matching the specified style. \n"
-            "CRITICAL INSTRUCTIONS:\n"
-            "1. STRICT GENDER AND IDENTITY CONFORMITY: Identify the main subject of the sentence. "
-            "If the sentence describes a boy (e.g., Ahmad, male, man, adventurer), generate ONLY a single male character. Do NOT generate any female character, saba, or girl! "
-            "If the sentence describes a girl (e.g., female, woman, girl, lady), generate ONLY a single female character. Do NOT generate any male character! "
-            "If no human character is mentioned (e.g. talking about forests, gardens, birds, trees, ruins, animals), do NOT show any human faces or bodies at all! Focus 100% on the scenery.\n"
-            "2. VISUAL SCALE AND BACKGROUND: Never zoom in on faces! Always generate medium-full shots or wide-angle shots showing the character integrated naturally into the environment so the scenery (forests, ancient ruins, birds, weather) is completely visible.\n"
-            "3. STYLE CONFORMITY: Build the prompt to strictly match the visual style specified in 'VISUAL STYLE TAGS'. If style is '3D Cartoon', specify smooth 3D renders, Pixar-style charming animation characters. If 'Cinematic Film', specify a live-action shot on ARRI Alexa LF, realistic lighting.\n"
-            "4. HOLY FIGURES SAFE FILTER: If the scene mentions any holy figures, prophets, angels, heaven, hell, or graves (and 'Islamic Safety Filter' is active), strictly avoid any human faces or silhouettes. Instead, depict volumetric golden and white divine light rays emanating from cosmic skies or ancient desert ruins.\n"
-            "5. CHARACTER CONSISTENCY: Keep character designs and faces highly consistent across all generated images based on the provided reference URLs: Male {raw_male_url}, Female {raw_female_url}.\n"
-            "6. Output ONLY the final English prompt with absolutely no introductory or conversational text."
+            "Analyze the provided Urdu scene sentence and translate/expand it into a highly detailed visual English image prompt for the Flux AI model. \n"
+            "STRICT CULTURAL AND ENVIRONMENTAL RULES:\n"
+            "1. VISUAL ACCURACY: You must depict EXACTLY what is written in the Urdu text. "
+            "If it describes birds, trees, gardens, magic, ruins, landscapes, or spiritual elements (heaven, hell, graves), make them the absolute focus. "
+            "If no humans are explicitly mentioned in the Urdu text, do NOT generate any human figures or faces at all! Show only the beautiful scenery.\n"
+            "2. NO GENDER OVERLAPPING OR HALLUCINATIONS: If the sentence describes a male character, generate ONLY a single male. "
+            "If it describes a female character, generate ONLY a single female. Never generate or mix opposite genders unless both are mentioned in that specific scene.\n"
+            "3. ENVIRONMENT-DOMINANT SCALE: Never generate close-up faces. Always place the characters in a wide-angle, long shot, or medium-full shot so the complete beautiful surrounding environment, background, trees, weather, animals, or objects occupy the majority of the screen.\n"
+            "4. CULTURAL DIVERSITY: Follow the cultural setting described in the Urdu text. If it is an Eastern/traditional setting, depict the characters wearing modest regional clothing (like Shalwar Kameez or traditional robes).\n"
+            "5. HOLY FIGURES SAFE GUARD: If the scene mentions any holy figures, prophets, angels, or sacred elements (and 'Islamic Safety Filter' is active), strictly avoid any human faces, shapes, or silhouettes. Instead, depict divine volumetric golden and white light beams in majestic ancient deserts or cosmic skies.\n"
+            "6. CHARACTER REFS: If reference URLs are provided, keep character faces aligned to them: Male {raw_male_url}, Female {raw_female_url}.\n"
+            "7. Output ONLY the English prompt with absolutely no introductory or conversational text."
         )
         
         prompt_input = f"Urdu Scene: {urdu_scene}\n"
@@ -943,9 +944,9 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             clips = []
             
             for idx, scene in enumerate(sentences):
-                # SMART DYNAMIC SPEAKER SELECTION
-                is_female_voice = any(k in scene or k in scene.lower() for k in ["صبا", "saba", "larki", "woman", "girl", "she", "her", "عائشہ", "ayisha"])
-                is_male_voice = any(k in scene or k in scene.lower() for k in ["عیسی", "essa", "awan", "احمد", "ahmad", "man", "boy", "he", "him", "adventurer", "maseeha", "mushaf"])
+                # UNIVERSAL DYNAMIC SPEAKER SELECTION (No Saba/Essa hardcoding)
+                is_female_voice = any(k in scene or k in scene.lower() for k in ["larki", "woman", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ"])
+                is_male_voice = any(k in scene or k in scene.lower() for k in ["man", "male", "boy", "he", "him", "adventurer", "maseeha", "mushaf", "مرد", "لڑکا", "احمد", "علی", "بادشاہ"])
                 
                 if is_female_voice and not is_male_voice:
                     v_code_scene = "ur-PK-UzmaNeural"
@@ -1030,7 +1031,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt[:400])}?model={video_model}&aspectRatio={aspect_ratio_param}&key={active_api_key}&duration=4"
                     
                     ref_url = None
-                    if "Saba" in scene or "saba" in scene.lower() or "female" in scene.lower():
+                    if any(k in scene or k in scene.lower() for k in ["larki", "woman", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ"]):
                         ref_url = raw_female_url if raw_female_url else raw_male_url
                     else:
                         ref_url = raw_male_url if raw_male_url else raw_female_url
@@ -1204,10 +1205,10 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700;900&display=swap');
     
-    /* High-Contrast Cyberpunk Layout Theme */
+    /* Professional Steel Blue-Gray & Dark Slate Theme */
     .stApp { 
-        background: #090d16 !important; 
-        color: #f1f5f9 !important; 
+        background: radial-gradient(circle at top, #1e293b, #0f172a) !important; 
+        color: #f8fafc !important; 
         font-family: 'Inter', sans-serif; 
     }
     
@@ -1247,21 +1248,21 @@ st.markdown("""
     }
 
     /* Premium Glow Button Styles */
-    .stButton>button { 
-        background: linear-gradient(90deg, #00f2fe, #0072ff) !important; 
+    .stButton>button, .stFormSubmitButton>button { 
+        background: linear-gradient(90deg, #2563eb, #1d4ed8) !important; 
         color: white !important; 
         border-radius: 12px !important; 
-        height: 55px; 
-        width: 100%; 
-        font-size: 20px; 
-        font-weight: bold; 
-        border: none;
-        box-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
-        transition: all 0.3s ease;
+        height: 55px !important; 
+        width: 100% !important; 
+        font-size: 20px !important; 
+        font-weight: bold !important; 
+        border: 1px solid #3b82f6 !important;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4) !important;
+        transition: all 0.3s ease !important;
     }
-    .stButton>button:hover {
-        box-shadow: 0 0 25px rgba(0, 242, 254, 0.8);
-        transform: scale(1.02);
+    .stButton>button:hover, .stFormSubmitButton>button:hover {
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.7) !important;
+        transform: scale(1.02) !important;
     }
     
     [data-testid="stSidebar"] { 
@@ -1275,7 +1276,7 @@ st.markdown("""
     
     /* FIXED: HIGH-CONTRAST INPUT BOXES WITH BRIGHT TYPING TEXT */
     textarea, input, select, div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input, .stTextArea textarea, .stTextInput input {
-        background-color: #111827 !important; /* Rich Dark Charcoal background */
+        background-color: #0f172a !important; /* Rich Dark Slate background */
         color: #ffffff !important; /* Bright White Typing Text */
         -webkit-text-fill-color: #ffffff !important;
         border: 2px solid #3b82f6 !important; /* Strong Blue borders for high contrast */
@@ -1285,7 +1286,7 @@ st.markdown("""
     textarea:focus, input:focus, select:focus {
         border-color: #00f2fe !important;
         box-shadow: 0 0 10px rgba(0, 242, 254, 0.6) !important;
-        background-color: #090d16 !important;
+        background-color: #1e293b !important;
     }
     textarea::placeholder, input::placeholder {
         color: #94a3b8 !important;
@@ -1294,11 +1295,11 @@ st.markdown("""
     
     /* FIXED: Option names (labels) on top of input fields are now beautifully bright and glowing */
     label, [data-testid="stWidgetLabel"] p, .stWidgetLabel {
-        color: #60a5fa !important; /* Radiant light blue labels */
-        -webkit-text-fill-color: #60a5fa !important;
+        color: #93c5fd !important; /* Radiant soft blue labels */
+        -webkit-text-fill-color: #93c5fd !important;
         font-weight: 700 !important;
         font-size: 1.05rem !important;
-        text-shadow: 0 0 10px rgba(96, 165, 250, 0.2);
+        text-shadow: 0 0 10px rgba(147, 197, 253, 0.2);
     }
     
     /* Headers, subheaders, and Markdown text fixes */
@@ -1313,21 +1314,21 @@ st.markdown("""
     
     /* Dark Tabs Styling - HIGH CONTRAST ALWAYS VISIBLE */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #0b1329 !important;
+        background-color: #0f172a !important;
         border-radius: 12px !important;
         padding: 6px !important;
         border: 1px solid #1e293b !important;
     }
     .stTabs [data-baseweb="tab"] {
-        background-color: #1e293b !important; /* Visible dark gray tab containers */
+        background-color: #1e293b !important; /* Visible slate blue tab containers */
         border: 1px solid #334155 !important;
         border-radius: 8px 8px 0 0 !important;
         margin: 2px !important;
         padding: 10px 18px !important;
     }
     .stTabs [data-baseweb="tab"] p {
-        color: #94a3b8 !important; /* Extremely readable gray-blue inactive text */
-        -webkit-text-fill-color: #94a3b8 !important;
+        color: #cbd5e1 !important; /* Extremely readable light slate inactive text */
+        -webkit-text-fill-color: #cbd5e1 !important;
         font-weight: 700 !important;
         font-size: 15px !important;
     }
@@ -1336,8 +1337,8 @@ st.markdown("""
         -webkit-text-fill-color: #ffffff !important;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #3b82f6 !important; /* Electrifying Blue background for active tab */
-        border-color: #60a5fa !important;
+        background-color: #2563eb !important; /* Electrifying Blue background for active tab */
+        border-color: #3b82f6 !important;
     }
     .stTabs [aria-selected="true"] p {
         color: #ffffff !important; /* Pure white active tab text */
@@ -1346,7 +1347,7 @@ st.markdown("""
 
     /* Fixed File Uploader Invisible Text and Icons */
     [data-testid="stFileUploader"] {
-        background-color: #111827 !important;
+        background-color: #0f172a !important;
         border: 2px dashed #3b82f6 !important;
         border-radius: 12px !important;
         padding: 15px !important;
@@ -1368,7 +1369,7 @@ st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>',
 tab_auth, tab_chat, tab_movie, tab_image, tab_enterprise = st.tabs([
     "🔑 Sign In & Registrations",
     "💬 Electric AI Chat", 
-    "🎬 Pro Master Studio", 
+    "🎬 Pro Movie Studio", 
     "🎨 Pro Image Studio",
     "👤 Enterprise Center"
 ])
