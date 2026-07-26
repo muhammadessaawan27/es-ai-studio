@@ -463,7 +463,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         }
         style_tag = style_boosters.get(style, "cinematic film style, highly detailed")
         
-        # SENSE ORIENTED CULTURAL STYLING
+        # SENSE ORIENTED CULTURAL STYLING (No hardcoded Saba/Essa overrides unless matched directly)
         if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
             if any(k in scene_lower for k in ["صبا", "saba", "woman", "female", "girl", "larki"]):
                 gender_booster = (
@@ -486,17 +486,17 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
 
         instruction = (
             "You are an expert Hollywood visual artist and prompt engineer. "
-            "Analyze the Urdu scene and write a highly detailed visual English image prompt matching the specified style. \n"
+            "Analyze the Urdu scene sentence and write a highly detailed visual English image prompt matching the specified style. \n"
             "CRITICAL INSTRUCTIONS:\n"
-            "1. STRICT VISUAL ALIGNMENT: You must depict EXACTLY what is written in the Urdu scene sentence. "
-            "If it describes birds, trees, majestic gardens, magic, forests, or ancient ruins, focus intensely on showing those beautiful environmental elements. "
-            "If no human is explicitly mentioned, do NOT generate any human characters. "
-            "If a boy is mentioned, show only a boy. If a girl is mentioned, show only a girl. Never show opposite genders unless they both appear in the text.\n"
-            "2. VISUAL SCALE: Always show characters as smaller figures integrated into a wider cinematic shot (medium-full or wide-angle shot) so the rich scenery, landscapes, weather, and animals are fully visible. Never show giant face close-ups.\n"
-            "3. STYLE: Strict visual conformity with the 'VISUAL STYLE TAGS'. If style is '3D Cartoon', make it Pixar-like. If 'Anime Art', Japanese hand-drawn style. If 'Cinematic Film', realistic live-action film style.\n"
-            "4. ISLAMIC FILTER: If the Urdu scene mentions Prophets/Auliya, heaven, hell, or Islamic sacred elements, strictly avoid any human faces or bodies. Instead, depict gorgeous volumetric golden/white spiritual rays of light in cosmic landscapes, ancient mystical ruins, or majestic desert paths.\n"
-            "5. CHARACTER REFS: If reference URLs are provided, align the facial details to them: Male {raw_male_url}, Female {raw_female_url}.\n"
-            "6. Output ONLY the final English prompt with absolutely no extra text or conversation."
+            "1. STRICT GENDER AND IDENTITY CONFORMITY: Identify the main subject of the sentence. "
+            "If the sentence describes a boy (e.g., Ahmad, male, man, adventurer), generate ONLY a single male character. Do NOT generate any female character, saba, or girl! "
+            "If the sentence describes a girl (e.g., female, woman, girl, lady), generate ONLY a single female character. Do NOT generate any male character! "
+            "If no human character is mentioned (e.g. talking about forests, gardens, birds, trees, ruins, animals), do NOT show any human faces or bodies at all! Focus 100% on the scenery.\n"
+            "2. VISUAL SCALE AND BACKGROUND: Never zoom in on faces! Always generate medium-full shots or wide-angle shots showing the character integrated naturally into the environment so the scenery (forests, ancient ruins, birds, weather) is completely visible.\n"
+            "3. STYLE CONFORMITY: Build the prompt to strictly match the visual style specified in 'VISUAL STYLE TAGS'. If style is '3D Cartoon', specify smooth 3D renders, Pixar-style charming animation characters. If 'Cinematic Film', specify a live-action shot on ARRI Alexa LF, realistic lighting.\n"
+            "4. HOLY FIGURES SAFE FILTER: If the scene mentions any holy figures, prophets, angels, heaven, hell, or graves (and 'Islamic Safety Filter' is active), strictly avoid any human faces or silhouettes. Instead, depict volumetric golden and white divine light rays emanating from cosmic skies or ancient desert ruins.\n"
+            "5. CHARACTER CONSISTENCY: Keep character designs and faces highly consistent across all generated images based on the provided reference URLs: Male {raw_male_url}, Female {raw_female_url}.\n"
+            "6. Output ONLY the final English prompt with absolutely no introductory or conversational text."
         )
         
         prompt_input = f"Urdu Scene: {urdu_scene}\n"
@@ -1311,20 +1311,50 @@ st.markdown("""
         -webkit-text-fill-color: #f1f5f9 !important;
     }
     
-    /* Dark Tabs Styling */
+    /* Dark Tabs Styling - HIGH CONTRAST ALWAYS VISIBLE */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #0b1329;
-        border-radius: 12px;
-        padding: 5px;
+        background-color: #0b1329 !important;
+        border-radius: 12px !important;
+        padding: 6px !important;
+        border: 1px solid #1e293b !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #1e293b !important; /* Visible dark gray tab containers */
+        border: 1px solid #334155 !important;
+        border-radius: 8px 8px 0 0 !important;
+        margin: 2px !important;
+        padding: 10px 18px !important;
     }
     .stTabs [data-baseweb="tab"] p {
-        color: #94a3b8 !important;
+        color: #94a3b8 !important; /* Extremely readable gray-blue inactive text */
         -webkit-text-fill-color: #94a3b8 !important;
-        font-weight: 600 !important;
+        font-weight: 700 !important;
+        font-size: 15px !important;
+    }
+    .stTabs [data-baseweb="tab"]:hover p {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #3b82f6 !important; /* Electrifying Blue background for active tab */
+        border-color: #60a5fa !important;
     }
     .stTabs [aria-selected="true"] p {
-        color: #00f2fe !important;
-        -webkit-text-fill-color: #00f2fe !important;
+        color: #ffffff !important; /* Pure white active tab text */
+        -webkit-text-fill-color: #ffffff !important;
+    }
+
+    /* Fixed File Uploader Invisible Text and Icons */
+    [data-testid="stFileUploader"] {
+        background-color: #111827 !important;
+        border: 2px dashed #3b82f6 !important;
+        border-radius: 12px !important;
+        padding: 15px !important;
+        text-align: center !important;
+    }
+    [data-testid="stFileUploader"] * {
+        color: #ffffff !important; /* Force all file uploader text and buttons to be fully white */
+        -webkit-text-fill-color: #ffffff !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -1402,7 +1432,7 @@ with tab_chat:
 # TAB 3: PRO MOVIE STUDIO
 # -----------------
 with tab_movie:
-    st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
+    st.write("### 🎥 Movie Studio")
     
     st.subheader("⚙️ AI Generation Mode")
     gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"])
