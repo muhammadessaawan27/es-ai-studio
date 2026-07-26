@@ -379,18 +379,19 @@ def analyze_scene_for_director(scene_text):
     color_grading = "Hollywood Cinematic"
     composition = "Medium Shot, Rule of Thirds"
     
-    if any(k in text for k in ["saba", "she", "her", "woman", "female", "girl"]):
-        composition = "Tight close-up portrait shot, extreme details of female face, emotional expression"
+    # ADVANCED SCENERY TRIGGERS: Ensuring scenery dominates over giant faces
+    if any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "mud", "ruins", "khandar", "jungling", "trees"]):
+        composition = "Cinematic wide-angle establishing landscape shot, majestic natural environment with characters shown from a far distance"
+        motion = "Drone Shot"
+    elif any(k in text for k in ["saba", "she", "her", "woman", "female", "girl"]):
+        composition = "Cinematic medium full-shot of a beautiful female character showing full traditional modest clothing and highly detailed background scenery"
         motion = "Push In"
-    elif any(k in text for k in ["essa", "he", "him", "man", "male", "boy", "warrior", "king"]):
-        composition = "Cinematic masculine close-up portrait, focus on eyes and facial details"
+    elif any(k in text for k in ["essa", "he", "him", "man", "male", "boy", "warrior", "king", "ahmad", "احمد"]):
+        composition = "Cinematic medium full-shot of a handsome male adventurer, integrated naturally into the environment, showing clothing and background scenery"
         motion = "Zoom In"
     elif any(k in text for k in ["together", "couple", "they", "them", "sitting with", "walking with"]):
-        composition = "Cinematic medium shot of a couple, side-by-side interacting"
+        composition = "Cinematic wide shot of a couple, integrated into the environment, showing both full bodies"
         motion = "Orbit Camera"
-    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "mud"]):
-        composition = "Cinematic wide-angle establishing landscape shot, highly atmospheric environment"
-        motion = "Drone Shot"
 
     if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag"]):
         motion = "Tracking Shot"
@@ -536,7 +537,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, char_memory, scene_mem
             "3. For human characters, strictly enforce gender separation. Do NOT mix genders. A female character (e.g. Saba) must have a beautiful, clean, feminine Eastern face. Absolutely NO facial hair, NO beards, and NO mustaches on females.\n"
             "4. A male character (e.g. Essa) must have a handsome, masculine face with a neat short black beard.\n"
             "5. All human characters must have realistic Middle Eastern, Pakistani, or Arabian features (no western default faces) and wear traditional modest clothing based on the heritage style.\n"
-            "6. STRICT CHARACTER CONSISTENCY: Keep the characters' face, hair, and look completely identical across scenes. If a male reference image URL is provided, copy the face and features of: {raw_male_url}. If a female reference image URL is provided, copy the face and features of: {raw_female_url}.\n"
+            "6. STRICT CHARACTER CONSISTENCY & SCALE: Keep the characters' face, hair, and look completely identical across scenes. If a male reference image URL is provided, copy the face and features of: {raw_male_url}. If a female reference image URL is provided, copy the face and features of: {raw_female_url}. DO NOT zoom closely on their faces. Show them as smaller figures in a wide shot or medium-full shot so the complete surrounding scenery is clearly visible.\n"
             "7. If both characters are mentioned, depict them as a distinct couple (one bearded man and one modest woman) interacting. Do NOT merge them into one body.\n"
             "8. Describe the scene's exact environment (e.g. deep green jungle, flowing river, mud-houses, rain, storms, animals like lions/snakes in the foreground) with strong descriptive words so the image generator produces it precisely.\n"
             "9. Write ONLY the final English prompt, with no conversational preamble or extra text."
@@ -990,9 +991,13 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             clips = []
             
             for idx, scene in enumerate(sentences):
-                if "صبا" in scene or "saba" in scene.lower():
+                # SMART DYNAMIC SPEAKER SELECTION
+                is_female_voice = any(k in scene or k in scene.lower() for k in ["صبا", "saba", "larki", "woman", "girl", "she", "her", "عائشہ", "ayisha"])
+                is_male_voice = any(k in scene or k in scene.lower() for k in ["عیسی", "essa", "awan", "احمد", "ahmad", "man", "boy", "he", "him", "adventurer", "maseeha"])
+                
+                if is_female_voice and not is_male_voice:
                     v_code_scene = "ur-PK-UzmaNeural"
-                elif "عیسی" in scene or "essa" in scene.lower() or "awan" in scene.lower():
+                elif is_male_voice:
                     v_code_scene = "ur-PK-AsadNeural"
                 else:
                     v_code_scene = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
@@ -1117,7 +1122,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 w_target = make_even(w * 1.25)
                 h_target = make_even(h * 1.25)
                 
-                # Consistent Seed Synchronization for Character Consistency
                 unique_seed = seed
                 
                 img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={unique_seed}&nologo=true&model=flux"
@@ -1201,7 +1205,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             
             final_video.close()
             
-            # --- MEMORY RELEASE SWEEPER ---
             for sub_voice in temporary_audio_tracks:
                 try:
                     if os.path.exists(sub_voice): os.remove(sub_voice)
