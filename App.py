@@ -377,27 +377,13 @@ def analyze_scene_for_director(scene_text):
     motion = "Zoom Out (v40 Default)"
     lighting = "Volumetric Light"
     color_grading = "Hollywood Cinematic"
-    composition = "Medium Shot, Rule of Thirds"
+    composition = "Cinematic Wide Shot" # Default to wide shot to capture forests, magic, ruins, and birds
     
-    # ADVANCED SCENERY TRIGGERS: Ensuring scenery dominates over giant faces
-    if any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "mud", "ruins", "khandar", "jungling", "trees"]):
-        composition = "Cinematic wide-angle establishing landscape shot, majestic natural environment with characters shown from a far distance"
-        motion = "Drone Shot"
-    elif any(k in text for k in ["saba", "she", "her", "woman", "female", "girl"]):
-        composition = "Cinematic medium full-shot of a beautiful female character showing full traditional modest clothing and highly detailed background scenery"
-        motion = "Push In"
-    elif any(k in text for k in ["essa", "he", "him", "man", "male", "boy", "warrior", "king", "ahmad", "احمد"]):
-        composition = "Cinematic medium full-shot of a handsome male adventurer, integrated naturally into the environment, showing clothing and background scenery"
-        motion = "Zoom In"
-    elif any(k in text for k in ["together", "couple", "they", "them", "sitting with", "walking with"]):
-        composition = "Cinematic wide shot of a couple, integrated into the environment, showing both full bodies"
-        motion = "Orbit Camera"
-
     if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag"]):
         motion = "Tracking Shot"
     elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
         motion = "Dolly In"
-        lighting = "Dark Cinematic, Horror Shadows"
+        lighting = "Dark Cinematic, Shadows"
         color_grading = "Horror Green"
     elif any(k in text for k in ["fight", "battle", "sword", "war"]):
         motion = "Handheld Camera"
@@ -459,34 +445,8 @@ def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
         return True, safe_prompt
     return False, scene_text_en
 
-def build_ultra_cinematic_prompt(scene, style, char_desc, scene_desc, director_settings):
-    motion = director_settings.get("motion", "Zoom Out (v40 Default)")
-    lighting = director_settings.get("lighting", "Volumetric Light")
-    color_grading = director_settings.get("color_grading", "Hollywood Cinematic")
-    composition = director_settings.get("composition", "Medium Shot, Rule of Thirds")
-    
-    quality_boost = "ultra photorealistic, 8k resolution, face restoration, sharp focus, highly detailed eyes, symmetrical face structure, natural skin texture, perfect anatomy, detail enhancement, professional photography"
-    
-    prompt_parts = [
-        f"{composition}, cinematic framing",
-        f"Scene: {scene}"
-    ]
-    
-    if scene_desc:
-        prompt_parts.append(f"Background environment: {scene_desc}")
-    if char_desc:
-        prompt_parts.append(f"Featuring consistent character: {char_desc}")
-    if style and style != "Auto (Smart Director)":
-        prompt_parts.append(f"Style: {style}")
-        
-    prompt_parts.append(f"Lighting: {lighting}")
-    prompt_parts.append(f"Color grade: {color_grading}")
-    prompt_parts.append(quality_boost)
-    
-    return ", ".join(prompt_parts)[:500]
-
-# Enhanced Cinematic Prompt Mastermind incorporating dual reference image context & STRICT EASTERN STYLING
-def generate_enhanced_cinematic_prompt(urdu_scene, style, char_memory, scene_memory, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
+# Pure story-driven prompt mastermind containing no external independent variables
+def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
     try:
         scene_lower = urdu_scene.lower()
         gender_booster = ""
@@ -503,23 +463,19 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, char_memory, scene_mem
         }
         style_tag = style_boosters.get(style, "cinematic film style, highly detailed")
         
+        # SENSE ORIENTED CULTURAL STYLING
         if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
-            if "صبا" in scene_lower or "saba" in scene_lower or "woman" in scene_lower or "female" in scene_lower or "girl" in scene_lower:
+            if any(k in scene_lower for k in ["صبا", "saba", "woman", "female", "girl", "larki"]):
                 gender_booster = (
                     "beautiful elegant Eastern Pakistani Punjabi Pathan woman, realistic South Asian sharp facial features, "
                     "wearing traditional modest cotton Shalwar Kameez with a clean modest Dupatta elegantly draped over her head as a hijab, "
                     "strictly no western look, modest posture"
                 )
-            elif "عیسی" in scene_lower or "essa" in scene_lower or "man" in scene_lower or "male" in scene_lower or "boy" in scene_lower:
+            elif any(k in scene_lower for k in ["عیسی", "essa", "awan", "احمد", "ahmad", "man", "male", "boy"]):
                 gender_booster = (
                     "handsome majestic Eastern Pakistani Punjabi Pathan man, highly realistic South Asian facial structure, "
                     "wearing a traditional modest cotton Shalwar Kameez with high collar, neat short Islamic beard, "
                     "strictly no western look"
-                )
-            else:
-                gender_booster = (
-                    "traditional modest Eastern Islamic attire, Shalwar Kameez, modest clothing, "
-                    "Pakistani/Arabian traditional South Asian features, strictly no western exposure"
                 )
         elif character_heritage == "Ancient Arabian":
             gender_booster = "wearing ancient traditional Arabian flowing historical robes, classic desert turban, historic Middle Eastern facial features"
@@ -532,25 +488,21 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, char_memory, scene_mem
             "You are an expert Hollywood visual artist and prompt engineer. "
             "Analyze the Urdu scene and write a highly detailed visual English image prompt matching the specified style. \n"
             "CRITICAL INSTRUCTIONS:\n"
-            "1. STRICT VISUAL STYLE ENFORCEMENT: You must generate the prompt matching the style specified in 'VISUAL STYLE TAGS'. If the style is '3D Cartoon', you must strictly describe a Disney/Pixar cartoon aesthetic (smooth 3D renders, stylized, cute characters, animated look), NOT a realistic photo. If the style is 'Anime Art', describe a Japanese anime style. If the style is 'Cinematic Film', describe a live-action film style.\n"
-            "2. If 'Islamic Safety Filter' is Active and the text contains Islamic holy names (like Prophets/انبیاء, Sahaba/صحابہ, Auliya, Allah, Quran, or grave, heaven, hell), you MUST strictly avoid generating any human face or human body. Instead, generate a highly spiritual scene depicting glorious volumetric white and golden divine light rays emanating from a cosmic night sky, beautiful natural mountains, or ancient desert paths. No human silhouettes.\n"
-            "3. For human characters, strictly enforce gender separation. Do NOT mix genders. A female character (e.g. Saba) must have a beautiful, clean, feminine Eastern face. Absolutely NO facial hair, NO beards, and NO mustaches on females.\n"
-            "4. A male character (e.g. Essa) must have a handsome, masculine face with a neat short black beard.\n"
-            "5. All human characters must have realistic Middle Eastern, Pakistani, or Arabian features (no western default faces) and wear traditional modest clothing based on the heritage style.\n"
-            "6. STRICT CHARACTER CONSISTENCY & SCALE: Keep the characters' face, hair, and look completely identical across scenes. If a male reference image URL is provided, copy the face and features of: {raw_male_url}. If a female reference image URL is provided, copy the face and features of: {raw_female_url}. DO NOT zoom closely on their faces. Show them as smaller figures in a wide shot or medium-full shot so the complete surrounding scenery is clearly visible.\n"
-            "7. If both characters are mentioned, depict them as a distinct couple (one bearded man and one modest woman) interacting. Do NOT merge them into one body.\n"
-            "8. Describe the scene's exact environment (e.g. deep green jungle, flowing river, mud-houses, rain, storms, animals like lions/snakes in the foreground) with strong descriptive words so the image generator produces it precisely.\n"
-            "9. Write ONLY the final English prompt, with no conversational preamble or extra text."
+            "1. STRICT VISUAL ALIGNMENT: You must depict EXACTLY what is written in the Urdu scene sentence. "
+            "If it describes birds, trees, majestic gardens, magic, forests, or ancient ruins, focus intensely on showing those beautiful environmental elements. "
+            "If no human is explicitly mentioned, do NOT generate any human characters. "
+            "If a boy is mentioned, show only a boy. If a girl is mentioned, show only a girl. Never show opposite genders unless they both appear in the text.\n"
+            "2. VISUAL SCALE: Always show characters as smaller figures integrated into a wider cinematic shot (medium-full or wide-angle shot) so the rich scenery, landscapes, weather, and animals are fully visible. Never show giant face close-ups.\n"
+            "3. STYLE: Strict visual conformity with the 'VISUAL STYLE TAGS'. If style is '3D Cartoon', make it Pixar-like. If 'Anime Art', Japanese hand-drawn style. If 'Cinematic Film', realistic live-action film style.\n"
+            "4. ISLAMIC FILTER: If the Urdu scene mentions Prophets/Auliya, heaven, hell, or Islamic sacred elements, strictly avoid any human faces or bodies. Instead, depict gorgeous volumetric golden/white spiritual rays of light in cosmic landscapes, ancient mystical ruins, or majestic desert paths.\n"
+            "5. CHARACTER REFS: If reference URLs are provided, align the facial details to them: Male {raw_male_url}, Female {raw_female_url}.\n"
+            "6. Output ONLY the final English prompt with absolutely no extra text or conversation."
         )
         
         prompt_input = f"Urdu Scene: {urdu_scene}\n"
         prompt_input += f"VISUAL STYLE TAGS: {style_tag}\n"
-        if char_memory:
-            prompt_input += f"Character Memory/Appearance override: {char_memory}\n"
         if gender_booster:
             prompt_input += f"FORCE GENDER AND ATTIRE STYLING TAGS: {gender_booster}\n"
-        if scene_memory:
-            prompt_input += f"Scene Environment/Background override: {scene_memory}\n"
         if raw_male_url:
             prompt_input += f"Male reference image URL: {raw_male_url}\n"
         if raw_female_url:
@@ -607,7 +559,7 @@ def download_scene_sfx(scene_text, u_id, idx):
         sfx_url = "https://www.soundjay.com/nature/sounds/rain-07.mp3"
     elif any(k in text for k in ["sword", "fight", "battle", "clash", "تلوار", "جنگ"]):
         sfx_url = "https://www.soundjay.com/mechanical/sounds/cutlery-clink-1.mp3"
-    elif any(k in text for k in ["forest", "jungle", "birds", "nature", "درخت", "جنگل"]):
+    elif any(k in text for k in ["forest", "jungle", "birds", "nature", "درخت", "جنگل", "باغات", "باغ", "پرندے", "پرندہ"]):
         sfx_url = "https://www.soundjay.com/nature/sounds/forest-wind-1.mp3"
     elif any(k in text for k in ["fire", "burn", "flame", "آگ"]):
         sfx_url = "https://www.soundjay.com/nature/sounds/fire-1.mp3"
@@ -924,7 +876,7 @@ def apply_canva_typography(img_path, text):
 # ==========================================
 # 4. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast", advanced_params=None):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast", advanced_params=None):
     if not MOVIEPY_AVAILABLE:
         st.error(f"MoviePy is not available on this server. Error: {MOVIEPY_ERROR}. Please check requirements.txt.")
         return "Error"
@@ -993,7 +945,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             for idx, scene in enumerate(sentences):
                 # SMART DYNAMIC SPEAKER SELECTION
                 is_female_voice = any(k in scene or k in scene.lower() for k in ["صبا", "saba", "larki", "woman", "girl", "she", "her", "عائشہ", "ayisha"])
-                is_male_voice = any(k in scene or k in scene.lower() for k in ["عیسی", "essa", "awan", "احمد", "ahmad", "man", "boy", "he", "him", "adventurer", "maseeha"])
+                is_male_voice = any(k in scene or k in scene.lower() for k in ["عیسی", "essa", "awan", "احمد", "ahmad", "man", "boy", "he", "him", "adventurer", "maseeha", "mushaf"])
                 
                 if is_female_voice and not is_male_voice:
                     v_code_scene = "ur-PK-UzmaNeural"
@@ -1054,8 +1006,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 refined_p = generate_enhanced_cinematic_prompt(
                     urdu_scene=scene,
                     style=style,
-                    char_memory=char_desc,
-                    scene_memory=scene_desc,
                     character_heritage=character_heritage,
                     enable_islamic_filter=enable_islamic_filter,
                     raw_male_url=raw_male_url,
@@ -1254,9 +1204,9 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700;900&display=swap');
     
-    /* Professional Electric-Dark Cyberpunk Theme */
+    /* High-Contrast Cyberpunk Layout Theme */
     .stApp { 
-        background: radial-gradient(circle at top, #0f172a, #020617) !important; 
+        background: #090d16 !important; 
         color: #f1f5f9 !important; 
         font-family: 'Inter', sans-serif; 
     }
@@ -1323,40 +1273,58 @@ st.markdown("""
         font-weight: bold !important; 
     }
     
-    /* FORCE HEAVY CONTRAST FOR ALL INPUT FIELDS & TEXTAREAS (Invisible text fix) */
+    /* FIXED: HIGH-CONTRAST INPUT BOXES WITH BRIGHT TYPING TEXT */
     textarea, input, select, div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input, .stTextArea textarea, .stTextInput input {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
+        background-color: #111827 !important; /* Rich Dark Charcoal background */
+        color: #ffffff !important; /* Bright White Typing Text */
         -webkit-text-fill-color: #ffffff !important;
-        border: 2px solid #334155 !important;
-        border-radius: 12px !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5) !important;
+        border: 2px solid #3b82f6 !important; /* Strong Blue borders for high contrast */
+        border-radius: 10px !important;
+        font-size: 16px !important;
     }
     textarea:focus, input:focus, select:focus {
         border-color: #00f2fe !important;
-        box-shadow: 0 0 10px rgba(0, 242, 254, 0.4) !important;
-        background-color: #0f172a !important;
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
+        box-shadow: 0 0 10px rgba(0, 242, 254, 0.6) !important;
+        background-color: #090d16 !important;
     }
     textarea::placeholder, input::placeholder {
-        color: #64748b !important;
+        color: #94a3b8 !important;
         opacity: 1 !important;
     }
     
-    /* Professional Dark Tabs overrides */
+    /* FIXED: Option names (labels) on top of input fields are now beautifully bright and glowing */
+    label, [data-testid="stWidgetLabel"] p, .stWidgetLabel {
+        color: #60a5fa !important; /* Radiant light blue labels */
+        -webkit-text-fill-color: #60a5fa !important;
+        font-weight: 700 !important;
+        font-size: 1.05rem !important;
+        text-shadow: 0 0 10px rgba(96, 165, 250, 0.2);
+    }
+    
+    /* Headers, subheaders, and Markdown text fixes */
+    h1, h2, h3, h4, h5, h6, .stSubheader, .stCaption {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+    .stMarkdown p {
+        color: #f1f5f9 !important;
+        -webkit-text-fill-color: #f1f5f9 !important;
+    }
+    
+    /* Dark Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {
         background-color: #0b1329;
         border-radius: 12px;
         padding: 5px;
     }
-    .stTabs [data-baseweb="tab"] {
+    .stTabs [data-baseweb="tab"] p {
         color: #94a3b8 !important;
+        -webkit-text-fill-color: #94a3b8 !important;
         font-weight: 600 !important;
     }
-    .stTabs [aria-selected="true"] {
+    .stTabs [aria-selected="true"] p {
         color: #00f2fe !important;
-        border-bottom-color: #00f2fe !important;
+        -webkit-text-fill-color: #00f2fe !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -1455,10 +1423,7 @@ with tab_movie:
     
     enable_islamic_filter = st.checkbox("Enable Islamic & Spiritual Safety Filter (حرمتِ انبیاء و اولیاء فلٹر) 🛡️", value=True)
     
-    char_desc = st.text_input("Character Memory (مرد یا عورت کا تفصیلی حلیہ):", 
-                              placeholder="Example: Saba is a 25-year-old beautiful Eastern woman wearing a modest dark blue hijab")
-    
-    st.write("##### 👤 Consistent Character Identity References (کرداروں کے چہروں کی تصاویر)")
+    st.write("##### 👤 Consistent Character Identity References (مخصوص تصویر کی بنیاد پر کارٹون لک دینے کے لیے)")
     col_up1, col_up2 = st.columns(2)
     with col_up1:
         uploaded_male_img = st.file_uploader("Upload Male Character Reference Image (مرد کردار کی تصویر):", type=["jpg", "png", "jpeg"])
@@ -1468,9 +1433,6 @@ with tab_movie:
         uploaded_female_img = st.file_uploader("Upload Female Character Reference Image (عورت کردار کی تصویر):", type=["jpg", "png", "jpeg"])
         if uploaded_female_img is not None:
             st.image(uploaded_female_img, caption="Female Identity Loaded ✅", width=120)
-        
-    scene_desc = st.text_input("Scene Memory (جنگل، موسم، ماحول، جانور):", 
-                              placeholder="Example: Deep green ancient forest, high realistic trees, thick foliage, dark stormy night")
 
     mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9, mc10 = st.columns(10)
     with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
@@ -1531,8 +1493,6 @@ with tab_movie:
                 ratio=mr, 
                 style=ms, 
                 seed=sd, 
-                char_desc=char_desc, 
-                scene_desc=scene_desc, 
                 camera_motion=camera_motion, 
                 transition_style=transition_style,
                 enable_watermark=enable_watermark, 
