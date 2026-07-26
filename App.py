@@ -1,5 +1,6 @@
 import streamlit as st
 import asyncio
+import edge_tts
 import requests
 import urllib.parse
 import os
@@ -14,83 +15,43 @@ import threading
 import gc
 import sqlite3
 import hashlib
-import json
 import concurrent.futures
 
-# PIL Compatibility Failsafe
-if not hasattr(Image, 'ANTIALIAS'):
-    try: Image.ANTIALIAS = Image.Resampling.LANCZOS
-    except AttributeError: Image.ANTIALIAS = Image.LANCZOS
-
-headers_browser = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-session = requests.Session()
-session.headers.update(headers_browser)
-
-AUDIO_CACHE_DIR = "audio_cache"
-os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
-DB_BACKUP_FILE = "sglowina_saas_backup.json"
-
-# Expanded Urdu to English Dictionary for High Accuracy Fallbacks
-UR_EN_DICT = {
-    "درخت": "trees", "جنگل": "forest", "باغ": "garden", "باغات": "gardens",
-    "پرندے": "birds", "پرندہ": "bird", "بارش": "rain", "طوفان": "storm",
-    "بادل": "clouds", "ہوا": "wind", "آگ": "fire", "پانی": "water",
-    "لڑکا": "boy", "لڑکی": "girl", "عورت": "woman", "مرد": "man",
-    "بادشاہ": "king", "ملکہ": "queen", "محل": "palace", "تخت": "throne",
-    "شیر": "lion", "تلوار": "sword", "جنگ": "war", "قبر": "grave",
-    "خوفناک": "scary", "جن": "ghost", "اندھیرا": "dark", "موت": "death",
-    "خوبصورت": "beautiful", "جادو": "magic", "جادوئی": "magical",
-    "مسجد": "mosque", "نماز": "prayer", "دعا": "pray", "نور": "holy light",
-    "چوزہ": "cute fluffy yellow chick", "چوزے": "cute fluffy yellow chicks",
-    "بلی": "cute cat", "بندر": "funny monkey", "طوطا": "colorful parrot",
-    "خرگوش": "fluffy rabbit", "بالٹی": "bucket", "سر": "head", "چوہا": "cute mouse",
-    "سپر ہیرو": "superhero", "ہنستے": "laughing", "لوٹ پوٹ": "hilariously rolling and laughing"
-}
-
-try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
-    MOVIEPY_AVAILABLE = True
-    MOVIEPY_ERROR = ""
-except Exception as e:
-    MOVIEPY_AVAILABLE = False
-    MOVIEPY_ERROR = str(e)
-    class AudioFileClip:
-        def __init__(self, *args, **kwargs): raise NameError("MoviePy missing")
-    class ImageClip:
-        def __init__(self, *args, **kwargs): raise NameError("MoviePy missing")
-    class VideoFileClip:
-        def __init__(self, *args, **kwargs): raise NameError("MoviePy missing")
-    def concatenate_videoclips(*args, **kwargs): raise NameError("MoviePy missing")
-    def CompositeAudioClip(*args, **kwargs): raise NameError("MoviePy missing")
-    def CompositeVideoClip(*args, **kwargs): raise NameError("MoviePy missing")
-
-try:
-    import edge_tts
-    EDGE_TTS_AVAILABLE = True
-except ImportError:
-    EDGE_TTS_AVAILABLE = False
-
+# ==========================================
+# 1. STREAMLIT INITIALIZATION & GLOBAL STATES
+# ==========================================
+# Streamlit page config MUST be the first Streamlit command called
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V2.1", layout="wide", page_icon="🎬")
 
-if "enable_watermark" not in st.session_state: st.session_state.enable_watermark = True
-if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
-if "logged_in_user" not in st.session_state: st.session_state.logged_in_user = "demo_user"
-if "msgs" not in st.session_state: st.session_state.msgs = []
-if "storyboard_scenes" not in st.session_state: st.session_state.storyboard_scenes = []
+# Initialize global default settings in session state to prevent NameError scoping issues
+if "enable_watermark" not in st.session_state:
+    st.session_state.enable_watermark = True
+if "enable_bg_music" not in st.session_state:
+    st.session_state.enable_bg_music = True
+if "logged_in_user" not in st.session_state:
+    st.session_state.logged_in_user = "demo_user"
+if "msgs" not in st.session_state:
+    st.session_state.msgs = []
 
+# Render sidebar widgets globally at the very top
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=st.session_state.enable_watermark)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=st.session_state.enable_bg_music)
+
+# Update session state values
 st.session_state.enable_watermark = enable_watermark
 st.session_state.enable_bg_music = enable_bg_music
 
-render_semaphore = threading.Semaphore(value=1)
+# Global Concurrency Queue locks to support up to 100 concurrent render requests without server crash
+render_semaphore = threading.Semaphore(value=2)  # Maximum 2 concurrent encoding processes to save RAM/CPU
 active_renderers = 0
 render_lock = threading.Lock()
 
+# Helper function to ensure even dimensions for FFMPEG compatibility
 def make_even(val):
     return int(val) if int(val) % 2 == 0 else int(val) + 1
 
+# PBKDF2 Secure Password Hashing
 def hash_password(password):
     salt = b"sglowina_saas_salt_1234"
     return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000).hex()
@@ -99,6 +60,7 @@ def verify_password(password, hashed):
     salt = b"sglowina_saas_salt_1234"
     return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000).hex() == hashed
 
+# Background Image Uploader to get public URL for Character Consistency
 def get_public_url(uploaded_file):
     try:
         file_bytes = uploaded_file.getvalue()
@@ -108,62 +70,39 @@ def get_public_url(uploaded_file):
         if res.status_code == 200:
             data = res.json()
             if data.get("status") == "success":
-                return data["data"]["url"].replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
-    except: pass
+                temp_url = data["data"]["url"]
+                raw_url = temp_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+                return raw_url
+    except Exception:
+        pass
     return None
 
+# ==========================================
+# 2. DYNAMIC DATABASE LAYER (PostgreSQL & SQLite Concurrency Compatible)
+# ==========================================
 def get_db_connection():
-    pg_url = os.environ.get("DATABASE_URL")
+    pg_url = os.environ.get("DATABASE_URL") # Checks for production PostgreSQL (e.g. Render/Heroku)
     if pg_url:
         try:
             import psycopg2
-            return psycopg2.connect(pg_url)
-        except: pass
+            conn = psycopg2.connect(pg_url)
+            return conn
+        except Exception:
+            pass
+    # High-concurrency SQLite config with WAL mode for smooth multi-user traffic
     conn = sqlite3.connect("sglowina_saas_v21.db", check_same_thread=False, timeout=30.0)
     conn.row_factory = sqlite3.Row
-    try: conn.execute("PRAGMA journal_mode=WAL;")
-    except: pass
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+    except Exception:
+        pass
     return conn
-
-def backup_db_to_json():
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        users = [dict(row) for row in cursor.execute("SELECT * FROM users").fetchall()]
-        payments = [dict(row) for row in cursor.execute("SELECT * FROM local_payments").fetchall()]
-        config = [dict(row) for row in cursor.execute("SELECT * FROM system_config").fetchall()]
-        conn.close()
-        backup_data = {"users": users, "payments": payments, "config": config}
-        with open(DB_BACKUP_FILE, "w", encoding="utf-8") as f:
-            json.dump(backup_data, f, indent=4)
-    except: pass
-
-def restore_db_from_json():
-    if not os.path.exists(DB_BACKUP_FILE): return
-    try:
-        with open(DB_BACKUP_FILE, "r", encoding="utf-8") as f:
-            backup_data = json.load(f)
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        for user in backup_data.get("users", []):
-            cursor.execute("""
-                INSERT OR IGNORE INTO users (id, username, email, password_hash, plan, credits, role, status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (user.get("id"), user["username"], user["email"], user["password_hash"], user["plan"], user["credits"], user["role"], user["status"], user["created_at"]))
-        for pay in backup_data.get("payments", []):
-            cursor.execute("""
-                INSERT OR IGNORE INTO local_payments (id, username, method, trx_id, amount, status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (pay["id"], pay["username"], pay["method"], pay["trx_id"], pay["amount"], pay["status"], pay["created_at"]))
-        for cfg in backup_data.get("config", []):
-            cursor.execute("INSERT OR REPLACE INTO system_config (key, value) VALUES (?, ?)", (cfg["key"], cfg["value"]))
-        conn.commit()
-        conn.close()
-    except: pass
 
 def init_db_v21():
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # SQLite compatibility checks
     is_sqlite = not hasattr(conn, "closed")
     serial_primary = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sqlite else "SERIAL PRIMARY KEY"
     
@@ -180,40 +119,117 @@ def init_db_v21():
             created_at TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS projects (
-            id TEXT PRIMARY KEY, user_id INTEGER, project_name TEXT,
-            type TEXT, file_path TEXT, prompt TEXT, created_at TEXT, is_favorite INTEGER DEFAULT 0
+            id TEXT PRIMARY KEY,
+            user_id INTEGER,
+            project_name TEXT,
+            type TEXT,
+            file_path TEXT,
+            prompt TEXT,
+            created_at TEXT,
+            is_favorite INTEGER DEFAULT 0
         )
     """)
-    cursor.execute(f"CREATE TABLE IF NOT EXISTS credits_history (id {serial_primary}, user_id INTEGER, action TEXT, credits_used INTEGER, balance_after INTEGER, date TEXT)")
-    cursor.execute("CREATE TABLE IF NOT EXISTS local_payments (id TEXT PRIMARY KEY, username TEXT, method TEXT, trx_id TEXT UNIQUE, amount REAL, status TEXT DEFAULT 'Pending', created_at TEXT)")
-    cursor.execute("CREATE TABLE IF NOT EXISTS system_config (key TEXT PRIMARY KEY, value TEXT)")
-    cursor.execute("CREATE TABLE IF NOT EXISTS coupons (code TEXT PRIMARY KEY, credits INTEGER, uses_left INTEGER)")
     
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS credits_history (
+            id {serial_primary},
+            user_id INTEGER,
+            action TEXT,
+            credits_used INTEGER,
+            balance_after INTEGER,
+            date TEXT
+        )
+    """)
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS local_payments (
+            id TEXT PRIMARY KEY,
+            username TEXT,
+            method TEXT,
+            trx_id TEXT UNIQUE,
+            amount REAL,
+            status TEXT DEFAULT 'Pending',
+            created_at TEXT
+        )
+    """)
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS characters (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER,
+            character_name TEXT,
+            description TEXT,
+            reference_data TEXT
+        )
+    """)
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS scenes (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER,
+            scene_name TEXT,
+            environment TEXT,
+            lighting TEXT,
+            camera_style TEXT
+        )
+    """)
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS coupons (
+            code TEXT PRIMARY KEY,
+            credits INTEGER,
+            uses_left INTEGER
+        )
+    """)
+    
+    # Secure Master Config Table to lock Admin API Key permanently
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS system_config (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
+    
+    # Default high-value coupon seeding
     cursor.execute("SELECT COUNT(*) FROM coupons WHERE code = 'ESSASABA'")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO coupons (code, credits, uses_left) VALUES ('ESSASABA', 100, 1000)")
     
     h_admin = hash_password("786")
-    for adm in ["essasaba", "essa_awan"]:
-        cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (adm,))
-        if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                           (adm, f"{adm}@sglowina.ai", h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
     
+    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'essasaba'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       ("essasaba", "essasaba@sglowina.ai", h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+    else:
+        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'essasaba'", (h_admin,))
+
+    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'essa_awan'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       ("essa_awan", "essa@sglowina.ai", h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+    else:
+        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'essa_awan'", (h_admin,))
+                       
     h_saba = hash_password("1234")
     cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                        ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", 5000, "Admin", "2026-07-21"))
+    else:
+        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'saba_wahid'", (h_saba,))
                        
     conn.commit()
     conn.close()
 
 init_db_v21()
-restore_db_from_json()
 
+# ==========================================
+# 3. ENTERPRISE AUTHENTICATION HELPERS
+# ==========================================
 def register_saas_user(username, email, password):
     username = username.strip().lower()
     email = email.strip().lower()
@@ -224,19 +240,22 @@ def register_saas_user(username, email, password):
         cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                        (username, email, h, 'Free', 50, 'User', time.strftime("%Y-%m-%d")))
         conn.commit()
-        backup_db_to_json()
         return True, "User registered successfully!"
-    except: return False, "Username or Email already exists."
-    finally: conn.close()
+    except Exception:
+        return False, "Username or Email already exists."
+    finally:
+        conn.close()
 
 def authenticate_user(username, password):
     username = username.strip().lower()
+    password = password.strip()
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT password_hash FROM users WHERE LOWER(username) = LOWER(?)", (username,))
     row = cursor.fetchone()
     conn.close()
-    if row: return verify_password(password.strip(), row['password_hash'])
+    if row:
+        return verify_password(password, row['password_hash'])
     return False
 
 def get_user_data(username):
@@ -254,7 +273,6 @@ def deduct_user_credits(username, amount):
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE LOWER(username) = LOWER(?)", (amount, username))
     conn.commit()
-    backup_db_to_json()
     conn.close()
 
 def log_credit_usage(user_id, action, used, balance):
@@ -265,166 +283,259 @@ def log_credit_usage(user_id, action, used, balance):
     conn.commit()
     conn.close()
 
+# AI Hollywood Director Mode Intelligent Scene & Speaker Analyzer
 def analyze_scene_for_director(scene_text):
     text = scene_text.lower()
-    motion, lighting, color_grading, composition = "Zoom Out (v40 Default)", "Volumetric Light", "Hollywood Cinematic", "Cinematic Wide Shot"
     
-    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag", "بھاگ", "دوڑ", "تیز"]):
+    motion = "Zoom Out (v40 Default)"
+    lighting = "Volumetric Light"
+    color_grading = "Hollywood Cinematic"
+    composition = "Medium Shot, Rule of Thirds"
+    
+    # 1. Dynamic speaker shot cuts logic based on pronouns / names
+    if any(k in text for k in ["saba", "she", "her", "woman", "female", "girl"]):
+        composition = "Tight close-up portrait shot, extreme details of female face, emotional expression"
+        motion = "Push In"
+    elif any(k in text for k in ["essa", "he", "him", "man", "male", "boy", "warrior", "king"]):
+        composition = "Cinematic masculine close-up portrait, focus on eyes and facial details"
+        motion = "Zoom In"
+    elif any(k in text for k in ["together", "couple", "they", "them", "sitting with", "walking with"]):
+        composition = "Cinematic medium shot of a couple, side-by-side interacting"
+        motion = "Orbit Camera"
+    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "mud"]):
+        composition = "Cinematic wide-angle establishing landscape shot, highly atmospheric environment"
+        motion = "Drone Shot"
+
+    # 2. Camera motion mapping
+    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag"]):
         motion = "Tracking Shot"
-    elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared", "قبر", "خوف", "جن", "بھوت", "تاریک", "ڈرا", "موت"]):
+    elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
         motion = "Dolly In"
-        lighting, color_grading = "Dark Cinematic, Shadows", "Horror Green"
-    elif any(k in text for k in ["fight", "battle", "sword", "war", "تلوار", "جنگ", "لڑائی"]):
+        lighting = "Dark Cinematic, Horror Shadows"
+        color_grading = "Horror Green"
+    elif any(k in text for k in ["fight", "battle", "sword", "war"]):
         motion = "Handheld Camera"
-    elif any(k in text for k in ["walk", "stroll", "چلنا", "گھوم", "سیر"]):
+    elif any(k in text for k in ["walk", "stroll"]):
         motion = "Follow Shot"
-    elif any(k in text for k in ["think", "silent", "quiet", "meditate", "سوچ", "خاموش"]):
+    elif any(k in text for k in ["think", "silent", "quiet", "meditate"]):
         motion = "Ken Burns Effect"
         
-    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine", "مسجد", "دعا", "نماز", "پاک", "نور"]):
-        lighting, color_grading = "Golden Hour", "Warm"
-    elif any(k in text for k in ["night", "midnight", "moon", "رات", "چاند", "اندھیرا"]):
-        lighting, color_grading = "Moonlight", "Cold Blue"
+    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine"]):
+        lighting = "Golden Hour"
+        color_grading = "Warm"
+    elif any(k in text for k in ["night", "midnight", "moon"]):
+        lighting = "Moonlight"
+        color_grading = "Cold Blue"
         
-    return {"motion": motion, "lighting": lighting, "color_grading": color_grading, "composition": composition}
+    return {
+        "motion": motion,
+        "lighting": lighting,
+        "color_grading": color_grading,
+        "composition": composition
+    }
 
+# Translation Engine with Strict Subject and Anatomy Enforcement
 def translate_ur_to_en_enhanced(text):
     try:
         instruction = (
-            "You are an expert visual prompt translator. Translate the following Urdu scene description into clean descriptive English. \n"
-            "CRITICAL RULE: Explicitly translate the animal subjects (e.g., chick, mouse, cat, parrot, monkey, rabbit). Do NOT assume any human subjects unless explicitly mentioned."
+            "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into highly descriptive English visual instructions. \n"
+            "CRITICAL RULES: \n"
+            "1. Explicitly identify the main subjects (e.g., 'a single male', 'a single female', 'a lion', 'only a peaceful landscape with no humans'). \n"
+            "2. Do NOT blend genders. If the subject is a man, do NOT include feminine descriptions. If the subject is a woman, do NOT include masculine features. \n"
+            "3. Never add animals unless they are explicitly mentioned in the text. \n"
+            "4. Ensure anatomical perfection. No extra hands, no overlapping bodies, no weird deformities. \n"
+            "5. Output ONLY the English translation and detailed visual descriptions, with no conversational filler or prefixes."
         )
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
         res = session.get(url, timeout=15)
-        if res.status_code == 200 and len(res.text.strip()) > 5:
+        if res.status_code == 200:
             return res.text.strip()
-    except: pass
-    
-    words = re.findall(r'[\u0600-\u06FF]+', text)
-    translated_words = [UR_EN_DICT[w] for w in words if w in UR_EN_DICT]
-    if translated_words:
-        return f"Cinematic scene depicting {', '.join(translated_words)}, highly detailed digital art"
-    return "Cute animated 3D scenery, highly detailed"
+    except Exception:
+        pass
+    return text
 
+# Islamic Holy Figures and Spiritual Safety Filter
 def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
     combined_text = (scene_text_en + " " + scene_text_ur).lower()
+    
     spiritual_keywords = [
         "prophet", "sahaba", "saint", "angel", "god", "allah", "messenger", "nooh", "musa", "isa", "ibrahim", "yousuf", "muhammad", 
         "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر",
         "grave", "shroud", "hell", "heaven", "paradise", "pious", "aulia", "angels", "holy dome", "mosque"
     ]
+    
     if any(k in combined_text for k in spiritual_keywords):
-        return True, (
+        safe_prompt = (
             "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light emanating from the heavens, "
-            "sacred light beam, peaceful glowing background. "
-            "STRICTLY NO human faces, NO visible bodies, NO portraits, NO human figures. Pure sacred light."
+            "sacred light beam, peaceful glowing ancient background, majestic natural mountains and glowing golden sand, "
+            "awe-inspiring holy atmosphere, highly detailed cosmic sky. "
+            "STRICTLY NO human faces, NO visible bodies, NO portraits, NO human figures, NO blasphemous shapes. "
+            "Pure sacred light, beautiful symbolic representation."
         )
+        return True, safe_prompt
     return False, scene_text_en
 
-def is_human_character_present(scene):
-    scene_l = scene.lower()
-    human_indicators = [
-        "man", "male", "boy", "he", "him", "adventurer", "maseeha", "mushaf", "مرد", "لڑکا", "احمد", "علی", "بادشاہ", "essa", "awan", "bhai",
-        "larki", "woman", "female", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ", "saba", "baji", "behn"
+# Smart Prompt Engine to build optimized prompts with negative prompts injected
+def build_ultra_cinematic_prompt(scene, style, char_desc, scene_desc, director_settings):
+    motion = director_settings.get("motion", "Zoom Out (v40 Default)")
+    lighting = director_settings.get("lighting", "Volumetric Light")
+    color_grading = director_settings.get("color_grading", "Hollywood Cinematic")
+    composition = director_settings.get("composition", "Medium Shot, Rule of Thirds")
+    
+    quality_boost = "ultra photorealistic, 8k resolution, face restoration, sharp focus, highly detailed eyes, symmetrical face structure, natural skin texture, perfect anatomy, detail enhancement, professional photography"
+    
+    prompt_parts = [
+        f"{composition}, cinematic framing",
+        f"Scene: {scene}"
     ]
-    return any(k in scene_l for k in human_indicators)
+    
+    if scene_desc:
+        prompt_parts.append(f"Background environment: {scene_desc}")
+    if char_desc:
+        prompt_parts.append(f"Featuring consistent character: {char_desc}")
+    if style and style != "Auto (Smart Director)":
+        prompt_parts.append(f"Style: {style}")
+        
+    prompt_parts.append(f"Lighting: {lighting}")
+    prompt_parts.append(f"Color grade: {color_grading}")
+    prompt_parts.append(quality_boost)
+    
+    return ", ".join(prompt_parts)[:500]
 
-def analyze_consistent_subject(story_text):
-    story_l = story_text.lower()
-    if any(k in story_l for k in ["چوزا", "chick", "چوزے"]):
-        return "a cute little fluffy yellow 3D Pixar style chick wearing an upside-down metallic bucket on its head as superhero helmet"
-    if any(k in story_l for k in ["چوہا", "mouse", "rat"]):
-        return "a cute tiny little 3D cartoon brown mouse wearing superhero attire"
-    if any(k in story_l for k in ["بندر", "monkey"]):
-        return "a funny goofy 3D cartoon brown monkey"
-    return ""
-
-def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url, attire_desc="", consistent_char_desc=""):
+# Enhanced Cinematic Prompt Mastermind incorporating dual reference image context & STRICT EASTERN STYLING
+def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
     try:
         scene_lower = urdu_scene.lower()
         gender_booster = ""
         
-        style_boosters = {
-            "Realistic HD": "ultra photorealistic, 8k resolution, highly detailed, sharp focus, natural skin textures",
-            "Cinematic Film": "cinematic movie style, dramatic cinematic lighting, deep shadows, cinematic color grade",
-            "3D Cartoon": "3D cartoon animation style, Pixar style, Disney animation style, vibrant colors, stylized cute characters, playful environment, no realism",
-            "Anime Art": "beautiful anime illustration, high-quality Japanese anime art style, detailed background",
-            "Logo Design": "minimalist professional vector logo design, flat colors, icon style",
-            "Historical Epic": "grand historical epic movie style, majestic ancient atmosphere, rich cultural heritage textures",
-            "Rustic Village Life": "rustic traditional old village life, raw earthy tones, authentic rural setting, natural rustic lighting",
-            "Dark Gothic / Mystery": "moody dark gothic mystery, eerie misty atmosphere, shadows, dramatic cinematic suspense"
-        }
-        style_tag = style_boosters.get(style, "cinematic film style, highly detailed")
-        
+        # PROMPT BOOSTER ENGINE: Forcefully overrides default Western biases
         if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
-            if any(k in scene_lower for k in ["larki", "woman", "female", "girl", "عورت", "لڑکی", "زارا", "سارہ"]):
-                gender_booster = f"beautiful elegant Eastern woman, realistic facial features, wearing traditional modest cotton Shalwar Kameez {attire_desc or 'with clean dupatta elegantly draped over head as hijab'}, modest posture"
-            elif any(k in scene_lower for k in ["man", "male", "boy", "مرد", "لڑکا", "احمد", "علی", "بادشاہ"]):
-                gender_booster = f"handsome majestic Eastern man, realistic facial structure, wearing traditional modest cotton Shalwar Kameez {attire_desc or 'with high collar, short neat beard'}, strictly modest"
+            if "صبا" in scene_lower or "saba" in scene_lower or "woman" in scene_lower or "female" in scene_lower or "girl" in scene_lower:
+                gender_booster = (
+                    "beautiful elegant Eastern Pakistani Punjabi Pathan woman, realistic South Asian sharp facial features, "
+                    "wearing traditional modest cotton Shalwar Kameez with a clean modest Dupatta elegantly draped over her head as a hijab, "
+                    "extremely realistic, 8k resolution, highly detailed, strictly no western look, modest posture"
+                )
+            elif "عیسی" in scene_lower or "essa" in scene_lower or "man" in scene_lower or "male" in scene_lower or "boy" in scene_lower:
+                gender_booster = (
+                    "handsome majestic Eastern Pakistani Punjabi Pathan man, highly realistic South Asian facial structure, "
+                    "wearing a traditional modest cotton Shalwar Kameez with high collar, neat short Islamic beard, "
+                    "strictly no western look, photorealistic, 8k resolution"
+                )
+            else:
+                gender_booster = (
+                    "traditional modest Eastern Islamic attire, Shalwar Kameez, modest clothing, "
+                    "Pakistani/Arabian traditional South Asian features, strictly no western exposure"
+                )
         elif character_heritage == "Ancient Arabian":
-            gender_booster = f"wearing ancient traditional Arabian flowing robes {attire_desc}, desert turban, historic Middle Eastern facial features"
+            gender_booster = "wearing ancient traditional Arabian flowing historical robes, classic desert turban, historic Middle Eastern facial features"
         elif character_heritage == "Western / Modern":
-            gender_booster = f"modern stylish contemporary Western clothing {attire_desc}, jeans and jacket"
+            gender_booster = "modern stylish contemporary Western clothing, jeans and jacket"
         elif character_heritage == "Far Eastern":
-            gender_booster = f"traditional East Asian oriental attire {attire_desc}"
+            gender_booster = "traditional East Asian oriental attire"
 
         instruction = (
-            "You are an expert visual prompt writer. Translate and expand the Urdu scene into a detailed English prompt for Flux AI. \n"
-            "RULES:\n"
-            "1. Strictly enforce the chosen visual style. If style is 3D Cartoon, do NOT generate any realistic elements, keep it purely Pixar/Disney cartoon!\n"
-            "2. Keep character consistent: if consistent character description is provided, keep that exact character active in the frame.\n"
-            "3. NEGATIVE PROMPT: If the story is about animal characters, STRICTLY NO human characters, NO human faces, NO human boys or girls. Focus purely on the cute animal."
+            "You are an expert Hollywood visual artist and prompt engineer. "
+            "Analyze the Urdu scene and write a highly detailed visual English image prompt for the Flux model. \n"
+            "CRITICAL INSTRUCTIONS:\n"
+            "1. If 'Islamic Safety Filter' is Active and the text contains Islamic holy names (like Prophets/انبیاء, Sahaba/صحابہ, Auliya, Allah, Quran, or grave, heaven, hell), you MUST strictly avoid generating any human face or human body. Instead, generate a highly spiritual scene depicting glorious volumetric white and golden divine light rays emanating from a cosmic night sky, beautiful natural mountains, or ancient desert paths. No human silhouettes.\n"
+            "2. For human characters, strictly enforce gender separation. Do NOT mix genders. A female character (e.g. Saba) must have a beautiful, clean, feminine Eastern face. Absolutely NO facial hair, NO beards, and NO mustaches on females.\n"
+            "3. A male character (e.g. Essa) must have a handsome, masculine face with a neat short black beard.\n"
+            "4. All human characters must have realistic Middle Eastern, Pakistani, or Arabian features (no western default faces) and wear traditional modest clothing based on the heritage style.\n"
+            "5. STRICT CHARACTER CONSISTENCY: Keep the characters' face, hair, and look completely identical across scenes. If a male reference image URL is provided, copy the face and features of: {raw_male_url}. If a female reference image URL is provided, copy the face and features of: {raw_female_url}.\n"
+            "6. If both characters are mentioned, depict them as a distinct couple (one bearded man and one modest woman) interacting. Do NOT merge them into one body.\n"
+            "7. Describe the scene's exact environment (e.g. deep green jungle, flowing river, mud-houses, rain, storms, animals like lions/snakes in the foreground) with strong descriptive words so the image generator produces it precisely.\n"
+            "8. Write ONLY the final English prompt, with no conversational preamble or extra text."
         )
-        prompt_input = f"Urdu Scene: {urdu_scene}\nStyle: {style_tag}\n"
-        if consistent_char_desc:
-            prompt_input += f"Consistent Subject Memory (Main Character): {consistent_char_desc}\n"
-        if gender_booster: prompt_input += f"Attire/Gender Tags: {gender_booster}\n"
         
+        prompt_input = f"Urdu Scene: {urdu_scene}\n"
+        if char_memory:
+            prompt_input += f"Character Memory/Appearance override: {char_memory}\n"
+        if gender_booster:
+            prompt_input += f"FORCE GENDER AND ATTIRE STYLING TAGS: {gender_booster}\n"
+        if scene_memory:
+            prompt_input += f"Scene Environment/Background override: {scene_memory}\n"
+        if raw_male_url:
+            prompt_input += f"Male reference image URL: {raw_male_url}\n"
+        if raw_female_url:
+            prompt_input += f"Female reference image URL: {raw_female_url}\n"
+        if enable_islamic_filter:
+            prompt_input += "Islamic Safety Filter: Active\n"
+        else:
+            prompt_input += "Islamic Safety Filter: Inactive\n"
+
         formatted_instruction = instruction.replace("{raw_male_url}", raw_male_url or "None").replace("{raw_female_url}", raw_female_url or "None")
+
         url = f"https://text.pollinations.ai/{urllib.parse.quote(formatted_instruction + ' ' + prompt_input)}?model=openai"
         res = session.get(url, timeout=20)
         if res.status_code == 200:
             refined_p = res.text.strip()
             refined_p = re.sub(r'^(prompt:|visual prompt:|cinematic prompt:)\s*', '', refined_p, flags=re.IGNORECASE)
-            return f"{refined_p}, visual style: {style_tag}"
-    except: pass
-    return f"3D cartoon scene: {urdu_scene}, style: {style}, highly detailed, 8k"
+            return refined_p
+    except Exception:
+        pass
+    return f"Cinematic film scene: {urdu_scene}, highly detailed, 8k"
 
-# Clean, safe image enhancement without channel splits/distortions
+# Post-Processing Color LUT Grading Matrix Harmony
 def apply_color_lut_harmony(img_path, style_preset):
     try:
         with Image.open(img_path) as im:
             im = im.convert("RGB")
-            # Natural image enhancements (No channel distortion or artificial coloring)
-            im = ImageEnhance.Sharpness(im).enhance(1.15)
-            im = ImageEnhance.Contrast(im).enhance(1.05)
-            if style_preset == "3D Cartoon":
-                im = ImageEnhance.Color(im).enhance(1.10)
+            # Apply color tinting based on style preset mathematically
+            if style_preset in ["Realistic HD", "Cinematic Film"]:
+                r, g, b = im.split()
+                # Warm highlights, cool shadows (Teal & Orange cinematic grade)
+                r = r.point(lambda i: int(i * 1.05))
+                b = b.point(lambda i: int(i * 0.95))
+                im = Image.merge("RGB", (r, g, b))
             elif style_preset == "Dark Gothic / Mystery":
-                im = ImageEnhance.Color(im).enhance(0.75)
+                im = ImageEnhance.Color(im).enhance(0.7)
+                r, g, b = im.split()
+                b = b.point(lambda i: int(i * 1.10))
+                im = Image.merge("RGB", (r, g, b))
+            elif style_preset == "Historical Epic":
+                r, g, b = im.split()
+                r = r.point(lambda i: int(i * 1.08))
+                g = g.point(lambda i: int(i * 1.02))
+                b = b.point(lambda i: int(i * 0.90))
+                im = Image.merge("RGB", (r, g, b))
+            
+            # Pop contrast slightly for cinema density
+            im = ImageEnhance.Contrast(im).enhance(1.08)
             im.save(img_path, "JPEG")
-    except: pass
+    except Exception:
+        pass
 
+# Dynamic Sound Effects (SFX) Downloader & Path Mapper
 def download_scene_sfx(scene_text, u_id, idx):
     text = scene_text.lower()
     sfx_url = None
+    
+    # Sound mapping from reliable, fast-loading public sources
     if any(k in text for k in ["rain", "storm", "thunder", "clouds", "بارش", "طوفان"]):
         sfx_url = "https://www.soundjay.com/nature/sounds/rain-07.mp3"
     elif any(k in text for k in ["sword", "fight", "battle", "clash", "تلوار", "جنگ"]):
-        sfx_url = "https://www.soundjay.com/mechanical/sounds/cutlery-clink-1.mp3"
-    elif any(k in text for k in ["forest", "jungle", "birds", "nature", "درخت", "جنگل", "باغات", "باغ", "پرندے"]):
+        sfx_url = "https://www.soundjay.com/mechanical/sounds/cutlery-clink-1.mp3" # Metallic clink
+    elif any(k in text for k in ["forest", "jungle", "birds", "nature", "درخت", "جنگل"]):
         sfx_url = "https://www.soundjay.com/nature/sounds/forest-wind-1.mp3"
+    elif any(k in text for k in ["fire", "burn", "flame", "آگ"]):
+        sfx_url = "https://www.soundjay.com/nature/sounds/fire-1.mp3"
+    elif any(k in text for k in ["wind", "breeze", "ہوا"]):
+        sfx_url = "https://www.soundjay.com/nature/sounds/wind-howl-01.mp3"
         
     if sfx_url:
         sfx_filename = f"sfx_{u_id}_{idx}.mp3"
         try:
             res = session.get(sfx_url, timeout=10)
             if res.status_code == 200:
-                with open(sfx_filename, "wb") as f: f.write(res.content)
+                with open(sfx_filename, "wb") as f:
+                    f.write(res.content)
                 return sfx_filename
-        except: pass
+        except Exception:
+            pass
     return None
 
+# Cinematic Blurred Background Padding to eliminate raw black bars
 def apply_blurred_background_padding(img_path, target_w, target_h):
     try:
         with Image.open(img_path) as im:
@@ -433,152 +544,144 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
             im_ratio = im.width / im.height
             target_ratio = target_w / target_h
             if im_ratio > target_ratio:
-                new_w, new_h = target_w, int(target_w / im_ratio)
+                new_w = target_w
+                new_h = int(target_w / im_ratio)
             else:
-                new_w, new_h = int(target_h * im_ratio), target_h
+                new_h = target_h
+                new_w = int(target_h * im_ratio)
             fg = im.resize((new_w, new_h))
-            bg.paste(fg, ((target_w - new_w) // 2, (target_h - new_h) // 2))
+            px = (target_w - new_w) // 2
+            py = (target_h - new_h) // 2
+            bg.paste(fg, (px, py))
             bg.save(img_path, "JPEG")
-    except: pass
+    except Exception:
+        pass
 
-# Clean, safe, unified metallic backdrop failsafe (No glowing orbs or weird gradients)
-def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
-    if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
+# Parallel image downloader using ThreadPoolExecutor for 5x Speed boost
+def parallel_download_flux_images(urls, paths):
+    def download_single(url, path):
         try:
-            base = Image.new("RGB", (w, h), color=(15, 23, 42))
-            base.save(img_path, "JPEG")
-        except:
-            try: Image.new("RGB", (w, h), color=(20, 20, 20)).save(img_path, "JPEG")
-            except: pass
-
-def parallel_download_flux_images(urls, paths, sentences, w, h):
-    def download_single(i):
-        url, path, scene_text = urls[i], paths[i], sentences[i]
-        for attempt in range(2):
-            try:
-                res = session.get(url, timeout=20)
-                if res.status_code == 200 and len(res.content) > 5000:
-                    with open(path, "wb") as f: f.write(res.content)
-                    return True
-            except: pass
-            time.sleep(0.5)
-            
-        # Standard Fallbacks
-        simplified = "3D Pixar Disney style cartoon, colorful cute characters, bright happy environment, 8k"
-        if any(k in scene_text.lower() for k in ["چوزا", "chick", "بالٹی", "superhero"]):
-            simplified = "3D Pixar cute fluffy yellow chick wearing an upside-down red bucket on its head as superhero helmet, bright cartoon background"
-        elif any(k in scene_text.lower() for k in ["بلی", "cat", "بندر", "monkey", "طوطا", "parrot"]):
-            simplified = "3D cartoon scene with funny animals laughing together, stylized forest, vibrant cartoon style"
-        elif any(k in scene_text.lower() for k in ["ہنستے", "لوٹ پوٹ", "خرگوش", "rabbit"]):
-            simplified = "3D Pixar cartoon of cute animals laughing and rolling with joy in a beautiful bright green pasture"
-            
-        fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(simplified)}?width={w}&height={h}&nologo=true"
-        for attempt in range(2):
-            try:
-                res = session.get(fallback_url, timeout=15)
-                if res.status_code == 200 and len(res.content) > 5000:
-                    with open(path, "wb") as f: f.write(res.content)
-                    return True
-            except: pass
-            
-        ensure_image_exists(path, w, h, scene_text)
-        return False
-        
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        list(executor.map(download_single, range(len(urls))))
-
-def get_cached_bg_music(is_horror, is_epic):
-    fn = "bg_horror.mp3" if is_horror else ("bg_epic.mp3" if is_epic else "bg_standard.mp3")
-    url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" if is_horror else ("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" if is_epic else "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3")
-    cf = os.path.join(AUDIO_CACHE_DIR, fn)
-    if os.path.exists(cf) and os.path.getsize(cf) > 100000: return cf
-    try:
-        res = session.get(url, timeout=15, verify=False)
-        if res.status_code == 200:
-            with open(cf, "wb") as f: f.write(res.content)
-            return cf
-    except: pass
-    return None
-
-def download_video_safely(url, dest_path, progress_status):
-    try:
-        with session.get(url, stream=True, timeout=120) as r:
-            if r.status_code == 200:
-                with open(dest_path, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=1024*1024):
-                        if chunk: f.write(chunk)
+            res = session.get(url, timeout=40)
+            if res.status_code == 200:
+                with open(path, "wb") as f:
+                    f.write(res.content)
                 return True
-    except Exception as e:
-        progress_status.warning(f"Video download timeout ({e}). Falling back to Cinematic Zoom...")
-    return False
+        except Exception:
+            pass
+        return False
 
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(download_single, urls[i], paths[i]) for i in range(len(urls))]
+        concurrent.futures.wait(futures)
+
+# Motion control logic safely wrapped to prevent MoviePy engine crash
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
-    if not MOVIEPY_AVAILABLE: return None
-    ensure_image_exists(img_path, w, h, "Visualizing scene...")
     try:
         scale_factor = 1.30
+        
+        # Apply slight motion blur during rapid panning
         if motion in ["Whip Pan", "Tracking Shot"]:
             try:
                 with Image.open(img_path) as im_blur:
                     im_blur = im_blur.filter(ImageFilter.GaussianBlur(radius=1))
                     im_blur.save(img_path, "JPEG")
-            except: pass
+            except Exception:
+                pass
+
         base_clip = ImageClip(img_path).set_duration(duration).set_fps(24)
         cw, ch = int(w * scale_factor), int(h * scale_factor)
         clip = base_clip.resize((cw, ch))
         
-        motions_map = {
-            "Zoom In": lambda: clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center'),
-            "Zoom Out (v40 Default)": lambda: clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center'),
-            "Pan Left": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
-            "Pan Right": lambda: clip.set_position(lambda t: (int((w - cw) * (1 - t / duration)), 'center')),
-            "Pan Up": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))),
-            "Pan Down": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
-            "Dolly In": lambda: clip.resize(lambda t: 1.0 + 0.25 * (t / duration)).set_position('center'),
-            "Dolly Out": lambda: clip.resize(lambda t: 1.25 - 0.25 * (t / duration)).set_position('center'),
-            "Orbit Camera": lambda: clip.rotate(lambda t: -3 + 6 * (t / duration)).resize(lambda t: 1.1 + 0.1 * (t / duration)).set_position('center'),
-            "Crane Shot": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -2 * (t / duration)),
-            "Drone Shot": lambda: clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center'),
-            "Tracking Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5))))),
-            "Follow Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5))))),
-            "Handheld Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0)),
-            "Shoulder Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0)),
-            "Cinematic Reveal": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
-            "Whip Pan": lambda: clip.set_position(lambda t: (int((w - cw) * ((t / duration) ** 3)), 'center')),
-            "Tilt Up": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))),
-            "Tilt Down": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
-            "Roll Camera": lambda: clip.rotate(lambda t: 8 * (t / duration)).set_position('center'),
-            "Parallax Motion": lambda: clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
-            "Ken Burns Effect": lambda: clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
-            "Rack Focus": lambda: clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center'),
-            "Motion Blur": lambda: clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center')
-        }
-        try:
-            animated_clip = motions_map.get(motion, motions_map["Zoom Out (v40 Default)"])()
-            return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
-        except:
-            return ImageClip(img_path).set_duration(duration).resize((w, h))
-    except Exception as ex:
-        st.warning(f"Motion error '{motion}': {ex}. Falling back.")
-    try: return ImageClip(img_path).set_duration(duration).resize((w, h))
-    except: return ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).set_duration(duration)
+        animated_clip = None
+        
+        if motion == "Zoom In":
+            animated_clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
+        elif motion == "Zoom Out (v40 Default)":
+            animated_clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
+        elif motion == "Pan Left":
+            animated_clip = clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
+        elif motion == "Pan Right":
+            animated_clip = clip.set_position(lambda t: (int((w - cw) * (1 - t / duration)), 'center'))
+        elif motion == "Pan Up":
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration))))
+        elif motion == "Pan Down":
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
+        elif motion == "Dolly In" or motion == "Push In":
+            animated_clip = clip.resize(lambda t: 1.0 + 0.25 * (t / duration)).set_position('center')
+        elif motion == "Dolly Out" or motion == "Pull Out":
+            animated_clip = clip.resize(lambda t: 1.25 - 0.25 * (t / duration)).set_position('center')
+        elif motion == "Orbit Camera" or motion == "Arc Shot":
+            animated_clip = clip.rotate(lambda t: -3 + 6 * (t / duration)).resize(lambda t: 1.1 + 0.1 * (t / duration)).set_position('center')
+        elif motion == "Crane Shot":
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -2 * (t / duration))
+        elif motion == "Drone Shot":
+            animated_clip = clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center')
+        elif motion == "Tracking Shot" or motion == "Follow Shot":
+            # Tracking with micro vibration shake
+            animated_clip = clip.set_position(lambda t: (
+                int((w - cw) * (t / duration)),
+                int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5)))
+            ))
+        elif motion == "Handheld Camera" or motion == "Shoulder Camera":
+            # Pure manual handheld camera shake calculations
+            animated_clip = clip.set_position(lambda t: (
+                int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))),
+                int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7)))
+            )).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0))
+        elif motion == "Cinematic Reveal":
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
+        elif motion == "Whip Pan":
+            animated_clip = clip.set_position(lambda t: (int((w - cw) * ((t / duration) ** 3)), 'center'))
+        elif motion == "Tilt Up":
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration))))
+        elif motion == "Tilt Down":
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
+        elif motion == "Roll Camera":
+            animated_clip = clip.rotate(lambda t: 8 * (t / duration)).set_position('center')
+        elif motion == "Parallax Motion" or motion == "Ken Burns Effect":
+            animated_clip = clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
+        elif motion == "Rack Focus" or motion == "Motion Blur":
+            animated_clip = clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center')
+        else:
+            animated_clip = clip.set_position('center')
 
+        final_clip = CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
+        return final_clip
+    except Exception as ex:
+        st.warning(f"Error applying camera motion '{motion}': {ex}. Falling back to default centering.")
+    try:
+        return ImageClip(img_path).set_duration(duration).resize((w, h))
+    except Exception:
+        pass
+    return None
+
+# Safe transitions renderer
 def apply_clip_transition(clip, transition, duration):
     try:
-        fade_dur = min(0.3, duration / 3.0)
-        if transition in ["Cross Dissolve (Fade)", "Flash Transition (White Glow)", "Film Dissolve (Muted)"]:
-            return clip.fadein(fade_dur).fadeout(fade_dur)
-    except: pass
+        if transition == "Cross Dissolve (Fade)":
+            return clip.fadein(0.5).fadeout(0.5)
+        elif transition == "Flash Transition (White Glow)":
+            return clip.fadein(0.3).fadeout(0.3)
+        elif transition == "Film Dissolve (Muted)":
+            return clip.fadein(0.4).fadeout(0.4)
+        elif transition == "Instant Cut":
+            return clip
+    except Exception:
+        pass
     return clip
 
+# Image failover provider from pollination (Upgraded strictly to Flux for high definition features)
 def fetch_img_failover(prompt, w, h, seed):
     try:
         url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
         res = session.get(url, timeout=30)
-        if res.status_code == 200: return res.content
-    except: pass
+        if res.status_code == 200:
+            return res.content
+    except Exception:
+        pass
     return None
 
+# Text to speech async to sync wrapper
 def save_audio_safe(text, voice, rate, pitch, filename):
     try:
         async def amain():
@@ -590,44 +693,47 @@ def save_audio_safe(text, voice, rate, pitch, filename):
         st.error(f"Voice synthesis error: {e}")
         return False
 
-def apply_canva_typography(img_path, text):
+# High quality placeholder generator 
+def generate_high_quality_placeholder(w, h, seed, active_watermark):
     try:
-        with Image.open(img_path) as im:
-            im = im.convert("RGB")
-            draw = ImageDraw.Draw(im)
-            w, h = im.size
-            font_size = int(h * 0.04) if h * 0.04 > 16 else 16
-            try: font = ImageFont.load_default()
-            except: font = None
-            overlay = Image.new('RGBA', im.size, (0, 0, 0, 0))
-            draw_overlay = ImageDraw.Draw(overlay)
-            box_h = int(font_size * 2.5)
-            box_y = h - box_h - 25
-            draw_overlay.rounded_rectangle([30, box_y, w - 30, h - 25], radius=12, fill=(15, 23, 42, 200))
-            im = Image.alpha_composite(im.convert('RGBA'), overlay).convert('RGB')
-            ImageDraw.Draw(im).text((50, box_y + (box_h - font_size) // 2), text, fill=(255, 255, 255), font=font)
-            im.save(img_path, "JPEG")
-    except: pass
+        im = Image.new("RGB", (w, h), color=(30, 41, 59))
+        draw = ImageDraw.Draw(im)
+        if active_watermark:
+            draw.text((w - 140, h - 45), "Sglowina AI [S]", fill=(200, 200, 200))
+        img_byte_arr = io.BytesIO()
+        im.save(img_byte_arr, format='JPEG')
+        return img_byte_arr.getvalue()
+    except Exception:
+        return b""
 
 # ==========================================
-# 4. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & SEQUENCE LOCK)
+# 4. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & CHARACTER ID LOCK)
 # ==========================================
-def create_cinematic_v40_interactive(storyboard_scenes, ratio, style, seed, transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast"):
-    if not MOVIEPY_AVAILABLE:
-        st.error(f"MoviePy is not available on this server. Error: {MOVIEPY_ERROR}.")
-        return "Error"
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", advanced_params=None):
     u_id = str(uuid.uuid4())[:8]
+    
+    # CONCURRENCY QUEUE DECK: Safely parks excess render requests
     global active_renderers
     with render_lock:
         active_renderers += 1
         my_pos = active_renderers
+        
     status = st.empty()
     if my_pos > 2:
-        status.info(f"⏳ Waiting in Queue... Your Position: #{my_pos - 2}.")
+        status.info(f"⏳ Waiting in Queue... Your Position: #{my_pos - 2}. (High concurrency protection active to avoid server crash)")
         
     with render_semaphore:
-        with render_lock: active_renderers -= 1
+        with render_lock:
+            active_renderers -= 1
+            
         progress_bar = st.progress(0.0)
+        
+        audio_file = f"a_{u_id}.mp3"
+        bg_music_f = f"bg_{u_id}.mp3"
+        generated_images = []
+        generated_prompts = []
+        temporary_audio_tracks = []
+        has_bg_music = False
         
         user_db = get_user_data(st.session_state.logged_in_user)
         if not user_db:
@@ -643,508 +749,884 @@ def create_cinematic_v40_interactive(storyboard_scenes, ratio, style, seed, tran
             return "Error"
         
         active_watermark = True if user_type == "Free" else enable_watermark
-        raw_male_url = get_public_url(uploaded_male_img) if uploaded_male_img else None
-        raw_female_url = get_public_url(uploaded_female_img) if uploaded_female_img else None
         
+        raw_male_url = get_public_url(uploaded_male_img) if uploaded_male_img is not None else None
+        raw_female_url = get_public_url(uploaded_female_img) if uploaded_female_img is not None else None
+        
+        # MASTER API KEY RESOLVER: Auto fetches Master Key if user didn't enter one
         active_api_key = pollinations_key.strip()
         if not active_api_key:
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT value FROM system_config WHERE key = 'master_pollinations_key'")
             row = cursor.fetchone()
-            if row and row['value'].strip(): active_api_key = row['value'].strip()
+            if row and row['value'].strip():
+                active_api_key = row['value'].strip()
             conn.close()
-            
+        
         try:
             progress_bar.progress(0.05)
             status.info("🎙️ Processing Dialogue Voiceovers...")
             
-            total_scenes = len(storyboard_scenes)
-            clips = [None] * total_scenes
-            generated_prompts = [None] * total_scenes
-            img_paths = [None] * total_scenes
-            flux_prompt_urls = [None] * total_scenes
-            temporary_audio_tracks = [None] * total_scenes
-            generated_images = []
-            has_bg_music = False
-            cached_bg_path = None
+            # Segment script by Urdu sentences
+            sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
+            if not sentences: sentences = [story]
             
-            # 1. Dialogue Voiceover synthesis
-            for idx, sc in enumerate(storyboard_scenes):
-                voice_choice = "ur-PK-UzmaNeural" if "Uzma" in sc["voice"] else "ur-PK-AsadNeural"
+            clips = []
+            
+            # Sentence-Level Audio Sync Module: generate individual TTS files
+            for idx, scene in enumerate(sentences):
+                # Auto Dialogue Speaker Selector
+                if "صبا" in scene or "saba" in scene.lower():
+                    v_code_scene = "ur-PK-UzmaNeural" # Female voice actor
+                elif "عیسی" in scene or "essa" in scene.lower() or "awan" in scene.lower():
+                    v_code_scene = "ur-PK-AsadNeural" # Male voice actor
+                else:
+                    v_code_scene = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
+                    
                 sub_audio_path = f"a_{u_id}_{idx}.mp3"
-                if not save_audio_safe(sc["dialogue"], voice_choice, sc["voice_rate"], sc["voice_pitch"], sub_audio_path):
+                save_audio_success = save_audio_safe(scene, v_code_scene, rate, pitch, sub_audio_path)
+                if not save_audio_success:
                     raise Exception("Voice generation failed.")
-                temporary_audio_tracks[idx] = sub_audio_path
+                temporary_audio_tracks.append(sub_audio_path)
                 
             progress_bar.progress(0.12)
-            if enable_bg_music:
-                whole_text = " ".join([sc["dialogue"] for sc in storyboard_scenes])
-                is_horror = any(k in whole_text for k in ["قبر", "عذاب", "موت", "خوف", "جن", "grave", "death", "scary", "ghost"])
-                is_epic = any(k in whole_text for k in ["بادشاہ", "تخت", "محل", "سلطنت", "king", "queen", "throne", "palace"])
-                cached_bg_path = get_cached_bg_music(is_horror, is_epic)
-                if cached_bg_path and os.path.exists(cached_bg_path): has_bg_music = True
-                
-            progress_bar.progress(0.18)
-            res_map = {"YouTube (16:9)": (1280, 720), "TikTok/Reels (9:16)": (720, 1280), "Instagram (1:1)": (720, 720)}
-            w, h = res_map.get(ratio, (1280, 720))
-            w, h = make_even(w), make_even(h)
             
-            # 2. Setup prompts and fallbacks
-            for i, sc in enumerate(storyboard_scenes):
-                refined_p = sc["flux_prompt"]
-                generated_prompts[i] = refined_p
+            # DOWNLOADING BACKGROUND MUSIC TRACK (CDN hosted stable tracks)
+            if enable_bg_music:
+                status.info("🎵 Downloading Atmospheric Background Track...")
+                story_lower = story.lower()
+                is_horror = any(k in story_lower or k in story for k in ["قبر", "عذاب", "موت", "خوفناک", "خوف", "جن", "بھوت", "تاریک", "ڈراؤنی", "grave", "torment", "punishment", "scary", "ghost", "dark", "death", "screaming", "blood", "bloody", "horror"])
+                is_epic = any(k in story_lower or k in story for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "شاہی", "تاریخ", "بہادر", "king", "queen", "throne", "palace", "empire", "warrior", "brave", "history", "castle"])
                 
-                if "Real AI Video" in gen_mode and active_api_key:
-                    status.info(f"🎥 Rendering Video Scene {i+1}/{total_scenes} via {video_model}...")
-                    aspect_ratio_param = "16:9" if "16:9" in ratio else "9:16"
-                    motion_prompt = f"high motion, realistic physics movement, wind blowing, {refined_p}"
-                    vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt[:400])}?model={video_model}&aspectRatio={aspect_ratio_param}&key={active_api_key}&duration=4"
+                if is_horror:
+                    bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
+                elif is_epic:
+                    bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
+                else:
+                    bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
                     
-                    vid_path = f"v_{u_id}_{i}.mp4"
-                    if download_video_safely(vid_url, vid_path, status):
-                        try:
-                            scene_voice_clip = AudioFileClip(temporary_audio_tracks[i])
-                            dur_scene = scene_voice_clip.duration
-                            clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_scene)
-                            
-                            sfx_file = download_scene_sfx(sc["dialogue"], u_id, i)
-                            if sfx_file and os.path.exists(sfx_file):
-                                sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
-                                clip = clip.set_audio(CompositeAudioClip([scene_voice_clip.volumex(1.2), sfx_audio]))
-                                generated_images.append(sfx_file)
-                            else:
-                                clip = clip.set_audio(scene_voice_clip.volumex(1.2))
-                            
-                            clips[i] = apply_clip_transition(clip, transition_style, dur_scene)
-                            generated_images.append(vid_path)
-                            continue
-                        except Exception as e:
-                            st.warning(f"Video clip loading failed: {e}. Switching to photo fallback...")
+                try:
+                    res_bg = requests.get(bg_url, timeout=12, headers=headers_browser)
+                    if res_bg.status_code == 200:
+                        with open(bg_music_f, 'wb') as f:
+                            f.write(res_bg.content)
+                        has_bg_music = True
+                except Exception as bg_ex:
+                    st.warning(f"Background music skipped due to CDN timeout: {bg_ex}")
+                    
+            progress_bar.progress(0.18)
+            
+            res_map = {
+                "YouTube (16:9)": (1280, 720), 
+                "TikTok/Reels (9:16)": (720, 1280), 
+                "Instagram (1:1)": (720, 720),
+                "CinemaScope (21:9)": (1680, 720),
+                "Standard Box (4:3)": (1024, 768)
+            }
+            w, h = res_map[ratio]
+            
+            w = make_even(w)
+            h = make_even(h)
+            
+            # PREPARE CINEMATIC PROMPTS FOR ALL SCENES
+            flux_prompt_urls = []
+            img_paths = []
+            
+            for i, scene in enumerate(sentences):
+                english_scene = translate_ur_to_en_enhanced(scene)
                 
-                w_target, h_target = make_even(w * 1.25), make_even(h * 1.25)
-                flux_prompt_urls[i] = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i * 17}&nologo=true&model=flux"
-                img_paths[i] = f"i_{u_id}_{i}.jpg"
+                is_spiritual = False
+                if enable_islamic_filter:
+                    is_spiritual, safe_scene_en = apply_islamic_safety_filter(english_scene, scene)
+                    if is_spiritual:
+                        english_scene = safe_scene_en
+                
+                dir_settings = analyze_scene_for_director(english_scene)
+                if camera_motion != "AI Hollywood Director (Auto)":
+                    dir_settings["motion"] = camera_motion
+                    
+                active_motion = dir_settings["motion"]
+                
+                # Build smart descriptive prompt with Flux optimized composition, dual reference images, and heritage override rules
+                refined_p = generate_enhanced_cinematic_prompt(
+                    urdu_scene=scene,
+                    char_memory=char_desc,
+                    scene_memory=scene_desc,
+                    character_heritage=character_heritage,
+                    enable_islamic_filter=enable_islamic_filter,
+                    raw_male_url=raw_male_url,
+                    raw_female_url=raw_female_url
+                )
+                
+                if not is_spiritual:
+                    refined_p += " [Avoid cross-gender blending, absolutely no woman with beard, absolutely no female with facial hair, anatomically perfect, symmetrical eyes, detailed limbs]"
+                
+                refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}, cinematic film look"
+                generated_prompts.append(refined_p)
+                
+                # --- Real AI Video Video Mode (WAN-FAST & Image-to-Video References) ---
+                if "Real AI Video" in gen_mode and active_api_key:
+                    status.info(f"🎥 Rendering 3D Video Frame {i+1} via Wan-Fast API...")
+                    aspect_ratio_param = "16:9" if "16:9" in ratio else "9:16"
+                    vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(refined_p)}?model=wan-fast&aspectRatio={aspect_ratio_param}&key={active_api_key}&duration=4"
+                    
+                    # Direct starting frame reference injection for image to video
+                    ref_url = None
+                    if "Saba" in scene or "saba" in scene.lower() or "female" in scene.lower():
+                        ref_url = raw_female_url if raw_female_url else raw_male_url
+                    else:
+                        ref_url = raw_male_url if raw_male_url else raw_female_url
+                        
+                    if ref_url:
+                        vid_url += f"&image={urllib.parse.quote(ref_url)}"
+                        
+                    vid_path = f"v_{u_id}_{i}.mp4"
+                    try:
+                        res_vid = session.get(vid_url, timeout=90)
+                        if res_vid.status_code == 200:
+                            with open(vid_path, "wb") as f_vid:
+                                f_vid.write(res_vid.content)
+                            clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_per)
+                            clip = apply_clip_transition(clip, transition_style, dur_per)
+                            clips.append(clip)
+                            generated_images.append(vid_path) 
+                            continue
+                    except Exception:
+                        st.warning(f"Video API failed, falling back to static photo...")
+                
+                w_target = make_even(w * 1.25)
+                h_target = make_even(h * 1.25)
+                
+                # Maintain strict seed alignment to guarantee absolute face consistency across frames
+                unique_seed = seed
+                
+                img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={unique_seed}&nologo=true&model=flux"
+                flux_prompt_urls.append(img_url)
+                
+                img_path = f"i_{u_id}_{i}.jpg"
+                img_paths.append(img_path)
+                generated_images.append(img_path)
                 
             progress_bar.progress(0.25)
-            indices_needing_images = [idx for idx, c in enumerate(clips) if c is None]
-            if indices_needing_images:
-                status.info("🎨 Downloading Visual Frames (Flux Optimization Active)...")
-                parallel_download_flux_images(
-                    [flux_prompt_urls[idx] for idx in indices_needing_images],
-                    [img_paths[idx] for idx in indices_needing_images],
-                    [storyboard_scenes[idx]["dialogue"] for idx in indices_needing_images], w, h
-                )
-                for idx in indices_needing_images:
-                    if img_paths[idx]: generated_images.append(img_paths[idx])
+            status.info("🎨 Running Parallel Flux Image Downloaders (5x Speed Optimization Active)...")
+            
+            # ASYNC PARALLEL IMAGE DOWNLOADING
+            parallel_download_flux_images(flux_prompt_urls, img_paths)
             
             progress_bar.progress(0.45)
-            status.info("🎞️ Stitching final elements together...")
+            status.info("🎞️ Assembling Audio Syncing and Camera Motions...")
             
-            for i in range(total_scenes):
-                if clips[i] is not None: continue
+            # ASSEMBLE CLIPS WITH EXACT VOICE SYNCHRONIZATION AND EFFECTS
+            for i, scene in enumerate(sentences):
+                # Skip if already rendered as real AI video above
+                if len(clips) > i:
+                    continue
+                    
                 img_path = img_paths[i]
                 sub_audio_path = temporary_audio_tracks[i]
-                sc = storyboard_scenes[i]
                 
-                ensure_image_exists(img_path, w, h, sc["dialogue"])
+                # Apply Color LUT matrix harmony on the downloaded frame
                 apply_color_lut_harmony(img_path, style)
+                
+                # Apply Blurred padding to completely eliminate black bars
                 apply_blurred_background_padding(img_path, make_even(w * 1.25), make_even(h * 1.25))
                 
+                # Read exact sub clip voiceover duration
                 scene_voice_clip = AudioFileClip(sub_audio_path)
                 dur_scene = scene_voice_clip.duration
                 
-                clip = apply_camera_motion_v40(img_path, sc["motion"], dur_scene, w, h)
-                if clip is None:
-                    try: clip = ImageClip(img_path).set_duration(dur_scene).resize((w, h))
-                    except: clip = ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).set_duration(dur_scene)
+                # Determine camera motion for this clip
+                english_scene_temp = translate_ur_to_en_enhanced(scene)
+                dir_settings = analyze_scene_for_director(english_scene_temp)
+                if camera_motion != "AI Hollywood Director (Auto)":
+                    dir_settings["motion"] = camera_motion
+                active_motion = dir_settings["motion"]
                 
-                sfx_file = download_scene_sfx(sc["dialogue"], u_id, i)
+                # Compile video motion frame
+                clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h)
+                
+                # Download and mix scene environmental SFX
+                sfx_file = download_scene_sfx(scene, u_id, i)
                 if sfx_file and os.path.exists(sfx_file):
-                    sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
-                    clip = clip.set_audio(CompositeAudioClip([scene_voice_clip.volumex(1.2), sfx_audio]))
-                    generated_images.append(sfx_file)
+                    try:
+                        sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
+                        clip_composite_audio = CompositeAudioClip([scene_voice_clip, sfx_audio])
+                        clip = clip.set_audio(clip_composite_audio)
+                        generated_images.append(sfx_file)
+                    except Exception:
+                        clip = clip.set_audio(scene_voice_clip)
                 else:
-                    clip = clip.set_audio(scene_voice_clip.volumex(1.2))
+                    clip = clip.set_audio(scene_voice_clip)
                     
-                clips[i] = apply_clip_transition(clip, transition_style, dur_scene)
+                clip = apply_clip_transition(clip, transition_style, dur_scene)
+                clips.append(clip)
                 
             progress_bar.progress(0.70)
-            valid_clips = [c for c in clips if c is not None]
-            if not valid_clips: raise Exception("No valid scenes were generated.")
+            status.info("🎞️ Stitching final video elements...")
             
-            final_video = concatenate_videoclips(valid_clips, method="compose").resize((w, h))
-            if has_bg_music and cached_bg_path:
+            final_video = concatenate_videoclips(clips, method="compose").resize((w, h))
+            
+            # OVERLAY GLOBAL BACKGROUND MUSIC IN FINAL MASTER MIX (Guaranteed to play)
+            if has_bg_music and os.path.exists(bg_music_f):
                 try:
-                    # Smart Audio Ducking during mix
-                    bg_track = AudioFileClip(cached_bg_path).volumex(0.03).set_duration(final_video.duration)
-                    final_video = final_video.set_audio(CompositeAudioClip([final_video.audio, bg_track]))
-                except Exception as e: st.warning(f"Background music error: {e}")
-                
+                    bg_track = AudioFileClip(bg_music_f).volumex(0.06).set_duration(final_video.duration)
+                    combined_master_audio = CompositeAudioClip([final_video.audio, bg_track])
+                    final_video = final_video.set_audio(combined_master_audio)
+                except Exception as e:
+                    st.warning(f"Background music mixing warning: {e}")
+                    
             out_name = f"Sglowina_{u_id}.mp4"
-            write_kwargs = {"codec": "libx264", "audio_codec": "aac", "fps": 24, "ffmpeg_params": ["-pix_fmt", "yuv420p"]}
-            try: final_video.write_videofile(out_name, logger=None, **write_kwargs)
-            except: final_video.write_videofile(out_name, verbose=False, **write_kwargs)
+            
+            # Video compilation
+            final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
             
             final_video.close()
+            
+            # CLEANUP TEMPORARY FILES to save server disk space
             for sub_voice in temporary_audio_tracks:
-                try: os.remove(sub_voice)
-                except: pass
-            for file_p in generated_images:
                 try:
-                    if file_p != cached_bg_path: os.remove(file_p)
+                    if os.path.exists(sub_voice): os.remove(sub_voice)
                 except: pass
+                
+            try:
+                if os.path.exists(audio_file): os.remove(audio_file)
+                if os.path.exists(bg_music_f): os.remove(bg_music_f)
+                for file_p in generated_images:
+                    if os.path.exists(file_p): os.remove(file_p)
+            except Exception:
+                pass
                 
             progress_bar.progress(1.0)
             status.success("🚀 Video Generated Successfully!")
             
+            # Database log
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("INSERT INTO projects (id, user_id, project_name, type, file_path, prompt, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                           (u_id, user_id, f"Video Project {u_id}", "Video", out_name, " | ".join([p for p in generated_prompts if p]), time.strftime("%Y-%m-%d %H:%M:%S")))
+                           (u_id, user_id, f"Video Project {u_id}", "Video", out_name, " | ".join(generated_prompts), time.strftime("%Y-%m-%d %H:%M:%S")))
             conn.commit()
-            backup_db_to_json()
             conn.close()
             
             deduct_user_credits(st.session_state.logged_in_user, 15)
             log_credit_usage(user_id, "Video Generation", 15, user_credits - 15)
+            
             return out_name
-        except Exception as e:
+        except Exception as e: 
             for sub_voice in temporary_audio_tracks:
-                try: os.remove(sub_voice)
-                except: pass
-            for file_p in generated_images:
                 try:
-                    if file_p != cached_bg_path: os.remove(file_p)
+                    if os.path.exists(sub_voice): os.remove(sub_voice)
                 except: pass
+            try:
+                if os.path.exists(audio_file): os.remove(audio_file)
+                if os.path.exists(bg_music_f): os.remove(bg_music_f)
+                for file_p in generated_images:
+                    if os.path.exists(file_p): os.remove(file_p)
+            except: pass
             progress_bar.empty()
             return f"Error Details: {e}"
-        finally: gc.collect()
+        finally:
+            gc.collect()
 
 # ==========================================
-# 5. UI SYSTEM STYLE (Streamlit Theme Sync)
+# 5. UI & PREMIUM BRANDING STYLING (V2.1)
 # ==========================================
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;500;700;900&display=swap');
     
-    .stApp { background: #f8fafc !important; color: #0f172a !important; font-family: 'Inter', sans-serif; }
-    
-    /* SHIMMERING GLOW PINK-BLUE GRADIENT METALLIC TITLE */
-    .glow-title { 
-        font-size: 2.2rem; font-weight: 900; text-align: center; font-family: 'Orbitron', sans-serif;
-        background: linear-gradient(135deg, #00f0ff, #ff007f, #00f0ff); background-size: 200% auto;
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        animation: shimmerGlow 3s infinite linear; margin-top: 15px; margin-bottom: 5px; letter-spacing: 5px;
-        filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
+    .stApp { 
+        background-color: #ffffff !important; 
+        color: #000000 !important; 
+        font-family: 'Inter', sans-serif; 
     }
     
+    /* شاندار چمکدار نیون پنک اور الیکٹرک بلیو لائٹنگ ٹائٹل کے لیے (صحیح سائز 2.2rem پر بحال) */
+    .glow-title { 
+        font-size: 2.2rem; 
+        font-weight: 900; 
+        text-align: center;
+        font-family: 'Orbitron', sans-serif;
+        background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 0 0 15px rgba(255, 0, 122, 0.2);
+        margin-top: 15px;
+        margin-bottom: 5px;
+        letter-spacing: 2px;
+    }
+
     .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
     
-    /* RADIAL GLOW METALLIC SPINNING CONTAINER */
     .circular-s {
-        width: 100px; height: 100px; background: radial-gradient(circle, #020617 40%, #1e1b4b 100%) !important;
+        width: 120px; height: 120px; 
+        background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff) !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        border: 4px solid #00f0ff !important; box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
-        animation: rotateSpins 10s infinite linear, electricGlow 3s infinite alternate;
+        font-family: 'Orbitron', sans-serif; font-size: 50px; color: #ffffff !important;
+        border: 5px solid #ffffff !important;
+        box-shadow: 0 0 50px #ff007a, inset 0 0 20px #ffffff;
+        animation: rotateShua 4s infinite linear, lightningGlow 1.5s infinite alternate;
     }
     
-    /* SHIMMERING GLOW METALLIC 'S' TEXT */
-    .metallic-s {
-        font-family: 'Orbitron', sans-serif; font-size: 55px; font-weight: 900;
-        background: linear-gradient(135deg, #ff007f, #00f0ff, #ff007f); background-size: 200% auto;
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.8)); animation: shimmerGlow 3s infinite linear;
+    @keyframes rotateShua {
+        0% { transform: perspective(1000px) rotateY(0deg); }
+        100% { transform: perspective(1000px) rotateY(360deg); }
+    }
+    @keyframes lightningGlow {
+        0%, 100% { box-shadow: 0 0 25px #2563eb, 0 0 50px #ff007a, inset 0 0 15px #ffffff; }
+        50% { box-shadow: 0 0 50px #ff007a, 0 0 80px #00d4ff, inset 0 0 25px #ffffff; }
+    }
+
+    .stButton>button { 
+        background: #000000 !important; 
+        color: white !important; 
+        border-radius: 12px !important; 
+        height: 55px; 
+        width: 100%; 
+        font-size: 20px; 
+        font-weight: bold; 
+        border: none; 
     }
     
-    @keyframes rotateSpins {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+    [data-testid="stSidebar"] { 
+        background-color: #ffffff !important; 
+        border-right: 1px solid #e2e8f0; 
     }
-    @keyframes electricGlow {
-        0%, 100% {
-            box-shadow: 0 0 20px rgba(0, 240, 255, 0.6), 0 0 40px rgba(255, 0, 127, 0.4);
-            border-color: #00f0ff !important;
-        }
-        50% {
-            box-shadow: 0 0 35px rgba(255, 0, 127, 0.9), 0 0 70px rgba(0, 240, 255, 0.7);
-            border-color: #ff007f !important;
-        }
-    }
-    @keyframes shimmerGlow {
-        0% {
-            text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(255, 0, 127, 0.5);
-            background-position: 0% 50%;
-        }
-        50% {
-            text-shadow: 0 0 25px rgba(255, 0, 127, 1), 0 0 45px rgba(0, 240, 255, 0.8);
-            background-position: 100% 50%;
-        }
-        100% {
-            text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(255, 0, 127, 0.5);
-            background-position: 0% 50%;
-        }
+    [data-testid="stSidebar"] * { 
+        color: #000000 !important; 
+        font-weight: bold !important; 
     }
     
-    .stButton>button, .stFormSubmitButton>button { 
-        background: linear-gradient(90deg, #2563eb, #1d4ed8) !important; color: white !important; 
-        border-radius: 12px !important; height: 55px !important; width: 100% !important; 
-        font-size: 20px !important; font-weight: bold !important; border: 1px solid #3b82f6 !important;
-        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.2) !important;
+    div[data-baseweb="textarea"] textarea, div[data-baseweb="input"] input {
+        background-color: #f8fafc !important;
+        color: #0f172a !important;
+        border: 2px solid #cbd5e1 !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+        transition: all 0.3s ease !important;
     }
-    textarea, input, select, .stTextArea textarea, .stTextInput input {
-        background-color: #ffffff !important; color: #0f172a !important; 
-        border: 2px solid #cbd5e1 !important; border-radius: 10px !important;
+    div[data-baseweb="textarea"] textarea:focus, div[data-baseweb="input"] input:focus {
+        border-color: #00d4ff !important;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.2) !important;
+        background-color: #ffffff !important;
     }
-    label, [data-testid="stWidgetLabel"] p { color: #1e3a8a !important; font-weight: 700 !important; }
+    div[data-baseweb="textarea"] textarea::placeholder, div[data-baseweb="input"] input::placeholder {
+        color: #64748b !important;
+        opacity: 1 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="glow-title">Sglowina AI Dashboard</div>', unsafe_allow_html=True)
-st.markdown('<div class="logo-container"><div class="circular-s"><span class="metallic-s">S</span></div></div>', unsafe_allow_html=True)
+st.markdown('<div class="glow-title">SGLOWINA AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
 
-# Tabs Initialization
+# ==========================================
+# 6. UI NAVIGATION & CONTROL PANEL
+# ==========================================
 tab_auth, tab_chat, tab_movie, tab_image, tab_enterprise = st.tabs([
-    "🔑 Sign In", "💬 Electric AI Chat", "🎬 Pro Movie Studio", "🎨 Pro Image Studio", "👤 Enterprise Center"
+    "🔑 Sign In & Registrations",
+    "💬 Electric AI Chat", 
+    "🎬 Pro Master Studio", 
+    "🎨 Pro Image Studio",
+    "👤 Enterprise Center"
 ])
 
-# Sign-In Form
+# -----------------
+# TAB 1: AUTHENTICATION
+# -----------------
 with tab_auth:
-    st.write("### 🔑 Sglowina Secure Authentication")
+    st.write("### 🔑 Sglowina Secure Authentication Portal")
     auth_mode = st.radio("Choose Action", ["Sign In", "Create New Account"])
-    with st.form("auth_form"):
-        u_name = st.text_input("Username")
-        u_email = st.text_input("Email (only for registration)") if auth_mode != "Sign In" else ""
-        p_word = st.text_input("Password", type="password")
-        btn_submit = st.form_submit_button("Submit 🚀")
-        if btn_submit:
-            if auth_mode == "Sign In":
+    
+    if auth_mode == "Sign In":
+        with st.form("login_form"):
+            u_name = st.text_input("Username")
+            p_word = st.text_input("Password", type="password")
+            btn_login = st.form_submit_button("Sign In 🚀")
+            if btn_login:
                 if authenticate_user(u_name, p_word):
                     st.session_state.logged_in_user = u_name.strip().lower()
-                    u_data = get_user_data(u_name)
-                    if u_data and u_data['role'] == 'Admin':
-                        st.success("خوش آمدید! Sglowina AI پر دوبارہ آمد مبارک ہو، محمد عیسیٰ اعوان اور صبا واحد! 🟢")
+                    if st.session_state.logged_in_user in ["essasaba", "essa_awan", "saba_wahid"]:
+                        st.success("Welcome back to SGLOWINA AI, Muhammad Essa Awan & Saba Wahid! (Admin Authorized) 🟢")
                     else:
-                        st.success("Welcome to Sglowina AI! 🟢")
-                    time.sleep(2)
+                        st.success(f"Welcome to SGLOWINA AI, {u_name}! (Authorized User) 🟢")
+                    time.sleep(1.5)
                     st.rerun()
-                else: st.error("Invalid credentials.")
-            else:
-                success, msg = register_saas_user(u_name, u_email, p_word)
-                if success: st.success(msg)
-                else: st.error(msg)
+                else:
+                    st.error("Invalid credentials.")
+    else:
+        with st.form("reg_form"):
+            new_u = st.text_input("Choose Username")
+            new_e = st.text_input("Email Address")
+            new_p = st.text_input("Password", type="password")
+            btn_reg = st.form_submit_button("Register Account 🎯")
+            if btn_reg:
+                if new_u and new_e and new_p:
+                    success, msg = register_saas_user(new_u, new_e, new_p)
+                    if success:
+                        st.success(f"Welcome to SGLOWINA AI! Account for '{new_u}' registered successfully. Please sign in. 🟢")
+                    else:
+                        st.error(msg)
+                else:
+                    st.warning("Please fill out all fields.")
 
-# Chat Bot
+# -----------------
+# TAB 2: CHAT INTERACTION
+# -----------------
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
     for m in st.session_state.msgs:
         with st.chat_message(m["role"]): st.write(m["content"])
-    if p := st.chat_input("How can I help you today?"):
+    if p := st.chat_input("How can I help you?"):
         st.session_state.msgs.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
-        res = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true").text
-        translated_res = res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
+        res = SGLOWINA_BIO if any(k in p.lower() for k in ["kisne", "who made", "owner", "essa", "saba"]) else requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true").text
         with st.chat_message("assistant"):
-            st.write(translated_res)
-            st.session_state.msgs.append({"role": "assistant", "content": translated_res})
+            translated_response = res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
+            st.write(translated_response)
+            st.session_state.msgs.append({"role": "assistant", "content": translated_response})
 
-# Pro Movie Studio
+# -----------------
+# TAB 3: PRO MOVIE STUDIO
+# -----------------
 with tab_movie:
-    st.write("### 🎥 Movie Studio")
-    gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"])
-    pollinations_key = st.text_input("Enter Pollinations API Key (if using video mode):", type="password") if "Real AI Video" in gen_mode else ""
-    m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
-    enable_islamic_filter = st.checkbox("Enable Islamic Safety Filter 🛡️", value=True)
+    st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
     
+    st.subheader("⚙️ AI Generation Mode")
+    gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"])
+    pollinations_key = ""
+    if "Real AI Video" in gen_mode:
+        pollinations_key = st.text_input("Enter Pollinations API Key (sk_* or pk_*):", type="password")
+        
+        with st.expander("🔑 Pollinations AI API Key حاصل کرنے کا طریقہ (Guide)"):
+            st.markdown("""
+            1. سب سے پہلے **[Pollinations AI کے آفیشل پورٹل](https://enter.pollinations.ai/)** پر جائیں۔
+            2. اگر آپ کا اکاؤنٹ نہیں ہے تو **Sign Up** کریں، ورنہ اپنے اکاؤنٹ میں **Log In** کریں۔
+            3. لاگ اِن کرنے کے بعد **API Keys** یا **Developer** سیکشن پر جائیں، وہاں سے ایک نئی API Key تخلیق کریں اور اسے کاپی کر لیں۔
+            4. کاپی کی گئی Key کو اوپر دیے گئے **Enter Pollinations API Key** والے باکس میں پیسٹ کریں۔
+            5. آپ کے اکاؤنٹ میں روزانہ کے مفت کریڈٹس (Daily Free Credits) شامل ہوں گے، جنہیں آپ لائیو ویڈیو بنانے کے لیے استعمال کر سکتے ہیں۔
+            6. اگر آپ کے پاس API Key نہیں ہے یا کریڈٹس ختم ہو جائیں، تو پریشان نہ ہوں! ہماری ایپ خودکار طور پر **Cinematic Photo Zoom & Pan (Free Mode)** پر واپس چلی جائے گی، جس سے آپ کی ویڈیو جنریشن کبھی بند نہیں ہوگی۔
+            """)
+
+    m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
+    
+    # Islamic and Spiritual Safety Filter Toggle
+    enable_islamic_filter = st.checkbox("Enable Islamic & Spiritual Safety Filter (حرمتِ انبیاء و اولیاء فلٹر) 🛡️", value=True, help="اگر کہانی میں اولیاء اللہ، انبیاء، قبر، جنت، جہنم یا صحابہ کا ذکر ہو تو یہ فلٹر خودکار طور پر چہرے بنانے کے بجائے روحانی نور اور تجلی دکھائے گا تا کہ بے ادبی نہ ہو۔")
+    
+    # Simple, high-impact Character & Scene Memory override inputs
+    char_desc = st.text_input("Character Memory (مرد یا عورت کا تفصیلی حلیہ):", 
+                              placeholder="Example: Saba is a 25-year-old beautiful Eastern woman wearing a modest dark blue hijab")
+    
+    # DUAL IMAGE UPLOADERS: Male and Female characters separately
+    st.write("##### 👤 Consistent Character Identity References (کرداروں کے چہروں کی تصاویر)")
     col_up1, col_up2 = st.columns(2)
-    with col_up1: uploaded_male_img = st.file_uploader("Upload Male Reference Image:", type=["jpg", "png", "jpeg"])
-    with col_up2: uploaded_female_img = st.file_uploader("Upload Female Reference Image:", type=["jpg", "png", "jpeg"])
+    with col_up1:
+        uploaded_male_img = st.file_uploader("Upload Male Character Reference Image (مرد کردار کی تصویر):", type=["jpg", "png", "jpeg"])
+        if uploaded_male_img is not None:
+            st.image(uploaded_male_img, caption="Male Identity Loaded ✅", width=120)
+    with col_up2:
+        uploaded_female_img = st.file_uploader("Upload Female Character Reference Image (عورت کردار کی تصویر):", type=["jpg", "png", "jpeg"])
+        if uploaded_female_img is not None:
+            st.image(uploaded_female_img, caption="Female Identity Loaded ✅", width=120)
+        
+    scene_desc = st.text_input("Scene Memory (جنگل، موسم، ماحول، جانور):", 
+                              placeholder="Example: Deep green ancient forest, high realistic trees, thick foliage, dark stormy night")
 
     mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9 = st.columns(9)
     with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
-    with mc2: mv_rate = st.selectbox("Voice Speed:", ["-10% (Slow)", "+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)"])
-    with mc3: mv_pitch = st.selectbox("Voice Pitch:", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
-    with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    with mc5: ms = st.selectbox("Style:", ["3D Cartoon", "Realistic HD", "Cinematic Film", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
-    with mc6: camera_motion = st.selectbox("Camera Motion:", ["AI Hollywood Director (Auto)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out", "Orbit Camera", "Crane Shot", "Drone Shot", "Tracking Shot", "Follow Shot", "Handheld Camera", "Shoulder Camera", "Cinematic Reveal", "Whip Pan", "Tilt Up", "Tilt Down", "Roll Camera", "Parallax Motion", "Ken Burns Effect", "Rack Focus", "Motion Blur"])
-    with mc7: transition_style = st.selectbox("Transition Effect:", ["Cross Dissolve (Fade)", "Instant Cut"])
-    with mc8: video_model = st.selectbox("AI Video Model:", ["wan-fast", "seedance", "veo"])
+    with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
+    with mc3: mv_pitch = st.selectbox("Voice Pitch (بھاری پن):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
+    with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
+    with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
+    with mc6: camera_motion = st.selectbox("Camera Motion:", [
+        "AI Hollywood Director (Auto)",
+        "Zoom Out (v40 Default)",
+        "Zoom In",
+        "Pan Left",
+        "Pan Right",
+        "Pan Up",
+        "Pan Down",
+        "Dolly In",
+        "Dolly Out",
+        "Orbit Camera",
+        "Crane Shot",
+        "Drone Shot",
+        "Tracking Shot",
+        "Follow Shot",
+        "Push In",
+        "Pull Out",
+        "Arc Shot",
+        "Handheld Camera",
+        "Shoulder Camera",
+        "Cinematic Reveal",
+        "Whip Pan",
+        "Tilt Up",
+        "Tilt Down",
+        "Roll Camera",
+        "Parallax Motion",
+        "Ken Burns Effect",
+        "Rack Focus"
+    ])
+    with mc7: transition_style = st.selectbox("Transition Effect:", ["Cross Dissolve (Fade)", "Flash Transition (White Glow)", "Film Dissolve (Muted)", "Instant Cut"])
+    with mc8: character_heritage = st.selectbox("Cultural Heritage (مشرقی یا مغربی لباس):", ["Automatic", "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)", "Ancient Arabian", "Western / Modern", "Far Eastern"])
     with mc9: sd = st.number_input("Character Seed:", value=786)
     
-    col_st1, col_st2 = st.columns(2)
-    with col_st1:
-        if st.button("Step 1: Draft Interactive Storyboard 📝"):
-            if len(m_script.strip()) > 5:
-                raw_sentences = [s.strip() for s in re.split(r'[۔\n.!|?()؛;]', m_script) if len(s.strip()) > 3]
-                scenes_list = []
-                
-                story_lower_all = m_script.lower()
-                female_keywords = ["larki", "woman", "female", "girl", "she", "her", "عورت", "لڑکی", "سارہ"]
-                primary_gender = "female" if any(k in story_lower_all for k in female_keywords) else "male"
-                consistent_char = analyze_consistent_subject(m_script)
-                
-                for s in raw_sentences:
-                    p_val = generate_enhanced_cinematic_prompt(s, ms, "Automatic", enable_islamic_filter, None, None, "", consistent_char)
-                    scenes_list.append({
-                        "dialogue": s,
-                        "flux_prompt": p_val,
-                        "voice": "Urdu Female (Uzma)" if any(k in s.lower() for k in female_keywords) else "Urdu Male (Asad)",
-                        "voice_rate": mv_rate.split(" ")[0],
-                        "voice_pitch": "+0Hz" if "Normal" in mv_pitch else ("-15Hz" if "Deep" in mv_pitch else "-28Hz"),
-                        "motion": "AI Hollywood Director (Auto)" if camera_motion == "AI Hollywood Director (Auto)" else camera_motion
-                    })
-                st.session_state.storyboard_scenes = scenes_list
-                st.success("Storyboard Drafted! Scroll down to edit each scene below.")
-            else:
-                st.error("Please write a script first.")
-                
-    # Storyboard Scene Editor Loop (Professional Control Layer)
-    if st.session_state.storyboard_scenes:
-        st.write("### 🎬 Interactive Storyboard Scenes (Edit Before Render)")
-        for idx, sc in enumerate(st.session_state.storyboard_scenes):
-            with st.expander(f"Scene #{idx + 1}: {sc['dialogue'][:50]}..."):
-                sc["dialogue"] = st.text_input(f"Dialogue text Ur:", value=sc["dialogue"], key=f"dialogue_{idx}")
-                sc["flux_prompt"] = st.text_area(f"Visual Prompt En:", value=sc["flux_prompt"], key=f"prompt_{idx}", height=80)
-                
-                col_sub1, col_sub2, col_sub3 = st.columns(3)
-                with col_sub1: sc["voice"] = st.selectbox("Actor Voice:", ["Asad (Male)", "Uzma (Female)"], index=0 if "Asad" in sc["voice"] else 1, key=f"voice_{idx}")
-                with col_sub2: sc["motion"] = st.selectbox("Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Dolly In", "Dolly Out", "Handheld Camera", "Ken Burns Effect"], index=0, key=f"motion_{idx}")
-                with col_sub3: sc["voice_rate"] = st.selectbox("Speed:", ["-10%", "+0%", "+10%", "+20%"], index=1, key=f"rate_{idx}")
-                
-        with col_st2:
-            if st.button("Step 2: Render Final Masterpiece Video 🚀"):
-                with st.spinner("🎬 Blending storyboard scenes and compiling video..."):
-                    v_res = create_cinematic_v40_interactive(
-                        st.session_state.storyboard_scenes, mr, ms, sd, transition_style,
-                        enable_watermark, enable_bg_music, uploaded_male_img, uploaded_female_img,
-                        enable_islamic_filter, gen_mode, pollinations_key, video_model
-                    )
-                if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res):
-                    st.video(v_res)
-                    st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
-                else: st.error(v_res)
+    if st.button("Generate Master Movie 🚀"):
+        rate_val = mv_rate.split(" ")[0]
+        
+        pitch_map = {
+            "Normal (نارمل)": "+0Hz",
+            "Deep (بھاری آواز)": "-15Hz",
+            "Very Deep (موٹی آواز)": "-28Hz"
+        }
+        pitch_val = pitch_map[mv_pitch]
+        
+        with st.spinner("🎬 Sglowina AI is generating your video with voice and motion... Please wait..."):
+            v_res = create_cinematic_v40(
+                story=m_script, 
+                voice_gen=mv, 
+                rate=rate_val, 
+                pitch=pitch_val, 
+                ratio=mr, 
+                style=ms, 
+                seed=sd, 
+                char_desc=char_desc, 
+                scene_desc=scene_desc, 
+                camera_motion=camera_motion, 
+                transition_style=transition_style,
+                enable_watermark=enable_watermark, 
+                enable_bg_music=enable_bg_music, 
+                uploaded_male_img=uploaded_male_img, 
+                uploaded_female_img=uploaded_female_img, 
+                enable_islamic_filter=enable_islamic_filter,
+                character_heritage=character_heritage,
+                gen_mode=gen_mode, 
+                pollinations_key=pollinations_key,
+                advanced_params=None
+            )
+            
+        if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
+            st.video(v_res)
+            st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
+        else: 
+            st.error(v_res)
 
-# Pro Image Studio
+# -----------------
+# TAB 4: PRO IMAGE STUDIO
+# -----------------
 with tab_image:
-    st.write("### 🎨 Visual Studio")
-    p_i = st.text_area("Describe Image:", height=100)
-    char_desc_img = st.text_input("Consistent Character Description:", placeholder="e.g. A young girl with blue eyes")
-    canva_overlay_text = st.text_input("Canva Text Overlay:", placeholder="e.g. Studio Title")
-    ic1, ic2, ic3 = st.columns(3)
-    with ic1: i_style = st.selectbox("Art Style:", ["3D Cartoon", "Realistic HD", "Cinematic Film", "Anime Art", "Logo Design"])
-    with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok"])
-    with ic3: count = st.slider("Quantity:", 1, 5, 1)
+    st.write("### 🎨 Industrial HD Visual Studio")
     
-    if st.button("Generate Titan Visuals 🚀"):
-        u_db = get_user_data(st.session_state.logged_in_user)
-        if u_db and u_db['credits'] >= 2 * count:
-            dim = {"Square (1:1)": (1024, 1024), "YouTube HD": (1280, 720), "TikTok": (720, 1280)}
-            w, h = dim.get(i_size, (1024, 1024))
-            final_p = p_i
-            if char_desc_img.strip(): final_p = f"Character is {char_desc_img.strip()}. {p_i}"
-            img_data = fetch_img_failover(f"{final_p}, visual style: {i_style}", w, h, random.randint(1,999999))
-            if img_data:
-                img_path = "temp_canvas_image.jpg"
-                with open(img_path, "wb") as f_temp: f_temp.write(img_data)
-                if canva_overlay_text.strip(): apply_canva_typography(img_path, canva_overlay_text.strip())
-                st.image(img_path, caption="Generated Visual")
-                try: os.remove(img_path)
-                except: pass
-                deduct_user_credits(st.session_state.logged_in_user, 2)
-            else: st.error("Image generation failed.")
-        else: st.error("Insufficient credits.")
+    tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Upload"])
+    
+    with tab_txt:
+        p_i = st.text_area("Describe Image (One per line for batch):", height=150)
+        
+        char_desc_img = st.text_input("Consistent Character Description:", 
+                                      placeholder="Example: A young girl, blue eyes, brown braided hair, red scarf")
+        
+        canva_overlay_text = st.text_input("Canva Text Overlay (Text overlay on image):", placeholder="Example: Sglowina Studio V1.5")
+                                      
+        ic1, ic2, ic3 = st.columns(3)
+        with ic1: i_style = st.selectbox("Art Style:", ["Realistic HD", "Cinematic Film", "Anime Art", "Logo Design", "3D Cartoon", "Rustic Village Life", "Historical Epic"])
+        with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok", "CinemaScope (21:9)", "Standard Box (4:3)"])
+        with ic3: count = st.slider("Quantity:", 1, 10, 1)
+        
+        if st.button("Generate Titan Visuals 🚀"):
+            u_db = get_user_data(st.session_state.logged_in_user)
+            if u_db and u_db['credits'] >= 2 * count:
+                dim = {
+                    "Square (1:1)": (1024, 1024), 
+                    "YouTube HD": (1280, 720), 
+                    "TikTok": (720, 1280),
+                    "CinemaScope (21:9)": (1680, 720),
+                    "Standard Box (4:3)": (1024, 768)
+                }
+                w, h = dim[i_size]
+                prompt_list = [line.strip() for line in p_i.split('\n') if line.strip()]
+                for idx, single_p in enumerate(prompt_list):
+                    for q in range(count):
+                        final_p = single_p
+                        if char_desc_img.strip():
+                            final_p = f"Character is {char_desc_img.strip()}. Action/Scene: {single_p}"
+                            
+                        img_data = fetch_img_failover(final_p, w, h, random.randint(1,999999))
+                        if img_data:
+                            img_path_temp = f"temp_canvas_{idx}_{q}.jpg"
+                            with open(img_path_temp, "wb") as f_temp:
+                                f_temp.write(img_data)
+                                
+                            if canva_overlay_text.strip():
+                                apply_canva_typography(img_path_temp, canva_overlay_text.strip())
+                                
+                            with Image.open(img_path_temp) as im:
+                                st.image(im, caption=f"Prompt: {single_p[:30]}...")
+                                
+                            try:
+                                if os.path.exists(img_path_temp):
+                                    os.remove(img_path_temp)
+                            except Exception:
+                                pass
+                                
+                            deduct_user_credits(st.session_state.logged_in_user, 2)
+                            log_credit_usage(u_db['id'], "Image Generation", 2, u_db['credits'] - 2)
+                        else:
+                            st.error(f"Image generation failed for prompt: {single_p}")
+            else:
+                st.error("Deduction failed: Sglowina requires 2 credits per generated image or login required.")
 
-# Enterprise tab
+    with tab_img:
+        uploaded_file = st.file_uploader("Upload Image to Modify:", type=["jpg", "png", "jpeg"])
+        if uploaded_file:
+            st.image(uploaded_file, caption="Uploaded Original Image", use_container_width=True)
+            
+        modify_prompt = st.text_input("Modification Instructions:", placeholder="Example: Make the background dark green, add cinematic volumetric light")
+        i_style_mod = st.selectbox("Modification Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon"])
+        
+        canva_overlay_text_mod = st.text_input("Canva Text Overlay for Modified Image:", placeholder="Example: Sglowina Studio V1.5")
+        
+        if st.button("Modify & Re-render Image 🎨"):
+            if uploaded_file and modify_prompt:
+                u_db = get_user_data(st.session_state.logged_in_user)
+                if u_db and u_db['credits'] >= 5:
+                    with st.spinner("Modifying image..."):
+                        img_name = translate_ur_to_en_enhanced(modify_prompt)
+                        img_data = fetch_img_failover(img_name, 1024, 1024, random.randint(1,999999))
+                        if img_data:
+                            img_path_temp_mod = "temp_canvas_mod.jpg"
+                            with open(img_path_temp_mod, "wb") as f_temp_mod:
+                                f_temp_mod.write(img_data)
+                                
+                            if canva_overlay_text_mod.strip():
+                                apply_canva_typography(img_path_temp_mod, canva_overlay_text_mod.strip())
+                                
+                            with Image.open(img_path_temp_mod) as im:
+                                st.image(im, caption="Modified Masterpiece")
+                                
+                            try:
+                                if os.path.exists(img_path_temp_mod):
+                                    os.remove(img_path_temp_mod)
+                            except Exception:
+                                pass
+                                
+                            deduct_user_credits(st.session_state.logged_in_user, 5)
+                            log_credit_usage(u_db['id'], "Image Modification", 5, u_db['credits'] - 5)
+                        else:
+                            st.error("Modification failed.")
+                else:
+                    st.error("Deduction failed: Sglowina requires 5 credits to modify images (or please sign in).")
+            else:
+                st.warning("Please upload an image and write instructions first.")
+
+# -----------------
+# TAB 5: ENTERPRISE CENTER
+# -----------------
 with tab_enterprise:
-    st.write("### 👤 Enterprise Center")
-    ent_tab_user, ent_tab_history, ent_tab_billing, ent_tab_admin = st.tabs(["👤 Profile", "Saved Projects", "💳 Billing Packages", "🔒 Admin Control Panel"])
+    st.write("### 👤 Sglowina Enterprise Administration Center")
+    
+    ent_tab_user, ent_tab_history, ent_tab_billing, ent_tab_admin = st.tabs(["👤 User Profile", "📁 Saved Projects", "💳 Billing & Subscription Plans", "🔒 Admin Control Panel"])
+    
     u_db = get_user_data(st.session_state.logged_in_user)
     
     with ent_tab_user:
         if u_db:
-            st.info(f"User: **{st.session_state.logged_in_user}** | Plan: **{u_db['plan']}** | Balance: **{u_db['credits']}** 🪙")
+            st.write(f"#### Logged-in User Profile")
+            st.info(f"User: **{st.session_state.logged_in_user}** | Plan: **{u_db['plan']}** | Available Balance: **{u_db['credits']}** 🪙")
+            st.write("Secure Session Token:")
+            st.code(str(uuid.uuid5(uuid.NAMESPACE_DNS, st.session_state.logged_in_user))[:20])
             st.write("Joined Sglowina Cloud:")
             st.code(u_db['created_at'])
-        else: st.warning("Please sign in first.")
+        else:
+            st.warning("Please login first to view profile.")
         
     with ent_tab_history:
+        st.write("#### 📁 Active Download Manager & Saved Projects")
         if u_db:
-            conn = get_db_connection()
-            rows = conn.execute("SELECT * FROM projects WHERE user_id = ?", (u_db['id'],)).fetchall()
-            conn.close()
-            if not rows: st.write("No saved projects found.")
-            for r in rows:
-                st.write(f"🎬 **{r['project_name']}** (Created: {r['created_at']})")
-                st.code(r['prompt'])
-                st.markdown("---")
-        else: st.warning("Please sign in.")
-        
-    with ent_tab_billing:
-        st.success("#### 🏆 Sglowina Premium Monthly Plan")
-        st.write("💰 **Price:** 1000 PKR / Month | 🪙 **Credits:** 450 Credits")
-        st.write(" Redeem Sglowina Promo Coupon:")
-        with st.form("coupon_form"):
-            coupon_code = st.text_input("Enter Coupon Code:")
-            if st.form_submit_button("Redeem 🎁") and u_db:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM coupons WHERE UPPER(code) = UPPER(?)", (coupon_code.strip(),))
-                c_row = cursor.fetchone()
-                if c_row and c_row['uses_left'] > 0:
-                    cursor.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (c_row['credits'], u_db['id']))
-                    cursor.execute("UPDATE coupons SET uses_left = uses_left - 1 WHERE code = ?", (c_row['code'],))
-                    conn.commit()
-                    st.success("Credits added successfully!")
-                    st.rerun()
-                else: st.error("Invalid or expired coupon.")
-                conn.close()
-
-        st.markdown("---")
-        st.write("### 📱 Pakistani Local Payment (EasyPaisa/JazzCash)")
-        st.info("💚 **EasyPaisa Account:** Saba Wahid | **03086834020**\n\n❤️ **JazzCash Account:** Ayisha bi bi | **03240755475**")
-        if u_db:
-            with st.form("payment_form"):
-                p_method = st.selectbox("Method:", ["EasyPaisa", "JazzCash"])
-                p_trx = st.text_input("Transaction ID (TrxID):")
-                p_amt = st.number_input("Amount Sent:", value=1000.0)
-                if st.form_submit_button("Submit Proof 🚀"):
-                    conn = get_db_connection()
-                    try:
-                        conn.execute("INSERT INTO local_payments (id, username, method, trx_id, amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                     (str(uuid.uuid4())[:8], u_db['username'], p_method, p_trx.strip(), p_amt, 'Pending', time.strftime("%Y-%m-%d")))
-                        conn.commit()
-                        st.success("Payment submitted successfully for verification!")
-                    except sqlite3.IntegrityError: st.error("This TrxID already exists.")
-                    finally: conn.close()
-                    
-    with ent_tab_admin:
-        if u_db and u_db['role'] == 'Admin':
-            st.success("Admin authorized.")
             conn = get_db_connection()
             cursor = conn.cursor()
-            
-            cursor.execute("SELECT value FROM system_config WHERE key = 'master_pollinations_key'")
-            m_key = cursor.fetchone()
-            current_key = m_key['value'] if m_key else ""
-            
-            with st.form("admin_key_form"):
-                new_key = st.text_input("Set Master API Key:", value=current_key, type="password")
-                if st.form_submit_button("Save Master Key"):
-                    cursor.execute("INSERT OR REPLACE INTO system_config (key, value) VALUES ('master_pollinations_key', ?)", (new_key.strip(),))
-                    conn.commit()
-                    st.success("Key updated!")
-            
-            st.write("### Pending Payment Requests")
-            pending_reqs = cursor.execute("SELECT * FROM local_payments WHERE status = 'Pending'").fetchall()
-            for r in pending_reqs:
-                st.write(f"👤 User: `{r['username']}` | Trx: `{r['trx_id']}` | Amount: {r['amount']} PKR")
-                if st.button(f"Approve {r['trx_id']}", key=f"app_{r['id']}"):
-                    cursor.execute("UPDATE local_payments SET status = 'Approved' WHERE id = ?", (r['id'],))
-                    cursor.execute("UPDATE users SET credits = credits + 450, plan = 'Premium' WHERE username = ?", (r['username'],))
-                    conn.commit()
-                    st.success("Approved!")
-                    st.rerun()
+            cursor.execute("SELECT * FROM projects WHERE user_id = ?", (u_db['id'],))
+            rows = cursor.fetchall()
             conn.close()
-        else: st.error("Admin access denied.")
+            
+            if not rows:
+                st.write("No saved projects found.")
+            else:
+                for proj in rows:
+                    st.write(f"🎬 **{proj['project_name']}** (Created: {proj['created_at']})")
+                    st.write("Saved Prompts for this video:")
+                    st.code(proj['prompt'], language="text")
+                    st.markdown("---")
+        else:
+            st.warning("Please login first.")
+                
+    with ent_tab_billing:
+        st.write("### 💳 Subscription Plans & Credit Packages (Pakistani Local Payment Integration)")
+        
+        st.success("#### 🏆 Sglowina Premium Monthly Plan")
+        st.write("💰 **Price:** 1000 PKR / Month")
+        st.write("🪙 **Credits Received:** 450 Credits (Guarantees at least 30 Cinematic Video Generations!)")
+        
+        st.markdown("---")
+        st.write("### 🎁 Redeem Sglowina Promo / Coupon Code")
+        with st.form("coupon_form"):
+            coupon_code = st.text_input("Enter Promo Code:", placeholder="e.g. ESSASABA")
+            btn_redeem = st.form_submit_button("Redeem Credits 🎁")
+            if btn_redeem:
+                if coupon_code.strip() and u_db:
+                    conn = get_db_connection()
+                    curr = conn.cursor()
+                    curr.execute("SELECT * FROM coupons WHERE UPPER(code) = UPPER(?)", (coupon_code.strip(),))
+                    c_row = curr.fetchone()
+                    if c_row:
+                        if c_row['uses_left'] > 0:
+                            curr.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (c_row['credits'], u_db['id']))
+                            curr.execute("UPDATE coupons SET uses_left = uses_left - 1 WHERE code = ?", (c_row['code'],))
+                            log_credit_usage(u_db['id'], f"Coupon Redeemed: {c_row['code']}", c_row['credits'], u_db['credits'] + c_row['credits'])
+                            conn.commit()
+                            st.success(f"Success! {c_row['credits']} credits added to your account! 🟢")
+                        else:
+                            st.error("This promo code has expired.")
+                    else:
+                        st.error("Invalid coupon code.")
+                    conn.close()
+                else:
+                    st.error("Please log in first to redeem coupons.")
+        
+        st.markdown("---")
+        st.write("### 📱 How to Pay via EasyPaisa / JazzCash")
+        st.write("1. Send **1000 PKR** to one of the accounts below:")
+        
+        bcol1, bcol2 = st.columns(2)
+        with bcol1:
+            st.info("💚 **EasyPaisa Account**\n\n* **Account Name:** Saba Wahid\n* **Account Number:** 03086834020")
+        with bcol2:
+            st.warning("❤️ **JazzCash Account**\n\n* **Account Name:** Ayisha bi bi\n* **Account Number:** 03240755475")
+            
+        st.write("2. After transferring the money, please submit your payment request below for instant verification:")
+        
+        if u_db:
+            with st.form("local_payment_form"):
+                p_method = st.selectbox("Payment Method Used:", ["EasyPaisa", "JazzCash"])
+                p_trx_id = st.text_input("Enter Transaction ID (TrxID):", placeholder="e.g., 50123456789")
+                p_amount = st.number_input("Amount Sent (PKR):", min_value=500.0, max_value=50000.0, value=1000.0, step=100.0)
+                btn_p_submit = st.form_submit_button("Submit Payment Proof 🚀")
+                
+                if btn_p_submit:
+                    if p_trx_id.strip():
+                        conn = get_db_connection()
+                        cursor = conn.cursor()
+                        try:
+                            req_id = str(uuid.uuid4())[:8]
+                            cursor.execute("INSERT INTO local_payments (id, username, method, trx_id, amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                           (req_id, u_db['username'], p_method, p_trx_id.strip(), p_amount, 'Pending', time.strftime("%Y-%m-%d %H:%M:%S")))
+                            conn.commit()
+                            st.success("Your payment request has been submitted successfully! Sglowina administrators will verify and credit your 450 coins shortly.")
+                        except sqlite3.IntegrityError:
+                            st.error("This Transaction ID (TrxID) has already been submitted.")
+                        finally:
+                            conn.close()
+                    else:
+                        st.warning("Please enter a valid Transaction ID (TrxID).")
+        else:
+            st.error("Please log in first to submit a payment request.")
+                
+    with ent_tab_admin:
+        st.write("#### 🔒 Secured Admin Control Settings")
+        if u_db and u_db['role'] == 'Admin':
+            st.success("Access Granted: Administrator Mode Activated")
+            
+            # --- NEW: MASTER API KEY MANAGEMENT UI ---
+            st.write("### 🔑 Sglowina Master API Key Configuration")
+            st.info("بطور ایڈمنسٹریٹر آپ یہاں اپنی پریمیم اے پی آئی کی (API Key) لگا کر ہمیشہ کے لیے سیو کر سکتے ہیں، تاکہ تمام صارفین بغیر اپنی کی درج کیے مستقل ویڈیو جنریٹ کر سکیں۔")
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_config WHERE key = 'master_pollinations_key'")
+            m_row = cursor.fetchone()
+            current_master_key = m_row['value'] if m_row else ""
+            conn.close()
+            
+            with st.form("master_key_config_form"):
+                new_master_key_input = st.text_input("Set Master API Key (e.g. sk_... / pk_...):", value=current_master_key, type="password")
+                btn_save_master_key = st.form_submit_button("Save Master API Key 💾")
+                if btn_save_master_key:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("INSERT OR REPLACE INTO system_config (key, value) VALUES ('master_pollinations_key', ?)", (new_master_key_input.strip(),))
+                    conn.commit()
+                    conn.close()
+                    st.success("Master API Key saved successfully! All user renders will now use this key. 🟢")
+                    time.sleep(1)
+                    st.rerun()
+            
+            st.markdown("---")
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM users")
+            total_users = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM projects")
+            total_projects = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT SUM(credits) FROM users")
+            total_credits_allocated = cursor.fetchone()[0]
+            
+            st.write("### System Metrics Dashboard")
+            saas_col1, saas_col2, saas_col3 = st.columns(3)
+            with saas_col1:
+                st.metric("Total Users Count", total_users)
+            with saas_col2:
+                st.metric("Total Generated Projects", total_projects)
+            with saas_col3:
+                st.metric("Total Allocated Credits", total_credits_allocated)
+                
+            st.markdown("---")
+            st.write("### 📲 Pending Local Payment Requests")
+            cursor.execute("SELECT * FROM local_payments WHERE status = 'Pending'")
+            pending_reqs = cursor.fetchall()
+            
+            if not pending_reqs:
+                st.info("No pending payment requests found.")
+            else:
+                for req in pending_reqs:
+                    st.write(f"👤 **User:** `{req['username']}` | 📱 **Method:** {req['method']} | 🔑 **TrxID:** `{req['trx_id']}` | 💰 **Amount:** {req['amount']} PKR")
+                    
+                    app_btn_key = f"approve_{req['id']}"
+                    if st.button(f"Approve Payment & Credit 450 Coins for {req['username']}", key=app_btn_key):
+                        cursor.execute("UPDATE local_payments SET status = 'Approved' WHERE id = ?", (req['id'],))
+                        cursor.execute("UPDATE users SET credits = credits + 450, plan = 'Premium' WHERE username = ?", (req['username'],))
+                        
+                        cursor.execute("SELECT id, credits FROM users WHERE username = ?", (req['username'],))
+                        target_u = cursor.fetchone()
+                        
+                        if target_u:
+                            log_credit_usage(target_u['id'], "Manual Purchase Approval", 450, target_u['credits'])
+                            
+                        conn.commit()
+                        st.success(f"Payment {req['trx_id']} approved! 450 credits successfully loaded onto {req['username']}'s account.")
+                        st.rerun()
+            
+            st.markdown("---")
+            cursor.execute("SELECT * FROM users")
+            all_users = cursor.fetchall()
+            
+            st.write("### User Database Management")
+            for u in all_users:
+                st.write(f"👤 **{u['username']}** | Role: {u['role']} | Plan: {u['plan']} | Credits: {u['credits']} 🪙 | Status: {u['status']}")
+                
+            st.markdown("---")
+            manage_user = st.selectbox("Select User to Adjust:", [u['username'] for u in all_users])
+            new_plan = st.selectbox("Change Subscription Plan:", ["Free", "Starter", "Premium", "Enterprise"])
+            new_role = st.selectbox("Change User Role:", ["User", "Admin"])
+            new_status = st.selectbox("Change Account Status:", ["Active", "Banned"])
+            new_credits = st.number_input("Adjust Credits Balance:", min_value=0, max_value=100000, value=500)
+            
+            if st.button("Apply Admin Settings"):
+                cursor.execute("UPDATE users SET credits = ?, plan = ?, role = ?, status = ? WHERE username = ?", (new_credits, new_plan, new_role, new_status, manage_user))
+                conn.commit()
+                st.success(f"Successfully updated settings for {manage_user}!")
+            conn.close()
+        else:
+            st.error("Access Denied: Only database-defined Administrators can access this control panel.")
 
-st.markdown("<p style='text-align: center; font-weight: bold; padding-top: 20px; color: #475569;'>Sglowina AI Version 2.1 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>Sglowina AI Version 1.5 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
