@@ -78,7 +78,8 @@ enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=s
 st.session_state.enable_watermark = enable_watermark
 st.session_state.enable_bg_music = enable_bg_music
 
-render_semaphore = threading.Semaphore(value=1)
+# --- CONCURRENCY BOOST: Allow 3 concurrent compiles for 1000+ users ---
+render_semaphore = threading.Semaphore(value=3)
 active_renderers = 0
 render_lock = threading.Lock()
 
@@ -516,7 +517,8 @@ def get_cached_bg_music(is_horror, is_epic):
 
 def download_video_safely(url, dest_path, progress_status):
     try:
-        with session.get(url, stream=True, timeout=120) as r:
+        # --- FIX: Reduced remote download timeout to 45 seconds to prevent server freeze ---
+        with session.get(url, stream=True, timeout=45) as r:
             if r.status_code == 200:
                 with open(dest_path, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=1024*1024):
@@ -1045,7 +1047,7 @@ with tab_movie:
 
     mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9, mc10 = st.columns(10)
     with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
-    with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)"])
+    with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)", "-10% (Slow)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch:", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
