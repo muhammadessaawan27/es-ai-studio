@@ -432,27 +432,28 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
     except: pass
 
 # ==========================================
-# FAILOVER IMAGE EMERGENCY RECOVERY SYSTEM (Draw Cinematic Gradient instead of Basic MS-Paint Shapes)
+# FAILOVER IMAGE EMERGENCY RECOVERY SYSTEM (Draw Beautiful Stylized Night Forest instead of Orbs)
 # ==========================================
 def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
     if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
         try:
-            # Generate a gorgeous cinematic dark nebula gradient background with soft noise instead of basic shapes
+            # Create a gorgeous misty nighttime silhouette forest
             base = Image.new("RGB", (w, h), color=(10, 15, 30))
             draw = ImageDraw.Draw(base)
             
-            # Draw soft expanding ambient glowing cosmic lights to simulate a professional nebula background
-            for r_offset in range(250, 0, -15):
-                draw.ellipse([w//2 - r_offset, h//2 - r_offset, w//2 + r_offset, h//2 + r_offset], 
-                             fill=(10 + int(90 * (1-r_offset/250)), 15, 30 + int(150 * (1-r_offset/250))))
+            # Soft atmospheric blue glow gradient
+            for y in range(h):
+                mist_intensity = int(35 * (y / h))
+                draw.line([(0, y), (w, y)], fill=(10, 15 + mist_intensity, 30 + mist_intensity))
             
-            base = base.filter(ImageFilter.GaussianBlur(radius=25))
+            # Soft glowing pale moon in sky
+            draw.ellipse([w//2 - 50, h//4 - 50, w//2 + 50, h//4 + 50], fill=(230, 240, 255))
+            base = base.filter(ImageFilter.GaussianBlur(radius=8))
+            draw = ImageDraw.Draw(base)
             
-            # Subtle artistic film noise overlay
-            np_im = np.array(base)
-            noise = np.random.normal(0, 3, np_im.shape).astype(np.int16)
-            np_im = np.clip(np_im.astype(np.int16) + noise, 0, 255).astype(np.uint8)
-            base = Image.fromarray(np_im)
+            # Stylized black silhouette mountains
+            draw.polygon([(0, h), (w//4, h - 150), (w//2, h), (0, h)], fill=(5, 8, 15))
+            draw.polygon([(w//4, h), (w*3//4, h - 200), (w, h), (w//4, h)], fill=(2, 4, 8))
             
             base.save(img_path, "JPEG")
         except Exception:
@@ -482,7 +483,7 @@ def parallel_download_flux_images(urls, paths, sentences, w, h):
         elif any(k in scene_text.lower() for k in ["جنگل", "شیر", "چیتا", "ہاتھی", "حیوان", "جانور", "jungle", "forest", "animals"]):
             simplified = "majestic cinematic wild jungle landscape with deep trees, misty atmosphere, sunset wildlife backdrop"
         elif any(k in scene_text.lower() for k in ["بہادری", "اتحاد", "بچاؤ", "unity", "brave"]):
-            simplified = "beautiful cinematic golden sunset after heavy storm, shining sun rays over lush green forest, peaceful dynamic landscape"
+            simplified = "beautiful cinematic golden sunset after heavy storm, shining sun rays over lush green forest, peaceful landscape"
             
         fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(simplified)}?width={w}&height={h}&nologo=true"
         for attempt in range(2):
@@ -493,7 +494,7 @@ def parallel_download_flux_images(urls, paths, sentences, w, h):
                     return True
             except: pass
             
-        # Attempt 3: Failsafe cinematic nebula reredner
+        # Attempt 3: Failsafe cinematic night forest silhouette
         ensure_image_exists(path, w, h, scene_text)
         return False
         
@@ -700,6 +701,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             
             story_has_female = any(k in story_lower_all for k in female_keywords)
             story_has_male = any(k in story_lower_all for k in male_keywords)
+            
+            # --- STRICT SCENIC/ANIMAL SEPARATION FILTER ---
+            story_has_animals = any(k in story_lower_all for k in animal_keywords)
+            story_has_humans = any(k in story_lower_all for k in female_keywords + male_keywords)
+            strictly_animals_only = story_has_animals and not story_has_humans
+            
             primary_gender = "female" if (story_has_female and not story_has_male) else ("male" if (story_has_male and not story_has_female) else None)
             
             # Lock constant attire style across the story
@@ -741,15 +748,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 dir_settings = analyze_scene_for_director(scene)
                 if camera_motion != "AI Hollywood Director (Auto)": dir_settings["motion"] = camera_motion
                 
-                # --- STRICT SCENIC/ANIMAL SEPARATION FILTER ---
-                has_animals_locally = any(k in scene.lower() for k in animal_keywords)
-                local_human = is_human_character_present(scene)
-                
-                if has_animals_locally and not local_human:
+                # Apply absolute animal restriction across scenes
+                if strictly_animals_only:
                     character_present = False
-                    # Optimize wildlife composition specifically
-                    style_modified = f"{style}, award-winning wild animals photography, deep majestic forest"
+                    style_modified = f"{style}, award-winning wild animals photography, deep majestic forest, no humans, no people, only wild animals"
                 else:
+                    local_human = is_human_character_present(scene)
                     character_present = local_human or (primary_gender is not None)
                     style_modified = style
                 
@@ -763,6 +767,9 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 refined_p = generate_enhanced_cinematic_prompt(scene, style_modified, active_heritage, enable_islamic_filter, active_male_ref, active_female_ref, attire_tag if character_present else "")
                 if not is_spiritual and character_present:
                     refined_p += " [Avoid cross-gender blending, absolutely no woman with beard, detailed limbs, symmetrical eyes]"
+                elif strictly_animals_only or not character_present:
+                    refined_p += " [STRICTLY NO humans, NO people, NO soldiers, NO faces, NO man, NO woman, only animals and nature]"
+                
                 refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}, {dir_settings['composition']}"
                 generated_prompts[i] = refined_p
                 
@@ -904,77 +911,63 @@ st.markdown("""
     
     .stApp { background: #f8fafc !important; color: #0f172a !important; font-family: 'Inter', sans-serif; }
     
-    /* SHIMMERING SOFT BORDER DUAL-GLOW TITLE (EASY READABILITY) */
+    /* COMPACT SUBTLE DOUBLE-GLOW TITLE (EASY READABILITY) */
     .title-container {
         text-align: center;
-        margin: 15px auto;
+        margin: 10px auto;
         display: table;
-        padding: 8px 35px;
-        border: 3px solid #00f0ff;
-        border-radius: 12px;
-        box-shadow: 0 0 12px rgba(0, 240, 255, 0.4), 0 0 12px rgba(255, 0, 127, 0.4);
+        padding: 6px 25px;
+        border: 2px solid #00f0ff;
+        border-radius: 8px;
+        box-shadow: 0 0 8px rgba(0, 240, 255, 0.3), 0 0 8px rgba(255, 0, 127, 0.3);
         animation: borderGlow 4s infinite alternate;
     }
     @keyframes borderGlow {
-        0% { border-color: #00f0ff; box-shadow: 0 0 12px rgba(0, 240, 255, 0.4); }
-        100% { border-color: #ff007f; box-shadow: 0 0 12px rgba(255, 0, 127, 0.4); }
+        0% { border-color: #00f0ff; box-shadow: 0 0 8px rgba(0, 240, 255, 0.3); }
+        100% { border-color: #ff007f; box-shadow: 0 0 8px rgba(255, 0, 127, 0.3); }
     }
     
     .glow-title { 
-        font-size: 2.6rem; 
-        font-weight: 900; 
+        font-size: 1.8rem; /* Compact size */
+        font-weight: 800; 
         font-family: 'Orbitron', sans-serif;
         color: #0f172a !important;
         -webkit-text-fill-color: #0f172a !important;
-        letter-spacing: 5px;
+        letter-spacing: 3px;
         margin: 0;
     }
     
-    .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
+    .logo-container { display: flex; justify-content: center; align-items: center; padding: 10px 0; }
     
-    /* RADIAL GLOW METALLIC SPINNING CONTAINER */
+    /* SMALL STATIC/SOFT METALLIC 'S' CONTAINER */
     .circular-s {
-        width: 120px; height: 120px; background: radial-gradient(circle, #020617 40%, #1e1b4b 100%) !important;
+        width: 70px; height: 70px; /* Small layout size */
+        background: #0f172a !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        border: 4px solid #00f0ff !important; box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
-        animation: rotateSpins 10s infinite linear, electricGlow 3s infinite alternate;
+        border: 2px solid #00f0ff !important; box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+        animation: rotateSpins 15s infinite linear, softGlow 4s infinite alternate;
     }
     
-    /* SHIMMERING GLOW METALLIC 'S' TEXT */
+    /* SHIMMERING SOFT METALLIC 'S' TEXT */
     .metallic-s {
-        font-family: 'Orbitron', sans-serif; font-size: 65px; font-weight: 900;
-        background: linear-gradient(135deg, #ff007f, #00f0ff, #ff007f); background-size: 200% auto;
+        font-family: 'Orbitron', sans-serif; font-size: 35px; font-weight: 900;
+        background: linear-gradient(135deg, #ff007f, #00f0ff); background-size: 200% auto;
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.8)); animation: shimmerGlow 3s infinite linear;
+        animation: shimmerGlow 3s infinite linear;
     }
     
     @keyframes rotateSpins {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
-    @keyframes electricGlow {
-        0%, 100% {
-            box-shadow: 0 0 20px rgba(0, 240, 255, 0.6), 0 0 40px rgba(255, 0, 127, 0.4);
-            border-color: #00f0ff !important;
-        }
-        50% {
-            box-shadow: 0 0 35px rgba(255, 0, 127, 0.9), 0 0 70px rgba(0, 240, 255, 0.7);
-            border-color: #ff007f !important;
-        }
+    @keyframes softGlow {
+        0% { border-color: #00f0ff; box-shadow: 0 0 8px rgba(0, 240, 255, 0.3); }
+        100% { border-color: #ff007f; box-shadow: 0 0 8px rgba(255, 0, 127, 0.3); }
     }
     @keyframes shimmerGlow {
-        0% {
-            text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(255, 0, 127, 0.5);
-            background-position: 0% 50%;
-        }
-        50% {
-            text-shadow: 0 0 25px rgba(255, 0, 127, 1), 0 0 45px rgba(0, 240, 255, 0.8);
-            background-position: 100% 50%;
-        }
-        100% {
-            text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(255, 0, 127, 0.5);
-            background-position: 0% 50%;
-        }
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
     }
     
     .stButton>button, .stFormSubmitButton>button { 
