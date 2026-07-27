@@ -74,9 +74,9 @@ except ImportError:
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V1.0", layout="wide", page_icon="🎬")
 
 if not MOVIEPY_AVAILABLE:
-    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to your requirements.txt.")
+    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to requirements.txt.")
 if not EDGE_TTS_AVAILABLE:
-    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to your requirements.txt.")
+    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to requirements.txt.")
 
 if "enable_watermark" not in st.session_state: st.session_state.enable_watermark = True
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
@@ -360,13 +360,36 @@ def analyze_consistent_subject(story_text):
         return "a funny goofy 3D cartoon brown monkey"
     return ""
 
-# Bulletproof Human Stripper filter to strictly enforce animal-only visuals (Forces Wide Shots with No Blur)
-def clean_animal_prompt_of_humans(prompt, urdu_text):
+# Universal style-locked animal prompt cleaning system (forces style chosen in UI and purges human traits)
+def clean_animal_prompt_of_humans(prompt, urdu_text, style):
     prompt_lower = prompt.lower()
     urdu_lower = urdu_text.lower()
     
     has_human_urdu = any(k in urdu_lower for k in ["لڑکا", "لڑکی", "عورت", "مرد", "انسان", "بچہ", "بچے", "لوگ", "شہزادہ", "بادشاہ", "ملکہ"])
-    has_animal_urdu = any(k in urdu_lower for k in ["چوزا", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا", "ہاتھی", "بھیڑیا"])
+    has_animal_urdu = any(k in urdu_lower for k in ["چوزہ", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا", "ہاتھی", "بھیڑیا"])
+    
+    # Map style parameter to descriptive prefixes dynamically to lock user choices
+    style_prefix = "3D cartoon Pixar style"
+    if style == "Realistic HD":
+        style_prefix = "highly realistic professional wildlife photography of a"
+    elif style == "Cinematic Hollywood":
+        style_prefix = "cinematic Hollywood movie scene of a"
+    elif style == "Bollywood Dramatic":
+        style_prefix = "dramatic Bollywood film shot of a"
+    elif style == "Lollywood Classic":
+        style_prefix = "authentic Lollywood film shot of a"
+    elif style == "Islamic Historical":
+        style_prefix = "grand Islamic historical film shot of a"
+    elif style == "Corporate Business":
+        style_prefix = "professional corporate business setup of a"
+    elif style == "Educational Explainer":
+        style_prefix = "clean educational explainer illustration of a"
+    elif style == "Anime Art":
+        style_prefix = "high-quality Japanese anime illustration of a"
+    elif style == "Rustic Village Life":
+        style_prefix = "rustic traditional village scene of a"
+    elif style == "Dark Gothic / Mystery":
+        style_prefix = "dark gothic suspenseful scene of a"
     
     if has_animal_urdu and not has_human_urdu:
         human_words = ["boy", "girl", "child", "infant", "toddler", "kid", "human", "person", "man", "woman", "he", "she", "male", "female", "glasses", "mustache", "beard"]
@@ -376,13 +399,13 @@ def clean_animal_prompt_of_humans(prompt, urdu_text):
         
         # Explicit wide-angle landscape animal anchors with 100% sharp background focus & beautiful scenic trails
         if "چوزہ" in urdu_lower or "chick" in urdu_lower:
-            cleaned_prompt = "A beautiful wide-angle landscape shot of a fluffy yellow 3D cartoon chick wearing a metal bucket on head, walking along a scenic detailed forest path, sharp focus, no background blur, no bokeh, beautiful trees, " + cleaned_prompt
+            cleaned_prompt = f"A beautiful wide-angle landscape shot of a {style_prefix} fluffy yellow chick wearing a metal bucket on head, walking along a scenic detailed forest path, sharp focus, no background blur, no bokeh, beautiful trees, " + cleaned_prompt
         elif "بلی" in urdu_lower:
-            cleaned_prompt = "A beautiful wide-angle shot of a cute 3D cartoon cat sitting in a lush detailed cartoon forest, sharp focus, no background blur, " + cleaned_prompt
+            cleaned_prompt = f"A beautiful wide-angle shot of a {style_prefix} cute cat sitting in a lush detailed cartoon forest, sharp focus, no background blur, " + cleaned_prompt
         elif any(k in urdu_lower for k in ["شیر", "چیتا", "ہاتھی", "بھیڑیا", "حیوان", "جانور", "lion", "cheetah", "elephant", "wolf"]):
-            cleaned_prompt = "A majestic wide-angle 3D cartoon group shot of a friendly cartoon lion, a cheetah, a small cute elephant, and a wolf walking side-by-side along a highly-detailed scenic forest trail, vibrant colors, sharp focus, no background blur, no bokeh, " + cleaned_prompt
+            cleaned_prompt = f"A majestic wide-angle {style_prefix} group shot of a friendly lion, a cheetah, a small cute elephant, and a wolf walking side-by-side along a highly-detailed scenic forest trail, vibrant colors, sharp focus, no background blur, no bokeh, " + cleaned_prompt
         elif "بندر" in urdu_lower or "طوطا" in urdu_lower or "خرگوش" in urdu_lower:
-            cleaned_prompt = "A beautiful wide-angle scenic group shot of cute 3D cartoon animals including a funny monkey, a colorful parrot, and a fluffy rabbit laughing and playing together in a detailed green forest pasture, sharp focus, no background blur, no bokeh, " + cleaned_prompt
+            cleaned_prompt = f"A beautiful wide-angle scenic {style_prefix} group shot of cute animals including a funny monkey, a colorful parrot, and a fluffy rabbit laughing and playing together in a detailed green forest pasture, sharp focus, no background blur, no bokeh, " + cleaned_prompt
             
         cleaned_prompt = re.sub(r',\s*,', ',', cleaned_prompt)
         cleaned_prompt = re.sub(r'\s+', ' ', cleaned_prompt).strip()
@@ -397,11 +420,15 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         
         style_boosters = {
             "Realistic HD": "ultra photorealistic, 8k resolution, highly detailed, sharp focus, natural skin textures",
-            "Cinematic Film": "cinematic movie style, dramatic cinematic lighting, deep shadows, cinematic color grade",
             "3D Cartoon": "3D cartoon animation style, Pixar style, Disney animation style, vibrant colors, stylized cute characters, playful environment, no realism",
+            "Cinematic Hollywood": "cinematic Hollywood movie style, dramatic anamorphic lens, Arri Alexa LF, deep shadows, cinematic warm color grade, atmospheric lighting",
+            "Bollywood Dramatic": "highly dramatic Bollywood movie style, rich colors, emotional dynamic lighting, vibrant clothing, cinematic film frame",
+            "Lollywood Classic": "authentic classic Lollywood film style, rich Pakistani traditional atmosphere, warm vibrant colors, dramatic scene composition",
+            "Islamic Historical": "grand Islamic historical movie style, ancient arabian architecture, majestic sands, rich Middle Eastern textures, golden hour volumetric lighting",
+            "Corporate Business": "professional corporate business setup, clean modern office environment, photorealistic business professionals, modern corporate videography, clean lighting",
+            "Educational Explainer": "clean educational explainer graphic style, clear high-contrast vector illustrations, professional instructional design, beautiful stylized diagrams, clean white background",
             "Anime Art": "beautiful anime illustration, high-quality Japanese anime art style, detailed background",
             "Logo Design": "minimalist professional vector logo design, flat colors, icon style",
-            "Historical Epic": "grand historical epic movie style, majestic ancient atmosphere, rich cultural heritage textures",
             "Rustic Village Life": "rustic traditional old village life, raw earthy tones, authentic rural setting, natural rustic lighting",
             "Dark Gothic / Mystery": "moody dark gothic mystery, eerie misty atmosphere, shadows, dramatic cinematic suspense look"
         }
@@ -790,8 +817,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     active_heritage = "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)" if (any(k in scene.lower() for k in female_keywords + male_keywords) or primary_gender) else "Western / Modern"
                 
                 refined_p = generate_enhanced_cinematic_prompt(scene, style, active_heritage, enable_islamic_filter, active_male_ref, active_female_ref, attire_tag if character_present else "", consistent_char_desc)
-                # Enforce programmatic human stripper cleaner to strictly protect animal visual fidelity
-                refined_p = clean_animal_prompt_of_humans(refined_p, scene)
+                # Enforce programmatic human stripper cleaner to strictly protect animal visual fidelity & lock selected style
+                refined_p = clean_animal_prompt_of_humans(refined_p, scene, style)
                 
                 if not is_spiritual and character_present:
                     refined_p += " [Avoid cross-gender blending, anatomically correct]"
@@ -943,10 +970,10 @@ st.markdown("""
     
     .stApp { background: #f8fafc !important; color: #0f172a !important; font-family: 'Inter', sans-serif; }
     
-    /* FLAT, SMALLER UNLIT TITLE DESIGN (Speed-optimized, zero graphics lag) */
+    /* FLAT, SMALLER UNLIT TITLE DESIGN (Speed-optimized, zero graphics lag, thin text font-weight 300) */
     .glow-title { 
-        font-size: 2rem !important; font-weight: 900; font-family: 'Orbitron', sans-serif;
-        color: #1e3a8a !important; letter-spacing: 3px; margin: 0 !important;
+        font-size: 2rem !important; font-weight: 300 !important; font-family: 'Inter', sans-serif;
+        color: #1e3a8a !important; letter-spacing: 2px; margin: 0 !important;
     }
     
     /* FLEX CONTAINER FOR TITLE AND LOGO SIDE-BY-SIDE */
@@ -955,15 +982,15 @@ st.markdown("""
         margin-top: 15px; margin-bottom: 20px;
     }
     
-    /* RADIAL GLOW METALLIC SPINNING CONTAINER (GPU optimized, no heavy box shadows) */
+    /* RADIAL GLOW METALLIC SPINNING CONTAINER (GPU optimized, clean white background, electric blue borders) */
     .circular-s {
-        width: 70px !important; height: 70px !important; background: #0f172a !important;
+        width: 70px !important; height: 70px !important; background: #ffffff !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
         border: 3px solid #2563eb !important;
         animation: rotateSpins 10s infinite linear;
     }
     
-    /* FLAT BLUE 'S' TEXT */
+    /* FLAT ELECTRIC BLUE 'S' TEXT */
     .metallic-s {
         font-family: 'Orbitron', sans-serif; font-size: 38px !important; font-weight: 900;
         color: #2563eb !important;
@@ -988,11 +1015,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Restored side-by-side unlit dashboard header layout
+# Restored side-by-side unlit dashboard header layout with thin text (Sglowina AI | ایس گلووینا)
 st.markdown("""
     <div class="dashboard-header">
         <div class="circular-s"><span class="metallic-s">S</span></div>
-        <h1 class="glow-title">SGLOWINA AI</h1>
+        <h1 class="glow-title">Sglowina AI | ایس گلووینا</h1>
     </div>
 """, unsafe_allow_html=True)
 
@@ -1074,7 +1101,8 @@ with tab_movie:
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["-10% (Slow)", "+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch:", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    with mc5: ms = st.selectbox("Style:", ["3D Cartoon", "Realistic HD", "Cinematic Film", "Historical Epic", "Rustic Village Life", "Dark Gothic / Mystery"])
+    # Reordered dropdown to place 'Realistic HD' first and added the new Hollywood, Bollywood, Lollywood, Corporate Business, Islamic & Educational/Learning styles
+    with mc5: ms = st.selectbox("Style:", ["Realistic HD", "3D Cartoon", "Cinematic Hollywood", "Bollywood Dramatic", "Lollywood Classic", "Islamic Historical", "Corporate Business", "Educational Explainer", "Anime Art", "Logo Design", "Rustic Village Life", "Dark Gothic / Mystery"])
     with mc6: camera_motion = st.selectbox("Camera Motion:", ["AI Hollywood Director (Auto)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out", "Orbit Camera", "Crane Shot", "Drone Shot", "Tracking Shot", "Follow Shot", "Handheld Camera", "Shoulder Camera", "Cinematic Reveal", "Whip Pan", "Tilt Up", "Tilt Down", "Roll Camera", "Parallax Motion", "Ken Burns Effect", "Rack Focus", "Motion Blur"])
     with mc7: transition_style = st.selectbox("Transition Effect:", ["Cross Dissolve (Fade)", "Instant Cut"])
     with mc8: video_model = st.selectbox("AI Video Model:", ["wan-fast", "seedance", "veo"])
