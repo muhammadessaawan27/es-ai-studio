@@ -70,7 +70,7 @@ try:
 except ImportError:
     EDGE_TTS_AVAILABLE = False
 
-# Streamlit Page Config - Set to Version 1.0 [7.1]
+# Restored Page Config to Version 1.0 as ordered
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V1.0", layout="wide", page_icon="🎬")
 
 if not MOVIEPY_AVAILABLE:
@@ -337,6 +337,7 @@ def is_human_character_present(scene):
 def analyze_consistent_subject(story_text):
     story_l = story_text.lower()
     if any(k in story_l for k in ["چوزا", "chick", "چوزے"]):
+        # Removed the word 'baby' to completely prevent human baby generation
         return "a cute fluffy yellow 3D Pixar style chick wearing an upside-down metallic bucket on its head as superhero helmet"
     if any(k in story_l for k in ["چوہا", "mouse", "rat"]):
         return "a cute tiny 3D cartoon brown mouse wearing superhero attire"
@@ -350,7 +351,7 @@ def clean_animal_prompt_of_humans(prompt, urdu_text):
     urdu_lower = urdu_text.lower()
     
     has_human_urdu = any(k in urdu_lower for k in ["لڑکا", "لڑکی", "عورت", "مرد", "انسان", "بچہ", "بچے", "لوگ", "شہزادہ", "بادشاہ", "ملکہ"])
-    has_animal_urdu = any(k in urdu_lower for k in ["چوزہ", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا", "ہاتھی", "بھیڑیا"])
+    has_animal_urdu = any(k in urdu_lower for k in ["چوزہ", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا"])
     
     if has_animal_urdu and not has_human_urdu:
         human_words = ["boy", "girl", "child", "infant", "toddler", "kid", "human", "person", "man", "woman", "he", "she", "male", "female", "glasses", "mustache", "beard"]
@@ -358,15 +359,13 @@ def clean_animal_prompt_of_humans(prompt, urdu_text):
         for word in human_words:
             cleaned_prompt = re.sub(r'\b' + word + r'\b', '', cleaned_prompt, flags=re.IGNORECASE)
         
-        # Explicit wide-angle landscape animal anchors with 100% sharp background focus & beautiful scenic trails
+        # Explicit wide-angle landscape animal anchoring with NO background blur / bokeh
         if "چوزہ" in urdu_lower or "chick" in urdu_lower:
-            cleaned_prompt = "A beautiful wide-angle landscape shot of a fluffy yellow 3D cartoon chick wearing a metal bucket on its head as a helmet, walking along a scenic detailed forest path, sharp focus, no background blur, no bokeh, beautiful trees, " + cleaned_prompt
+            cleaned_prompt = "A beautiful wide-angle medium-shot of a fluffy yellow 3D cartoon chick wearing a metal bucket on head, walking along a detailed forest path, sharp focus, no background blur, no bokeh, " + cleaned_prompt
         elif "بلی" in urdu_lower:
-            cleaned_prompt = "A beautiful wide-angle shot of a cute 3D cartoon cat sitting in a lush detailed cartoon forest, sharp focus, no background blur, " + cleaned_prompt
-        elif any(k in urdu_lower for k in ["شیر", "چیتا", "ہاتھی", "بھیڑیا", "حیوان", "جانور", "lion", "cheetah", "elephant", "wolf"]):
-            cleaned_prompt = "A majestic wide-angle 3D cartoon group shot of a friendly cartoon lion, a cheetah, a small cute elephant, and a wolf walking side-by-side along a highly-detailed scenic forest trail, vibrant colors, sharp focus, no background blur, no bokeh, " + cleaned_prompt
+            cleaned_prompt = "A beautiful wide-angle shot of a cute 3D cartoon cat sitting gracefully in a detailed scenic garden, sharp focus, no background blur, " + cleaned_prompt
         elif "بندر" in urdu_lower or "طوطا" in urdu_lower or "خرگوش" in urdu_lower:
-            cleaned_prompt = "A beautiful wide-angle scenic group shot of cute 3D cartoon animals including a funny monkey, a colorful parrot, and a fluffy rabbit laughing and playing together in a detailed green forest pasture, sharp focus, no background blur, no bokeh, " + cleaned_prompt
+            cleaned_prompt = "A beautiful wide-angle scenic group shot of cute 3D cartoon animals including a funny monkey, a colorful parrot, and a fluffy rabbit laughing and playing together in a detailed forest landscape, sharp focus, no background blur, no bokeh, " + cleaned_prompt
             
         cleaned_prompt = re.sub(r',\s*,', ',', cleaned_prompt)
         cleaned_prompt = re.sub(r'\s+', ' ', cleaned_prompt).strip()
@@ -475,22 +474,17 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
             bg.save(img_path, "JPEG")
     except: pass
 
-# Solid clean cartoon landscape failsafe drawing (sky, sun, hills, path) to ensure no solid black screens ever
+# Solid clean dark slate gray failsafe (No glowing purple orbs)
 def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
     if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
         try:
-            base = Image.new("RGB", (w, h), color=(135, 206, 235))
-            draw = ImageDraw.Draw(base)
-            draw.ellipse([w - 150, 50, w - 50, 150], fill=(253, 224, 71)) # Yellow sun
-            draw.ellipse([-100, h - 300, w + 100, h + 300], fill=(74, 222, 128)) # Green hill
-            draw.ellipse([w//3, h - 250, w*1.5, h + 350], fill=(34, 197, 94)) # Dark green hill
-            draw.polygon([(w//2 - 50, h - 200), (w//2 + 50, h - 200), (w//2 + 200, h), (w//2 - 200, h)], fill=(168, 162, 158)) # path
+            base = Image.new("RGB", (w, h), color=(30, 41, 59))
             base.save(img_path, "JPEG")
         except:
-            try: Image.new("RGB", (w, h), color=(30, 41, 59)).save(img_path, "JPEG")
+            try: Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
             except: pass
 
-# Optimized Parallel Downloading (Passes English prompts as fallback and limits prompt length to 400 chars to avoid 414 errors)
+# Optimized Parallel Downloading via ThreadPool for maximum rendering speedup (Passes English prompts as fallback)
 def parallel_download_flux_images(urls, paths, prompts, w, h):
     def download_single(i):
         url, path, english_prompt = urls[i], paths[i], prompts[i]
@@ -508,7 +502,7 @@ def parallel_download_flux_images(urls, paths, prompts, w, h):
             
         # Robust Fallback utilizing the generated English prompt to guarantee 100% successful generation
         if not success:
-            fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('3D Pixar style cartoon, ' + english_prompt[:150])}?width={w}&height={h}&nologo=true&model=flux"
+            fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('3D Pixar style, ' + english_prompt[:150])}?width={w}&height={h}&nologo=true&model=flux"
             try:
                 res = session.get(fallback_url, timeout=20)
                 if res.status_code == 200 and len(res.content) > 5000:
@@ -547,41 +541,41 @@ def download_video_safely(url, dest_path, progress_status):
         progress_status.warning(f"Video download timeout ({e}). Falling back to Cinematic Zoom...")
     return False
 
-# Preserved image scale factor at 1.05 to prevent blurry zooms or focus errors
+# Removed automatic Gaussian blur to protect background clarity
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     if not MOVIEPY_AVAILABLE: return None
     ensure_image_exists(img_path, w, h, "Visualizing scene...")
     try:
-        scale_factor = 1.05
+        scale_factor = 1.30
         base_clip = ImageClip(img_path).set_duration(duration).set_fps(24)
         cw, ch = int(w * scale_factor), int(h * scale_factor)
         clip = base_clip.resize((cw, ch))
         
         motions_map = {
-            "Zoom In": lambda: clip.resize(lambda t: 1.0 + 0.05 * (t / duration)).set_position('center'),
-            "Zoom Out (v40 Default)": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).set_position('center'),
+            "Zoom In": lambda: clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center'),
+            "Zoom Out (v40 Default)": lambda: clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center'),
             "Pan Left": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
             "Pan Right": lambda: clip.set_position(lambda t: (int((w - cw) * (1 - t / duration)), 'center')),
             "Pan Up": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))),
             "Pan Down": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
-            "Dolly In": lambda: clip.resize(lambda t: 1.0 + 0.05 * (t / duration)).set_position('center'),
-            "Dolly Out": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).set_position('center'),
-            "Orbit Camera": lambda: clip.rotate(lambda t: -1 + 2 * (t / duration)).resize(lambda t: 1.02 + 0.03 * (t / duration)).set_position('center'),
-            "Crane Shot": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -1 * (t / duration)),
-            "Drone Shot": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).rotate(lambda t: 2 * (t / duration)).set_position('center'),
-            "Tracking Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (2 * np.sin(2 * np.pi * t * 1.5))))),
-            "Follow Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (2 * np.sin(2 * np.pi * t * 1.5))))),
-            "Handheld Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (2 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (2 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 0.5 * np.sin(2 * np.pi * t * 1.0)),
-            "Shoulder Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (2 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (2 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 0.5 * np.sin(2 * np.pi * t * 1.0)),
+            "Dolly In": lambda: clip.resize(lambda t: 1.0 + 0.25 * (t / duration)).set_position('center'),
+            "Dolly Out": lambda: clip.resize(lambda t: 1.25 - 0.25 * (t / duration)).set_position('center'),
+            "Orbit Camera": lambda: clip.rotate(lambda t: -3 + 6 * (t / duration)).resize(lambda t: 1.1 + 0.1 * (t / duration)).set_position('center'),
+            "Crane Shot": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -2 * (t / duration)),
+            "Drone Shot": lambda: clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center'),
+            "Tracking Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5))))),
+            "Follow Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5))))),
+            "Handheld Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0)),
+            "Shoulder Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0)),
             "Cinematic Reveal": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
             "Whip Pan": lambda: clip.set_position(lambda t: (int((w - cw) * ((t / duration) ** 3)), 'center')),
             "Tilt Up": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))),
             "Tilt Down": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
-            "Roll Camera": lambda: clip.rotate(lambda t: 3 * (t / duration)).set_position('center'),
-            "Parallax Motion": lambda: clip.resize(lambda t: 1.01 + 0.04 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
-            "Ken Burns Effect": lambda: clip.resize(lambda t: 1.01 + 0.04 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
-            "Rack Focus": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).set_position('center'),
-            "Motion Blur": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).set_position('center')
+            "Roll Camera": lambda: clip.rotate(lambda t: 8 * (t / duration)).set_position('center'),
+            "Parallax Motion": lambda: clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
+            "Ken Burns Effect": lambda: clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
+            "Rack Focus": lambda: clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center'),
+            "Motion Blur": lambda: clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center')
         }
         try:
             animated_clip = motions_map.get(motion, motions_map["Zoom Out (v40 Default)"])()
@@ -612,7 +606,7 @@ def fetch_img_failover(prompt, w, h, seed):
 def save_audio_safe(text, voice, rate, pitch, filename):
     try:
         async def amain():
-            communicate = edge_tts.Combine(text, voice, rate=rate, pitch=pitch) if hasattr(edge_tts, 'Combine') else edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
+            communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
             await communicate.save(filename)
         asyncio.run(amain())
         return True
@@ -809,9 +803,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                             st.warning(f"Video clip loading failed: {e}. Switching to photo fallback...")
                 
                 w_target, h_target = make_even(w * 1.25), make_even(h * 1.25)
-                # Safeguard: Truncate prompt passed to Flux to 400 chars to avoid HTTP 414 URI Too Long errors
-                truncated_prompt = refined_p[:400]
-                flux_prompt_urls[i] = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(truncated_prompt)}?width={w_target}&height={h_target}&seed={seed + i * 17}&nologo=true&model=flux"
+                flux_prompt_urls[i] = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i * 17}&nologo=true&model=flux"
                 img_paths[i] = f"i_{u_id}_{i}.jpg"
                 
             progress_bar.progress(0.25)
