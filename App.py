@@ -76,7 +76,6 @@ if "enable_watermark" not in st.session_state: st.session_state.enable_watermark
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
 if "logged_in_user" not in st.session_state: st.session_state.logged_in_user = "demo_user"
 if "msgs" not in st.session_state: st.session_state.msgs = []
-if "storyboard_scenes" not in st.session_state: st.session_state.storyboard_scenes = []
 
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=st.session_state.enable_watermark)
@@ -332,7 +331,6 @@ def is_human_character_present(scene):
 def analyze_consistent_subject(story_text):
     story_l = story_text.lower()
     if any(k in story_l for k in ["چوزا", "chick", "چوزے"]):
-        # Completely removed the word 'baby' to prevent human child generation
         return "a cute fluffy yellow 3D Pixar style chick wearing an upside-down metallic bucket on its head as superhero helmet"
     if any(k in story_l for k in ["چوہا", "mouse", "rat"]):
         return "a cute tiny 3D cartoon brown mouse wearing superhero attire"
@@ -354,17 +352,13 @@ def clean_animal_prompt_of_humans(prompt, urdu_text):
         for word in human_words:
             cleaned_prompt = re.sub(r'\b' + word + r'\b', '', cleaned_prompt, flags=re.IGNORECASE)
         
-        # Explicit animal anchoring based on Urdu keyword detection
+        # Explicit wide-angle animal anchoring based on Urdu keyword detection
         if "چوزہ" in urdu_lower or "chick" in urdu_lower:
-            cleaned_prompt = "A beautiful fluffy yellow 3D cartoon chick wearing a metal bucket on head, " + cleaned_prompt
+            cleaned_prompt = "A beautiful wide-angle medium-shot of a fluffy yellow 3D cartoon chick wearing a metal bucket on head, " + cleaned_prompt
         elif "بلی" in urdu_lower:
-            cleaned_prompt = "A cute 3D cartoon cat, " + cleaned_prompt
-        elif "بندر" in urdu_lower:
-            cleaned_prompt = "A funny 3D cartoon monkey, " + cleaned_prompt
-        elif "طوطا" in urdu_lower:
-            cleaned_prompt = "A colorful 3D cartoon parrot, " + cleaned_prompt
-        elif "خرگوش" in urdu_lower:
-            cleaned_prompt = "A fluffy 3D cartoon rabbit, " + cleaned_prompt
+            cleaned_prompt = "A cute 3D cartoon cat sitting gracefully, " + cleaned_prompt
+        elif "بندر" in urdu_lower or "طوطا" in urdu_lower or "خرگوش" in urdu_lower:
+            cleaned_prompt = "A joyful group of cute 3D cartoon animals including a funny monkey, a colorful parrot, and a fluffy rabbit laughing and playing together in a beautiful forest pasture, " + cleaned_prompt
             
         cleaned_prompt = re.sub(r',\s*,', ',', cleaned_prompt)
         cleaned_prompt = re.sub(r'\s+', ' ', cleaned_prompt).strip()
@@ -1066,7 +1060,7 @@ with tab_image:
     
     if st.button("Generate Titan Visuals 🚀"):
         u_db = get_user_data(st.session_state.logged_in_user)
-        # Corrected Python '&&' syntax error to 'and'
+        # Corrected Python logical 'and' operator
         if u_db and u_db['credits'] >= 2 * count:
             dim = {"Square (1:1)": (1024, 1024), "YouTube HD": (1280, 720), "TikTok": (720, 1280)}
             w, h = dim.get(i_size, (1024, 1024))
