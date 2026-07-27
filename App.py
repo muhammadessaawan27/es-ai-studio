@@ -30,9 +30,15 @@ AUDIO_CACHE_DIR = "audio_cache"
 os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
 DB_BACKUP_FILE = "sglowina_saas_backup.json"
 
+# Global Session State Registration to permanently prevent NameErrors
+if "gen_mode" not in st.session_state:
+    st.session_state.gen_mode = "Cinematic Photo Zoom & Pan (100% Free & Unlimited)"
+if "pollinations_key" not in st.session_state:
+    st.session_state.pollinations_key = ""
+
 # Expanded Urdu to English Dictionary
 UR_EN_DICT = {
-    "درخت": "trees", "جنگل": "forest", "باغ": "garden", "باغات": "gardens",
+    "درخت": "trees", "جنگل": "forest", "baag": "garden", "باغات": "gardens",
     "پرندے": "birds", "پرندہ": "bird", "بارش": "rain", "طوفان": "storm",
     "بادل": "clouds", "ہوا": "wind", "آگ": "fire", "پانی": "water",
     "لڑکا": "boy", "لڑکی": "girl", "عورت": "woman", "مرد": "man",
@@ -611,29 +617,28 @@ def apply_custom_watermark(img_path, watermark_bytes):
             im.convert("RGB").save(img_path, "JPEG")
     except: pass
 
-# Restored to Sequential Downloading with Safe Delay to completely bypass Cloudflare 429 locks
+# Optimized Sequential downloading (Max timeout capped at 12s, max 2 retry attempts to prevent freezing)
 def parallel_download_flux_images(urls, paths, sentences, w, h):
     for i in range(len(urls)):
         url, path, scene_text = urls[i], paths[i], sentences[i]
         success = False
         
-        # Primary Download (Timeout raised to 45 seconds for first frame to allow cold starts)
-        t_limit = 45 if i == 0 else 25
-        for attempt in range(3):
+        # Primary Download (Fast timeout of 12 seconds with max 2 retries)
+        for attempt in range(2):
             try:
-                res = session.get(url, timeout=t_limit)
+                res = session.get(url, timeout=12)
                 if res.status_code == 200 and len(res.content) > 5000:
                     with open(path, "wb") as f: f.write(res.content)
                     success = True
                     break
             except: pass
-            time.sleep(1.5)
+            time.sleep(0.5)
             
         # If primary failed, use the same Urdu sentence again rather than a fixed template
         if not success:
             fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('3D Pixar style, cute, ' + scene_text)}?width={w}&height={h}&nologo=true&model=flux"
             try:
-                res = session.get(fallback_url, timeout=20)
+                res = session.get(fallback_url, timeout=10)
                 if res.status_code == 200 and len(res.content) > 5000:
                     with open(path, "wb") as f: f.write(res.content)
                     success = True
@@ -642,8 +647,8 @@ def parallel_download_flux_images(urls, paths, sentences, w, h):
         if not success:
             ensure_image_exists(path, w, h, scene_text)
             
-        # 1 second defensive cooldown to protect against server rate limits
-        time.sleep(1.0)
+        # 0.2 second defensive cooldown to protect against server rate limits (extremely fast)
+        time.sleep(0.2)
 
 def get_cached_bg_music(is_horror, is_epic):
     fn = "bg_horror.mp3" if is_horror else ("bg_epic.mp3" if is_epic else "bg_standard.mp3")
@@ -946,7 +951,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             progress_bar.progress(0.25)
             indices_needing_images = [idx for idx, c in enumerate(clips) if c is None]
             if indices_needing_images:
-                # Update progress for frame generation
+                # Update progress for frame generation (Capped at 12s sequential processing for high speed)
                 status.info("🎨 Visuals: Actively generating custom AI scenes with Flux AI (تخلیق کا عمل جاری ہے)...")
                 parallel_download_flux_images(
                     [flux_prompt_urls[idx] for idx in indices_needing_images],
@@ -1180,8 +1185,8 @@ with tab_movie:
     st.write("### 🎥 Movie Studio")
     
     # Restored selectbox and text input to resolve NameError: name 'gen_mode' is not defined [1.2, 1.3]
-    gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"])
-    pollinations_key = st.text_input("Enter Pollinations API Key (if using video mode):", type="password") if "Real AI Video" in gen_mode else ""
+    gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"], key="gen_mode")
+    pollinations_key = st.text_input("Enter Pollinations API Key (if using video mode):", type="password", key="pollinations_key") if "Real AI Video" in st.session_state.gen_mode else ""
     
     # 1. Sglowina AI Script Writer Integration (Step 1 of Auto Script generation)
     st.write("#### 📝 Sglowina AI Script Writer (Optional)")
@@ -1245,7 +1250,7 @@ with tab_movie:
             v_res = create_cinematic_v40(
                 m_script, active_voice, rate_val, pitch_val, mr, ms, sd, camera_motion, transition_style,
                 enable_watermark, enable_bg_music, uploaded_male_img, uploaded_female_img,
-                enable_islamic_filter, "Automatic", gen_mode, pollinations_key, video_model,
+                enable_islamic_filter, "Automatic", st.session_state.gen_mode, st.session_state.pollinations_key, video_model,
                 custom_wm_bytes=wm_bytes, enable_sub=enable_subtitles
             )
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res):
