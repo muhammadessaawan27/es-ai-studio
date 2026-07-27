@@ -74,9 +74,9 @@ except ImportError:
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V1.0", layout="wide", page_icon="🎬")
 
 if not MOVIEPY_AVAILABLE:
-    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to requirements.txt.")
+    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to your requirements.txt.")
 if not EDGE_TTS_AVAILABLE:
-    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to requirements.txt.")
+    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to your requirements.txt.")
 
 if "enable_watermark" not in st.session_state: st.session_state.enable_watermark = True
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
@@ -376,14 +376,16 @@ def is_human_character_present(scene):
     ]
     return any(k in scene_l for k in human_indicators)
 
-def analyze_consistent_subject(story_text):
+# Simplified Character Memory without hardcoded layout issues
+def analyze_consistent_subject(story_text, style):
     story_l = story_text.lower()
+    style_theme = "cartoon" if style == "3D Cartoon" else "photorealistic"
     if any(k in story_l for k in ["چوزا", "chick", "چوزے"]):
-        return "a cute fluffy yellow 3D Pixar style chick wearing an upside-down metallic bucket on its head as superhero helmet"
+        return f"a cute fluffy yellow {style_theme} chick wearing an upside-down metallic bucket on its head as superhero helmet"
     if any(k in story_l for k in ["چوہا", "mouse", "rat"]):
-        return "a cute tiny 3D cartoon brown mouse wearing superhero attire"
+        return f"a cute tiny {style_theme} brown mouse wearing superhero attire"
     if any(k in story_l for k in ["بندر", "monkey"]):
-        return "a funny goofy 3D cartoon brown monkey"
+        return f"a funny goofy {style_theme} brown monkey"
     return ""
 
 # Universal style-locked animal prompt cleaning system (forces style chosen in UI and purges human traits)
@@ -392,7 +394,7 @@ def clean_animal_prompt_of_humans(prompt, urdu_text, style):
     urdu_lower = urdu_text.lower()
     
     has_human_urdu = any(k in urdu_lower for k in ["لڑکا", "لڑکی", "عورت", "مرد", "انسان", "بچہ", "بچے", "لوگ", "شہزادہ", "بادشاہ", "ملکہ"])
-    has_animal_urdu = any(k in urdu_lower for k in ["چوزا", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا", "ہاتھی", "بھیڑیا"])
+    has_animal_urdu = any(k in urdu_lower for k in ["چوزہ", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا", "ہاتھی", "بھیڑیا"])
     
     # Map style parameter to descriptive prefixes dynamically to lock user choices
     style_prefix = "3D cartoon Pixar style"
@@ -845,7 +847,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             
             attire_tag = "wearing clean bright red and green cotton clothing" if primary_gender == "female" else "wearing elegant white historical cotton dress"
             
-            consistent_char_desc = analyze_consistent_subject(story)
+            consistent_char_desc = analyze_consistent_subject(story, style)
             
             for idx, scene in enumerate(sentences):
                 # Update progress per scene voiceover
@@ -1006,7 +1008,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     final_video = final_video.set_audio(CompositeAudioClip([final_video.audio, bg_track]))
                 except Exception as e: st.warning(f"Background music error: {e}")
                 
-            out_name = f"Sglowina_{u_id}.mp4"
+            # Randomize output file name completely with timestamp to forcefully bypass browser caches [1.1]
+            out_name = f"Sglowina_{u_id}_{int(time.time())}.mp4"
             status.info("🎬 Rendering: Stitching elements into final master video (Ultrafast compression active)...")
             # 100x Speedup parameters injected directly into moviepy writer
             write_kwargs = {"codec": "libx264", "audio_codec": "aac", "fps": 24, "preset": "ultrafast", "threads": 4, "ffmpeg_params": ["-pix_fmt", "yuv420p"]}
@@ -1057,9 +1060,9 @@ st.markdown("""
     
     .stApp { background: #f8fafc !important; color: #0f172a !important; font-family: 'Inter', sans-serif; }
     
-    /* FLAT, SMALLER UNLIT TITLE DESIGN (Speed-optimized, zero graphics lag, thin text font-weight 300) */
+    /* FLAT, SMALLER UNLIT TITLE DESIGN (Speed-optimized, zero graphics lag, thin text font-weight 300, font-size reduced to 1.2rem) */
     .glow-title { 
-        font-size: 2rem !important; font-weight: 300 !important; font-family: 'Inter', sans-serif;
+        font-size: 1.2rem !important; font-weight: 300 !important; font-family: 'Inter', sans-serif;
         color: #1e3a8a !important; letter-spacing: 2px; margin: 0 !important;
     }
     
@@ -1212,7 +1215,7 @@ with tab_movie:
     with mc8: video_model = st.selectbox("AI Video Model:", ["wan-fast", "seedance", "veo"])
     with mc9: sd = st.number_input("Character Seed:", value=786)
     
-    # Restored to 1-Click Generation Action
+    # Restored to 1-Click Generation Action with unique key parameter to forcefully invalidate browser video cache
     if st.button("Generate Master Movie 🚀"):
         rate_val = mv_rate.split(" ")[0]
         pitch_map = {"Normal (نارمل)": "+0Hz", "Deep (بھاری آواز)": "-15Hz", "Very Deep (موٹی آواز)": "-28Hz"}
@@ -1240,7 +1243,7 @@ with tab_movie:
                 custom_wm_bytes=wm_bytes, enable_sub=enable_subtitles
             )
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res):
-            st.video(v_res)
+            st.video(v_res, key=f"video_{v_res}_{int(time.time())}") # Force unique key to completely bypass local browser cache
             st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
         else: st.error(v_res)
 
