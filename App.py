@@ -74,9 +74,9 @@ except ImportError:
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V1.0", layout="wide", page_icon="🎬")
 
 if not MOVIEPY_AVAILABLE:
-    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to requirements.txt.")
+    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to your requirements.txt.")
 if not EDGE_TTS_AVAILABLE:
-    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to requirements.txt.")
+    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to your requirements.txt.")
 
 if "enable_watermark" not in st.session_state: st.session_state.enable_watermark = True
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
@@ -270,6 +270,22 @@ def log_credit_usage(user_id, action, used, balance):
     conn.commit()
     conn.close()
 
+# Real-time Web Search Engine using pure DuckDuckGo parsing to bypass heavy APIs
+def search_web_ddg(query):
+    try:
+        url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
+        res = session.get(url, timeout=10)
+        if res.status_code == 200:
+            snippets = re.findall(r'<a class="result__snippet"[^>]*>(.*?)</a>', res.text, re.DOTALL)
+            if snippets:
+                clean_snippets = []
+                for s in snippets[:3]:
+                    clean_s = re.sub(r'<[^>]*>', '', s).strip()
+                    clean_snippets.append(clean_s)
+                return "\n".join(clean_snippets)
+    except: pass
+    return ""
+
 def analyze_scene_for_director(scene_text):
     text = scene_text.lower()
     motion, lighting, color_grading, composition = "Zoom Out (v40 Default)", "Volumetric Light", "Hollywood Cinematic", "Cinematic Wide Shot"
@@ -350,7 +366,7 @@ def clean_animal_prompt_of_humans(prompt, urdu_text):
     urdu_lower = urdu_text.lower()
     
     has_human_urdu = any(k in urdu_lower for k in ["لڑکا", "لڑکی", "عورت", "مرد", "انسان", "بچہ", "بچے", "لوگ", "شہزادہ", "بادشاہ", "ملکہ"])
-    has_animal_urdu = any(k in urdu_lower for k in ["چوزہ", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا", "ہاتھی", "بھیڑیا"])
+    has_animal_urdu = any(k in urdu_lower for k in ["چوزا", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا", "ہاتھی", "بھیڑیا"])
     
     if has_animal_urdu and not has_human_urdu:
         human_words = ["boy", "girl", "child", "infant", "toddler", "kid", "human", "person", "man", "woman", "he", "she", "male", "female", "glasses", "mustache", "beard"]
@@ -637,7 +653,7 @@ def apply_canva_typography(img_path, text):
     except: pass
 
 # ==========================================
-# 4. SINGLE CLICK DIRECT MOVIE GENERATION
+# 4. SINGLE CLICK DIRECT MOVIE GENERATION (V1.0 restored with step progress text)
 # ==========================================
 def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast"):
     if not MOVIEPY_AVAILABLE:
@@ -684,7 +700,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             
         try:
             progress_bar.progress(0.05)
-            status.info("🎙️ Processing Dialogue Voiceovers...")
             
             raw_sentences = [s.strip() for s in re.split(r'[۔\n.!|?()؛;]', story) if len(s.strip()) > 3]
             sentences = []
@@ -709,6 +724,9 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             has_bg_music = False
             cached_bg_path = None
             
+            # Step progress feedback text
+            status.info(f"🎙️ Voiceovers: Generating speech audio for {total_scenes} scene(s)...")
+            
             story_lower_all = story.lower()
             female_keywords = ["larki", "woman", "female", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ", "saba", "baji", "behn"]
             male_keywords = ["man", "male", "boy", "he", "him", "adventurer", "maseeha", "mushaf", "مرد", "لڑکا", "احمد", "علی", "بادشاہ", "essa", "awan", "bhai"]
@@ -722,6 +740,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             consistent_char_desc = analyze_consistent_subject(story)
             
             for idx, scene in enumerate(sentences):
+                # Update progress per scene voiceover
+                status.info(f"🎙️ Voiceovers: Compiling speech for Scene {idx + 1} of {total_scenes}...")
                 is_female_voice = any(k in scene or k in scene.lower() for k in female_keywords)
                 is_male_voice = any(k in scene or k in scene.lower() for k in male_keywords)
                 if not is_female_voice and not is_male_voice:
@@ -748,6 +768,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             w, h = make_even(w), make_even(h)
             
             for i, scene in enumerate(sentences):
+                # Update progress per scene prompt formulation
+                status.info(f"🎨 Visuals: Formatting high-quality prompt for Scene {i + 1} of {total_scenes}...")
                 english_scene = translate_ur_to_en_enhanced(scene)
                 is_spiritual = False
                 if enable_islamic_filter:
@@ -814,7 +836,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             progress_bar.progress(0.25)
             indices_needing_images = [idx for idx, c in enumerate(clips) if c is None]
             if indices_needing_images:
-                status.info("🎨 Generating custom visual frames...")
+                # Update progress for frame generation
+                status.info("🎨 Visuals: Actively generating custom AI scenes with Flux AI (تخلیق کا عمل جاری ہے)...")
                 parallel_download_flux_images(
                     [flux_prompt_urls[idx] for idx in indices_needing_images],
                     [img_paths[idx] for idx in indices_needing_images],
@@ -824,7 +847,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     if img_paths[idx]: generated_images.append(img_paths[idx])
             
             progress_bar.progress(0.45)
-            status.info("🎞️ Stitching final elements together...")
             
             for i in range(total_scenes):
                 if clips[i] is not None: continue
@@ -832,6 +854,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 sub_audio_path = temporary_audio_tracks[i]
                 scene = sentences[i]
                 
+                # Update progress per scene rendering
+                status.info(f"🎞️ Video: Applying camera motion and compiling Scene {i + 1} of {total_scenes}...")
                 ensure_image_exists(img_path, w, h, scene)
                 apply_color_lut_harmony(img_path, style)
                 apply_blurred_background_padding(img_path, make_even(w * 1.25), make_even(h * 1.25))
@@ -857,6 +881,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 clips[i] = apply_clip_transition(clip, transition_style, dur_scene)
                 
             progress_bar.progress(0.70)
+            status.info("🎵 Audio Mixer: Ducking background music and mixing elements...")
             valid_clips = [c for c in clips if c is not None]
             if not valid_clips: raise Exception("No valid scenes were generated.")
             
@@ -868,6 +893,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 except Exception as e: st.warning(f"Background music error: {e}")
                 
             out_name = f"Sglowina_{u_id}.mp4"
+            status.info("🎬 Rendering: Stitching elements into final master video (Ultrafast compression active)...")
             # 100x Speedup parameters injected directly into moviepy writer
             write_kwargs = {"codec": "libx264", "audio_codec": "aac", "fps": 24, "preset": "ultrafast", "threads": 4, "ffmpeg_params": ["-pix_fmt", "yuv420p"]}
             try: final_video.write_videofile(out_name, logger=None, **write_kwargs)
@@ -1002,7 +1028,7 @@ with tab_auth:
                 if success: st.success(msg)
                 else: st.error(msg)
 
-# Chat Bot
+# Chat Bot (Connected to Google Live Web Search & Copy Container Card)
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
     for m in st.session_state.msgs:
@@ -1010,10 +1036,25 @@ with tab_chat:
     if p := st.chat_input("How can I help you today?"):
         st.session_state.msgs.append({"role": "user", "content": p})
         with st.chat_message("user"): st.write(p)
-        res = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true").text
+        
+        # Real-time search criteria check
+        web_snippets = ""
+        p_lower = p.lower()
+        if any(k in p_lower for k in ["search", "live", "latest", "who is", "what is", "current", "news", "گوگل", "سرچ", "اج کل"]):
+            web_snippets = search_web_ddg(p)
+            
+        system_prompt = "You are Sglowina AI, an advanced real-time assistant developed by Sglowina Team. "
+        if web_snippets:
+            system_prompt += f"\n[Live Web Search Context]:\n{web_snippets}\nUse this real-time context to accurately formulate your response."
+            
+        res = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(system_prompt + ' User query: ' + p)}?model=openai&cache=true").text
         translated_res = res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
+        
         with st.chat_message("assistant"):
             st.write(translated_res)
+            # Copy Option Container Card (allows copying the whole story/response in 1 click)
+            st.info("📋 Click the Copy icon in the top right of the box below to copy the full response:")
+            st.code(translated_res, language="")
             st.session_state.msgs.append({"role": "assistant", "content": translated_res})
 
 # Pro Movie Studio
