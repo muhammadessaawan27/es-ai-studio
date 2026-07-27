@@ -30,9 +30,9 @@ AUDIO_CACHE_DIR = "audio_cache"
 os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
 DB_BACKUP_FILE = "sglowina_saas_backup.json"
 
-# Expanded Urdu to English Dictionary (Removed 'baby' to prevent human child hallucination)
+# Expanded Urdu to English Dictionary
 UR_EN_DICT = {
-    "درخت": "trees", "جنگل": "forest", "باغ": "garden", "باغات": "gardens",
+    "درخت": "trees", "جنگل": "forest", "baag": "garden", "باغات": "gardens",
     "پرندے": "birds", "پرندہ": "bird", "بارش": "rain", "طوفان": "storm",
     "بادل": "clouds", "ہوا": "wind", "آگ": "fire", "پانی": "water",
     "لڑکا": "boy", "لڑکی": "girl", "عورت": "woman", "مرد": "man",
@@ -340,6 +340,41 @@ def analyze_consistent_subject(story_text):
         return "a funny goofy 3D cartoon brown monkey"
     return ""
 
+# Bulletproof Human Stripper filter to strictly enforce animal-only visuals
+def clean_animal_prompt_of_humans(prompt, urdu_text):
+    prompt_lower = prompt.lower()
+    urdu_lower = urdu_text.lower()
+    
+    # Check if Urdu text contains human keywords
+    has_human_urdu = any(k in urdu_lower for k in ["لڑکا", "لڑکی", "عورت", "مرد", "انسان", "بچہ", "بچے", "لوگ", "شہزادہ", "بادشاہ", "ملکہ"])
+    
+    # Check if Urdu text has animal keywords
+    has_animal_urdu = any(k in urdu_lower for k in ["چوزہ", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا"])
+    
+    if has_animal_urdu and not has_human_urdu:
+        human_words = ["boy", "girl", "child", "infant", "toddler", "kid", "human", "person", "man", "woman", "he", "she", "male", "female"]
+        cleaned_prompt = prompt
+        for word in human_words:
+            cleaned_prompt = re.sub(r'\b' + word + r'\b', '', cleaned_prompt, flags=re.IGNORECASE)
+        
+        # Explicit animal anchoring based on Urdu keyword detection
+        if "چوزہ" in urdu_lower or "chick" in urdu_lower:
+            cleaned_prompt = "A beautiful fluffy yellow 3D cartoon chick, " + cleaned_prompt
+        elif "بلی" in urdu_lower:
+            cleaned_prompt = "A cute 3D cartoon cat, " + cleaned_prompt
+        elif "بندر" in urdu_lower:
+            cleaned_prompt = "A funny 3D cartoon monkey, " + cleaned_prompt
+        elif "طوطا" in urdu_lower:
+            cleaned_prompt = "A colorful 3D cartoon parrot, " + cleaned_prompt
+        elif "خرگوش" in urdu_lower:
+            cleaned_prompt = "A fluffy 3D cartoon rabbit, " + cleaned_prompt
+            
+        cleaned_prompt = re.sub(r',\s*,', ',', cleaned_prompt)
+        cleaned_prompt = re.sub(r'\s+', ' ', cleaned_prompt).strip()
+        return cleaned_prompt
+        
+    return prompt
+
 def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url, attire_desc="", consistent_char_desc=""):
     try:
         scene_lower = urdu_scene.lower()
@@ -396,7 +431,6 @@ def apply_color_lut_harmony(img_path, style_preset):
     try:
         with Image.open(img_path) as im:
             im = im.convert("RGB")
-            # Natural image enhancements (No channel distortion or artificial coloring)
             im = ImageEnhance.Sharpness(im).enhance(1.15)
             im = ImageEnhance.Contrast(im).enhance(1.05)
             if style_preset == "3D Cartoon":
@@ -828,9 +862,9 @@ st.markdown("""
     
     .stApp { background: #f8fafc !important; color: #0f172a !important; font-family: 'Inter', sans-serif; }
     
-    /* SHIMMERING GLOW PINK-BLUE GRADIENT METALLIC TITLE */
+    /* SHIMMERING GLOW PINK-BLUE GRADIENT METALLIC TITLE (Restored Original CSS) */
     .glow-title { 
-        font-size: 2.2rem; font-weight: 900; text-align: center; font-family: 'Orbitron', sans-serif;
+        font-size: 3rem; font-weight: 900; text-align: center; font-family: 'Orbitron', sans-serif;
         background: linear-gradient(135deg, #00f0ff, #ff007f, #00f0ff); background-size: 200% auto;
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         animation: shimmerGlow 3s infinite linear; margin-top: 15px; margin-bottom: 5px; letter-spacing: 5px;
@@ -839,17 +873,17 @@ st.markdown("""
     
     .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
     
-    /* RADIAL GLOW METALLIC SPINNING CONTAINER */
+    /* RADIAL GLOW METALLIC SPINNING CONTAINER (Restored Original Width 120px) */
     .circular-s {
-        width: 100px; height: 100px; background: radial-gradient(circle, #020617 40%, #1e1b4b 100%) !important;
+        width: 120px; height: 120px; background: radial-gradient(circle, #020617 40%, #1e1b4b 100%) !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
         border: 4px solid #00f0ff !important; box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
         animation: rotateSpins 10s infinite linear, electricGlow 3s infinite alternate;
     }
     
-    /* SHIMMERING GLOW METALLIC 'S' TEXT */
+    /* SHIMMERING GLOW METALLIC 'S' TEXT (Restored Original Size 65px) */
     .metallic-s {
-        font-family: 'Orbitron', sans-serif; font-size: 55px; font-weight: 900;
+        font-family: 'Orbitron', sans-serif; font-size: 65px; font-weight: 900;
         background: linear-gradient(135deg, #ff007f, #00f0ff, #ff007f); background-size: 200% auto;
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.8)); animation: shimmerGlow 3s infinite linear;
@@ -898,7 +932,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="glow-title">Sglowina AI Dashboard</div>', unsafe_allow_html=True)
+st.markdown('<div class="glow-title">SGLOWINA AI</div>', unsafe_allow_html=True)
 st.markdown('<div class="logo-container"><div class="circular-s"><span class="metallic-s">S</span></div></div>', unsafe_allow_html=True)
 
 # Tabs Initialization
@@ -920,8 +954,9 @@ with tab_auth:
                 if authenticate_user(u_name, p_word):
                     st.session_state.logged_in_user = u_name.strip().lower()
                     u_data = get_user_data(u_name)
+                    # Corrected English-only success greetings to avoid RTL/LTR layout distortion on Streamlit
                     if u_data and u_data['role'] == 'Admin':
-                        st.success("خوش آمدید! Sglowina AI پر دوبارہ آمد مبارک ہو، محمد عیسیٰ اعوان اور صبا واحد! 🟢")
+                        st.success("Welcome back, Muhammad Essa Awan and Saba Wahid to Sglowina AI! 🟢")
                     else:
                         st.success("Welcome to Sglowina AI! 🟢")
                     time.sleep(2)
@@ -983,6 +1018,9 @@ with tab_movie:
                 
                 for s in raw_sentences:
                     p_val = generate_enhanced_cinematic_prompt(s, ms, "Automatic", enable_islamic_filter, None, None, "", consistent_char)
+                    # Enforce programmatic human stripper cleaner to strictly protect animal visual fidelity
+                    p_val = clean_animal_prompt_of_humans(p_val, s)
+                    
                     scenes_list.append({
                         "dialogue": s,
                         "flux_prompt": p_val,
