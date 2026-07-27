@@ -86,6 +86,9 @@ if "msgs" not in st.session_state: st.session_state.msgs = []
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=st.session_state.enable_watermark)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=st.session_state.enable_bg_music)
+enable_subtitles = st.sidebar.checkbox("Enable Beautiful Urdu Subtitles", value=True)
+custom_watermark_file = st.sidebar.file_uploader("Upload Custom Watermark Logo (Premium Only):", type=["png", "jpg", "jpeg"])
+
 st.session_state.enable_watermark = enable_watermark
 st.session_state.enable_bg_music = enable_bg_music
 
@@ -286,6 +289,29 @@ def search_web_ddg(query):
     except: pass
     return ""
 
+# Breathtaking Nastaliq Urdu Font Downloader (downloads Google Noto Nastaliq Urdu dynamically to guarantee beautiful font style)
+def get_urdu_font(font_size=32):
+    font_paths = [
+        "NotoNastaliqUrdu-Regular.ttf",
+        "arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf"
+    ]
+    for path in font_paths:
+        try: return ImageFont.truetype(path, font_size)
+        except: pass
+    
+    font_url = "https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoNastaliqUrdu/NotoNastaliqUrdu-Regular.ttf"
+    local_font_path = "NotoNastaliqUrdu.ttf"
+    if not os.path.exists(local_font_path):
+        try:
+            r = session.get(font_url, timeout=10)
+            if r.status_code == 200:
+                with open(local_font_path, "wb") as f: f.write(r.content)
+        except: pass
+    try: return ImageFont.truetype(local_font_path, font_size)
+    except: return ImageFont.load_default()
+
 def analyze_scene_for_director(scene_text):
     text = scene_text.lower()
     motion, lighting, color_grading, composition = "Zoom Out (v40 Default)", "Volumetric Light", "Hollywood Cinematic", "Cinematic Wide Shot"
@@ -366,7 +392,7 @@ def clean_animal_prompt_of_humans(prompt, urdu_text, style):
     urdu_lower = urdu_text.lower()
     
     has_human_urdu = any(k in urdu_lower for k in ["لڑکا", "لڑکی", "عورت", "مرد", "انسان", "بچہ", "بچے", "لوگ", "شہزادہ", "بادشاہ", "ملکہ"])
-    has_animal_urdu = any(k in urdu_lower for k in ["چوزہ", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا", "ہاتھی", "بھیڑیا"])
+    has_animal_urdu = any(k in urdu_lower for k in ["چوزا", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا", "ہاتھی", "بھیڑیا"])
     
     # Map style parameter to descriptive prefixes dynamically to lock user choices
     style_prefix = "3D cartoon Pixar style"
@@ -528,6 +554,61 @@ def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
             try: Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
             except: pass
 
+# Subtitle burner utilizing the official Google Noto Nastaliq Urdu font dynamically to guarantee beautiful Urdu text styling without crashes
+def burn_subtitles_to_image(img_path, text, font_size=28):
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            draw = ImageDraw.Draw(im)
+            w, h = im.size
+            
+            # Load Google's Noto Nastaliq Urdu font safely
+            font = get_urdu_font(font_size)
+            
+            # Word wrapping for Urdu text
+            words = text.split(" ")
+            lines = []
+            current_line = ""
+            for word in words:
+                if len(current_line + " " + word) < 32:
+                    current_line += (" " if current_line else "") + word
+                else:
+                    lines.append(current_line)
+                    current_line = word
+            if current_line: lines.append(current_line)
+            
+            line_h = font_size + 12
+            box_h = len(lines) * line_h + 30
+            box_y = h - box_h - 40
+            
+            overlay = Image.new('RGBA', im.size, (0, 0, 0, 0))
+            draw_overlay = ImageDraw.Draw(overlay)
+            draw_overlay.rounded_rectangle([40, box_y, w - 40, h - 40], radius=10, fill=(0, 0, 0, 160))
+            im = Image.alpha_composite(im.convert('RGBA'), overlay).convert('RGB')
+            
+            draw_final = ImageDraw.Draw(im)
+            curr_y = box_y + 15
+            for line in lines:
+                draw_final.text((w // 2, curr_y), line, fill=(255, 255, 255), anchor="mm", font=font)
+                curr_y += line_h
+            im.save(img_path, "JPEG")
+    except: pass # Failsafe wrapper prevents black screen / rendering block on failures
+
+# Apply custom logo watermark to the image directly
+def apply_custom_watermark(img_path, watermark_bytes):
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGBA")
+            with Image.open(io.BytesIO(watermark_bytes)) as wm:
+                wm = wm.convert("RGBA")
+                wm_w = int(im.width * 0.15)
+                wm_ratio = wm.height / wm.width
+                wm_h = int(wm_w * wm_ratio)
+                wm = wm.resize((wm_w, wm_h))
+                im.paste(wm, (im.width - wm_w - 30, im.height - wm_h - 30), wm)
+            im.convert("RGB").save(img_path, "JPEG")
+    except: pass
+
 # Restored to Sequential Downloading with Safe Delay to completely bypass Cloudflare 429 locks
 def parallel_download_flux_images(urls, paths, sentences, w, h):
     for i in range(len(urls)):
@@ -667,7 +748,7 @@ def apply_canva_typography(img_path, text):
             draw = ImageDraw.Draw(im)
             w, h = im.size
             font_size = int(h * 0.04) if h * 0.04 > 16 else 16
-            try: font = ImageFont.load_default()
+            try: font = get_urdu_font(font_size) # Restored beautiful Urdu font
             except: font = None
             overlay = Image.new('RGBA', im.size, (0, 0, 0, 0))
             draw_overlay = ImageDraw.Draw(overlay)
@@ -680,9 +761,9 @@ def apply_canva_typography(img_path, text):
     except: pass
 
 # ==========================================
-# 4. SINGLE CLICK DIRECT MOVIE GENERATION (V1.0 restored with step progress text)
+# 4. SINGLE CLICK DIRECT MOVIE GENERATION (V1.0 restored with step progress text and custom watermark)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast"):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast", custom_wm_bytes=None, enable_sub=True):
     if not MOVIEPY_AVAILABLE:
         st.error(f"MoviePy is not available on this server. Error: {MOVIEPY_ERROR}.")
         return "Error"
@@ -885,6 +966,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 status.info(f"🎞️ Video: Applying camera motion and compiling Scene {i + 1} of {total_scenes}...")
                 ensure_image_exists(img_path, w, h, scene)
                 apply_color_lut_harmony(img_path, style)
+                # Dynamically write Nastaliq Urdu subtitles on image safely
+                if enable_sub:
+                    burn_subtitles_to_image(img_path, scene)
+                # Apply custom watermark if provided
+                if custom_wm_bytes is not None:
+                    apply_custom_watermark(img_path, custom_wm_bytes)
                 apply_blurred_background_padding(img_path, make_even(w * 1.25), make_even(h * 1.25))
                 
                 scene_voice_clip = AudioFileClip(sub_audio_path)
@@ -1087,9 +1174,25 @@ with tab_chat:
 # Pro Movie Studio
 with tab_movie:
     st.write("### 🎥 Movie Studio")
-    gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"])
-    pollinations_key = st.text_input("Enter Pollinations API Key (if using video mode):", type="password") if "Real AI Video" in gen_mode else ""
-    m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150)
+    
+    # 1. Sglowina AI Script Writer Integration (Step 1 of Auto Script generation)
+    st.write("#### 📝 Sglowina AI Script Writer (Optional)")
+    with st.expander("Write a story automatically with Sglowina AI"):
+        script_genre = st.selectbox("Story Genre:", ["Moral Animal Story", "Islamic Historical Story", "Business Explainer Script", "Hollywood Action Plot", "Fun Educational Kid Story"])
+        script_topic = st.text_input("Enter Topic/Theme:", placeholder="e.g. A brave rabbit saving the forest")
+        if st.button("Generate Script with AI ✨"):
+            if script_topic.strip():
+                with st.spinner("AI is crafting your story..."):
+                    story_prompt = f"Write a scenic, detailed {script_genre} in Urdu language, with clear, separate sentences divided by periods. Topic: {script_topic}. Keep it engaging for a cinematic video narration."
+                    ai_story = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(story_prompt)}?model=openai").text
+                    st.session_state.movie_script_val = ai_story.strip()
+                    st.success("Story Generated! It has been copied to the Script Box below.")
+            else:
+                st.error("Please enter a topic first.")
+
+    # Script Box
+    script_box_default = st.session_state.get("movie_script_val", "")
+    m_script = st.text_area("Enter Movie Script (Urdu/English):", value=script_box_default, height=150)
     enable_islamic_filter = st.checkbox("Enable Islamic Safety Filter 🛡️", value=True)
     
     col_up1, col_up2 = st.columns(2)
@@ -1097,11 +1200,12 @@ with tab_movie:
     with col_up2: uploaded_female_img = st.file_uploader("Upload Female Reference Image:", type=["jpg", "png", "jpeg"])
 
     mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9 = st.columns(9)
-    with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
+    # Multi-Language Edge-TTS Voices Support Added (Urdu, English, Arabic, Persian)
+    with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)", "English US Male (Guy)", "English US Female (Jenny)", "Arabic Egypt Male (Shakir)", "Persian Male (Farid)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["-10% (Slow)", "+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch:", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    # Reordered dropdown to place 'Realistic HD' first and added the new Hollywood, Bollywood, Lollywood, Corporate Business, Islamic & Educational/Learning styles
+    # Style Dropdown reordered with Realistic HD first, added Hollywood, Bollywood, Lollywood, Corporate Business, Islamic & Educational/Learning styles
     with mc5: ms = st.selectbox("Style:", ["Realistic HD", "3D Cartoon", "Cinematic Hollywood", "Bollywood Dramatic", "Lollywood Classic", "Islamic Historical", "Corporate Business", "Educational Explainer", "Anime Art", "Logo Design", "Rustic Village Life", "Dark Gothic / Mystery"])
     with mc6: camera_motion = st.selectbox("Camera Motion:", ["AI Hollywood Director (Auto)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out", "Orbit Camera", "Crane Shot", "Drone Shot", "Tracking Shot", "Follow Shot", "Handheld Camera", "Shoulder Camera", "Cinematic Reveal", "Whip Pan", "Tilt Up", "Tilt Down", "Roll Camera", "Parallax Motion", "Ken Burns Effect", "Rack Focus", "Motion Blur"])
     with mc7: transition_style = st.selectbox("Transition Effect:", ["Cross Dissolve (Fade)", "Instant Cut"])
@@ -1113,11 +1217,27 @@ with tab_movie:
         rate_val = mv_rate.split(" ")[0]
         pitch_map = {"Normal (نارمل)": "+0Hz", "Deep (بھاری آواز)": "-15Hz", "Very Deep (موٹی آواز)": "-28Hz"}
         pitch_val = pitch_map[mv_pitch]
+        
+        # Read custom watermark bytes if uploaded
+        wm_bytes = custom_watermark_file.getvalue() if custom_watermark_file else None
+        
+        # Map voice choice locale to Edge-TTS correctly
+        voice_map = {
+            "Urdu Male (Asad)": "ur-PK-AsadNeural",
+            "Urdu Female (Uzma)": "ur-PK-UzmaNeural",
+            "English US Male (Guy)": "en-US-GuyNeural",
+            "English US Female (Jenny)": "en-US-JennyNeural",
+            "Arabic Egypt Male (Shakir)": "ar-EG-ShakirNeural",
+            "Persian Male (Farid)": "fa-IR-FaridNeural"
+        }
+        active_voice = voice_map.get(mv, "ur-PK-AsadNeural")
+        
         with st.spinner("🎬 Generating Sglowina Masterpiece..."):
             v_res = create_cinematic_v40(
-                m_script, mv, rate_val, pitch_val, mr, ms, sd, camera_motion, transition_style,
+                m_script, active_voice, rate_val, pitch_val, mr, ms, sd, camera_motion, transition_style,
                 enable_watermark, enable_bg_music, uploaded_male_img, uploaded_female_img,
-                enable_islamic_filter, "Automatic", gen_mode, pollinations_key, video_model
+                enable_islamic_filter, "Automatic", gen_mode, pollinations_key, video_model,
+                custom_wm_bytes=wm_bytes, enable_sub=enable_subtitles
             )
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res):
             st.video(v_res)
