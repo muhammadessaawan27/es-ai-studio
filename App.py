@@ -80,9 +80,9 @@ except ImportError:
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V1.0", layout="wide", page_icon="🎬")
 
 if not MOVIEPY_AVAILABLE:
-    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to requirements.txt.")
+    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to your requirements.txt.")
 if not EDGE_TTS_AVAILABLE:
-    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to requirements.txt.")
+    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to your requirements.txt.")
 
 if "enable_watermark" not in st.session_state: st.session_state.enable_watermark = True
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
@@ -311,7 +311,7 @@ def get_urdu_font(font_size=32):
     local_font_path = "NotoNastaliqUrdu.ttf"
     if not os.path.exists(local_font_path):
         try:
-            r = session.get(font_url, timeout=10)
+            r = requests.get(font_url, timeout=10)
             if r.status_code == 200:
                 with open(local_font_path, "wb") as f: f.write(r.content)
         except: pass
@@ -341,7 +341,7 @@ def analyze_scene_for_director(scene_text):
         
     return {"motion": motion, "lighting": lighting, "color_grading": color_grading, "composition": composition}
 
-# Removed ?model=openai to force 100% free and unlimited anonymous text requests
+# Clean anonymous request using direct requests.get (never session.get) to stop 402 API key pollution
 def translate_ur_to_en_enhanced(text):
     try:
         instruction = (
@@ -349,7 +349,7 @@ def translate_ur_to_en_enhanced(text):
             "CRITICAL RULE: Translate the animal subjects explicitly (e.g., chick, mouse, cat, parrot, monkey, rabbit). Do NOT assume any human subjects unless explicitly requested."
         )
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}"
-        res = session.get(url, timeout=15)
+        res = requests.get(url, timeout=15)
         if res.status_code == 200 and len(res.text.strip()) > 5:
             return res.text.strip()
     except: pass
@@ -447,6 +447,7 @@ def clean_animal_prompt_of_humans(prompt, urdu_text, style):
         
     return prompt
 
+# Clean anonymous request using direct requests.get (never session.get) to stop 402 API key pollution
 def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url, attire_desc="", consistent_char_desc=""):
     try:
         scene_lower = urdu_scene.lower()
@@ -494,7 +495,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         
         formatted_instruction = instruction.replace("{raw_male_url}", raw_male_url or "None").replace("{raw_female_url}", raw_female_url or "None")
         url = f"https://text.pollinations.ai/{urllib.parse.quote(formatted_instruction + ' ' + prompt_input)}"
-        res = session.get(url, timeout=20)
+        res = requests.get(url, timeout=20)
         if res.status_code == 200:
             refined_p = res.text.strip()
             refined_p = re.sub(r'^(prompt:|visual prompt:|cinematic prompt:)\s*', '', refined_p, flags=re.IGNORECASE)
@@ -1226,7 +1227,7 @@ with tab_movie:
     with mc8: video_model = st.selectbox("AI Video Model:", ["wan-fast", "seedance", "veo"])
     with mc9: sd = st.number_input("Character Seed:", value=786)
     
-    # Restored to 1-Click Generation Action with unique key parameter to forcefully invalidate browser video cache
+    # Restored to 1-Click Generation Action (Safely resolved st.video NameError and TypeError by passing session state variables and removing incompatible key parameter)
     if st.button("Generate Master Movie 🚀"):
         rate_val = mv_rate.split(" ")[0]
         pitch_map = {"Normal (نارمل)": "+0Hz", "Deep (بھاری آواز)": "-15Hz", "Very Deep (موٹی آواز)": "-28Hz"}
@@ -1254,7 +1255,7 @@ with tab_movie:
                 custom_wm_bytes=wm_bytes, enable_sub=enable_subtitles
             )
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res):
-            st.video(v_res, key=f"video_{v_res}_{int(time.time())}") # Force unique key to completely bypass local browser cache
+            st.video(v_res) # Completely removed key parameter from st.video to prevent TypeErrors in older/newer Streamlit releases
             st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
         else: st.error(v_res)
 
