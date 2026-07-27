@@ -70,13 +70,13 @@ try:
 except ImportError:
     EDGE_TTS_AVAILABLE = False
 
-# Restored Page Config to Version 1.0 as ordered
+# Page Config - Restored V1.0 [7.1]
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V1.0", layout="wide", page_icon="🎬")
 
 if not MOVIEPY_AVAILABLE:
-    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to your requirements.txt.")
+    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to requirements.txt.")
 if not EDGE_TTS_AVAILABLE:
-    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to your requirements.txt.")
+    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to requirements.txt.")
 
 if "enable_watermark" not in st.session_state: st.session_state.enable_watermark = True
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
@@ -337,7 +337,6 @@ def is_human_character_present(scene):
 def analyze_consistent_subject(story_text):
     story_l = story_text.lower()
     if any(k in story_l for k in ["چوزا", "chick", "چوزے"]):
-        # Removed the word 'baby' to completely prevent human baby generation
         return "a cute fluffy yellow 3D Pixar style chick wearing an upside-down metallic bucket on its head as superhero helmet"
     if any(k in story_l for k in ["چوہا", "mouse", "rat"]):
         return "a cute tiny 3D cartoon brown mouse wearing superhero attire"
@@ -351,7 +350,7 @@ def clean_animal_prompt_of_humans(prompt, urdu_text):
     urdu_lower = urdu_text.lower()
     
     has_human_urdu = any(k in urdu_lower for k in ["لڑکا", "لڑکی", "عورت", "مرد", "انسان", "بچہ", "بچے", "لوگ", "شہزادہ", "بادشاہ", "ملکہ"])
-    has_animal_urdu = any(k in urdu_lower for k in ["چوزہ", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا"])
+    has_animal_urdu = any(k in urdu_lower for k in ["چوزہ", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا", "ہاتھی", "بھیڑیا"])
     
     if has_animal_urdu and not has_human_urdu:
         human_words = ["boy", "girl", "child", "infant", "toddler", "kid", "human", "person", "man", "woman", "he", "she", "male", "female", "glasses", "mustache", "beard"]
@@ -359,13 +358,15 @@ def clean_animal_prompt_of_humans(prompt, urdu_text):
         for word in human_words:
             cleaned_prompt = re.sub(r'\b' + word + r'\b', '', cleaned_prompt, flags=re.IGNORECASE)
         
-        # Explicit wide-angle landscape animal anchoring with NO background blur / bokeh
+        # Explicit wide-angle landscape animal anchors with 100% sharp background focus & beautiful scenic trails
         if "چوزہ" in urdu_lower or "chick" in urdu_lower:
-            cleaned_prompt = "A beautiful wide-angle medium-shot of a fluffy yellow 3D cartoon chick wearing a metal bucket on head, walking along a detailed forest path, sharp focus, no background blur, no bokeh, " + cleaned_prompt
+            cleaned_prompt = "A beautiful wide-angle landscape shot of a fluffy yellow 3D cartoon chick wearing a metal bucket on head, walking along a scenic detailed forest path, sharp focus, no background blur, no bokeh, beautiful trees, " + cleaned_prompt
         elif "بلی" in urdu_lower:
-            cleaned_prompt = "A beautiful wide-angle shot of a cute 3D cartoon cat sitting gracefully in a detailed scenic garden, sharp focus, no background blur, " + cleaned_prompt
+            cleaned_prompt = "A beautiful wide-angle shot of a cute 3D cartoon cat sitting in a lush detailed cartoon forest, sharp focus, no background blur, " + cleaned_prompt
+        elif any(k in urdu_lower for k in ["شیر", "چیتا", "ہاتھی", "بھیڑیا", "حیوان", "جانور", "lion", "cheetah", "elephant", "wolf"]):
+            cleaned_prompt = "A majestic wide-angle 3D cartoon group shot of a friendly cartoon lion, a cheetah, a small cute elephant, and a wolf walking side-by-side along a highly-detailed scenic forest trail, vibrant colors, sharp focus, no background blur, no bokeh, " + cleaned_prompt
         elif "بندر" in urdu_lower or "طوطا" in urdu_lower or "خرگوش" in urdu_lower:
-            cleaned_prompt = "A beautiful wide-angle scenic group shot of cute 3D cartoon animals including a funny monkey, a colorful parrot, and a fluffy rabbit laughing and playing together in a detailed forest landscape, sharp focus, no background blur, no bokeh, " + cleaned_prompt
+            cleaned_prompt = "A beautiful wide-angle scenic group shot of cute 3D cartoon animals including a funny monkey, a colorful parrot, and a fluffy rabbit laughing and playing together in a detailed green forest pasture, sharp focus, no background blur, no bokeh, " + cleaned_prompt
             
         cleaned_prompt = re.sub(r',\s*,', ',', cleaned_prompt)
         cleaned_prompt = re.sub(r'\s+', ' ', cleaned_prompt).strip()
@@ -484,25 +485,27 @@ def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
             try: Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
             except: pass
 
-# Optimized Parallel Downloading via ThreadPool for maximum rendering speedup (Passes English prompts as fallback)
-def parallel_download_flux_images(urls, paths, prompts, w, h):
-    def download_single(i):
-        url, path, english_prompt = urls[i], paths[i], prompts[i]
+# Restored to Sequential Downloading with Safe Delay to completely bypass Cloudflare 429 locks
+def parallel_download_flux_images(urls, paths, sentences, w, h):
+    for i in range(len(urls)):
+        url, path, scene_text = urls[i], paths[i], sentences[i]
         success = False
         
+        # Primary Download (Timeout raised to 45 seconds for first frame to allow cold starts)
+        t_limit = 45 if i == 0 else 25
         for attempt in range(3):
             try:
-                res = session.get(url, timeout=25)
+                res = session.get(url, timeout=t_limit)
                 if res.status_code == 200 and len(res.content) > 5000:
                     with open(path, "wb") as f: f.write(res.content)
                     success = True
                     break
             except: pass
-            time.sleep(0.5)
+            time.sleep(1.5)
             
-        # Robust Fallback utilizing the generated English prompt to guarantee 100% successful generation
+        # If primary failed, use the same Urdu sentence again rather than a fixed template
         if not success:
-            fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('3D Pixar style, ' + english_prompt[:150])}?width={w}&height={h}&nologo=true&model=flux"
+            fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('3D Pixar style, cute, ' + scene_text)}?width={w}&height={h}&nologo=true&model=flux"
             try:
                 res = session.get(fallback_url, timeout=20)
                 if res.status_code == 200 and len(res.content) > 5000:
@@ -511,10 +514,10 @@ def parallel_download_flux_images(urls, paths, prompts, w, h):
             except: pass
             
         if not success:
-            ensure_image_exists(path, w, h, english_prompt)
+            ensure_image_exists(path, w, h, scene_text)
             
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        list(executor.map(download_single, range(len(urls))))
+        # 1 second defensive cooldown to protect against server rate limits
+        time.sleep(1.0)
 
 def get_cached_bg_music(is_horror, is_epic):
     fn = "bg_horror.mp3" if is_horror else ("bg_epic.mp3" if is_epic else "bg_standard.mp3")
@@ -541,41 +544,41 @@ def download_video_safely(url, dest_path, progress_status):
         progress_status.warning(f"Video download timeout ({e}). Falling back to Cinematic Zoom...")
     return False
 
-# Removed automatic Gaussian blur to protect background clarity
+# Preserved image scale factor at 1.05 to prevent blurry zooms or focus errors
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     if not MOVIEPY_AVAILABLE: return None
     ensure_image_exists(img_path, w, h, "Visualizing scene...")
     try:
-        scale_factor = 1.30
+        scale_factor = 1.05
         base_clip = ImageClip(img_path).set_duration(duration).set_fps(24)
         cw, ch = int(w * scale_factor), int(h * scale_factor)
         clip = base_clip.resize((cw, ch))
         
         motions_map = {
-            "Zoom In": lambda: clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center'),
-            "Zoom Out (v40 Default)": lambda: clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center'),
+            "Zoom In": lambda: clip.resize(lambda t: 1.0 + 0.05 * (t / duration)).set_position('center'),
+            "Zoom Out (v40 Default)": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).set_position('center'),
             "Pan Left": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
             "Pan Right": lambda: clip.set_position(lambda t: (int((w - cw) * (1 - t / duration)), 'center')),
             "Pan Up": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))),
             "Pan Down": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
-            "Dolly In": lambda: clip.resize(lambda t: 1.0 + 0.25 * (t / duration)).set_position('center'),
-            "Dolly Out": lambda: clip.resize(lambda t: 1.25 - 0.25 * (t / duration)).set_position('center'),
-            "Orbit Camera": lambda: clip.rotate(lambda t: -3 + 6 * (t / duration)).resize(lambda t: 1.1 + 0.1 * (t / duration)).set_position('center'),
-            "Crane Shot": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -2 * (t / duration)),
-            "Drone Shot": lambda: clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center'),
-            "Tracking Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5))))),
-            "Follow Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5))))),
-            "Handheld Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0)),
-            "Shoulder Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0)),
+            "Dolly In": lambda: clip.resize(lambda t: 1.0 + 0.05 * (t / duration)).set_position('center'),
+            "Dolly Out": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).set_position('center'),
+            "Orbit Camera": lambda: clip.rotate(lambda t: -1 + 2 * (t / duration)).resize(lambda t: 1.02 + 0.03 * (t / duration)).set_position('center'),
+            "Crane Shot": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -1 * (t / duration)),
+            "Drone Shot": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).rotate(lambda t: 2 * (t / duration)).set_position('center'),
+            "Tracking Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (2 * np.sin(2 * np.pi * t * 1.5))))),
+            "Follow Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (2 * np.sin(2 * np.pi * t * 1.5))))),
+            "Handheld Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (2 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (2 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 0.5 * np.sin(2 * np.pi * t * 1.0)),
+            "Shoulder Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (2 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (2 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 0.5 * np.sin(2 * np.pi * t * 1.0)),
             "Cinematic Reveal": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
             "Whip Pan": lambda: clip.set_position(lambda t: (int((w - cw) * ((t / duration) ** 3)), 'center')),
             "Tilt Up": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))),
             "Tilt Down": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
-            "Roll Camera": lambda: clip.rotate(lambda t: 8 * (t / duration)).set_position('center'),
-            "Parallax Motion": lambda: clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
-            "Ken Burns Effect": lambda: clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
-            "Rack Focus": lambda: clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center'),
-            "Motion Blur": lambda: clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center')
+            "Roll Camera": lambda: clip.rotate(lambda t: 3 * (t / duration)).set_position('center'),
+            "Parallax Motion": lambda: clip.resize(lambda t: 1.01 + 0.04 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
+            "Ken Burns Effect": lambda: clip.resize(lambda t: 1.01 + 0.04 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
+            "Rack Focus": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).set_position('center'),
+            "Motion Blur": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).set_position('center')
         }
         try:
             animated_clip = motions_map.get(motion, motions_map["Zoom Out (v40 Default)"])()
@@ -634,7 +637,7 @@ def apply_canva_typography(img_path, text):
     except: pass
 
 # ==========================================
-# 4. SINGLE CLICK DIRECT MOVIE GENERATION (V1.0 restored)
+# 4. SINGLE CLICK DIRECT MOVIE GENERATION
 # ==========================================
 def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast"):
     if not MOVIEPY_AVAILABLE:
@@ -803,18 +806,19 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                             st.warning(f"Video clip loading failed: {e}. Switching to photo fallback...")
                 
                 w_target, h_target = make_even(w * 1.25), make_even(h * 1.25)
-                flux_prompt_urls[i] = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed + i * 17}&nologo=true&model=flux"
+                # Safeguard: Truncate prompt passed to Flux to 400 chars to avoid HTTP 414 URI Too Long errors
+                truncated_prompt = refined_p[:400]
+                flux_prompt_urls[i] = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(truncated_prompt)}?width={w_target}&height={h_target}&seed={seed + i * 17}&nologo=true&model=flux"
                 img_paths[i] = f"i_{u_id}_{i}.jpg"
                 
             progress_bar.progress(0.25)
             indices_needing_images = [idx for idx, c in enumerate(clips) if c is None]
             if indices_needing_images:
                 status.info("🎨 Generating custom visual frames...")
-                # Pass generated English prompts to guarantee 100% stable fallbacks
                 parallel_download_flux_images(
                     [flux_prompt_urls[idx] for idx in indices_needing_images],
                     [img_paths[idx] for idx in indices_needing_images],
-                    [generated_prompts[idx] for idx in indices_needing_images], w, h
+                    [sentences[idx] for idx in indices_needing_images], w, h
                 )
                 for idx in indices_needing_images:
                     if img_paths[idx]: generated_images.append(img_paths[idx])
