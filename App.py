@@ -70,7 +70,13 @@ try:
 except ImportError:
     EDGE_TTS_AVAILABLE = False
 
-st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V2.1", layout="wide", page_icon="🎬")
+# Restored Page Config to Version 1.0 as ordered
+st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V1.0", layout="wide", page_icon="🎬")
+
+if not MOVIEPY_AVAILABLE:
+    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to your requirements.txt.")
+if not EDGE_TTS_AVAILABLE:
+    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to your requirements.txt.")
 
 if "enable_watermark" not in st.session_state: st.session_state.enable_watermark = True
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
@@ -331,6 +337,7 @@ def is_human_character_present(scene):
 def analyze_consistent_subject(story_text):
     story_l = story_text.lower()
     if any(k in story_l for k in ["چوزا", "chick", "چوزے"]):
+        # Removed the word 'baby' to completely prevent human baby generation
         return "a cute fluffy yellow 3D Pixar style chick wearing an upside-down metallic bucket on its head as superhero helmet"
     if any(k in story_l for k in ["چوہا", "mouse", "rat"]):
         return "a cute tiny 3D cartoon brown mouse wearing superhero attire"
@@ -338,7 +345,7 @@ def analyze_consistent_subject(story_text):
         return "a funny goofy 3D cartoon brown monkey"
     return ""
 
-# Bulletproof Human Stripper filter to strictly enforce animal-only visuals
+# Bulletproof Human Stripper filter to strictly enforce animal-only visuals (Forces Wide Shots with No Blur)
 def clean_animal_prompt_of_humans(prompt, urdu_text):
     prompt_lower = prompt.lower()
     urdu_lower = urdu_text.lower()
@@ -352,13 +359,13 @@ def clean_animal_prompt_of_humans(prompt, urdu_text):
         for word in human_words:
             cleaned_prompt = re.sub(r'\b' + word + r'\b', '', cleaned_prompt, flags=re.IGNORECASE)
         
-        # Explicit wide-angle animal anchoring based on Urdu keyword detection
+        # Explicit wide-angle landscape animal anchoring with NO background blur / bokeh
         if "چوزہ" in urdu_lower or "chick" in urdu_lower:
-            cleaned_prompt = "A beautiful wide-angle medium-shot of a fluffy yellow 3D cartoon chick wearing a metal bucket on head, " + cleaned_prompt
+            cleaned_prompt = "A beautiful wide-angle medium-shot of a fluffy yellow 3D cartoon chick wearing a metal bucket on head, walking along a detailed forest path, sharp focus, no background blur, no bokeh, " + cleaned_prompt
         elif "بلی" in urdu_lower:
-            cleaned_prompt = "A cute 3D cartoon cat sitting gracefully, " + cleaned_prompt
+            cleaned_prompt = "A beautiful wide-angle shot of a cute 3D cartoon cat sitting gracefully in a detailed scenic garden, sharp focus, no background blur, " + cleaned_prompt
         elif "بندر" in urdu_lower or "طوطا" in urdu_lower or "خرگوش" in urdu_lower:
-            cleaned_prompt = "A joyful group of cute 3D cartoon animals including a funny monkey, a colorful parrot, and a fluffy rabbit laughing and playing together in a beautiful forest pasture, " + cleaned_prompt
+            cleaned_prompt = "A beautiful wide-angle scenic group shot of cute 3D cartoon animals including a funny monkey, a colorful parrot, and a fluffy rabbit laughing and playing together in a detailed forest landscape, sharp focus, no background blur, no bokeh, " + cleaned_prompt
             
         cleaned_prompt = re.sub(r',\s*,', ',', cleaned_prompt)
         cleaned_prompt = re.sub(r'\s+', ' ', cleaned_prompt).strip()
@@ -379,7 +386,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
             "Logo Design": "minimalist professional vector logo design, flat colors, icon style",
             "Historical Epic": "grand historical epic movie style, majestic ancient atmosphere, rich cultural heritage textures",
             "Rustic Village Life": "rustic traditional old village life, raw earthy tones, authentic rural setting, natural rustic lighting",
-            "Dark Gothic / Mystery": "moody dark gothic mystery, eerie misty atmosphere, shadows, dramatic cinematic suspense"
+            "Dark Gothic / Mystery": "moody dark gothic mystery, eerie misty atmosphere, shadows, dramatic cinematic suspense look"
         }
         style_tag = style_boosters.get(style, "cinematic film style, highly detailed")
         
@@ -467,7 +474,7 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
             bg.save(img_path, "JPEG")
     except: pass
 
-# Solid clean dark slate gray failsafe
+# Solid clean dark slate gray failsafe (No glowing purple orbs)
 def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
     if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
         try:
@@ -477,10 +484,10 @@ def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
             try: Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
             except: pass
 
-# Optimized Parallel Downloading via ThreadPool for maximum rendering speedup
-def parallel_download_flux_images(urls, paths, sentences, w, h):
+# Optimized Parallel Downloading via ThreadPool for maximum rendering speedup (Passes English prompts as fallback)
+def parallel_download_flux_images(urls, paths, prompts, w, h):
     def download_single(i):
-        url, path, scene_text = urls[i], paths[i], sentences[i]
+        url, path, english_prompt = urls[i], paths[i], prompts[i]
         success = False
         
         for attempt in range(3):
@@ -493,8 +500,9 @@ def parallel_download_flux_images(urls, paths, sentences, w, h):
             except: pass
             time.sleep(0.5)
             
+        # Robust Fallback utilizing the generated English prompt to guarantee 100% successful generation
         if not success:
-            fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('3D Pixar style, cute, ' + scene_text)}?width={w}&height={h}&nologo=true&model=flux"
+            fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('3D Pixar style, ' + english_prompt[:150])}?width={w}&height={h}&nologo=true&model=flux"
             try:
                 res = session.get(fallback_url, timeout=20)
                 if res.status_code == 200 and len(res.content) > 5000:
@@ -503,7 +511,7 @@ def parallel_download_flux_images(urls, paths, sentences, w, h):
             except: pass
             
         if not success:
-            ensure_image_exists(path, w, h, scene_text)
+            ensure_image_exists(path, w, h, english_prompt)
             
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         list(executor.map(download_single, range(len(urls))))
@@ -533,17 +541,12 @@ def download_video_safely(url, dest_path, progress_status):
         progress_status.warning(f"Video download timeout ({e}). Falling back to Cinematic Zoom...")
     return False
 
+# Removed automatic Gaussian blur to protect background clarity
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     if not MOVIEPY_AVAILABLE: return None
     ensure_image_exists(img_path, w, h, "Visualizing scene...")
     try:
         scale_factor = 1.30
-        if motion in ["Whip Pan", "Tracking Shot"]:
-            try:
-                with Image.open(img_path) as im_blur:
-                    im_blur = im_blur.filter(ImageFilter.GaussianBlur(radius=1))
-                    im_blur.save(img_path, "JPEG")
-            except: pass
         base_clip = ImageClip(img_path).set_duration(duration).set_fps(24)
         cw, ch = int(w * scale_factor), int(h * scale_factor)
         clip = base_clip.resize((cw, ch))
@@ -631,7 +634,7 @@ def apply_canva_typography(img_path, text):
     except: pass
 
 # ==========================================
-# 4. SINGLE CLICK DIRECT MOVIE GENERATION
+# 4. SINGLE CLICK DIRECT MOVIE GENERATION (V1.0 restored)
 # ==========================================
 def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast"):
     if not MOVIEPY_AVAILABLE:
@@ -807,10 +810,11 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             indices_needing_images = [idx for idx, c in enumerate(clips) if c is None]
             if indices_needing_images:
                 status.info("🎨 Generating custom visual frames...")
+                # Pass generated English prompts to guarantee 100% stable fallbacks
                 parallel_download_flux_images(
                     [flux_prompt_urls[idx] for idx in indices_needing_images],
                     [img_paths[idx] for idx in indices_needing_images],
-                    [sentences[idx] for idx in indices_needing_images], w, h
+                    [generated_prompts[idx] for idx in indices_needing_images], w, h
                 )
                 for idx in indices_needing_images:
                     if img_paths[idx]: generated_images.append(img_paths[idx])
@@ -1171,4 +1175,4 @@ with tab_enterprise:
             conn.close()
         else: st.error("Admin access denied.")
 
-st.markdown("<p style='text-align: center; font-weight: bold; padding-top: 20px; color: #475569;'>Sglowina AI Version 2.1 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; padding-top: 20px; color: #475569;'>Sglowina AI Version 1.0 Premium | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
