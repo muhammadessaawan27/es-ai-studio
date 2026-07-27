@@ -76,6 +76,7 @@ if "enable_watermark" not in st.session_state: st.session_state.enable_watermark
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
 if "logged_in_user" not in st.session_state: st.session_state.logged_in_user = "demo_user"
 if "msgs" not in st.session_state: st.session_state.msgs = []
+if "storyboard_scenes" not in st.session_state: st.session_state.storyboard_scenes = []
 
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=st.session_state.enable_watermark)
@@ -331,7 +332,6 @@ def is_human_character_present(scene):
 def analyze_consistent_subject(story_text):
     story_l = story_text.lower()
     if any(k in story_l for k in ["چوزا", "chick", "چوزے"]):
-        # Completely removed the word 'baby' to prevent human child generation
         return "a cute fluffy yellow 3D Pixar style chick wearing an upside-down metallic bucket on its head as superhero helmet"
     if any(k in story_l for k in ["چوہا", "mouse", "rat"]):
         return "a cute tiny 3D cartoon brown mouse wearing superhero attire"
@@ -422,7 +422,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
     except: pass
     return f"3D cartoon scene: {urdu_scene}, style: {style}, highly detailed, 8k"
 
-# Clean, safe image enhancement without channel splits/distortions (No yellow/blue tints)
+# Clean, safe image enhancement without channel splits/distortions
 def apply_color_lut_harmony(img_path, style_preset):
     try:
         with Image.open(img_path) as im:
@@ -636,7 +636,7 @@ def apply_canva_typography(img_path, text):
     except: pass
 
 # ==========================================
-# 4. SINGLE CLICK DIRECT MOVIE GENERATION (V40 Restored logic)
+# 4. SINGLE CLICK DIRECT MOVIE GENERATION
 # ==========================================
 def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast"):
     if not MOVIEPY_AVAILABLE:
@@ -914,60 +914,35 @@ st.markdown("""
     
     .stApp { background: #f8fafc !important; color: #0f172a !important; font-family: 'Inter', sans-serif; }
     
-    /* SHIMMERING GLOW PINK-BLUE GRADIENT METALLIC TITLE (Restored Original) */
+    /* FLAT, SMALLER UNLIT TITLE DESIGN (Speed-optimized, zero graphics lag) */
     .glow-title { 
-        font-size: 3rem; font-weight: 900; text-align: center; font-family: 'Orbitron', sans-serif;
-        background: linear-gradient(135deg, #00f0ff, #ff007f, #00f0ff); background-size: 200% auto;
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        animation: shimmerGlow 3s infinite linear; margin-top: 15px; margin-bottom: 5px; letter-spacing: 5px;
-        filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
+        font-size: 2rem !important; font-weight: 900; font-family: 'Orbitron', sans-serif;
+        color: #1e3a8a !important; letter-spacing: 3px; margin: 0 !important;
     }
     
-    .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
+    /* FLEX CONTAINER FOR TITLE AND LOGO SIDE-BY-SIDE */
+    .dashboard-header {
+        display: flex; justify-content: center; align-items: center; gap: 15px;
+        margin-top: 15px; margin-bottom: 20px;
+    }
     
-    /* RADIAL GLOW METALLIC SPINNING CONTAINER (120px Original Restored) */
+    /* RADIAL GLOW METALLIC SPINNING CONTAINER (GPU optimized, no heavy box shadows) */
     .circular-s {
-        width: 120px; height: 120px; background: radial-gradient(circle, #020617 40%, #1e1b4b 100%) !important;
+        width: 70px !important; height: 70px !important; background: #0f172a !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        border: 4px solid #00f0ff !important; box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
-        animation: rotateSpins 10s infinite linear, electricGlow 3s infinite alternate;
+        border: 3px solid #2563eb !important;
+        animation: rotateSpins 10s infinite linear;
     }
     
-    /* SHIMMERING GLOW METALLIC 'S' TEXT (65px Original Restored) */
+    /* FLAT BLUE 'S' TEXT */
     .metallic-s {
-        font-family: 'Orbitron', sans-serif; font-size: 65px; font-weight: 900;
-        background: linear-gradient(135deg, #ff007f, #00f0ff, #ff007f); background-size: 200% auto;
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.8)); animation: shimmerGlow 3s infinite linear;
+        font-family: 'Orbitron', sans-serif; font-size: 38px !important; font-weight: 900;
+        color: #2563eb !important;
     }
     
     @keyframes rotateSpins {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
-    }
-    @keyframes electricGlow {
-        0%, 100% {
-            box-shadow: 0 0 20px rgba(0, 240, 255, 0.6), 0 0 40px rgba(255, 0, 127, 0.4);
-            border-color: #00f0ff !important;
-        }
-        50% {
-            box-shadow: 0 0 35px rgba(255, 0, 127, 0.9), 0 0 70px rgba(0, 240, 255, 0.7);
-            border-color: #ff007f !important;
-        }
-    }
-    @keyframes shimmerGlow {
-        0% {
-            text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(255, 0, 127, 0.5);
-            background-position: 0% 50%;
-        }
-        50% {
-            text-shadow: 0 0 25px rgba(255, 0, 127, 1), 0 0 45px rgba(0, 240, 255, 0.8);
-            background-position: 100% 50%;
-        }
-        100% {
-            text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(255, 0, 127, 0.5);
-            background-position: 0% 50%;
-        }
     }
     
     .stButton>button, .stFormSubmitButton>button { 
@@ -984,8 +959,13 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="glow-title">SGLOWINA AI</div>', unsafe_allow_html=True)
-st.markdown('<div class="logo-container"><div class="circular-s"><span class="metallic-s">S</span></div></div>', unsafe_allow_html=True)
+# Restored side-by-side unlit dashboard header layout
+st.markdown("""
+    <div class="dashboard-header">
+        <div class="circular-s"><span class="metallic-s">S</span></div>
+        <h1 class="glow-title">SGLOWINA AI</h1>
+    </div>
+""", unsafe_allow_html=True)
 
 # Tabs Initialization
 tab_auth, tab_chat, tab_movie, tab_image, tab_enterprise = st.tabs([
@@ -1085,7 +1065,7 @@ with tab_image:
     
     if st.button("Generate Titan Visuals 🚀"):
         u_db = get_user_data(st.session_state.logged_in_user)
-        if u_db and u_db['credits'] >= 2 * count:
+        if u_db && u_db['credits'] >= 2 * count:
             dim = {"Square (1:1)": (1024, 1024), "YouTube HD": (1280, 720), "TikTok": (720, 1280)}
             w, h = dim.get(i_size, (1024, 1024))
             final_p = p_i
