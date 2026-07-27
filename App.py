@@ -332,6 +332,7 @@ def is_human_character_present(scene):
 def analyze_consistent_subject(story_text):
     story_l = story_text.lower()
     if any(k in story_l for k in ["چوزا", "chick", "چوزے"]):
+        # Completely removed the word 'baby' to prevent human child generation
         return "a cute fluffy yellow 3D Pixar style chick wearing an upside-down metallic bucket on its head as superhero helmet"
     if any(k in story_l for k in ["چوہا", "mouse", "rat"]):
         return "a cute tiny 3D cartoon brown mouse wearing superhero attire"
@@ -1065,7 +1066,8 @@ with tab_image:
     
     if st.button("Generate Titan Visuals 🚀"):
         u_db = get_user_data(st.session_state.logged_in_user)
-        if u_db && u_db['credits'] >= 2 * count:
+        # Corrected Python '&&' syntax error to 'and'
+        if u_db and u_db['credits'] >= 2 * count:
             dim = {"Square (1:1)": (1024, 1024), "YouTube HD": (1280, 720), "TikTok": (720, 1280)}
             w, h = dim.get(i_size, (1024, 1024))
             final_p = p_i
