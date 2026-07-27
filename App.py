@@ -74,9 +74,9 @@ except ImportError:
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V1.0", layout="wide", page_icon="🎬")
 
 if not MOVIEPY_AVAILABLE:
-    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to your requirements.txt.")
+    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to requirements.txt.")
 if not EDGE_TTS_AVAILABLE:
-    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to your requirements.txt.")
+    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to requirements.txt.")
 
 if "enable_watermark" not in st.session_state: st.session_state.enable_watermark = True
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
@@ -335,13 +335,14 @@ def analyze_scene_for_director(scene_text):
         
     return {"motion": motion, "lighting": lighting, "color_grading": color_grading, "composition": composition}
 
+# Removed ?model=openai to force 100% free and unlimited anonymous text requests
 def translate_ur_to_en_enhanced(text):
     try:
         instruction = (
             "You are an expert visual prompt translator. Translate the following Urdu scene description into clean descriptive English. \n"
             "CRITICAL RULE: Translate the animal subjects explicitly (e.g., chick, mouse, cat, parrot, monkey, rabbit). Do NOT assume any human subjects unless explicitly requested."
         )
-        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}"
         res = session.get(url, timeout=15)
         if res.status_code == 200 and len(res.text.strip()) > 5:
             return res.text.strip()
@@ -376,7 +377,6 @@ def is_human_character_present(scene):
     ]
     return any(k in scene_l for k in human_indicators)
 
-# Simplified Character Memory without hardcoded layout issues
 def analyze_consistent_subject(story_text, style):
     story_l = story_text.lower()
     style_theme = "cartoon" if style == "3D Cartoon" else "photorealistic"
@@ -487,7 +487,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         if gender_booster: prompt_input += f"Attire/Gender Tags: {gender_booster}\n"
         
         formatted_instruction = instruction.replace("{raw_male_url}", raw_male_url or "None").replace("{raw_female_url}", raw_female_url or "None")
-        url = f"https://text.pollinations.ai/{urllib.parse.quote(formatted_instruction + ' ' + prompt_input)}?model=openai"
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(formatted_instruction + ' ' + prompt_input)}"
         res = session.get(url, timeout=20)
         if res.status_code == 200:
             refined_p = res.text.strip()
@@ -1164,7 +1164,8 @@ with tab_chat:
         if web_snippets:
             system_prompt += f"\n[Live Web Search Context]:\n{web_snippets}\nUse this real-time context to accurately formulate your response."
             
-        res = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(system_prompt + ' User query: ' + p)}?model=openai&cache=true").text
+        # Removed model=openai to prevent 402 Payment Required errors
+        res = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(system_prompt + ' User query: ' + p)}").text
         translated_res = res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
         
         with st.chat_message("assistant"):
@@ -1178,6 +1179,10 @@ with tab_chat:
 with tab_movie:
     st.write("### 🎥 Movie Studio")
     
+    # Restored selectbox and text input to resolve NameError: name 'gen_mode' is not defined [1.2, 1.3]
+    gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"])
+    pollinations_key = st.text_input("Enter Pollinations API Key (if using video mode):", type="password") if "Real AI Video" in gen_mode else ""
+    
     # 1. Sglowina AI Script Writer Integration (Step 1 of Auto Script generation)
     st.write("#### 📝 Sglowina AI Script Writer (Optional)")
     with st.expander("Write a story automatically with Sglowina AI"):
@@ -1187,7 +1192,8 @@ with tab_movie:
             if script_topic.strip():
                 with st.spinner("AI is crafting your story..."):
                     story_prompt = f"Write a scenic, detailed {script_genre} in Urdu language, with clear, separate sentences divided by periods. Topic: {script_topic}. Keep it engaging for a cinematic video narration."
-                    ai_story = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(story_prompt)}?model=openai").text
+                    # Removed model=openai to bypass 402 errors
+                    ai_story = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(story_prompt)}").text
                     st.session_state.movie_script_val = ai_story.strip()
                     st.success("Story Generated! It has been copied to the Script Box below.")
             else:
