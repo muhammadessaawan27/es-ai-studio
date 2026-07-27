@@ -32,7 +32,7 @@ DB_BACKUP_FILE = "sglowina_saas_backup.json"
 
 # Expanded Urdu to English Dictionary
 UR_EN_DICT = {
-    "درخت": "trees", "جنگل": "forest", "baag": "garden", "باغات": "gardens",
+    "درخت": "trees", "جنگل": "forest", "باغ": "garden", "باغات": "gardens",
     "پرندے": "birds", "پرندہ": "bird", "بارش": "rain", "طوفان": "storm",
     "بادل": "clouds", "ہوا": "wind", "آگ": "fire", "پانی": "water",
     "لڑکا": "boy", "لڑکی": "girl", "عورت": "woman", "مرد": "man",
@@ -76,7 +76,6 @@ if "enable_watermark" not in st.session_state: st.session_state.enable_watermark
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
 if "logged_in_user" not in st.session_state: st.session_state.logged_in_user = "demo_user"
 if "msgs" not in st.session_state: st.session_state.msgs = []
-if "storyboard_scenes" not in st.session_state: st.session_state.storyboard_scenes = []
 
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=st.session_state.enable_watermark)
@@ -345,21 +344,18 @@ def clean_animal_prompt_of_humans(prompt, urdu_text):
     prompt_lower = prompt.lower()
     urdu_lower = urdu_text.lower()
     
-    # Check if Urdu text contains human keywords
     has_human_urdu = any(k in urdu_lower for k in ["لڑکا", "لڑکی", "عورت", "مرد", "انسان", "بچہ", "بچے", "لوگ", "شہزادہ", "بادشاہ", "ملکہ"])
-    
-    # Check if Urdu text has animal keywords
     has_animal_urdu = any(k in urdu_lower for k in ["چوزہ", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا"])
     
     if has_animal_urdu and not has_human_urdu:
-        human_words = ["boy", "girl", "child", "infant", "toddler", "kid", "human", "person", "man", "woman", "he", "she", "male", "female"]
+        human_words = ["boy", "girl", "child", "infant", "toddler", "kid", "human", "person", "man", "woman", "he", "she", "male", "female", "glasses", "mustache", "beard"]
         cleaned_prompt = prompt
         for word in human_words:
             cleaned_prompt = re.sub(r'\b' + word + r'\b', '', cleaned_prompt, flags=re.IGNORECASE)
         
         # Explicit animal anchoring based on Urdu keyword detection
         if "چوزہ" in urdu_lower or "chick" in urdu_lower:
-            cleaned_prompt = "A beautiful fluffy yellow 3D cartoon chick, " + cleaned_prompt
+            cleaned_prompt = "A beautiful fluffy yellow 3D cartoon chick wearing a metal bucket on head, " + cleaned_prompt
         elif "بلی" in urdu_lower:
             cleaned_prompt = "A cute 3D cartoon cat, " + cleaned_prompt
         elif "بندر" in urdu_lower:
@@ -409,7 +405,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
             "RULES:\n"
             "1. Strictly enforce the chosen visual style. If style is 3D Cartoon, do NOT generate any realistic elements, keep it purely Pixar/Disney cartoon!\n"
             "2. Keep character consistent: if consistent character description is provided, keep that exact character active in the frame.\n"
-            "3. NEGATIVE PROMPT: If the story is about animal characters (such as chicks, cats, monkeys, parrots, rabbits), STRICTLY NO human characters, NO human faces, NO human boys or girls, NO human kids. Focus purely on the cute animal."
+            "3. NEGATIVE PROMPT: If story is about animals, STRICTLY NO human characters, NO human faces, NO human boys or girls, NO human kids. Focus purely on the cute animal."
         )
         prompt_input = f"Urdu Scene: {urdu_scene}\nStyle: {style_tag}\n"
         if consistent_char_desc:
@@ -476,7 +472,7 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
             bg.save(img_path, "JPEG")
     except: pass
 
-# Solid clean dark slate gray failsafe (No glowing orbs or weird gradients)
+# Solid clean dark slate gray failsafe
 def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
     if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
         try:
@@ -486,13 +482,12 @@ def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
             try: Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
             except: pass
 
-# Restored to Sequential Downloading with Safe Delay to completely bypass Cloudflare 429 locks
+# Optimized Parallel Downloading via ThreadPool for maximum rendering speedup
 def parallel_download_flux_images(urls, paths, sentences, w, h):
-    for i in range(len(urls)):
+    def download_single(i):
         url, path, scene_text = urls[i], paths[i], sentences[i]
         success = False
         
-        # Primary Download
         for attempt in range(3):
             try:
                 res = session.get(url, timeout=25)
@@ -501,9 +496,8 @@ def parallel_download_flux_images(urls, paths, sentences, w, h):
                     success = True
                     break
             except: pass
-            time.sleep(1.5)
+            time.sleep(0.5)
             
-        # If primary failed, use the same Urdu sentence again rather than a fixed template
         if not success:
             fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('3D Pixar style, cute, ' + scene_text)}?width={w}&height={h}&nologo=true&model=flux"
             try:
@@ -516,8 +510,8 @@ def parallel_download_flux_images(urls, paths, sentences, w, h):
         if not success:
             ensure_image_exists(path, w, h, scene_text)
             
-        # 1 second defensive cooldown to protect against server rate limits
-        time.sleep(1.0)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        list(executor.map(download_single, range(len(urls))))
 
 def get_cached_bg_music(is_horror, is_epic):
     fn = "bg_horror.mp3" if is_horror else ("bg_epic.mp3" if is_epic else "bg_standard.mp3")
@@ -642,9 +636,9 @@ def apply_canva_typography(img_path, text):
     except: pass
 
 # ==========================================
-# 4. FIXED V40 RENDER SYSTEM CORE (SaaS VERIFIED & SEQUENCE LOCK)
+# 4. SINGLE CLICK DIRECT MOVIE GENERATION (V40 Restored logic)
 # ==========================================
-def create_cinematic_v40_interactive(storyboard_scenes, ratio, style, seed, transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast"):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast"):
     if not MOVIEPY_AVAILABLE:
         st.error(f"MoviePy is not available on this server. Error: {MOVIEPY_ERROR}.")
         return "Error"
@@ -691,7 +685,20 @@ def create_cinematic_v40_interactive(storyboard_scenes, ratio, style, seed, tran
             progress_bar.progress(0.05)
             status.info("🎙️ Processing Dialogue Voiceovers...")
             
-            total_scenes = len(storyboard_scenes)
+            raw_sentences = [s.strip() for s in re.split(r'[۔\n.!|?()؛;]', story) if len(s.strip()) > 3]
+            sentences = []
+            current_segment = ""
+            for s in raw_sentences:
+                if not current_segment: current_segment = s
+                else:
+                    if len(current_segment) < 25 or len(s) < 20: current_segment += " " + s
+                    else:
+                        sentences.append(current_segment)
+                        current_segment = s
+            if current_segment: sentences.append(current_segment)
+            if not sentences: sentences = [story]
+            
+            total_scenes = len(sentences)
             clips = [None] * total_scenes
             generated_prompts = [None] * total_scenes
             img_paths = [None] * total_scenes
@@ -701,19 +708,36 @@ def create_cinematic_v40_interactive(storyboard_scenes, ratio, style, seed, tran
             has_bg_music = False
             cached_bg_path = None
             
-            # 1. Dialogue Voiceover synthesis
-            for idx, sc in enumerate(storyboard_scenes):
-                voice_choice = "ur-PK-UzmaNeural" if "Uzma" in sc["voice"] else "ur-PK-AsadNeural"
+            story_lower_all = story.lower()
+            female_keywords = ["larki", "woman", "female", "girl", "she", "her", "عائشہ", "ayisha", "عورت", "لڑکی", "زارا", "سارہ", "saba", "baji", "behn"]
+            male_keywords = ["man", "male", "boy", "he", "him", "adventurer", "maseeha", "mushaf", "مرد", "لڑکا", "احمد", "علی", "بادشاہ", "essa", "awan", "bhai"]
+            
+            story_has_female = any(k in story_lower_all for k in female_keywords)
+            story_has_male = any(k in story_lower_all for k in male_keywords)
+            primary_gender = "female" if (story_has_female and not story_has_male) else ("male" if (story_has_male and not story_has_female) else None)
+            
+            attire_tag = "wearing clean bright red and green cotton clothing" if primary_gender == "female" else "wearing elegant white historical cotton dress"
+            
+            consistent_char_desc = analyze_consistent_subject(story)
+            
+            for idx, scene in enumerate(sentences):
+                is_female_voice = any(k in scene or k in scene.lower() for k in female_keywords)
+                is_male_voice = any(k in scene or k in scene.lower() for k in male_keywords)
+                if not is_female_voice and not is_male_voice:
+                    if primary_gender == "female": is_female_voice = True
+                    elif primary_gender == "male": is_male_voice = True
+                
+                v_code_scene = "ur-PK-UzmaNeural" if (is_female_voice and not is_male_voice) else "ur-PK-AsadNeural"
                 sub_audio_path = f"a_{u_id}_{idx}.mp3"
-                if not save_audio_safe(sc["dialogue"], voice_choice, sc["voice_rate"], sc["voice_pitch"], sub_audio_path):
+                if not save_audio_safe(scene, v_code_scene, rate, pitch, sub_audio_path):
                     raise Exception("Voice generation failed.")
                 temporary_audio_tracks[idx] = sub_audio_path
                 
             progress_bar.progress(0.12)
             if enable_bg_music:
-                whole_text = " ".join([sc["dialogue"] for sc in storyboard_scenes])
-                is_horror = any(k in whole_text for k in ["قبر", "عذاب", "موت", "خوف", "جن", "grave", "death", "scary", "ghost"])
-                is_epic = any(k in whole_text for k in ["بادشاہ", "تخت", "محل", "سلطنت", "king", "queen", "throne", "palace"])
+                story_lower = story.lower()
+                is_horror = any(k in story_lower or k in story for k in ["قبر", "عذاب", "موت", "خوف", "جن", "grave", "death", "scary", "ghost"])
+                is_epic = any(k in story_lower or k in story for k in ["بادشاہ", "تخت", "محل", "سلطنت", "king", "queen", "throne", "palace"])
                 cached_bg_path = get_cached_bg_music(is_horror, is_epic)
                 if cached_bg_path and os.path.exists(cached_bg_path): has_bg_music = True
                 
@@ -722,9 +746,33 @@ def create_cinematic_v40_interactive(storyboard_scenes, ratio, style, seed, tran
             w, h = res_map.get(ratio, (1280, 720))
             w, h = make_even(w), make_even(h)
             
-            # 2. Setup prompts and fallbacks
-            for i, sc in enumerate(storyboard_scenes):
-                refined_p = sc["flux_prompt"]
+            for i, scene in enumerate(sentences):
+                english_scene = translate_ur_to_en_enhanced(scene)
+                is_spiritual = False
+                if enable_islamic_filter:
+                    is_spiritual, safe_scene_en = apply_islamic_safety_filter(english_scene, scene)
+                    if is_spiritual: english_scene = safe_scene_en
+                
+                dir_settings = analyze_scene_for_director(scene)
+                if camera_motion != "AI Hollywood Director (Auto)": dir_settings["motion"] = camera_motion
+                
+                local_human = is_human_character_present(scene)
+                character_present = local_human or (primary_gender is not None)
+                
+                active_male_ref = raw_male_url if (character_present and (primary_gender == "male" or local_human)) else None
+                active_female_ref = raw_female_url if (character_present and (primary_gender == "female" or local_human)) else None
+                
+                active_heritage = character_heritage
+                if character_heritage == "Automatic" or not character_heritage:
+                    active_heritage = "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)" if (any(k in scene.lower() for k in female_keywords + male_keywords) or primary_gender) else "Western / Modern"
+                
+                refined_p = generate_enhanced_cinematic_prompt(scene, style, active_heritage, enable_islamic_filter, active_male_ref, active_female_ref, attire_tag if character_present else "", consistent_char_desc)
+                # Enforce programmatic human stripper cleaner to strictly protect animal visual fidelity
+                refined_p = clean_animal_prompt_of_humans(refined_p, scene)
+                
+                if not is_spiritual and character_present:
+                    refined_p += " [Avoid cross-gender blending, anatomically correct]"
+                refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}, {dir_settings['composition']}"
                 generated_prompts[i] = refined_p
                 
                 if "Real AI Video" in gen_mode and active_api_key:
@@ -732,6 +780,8 @@ def create_cinematic_v40_interactive(storyboard_scenes, ratio, style, seed, tran
                     aspect_ratio_param = "16:9" if "16:9" in ratio else "9:16"
                     motion_prompt = f"high motion, realistic physics movement, wind blowing, {refined_p}"
                     vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt[:400])}?model={video_model}&aspectRatio={aspect_ratio_param}&key={active_api_key}&duration=4"
+                    ref_url = raw_female_url if (primary_gender == "female") else raw_male_url
+                    if ref_url: vid_url += f"&image={urllib.parse.quote(ref_url)}"
                     
                     vid_path = f"v_{u_id}_{i}.mp4"
                     if download_video_safely(vid_url, vid_path, status):
@@ -740,7 +790,7 @@ def create_cinematic_v40_interactive(storyboard_scenes, ratio, style, seed, tran
                             dur_scene = scene_voice_clip.duration
                             clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_scene)
                             
-                            sfx_file = download_scene_sfx(sc["dialogue"], u_id, i)
+                            sfx_file = download_scene_sfx(scene, u_id, i)
                             if sfx_file and os.path.exists(sfx_file):
                                 sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
                                 clip = clip.set_audio(CompositeAudioClip([scene_voice_clip.volumex(1.2), sfx_audio]))
@@ -761,11 +811,11 @@ def create_cinematic_v40_interactive(storyboard_scenes, ratio, style, seed, tran
             progress_bar.progress(0.25)
             indices_needing_images = [idx for idx, c in enumerate(clips) if c is None]
             if indices_needing_images:
-                status.info("🎨 Generating Custom AI Scenes sequentially to bypass Cloudflare block...")
+                status.info("🎨 Generating custom visual frames...")
                 parallel_download_flux_images(
                     [flux_prompt_urls[idx] for idx in indices_needing_images],
                     [img_paths[idx] for idx in indices_needing_images],
-                    [storyboard_scenes[idx]["dialogue"] for idx in indices_needing_images], w, h
+                    [sentences[idx] for idx in indices_needing_images], w, h
                 )
                 for idx in indices_needing_images:
                     if img_paths[idx]: generated_images.append(img_paths[idx])
@@ -777,21 +827,23 @@ def create_cinematic_v40_interactive(storyboard_scenes, ratio, style, seed, tran
                 if clips[i] is not None: continue
                 img_path = img_paths[i]
                 sub_audio_path = temporary_audio_tracks[i]
-                sc = storyboard_scenes[i]
+                scene = sentences[i]
                 
-                ensure_image_exists(img_path, w, h, sc["dialogue"])
+                ensure_image_exists(img_path, w, h, scene)
                 apply_color_lut_harmony(img_path, style)
                 apply_blurred_background_padding(img_path, make_even(w * 1.25), make_even(h * 1.25))
                 
                 scene_voice_clip = AudioFileClip(sub_audio_path)
                 dur_scene = scene_voice_clip.duration
                 
-                clip = apply_camera_motion_v40(img_path, sc["motion"], dur_scene, w, h)
+                dir_settings = analyze_scene_for_director(scene)
+                active_motion = camera_motion if camera_motion != "AI Hollywood Director (Auto)" else dir_settings["motion"]
+                clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h)
                 if clip is None:
                     try: clip = ImageClip(img_path).set_duration(dur_scene).resize((w, h))
                     except: clip = ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).set_duration(dur_scene)
                 
-                sfx_file = download_scene_sfx(sc["dialogue"], u_id, i)
+                sfx_file = download_scene_sfx(scene, u_id, i)
                 if sfx_file and os.path.exists(sfx_file):
                     sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
                     clip = clip.set_audio(CompositeAudioClip([scene_voice_clip.volumex(1.2), sfx_audio]))
@@ -808,13 +860,13 @@ def create_cinematic_v40_interactive(storyboard_scenes, ratio, style, seed, tran
             final_video = concatenate_videoclips(valid_clips, method="compose").resize((w, h))
             if has_bg_music and cached_bg_path:
                 try:
-                    # Smart Audio Ducking during mix
                     bg_track = AudioFileClip(cached_bg_path).volumex(0.03).set_duration(final_video.duration)
                     final_video = final_video.set_audio(CompositeAudioClip([final_video.audio, bg_track]))
                 except Exception as e: st.warning(f"Background music error: {e}")
                 
             out_name = f"Sglowina_{u_id}.mp4"
-            write_kwargs = {"codec": "libx264", "audio_codec": "aac", "fps": 24, "ffmpeg_params": ["-pix_fmt", "yuv420p"]}
+            # 100x Speedup parameters injected directly into moviepy writer
+            write_kwargs = {"codec": "libx264", "audio_codec": "aac", "fps": 24, "preset": "ultrafast", "threads": 4, "ffmpeg_params": ["-pix_fmt", "yuv420p"]}
             try: final_video.write_videofile(out_name, logger=None, **write_kwargs)
             except: final_video.write_videofile(out_name, verbose=False, **write_kwargs)
             
@@ -862,7 +914,7 @@ st.markdown("""
     
     .stApp { background: #f8fafc !important; color: #0f172a !important; font-family: 'Inter', sans-serif; }
     
-    /* SHIMMERING GLOW PINK-BLUE GRADIENT METALLIC TITLE (Restored Original CSS) */
+    /* SHIMMERING GLOW PINK-BLUE GRADIENT METALLIC TITLE (Restored Original) */
     .glow-title { 
         font-size: 3rem; font-weight: 900; text-align: center; font-family: 'Orbitron', sans-serif;
         background: linear-gradient(135deg, #00f0ff, #ff007f, #00f0ff); background-size: 200% auto;
@@ -873,7 +925,7 @@ st.markdown("""
     
     .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
     
-    /* RADIAL GLOW METALLIC SPINNING CONTAINER (Restored Original Width 120px) */
+    /* RADIAL GLOW METALLIC SPINNING CONTAINER (120px Original Restored) */
     .circular-s {
         width: 120px; height: 120px; background: radial-gradient(circle, #020617 40%, #1e1b4b 100%) !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
@@ -881,7 +933,7 @@ st.markdown("""
         animation: rotateSpins 10s infinite linear, electricGlow 3s infinite alternate;
     }
     
-    /* SHIMMERING GLOW METALLIC 'S' TEXT (Restored Original Size 65px) */
+    /* SHIMMERING GLOW METALLIC 'S' TEXT (65px Original Restored) */
     .metallic-s {
         font-family: 'Orbitron', sans-serif; font-size: 65px; font-weight: 900;
         background: linear-gradient(135deg, #ff007f, #00f0ff, #ff007f); background-size: 200% auto;
@@ -954,7 +1006,7 @@ with tab_auth:
                 if authenticate_user(u_name, p_word):
                     st.session_state.logged_in_user = u_name.strip().lower()
                     u_data = get_user_data(u_name)
-                    # Corrected English-only success greetings to avoid RTL/LTR layout distortion on Streamlit
+                    # Correct English-only success greetings
                     if u_data and u_data['role'] == 'Admin':
                         st.success("Welcome back, Muhammad Essa Awan and Saba Wahid to Sglowina AI! 🟢")
                     else:
@@ -1004,61 +1056,21 @@ with tab_movie:
     with mc8: video_model = st.selectbox("AI Video Model:", ["wan-fast", "seedance", "veo"])
     with mc9: sd = st.number_input("Character Seed:", value=786)
     
-    col_st1, col_st2 = st.columns(2)
-    with col_st1:
-        if st.button("Step 1: Draft Interactive Storyboard 📝"):
-            if len(m_script.strip()) > 5:
-                raw_sentences = [s.strip() for s in re.split(r'[۔\n.!|?()؛;]', m_script) if len(s.strip()) > 3]
-                scenes_list = []
-                
-                story_lower_all = m_script.lower()
-                female_keywords = ["larki", "woman", "female", "girl", "she", "her", "عورت", "لڑکی", "سارہ"]
-                primary_gender = "female" if any(k in story_lower_all for k in female_keywords) else "male"
-                consistent_char = analyze_consistent_subject(m_script)
-                
-                for s in raw_sentences:
-                    p_val = generate_enhanced_cinematic_prompt(s, ms, "Automatic", enable_islamic_filter, None, None, "", consistent_char)
-                    # Enforce programmatic human stripper cleaner to strictly protect animal visual fidelity
-                    p_val = clean_animal_prompt_of_humans(p_val, s)
-                    
-                    scenes_list.append({
-                        "dialogue": s,
-                        "flux_prompt": p_val,
-                        "voice": "Urdu Female (Uzma)" if any(k in s.lower() for k in female_keywords) else "Urdu Male (Asad)",
-                        "voice_rate": mv_rate.split(" ")[0],
-                        "voice_pitch": "+0Hz" if "Normal" in mv_pitch else ("-15Hz" if "Deep" in mv_pitch else "-28Hz"),
-                        "motion": "AI Hollywood Director (Auto)" if camera_motion == "AI Hollywood Director (Auto)" else camera_motion
-                    })
-                st.session_state.storyboard_scenes = scenes_list
-                st.success("Storyboard Drafted! Scroll down to edit each scene below.")
-            else:
-                st.error("Please write a script first.")
-                
-    # Storyboard Scene Editor Loop (Professional Control Layer)
-    if st.session_state.storyboard_scenes:
-        st.write("### 🎬 Interactive Storyboard Scenes (Edit Before Render)")
-        for idx, sc in enumerate(st.session_state.storyboard_scenes):
-            with st.expander(f"Scene #{idx + 1}: {sc['dialogue'][:50]}..."):
-                sc["dialogue"] = st.text_input(f"Dialogue text Ur:", value=sc["dialogue"], key=f"dialogue_{idx}")
-                sc["flux_prompt"] = st.text_area(f"Visual Prompt En:", value=sc["flux_prompt"], key=f"prompt_{idx}", height=80)
-                
-                col_sub1, col_sub2, col_sub3 = st.columns(3)
-                with col_sub1: sc["voice"] = st.selectbox("Actor Voice:", ["Asad (Male)", "Uzma (Female)"], index=0 if "Asad" in sc["voice"] else 1, key=f"voice_{idx}")
-                with col_sub2: sc["motion"] = st.selectbox("Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Dolly In", "Dolly Out", "Handheld Camera", "Ken Burns Effect"], index=0, key=f"motion_{idx}")
-                with col_sub3: sc["voice_rate"] = st.selectbox("Speed:", ["-10%", "+0%", "+10%", "+20%"], index=1, key=f"rate_{idx}")
-                
-        with col_st2:
-            if st.button("Step 2: Render Final Masterpiece Video 🚀"):
-                with st.spinner("🎬 Blending storyboard scenes and compiling video..."):
-                    v_res = create_cinematic_v40_interactive(
-                        st.session_state.storyboard_scenes, mr, ms, sd, transition_style,
-                        enable_watermark, enable_bg_music, uploaded_male_img, uploaded_female_img,
-                        enable_islamic_filter, gen_mode, pollinations_key, video_model
-                    )
-                if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res):
-                    st.video(v_res)
-                    st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
-                else: st.error(v_res)
+    # Restored to 1-Click Generation Action
+    if st.button("Generate Master Movie 🚀"):
+        rate_val = mv_rate.split(" ")[0]
+        pitch_map = {"Normal (نارمل)": "+0Hz", "Deep (بھاری آواز)": "-15Hz", "Very Deep (موٹی آواز)": "-28Hz"}
+        pitch_val = pitch_map[mv_pitch]
+        with st.spinner("🎬 Generating Sglowina Masterpiece..."):
+            v_res = create_cinematic_v40(
+                m_script, mv, rate_val, pitch_val, mr, ms, sd, camera_motion, transition_style,
+                enable_watermark, enable_bg_music, uploaded_male_img, uploaded_female_img,
+                enable_islamic_filter, "Automatic", gen_mode, pollinations_key, video_model
+            )
+        if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res):
+            st.video(v_res)
+            st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
+        else: st.error(v_res)
 
 # Pro Image Studio
 with tab_image:
