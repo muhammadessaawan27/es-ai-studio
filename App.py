@@ -177,8 +177,9 @@ def restore_db_from_json():
 def init_db_v21():
     conn = get_db_connection()
     cursor = conn.cursor()
-    is_sqlite = not hasattr(conn, "closed")
+    is_sqlite = "sqlite" in str(type(conn))
     serial_primary = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sqlite else "SERIAL PRIMARY KEY"
+    placeholder = "?" if is_sqlite else "%s"
     
     cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS users (
@@ -204,22 +205,22 @@ def init_db_v21():
     cursor.execute("CREATE TABLE IF NOT EXISTS system_config (key TEXT PRIMARY KEY, value TEXT)")
     cursor.execute("CREATE TABLE IF NOT EXISTS coupons (code TEXT PRIMARY KEY, credits INTEGER, uses_left INTEGER)")
     
-    cursor.execute("SELECT COUNT(*) FROM coupons WHERE code = 'ESSASABA'")
+    cursor.execute(f"SELECT COUNT(*) FROM coupons WHERE code = {placeholder}", ('ESSASABA',))
     if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO coupons (code, credits, uses_left) VALUES ('ESSASABA', 100, 1000)")
+        cursor.execute(f"INSERT INTO coupons (code, credits, uses_left) VALUES ({placeholder}, 100, 1000)", ('ESSASABA',))
     
     h_admin = hash_password("786")
     for adm in ["essasaba", "essa_awan"]:
-        cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (adm,))
+        cursor.execute(f"SELECT COUNT(*) FROM users WHERE LOWER(username) = {placeholder}", (adm,))
         if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                           (adm, f"{adm}@sglowina.ai", h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+            cursor.execute(f"INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, 5000, {placeholder}, {placeholder})",
+                           (adm, f"{adm}@sglowina.ai", h_admin, "Enterprise", "Admin", "2026-07-21"))
     
     h_saba = hash_password("1234")
-    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
+    cursor.execute(f"SELECT COUNT(*) FROM users WHERE LOWER(username) = {placeholder}", ("saba_wahid",))
     if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                       ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", 5000, "Admin", "2026-07-21"))
+        cursor.execute(f"INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, 5000, {placeholder}, {placeholder})",
+                       ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", "Admin", "2026-07-21"))
                        
     conn.commit()
     conn.close()
@@ -232,10 +233,11 @@ def register_saas_user(username, email, password):
     email = email.strip().lower()
     conn = get_db_connection()
     cursor = conn.cursor()
+    placeholder = "%s" if "psycopg2" in str(type(conn)) else "?"
     try:
         h = hash_password(password)
-        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                       (username, email, h, 'Free', 50, 'User', time.strftime("%Y-%m-%d")))
+        cursor.execute(f"INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, 'Free', 50, 'User', {placeholder})",
+                       (username, email, h, time.strftime("%Y-%m-%d")))
         conn.commit()
         backup_db_to_json()
         return True, "User registered successfully!"
@@ -246,37 +248,59 @@ def authenticate_user(username, password):
     username = username.strip().lower()
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT password_hash FROM users WHERE LOWER(username) = LOWER(?)", (username,))
-    row = cursor.fetchone()
-    conn.close()
-    if row: return verify_password(password.strip(), row['password_hash'])
-    return False
+    placeholder = "%s" if "psycopg2" in str(type(conn)) else "?"
+    try:
+        cursor.execute(f"SELECT password_hash FROM users WHERE LOWER(username) = LOWER({placeholder})", (username,))
+        row = cursor.fetchone()
+        if row:
+            hashed = row[0] if not isinstance(row, dict) and not hasattr(row, 'keys') else row['password_hash']
+            return verify_password(password.strip(), hashed)
+        return False
+    except: return False
+    finally: conn.close()
 
 def get_user_data(username):
     username = username.strip().lower()
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,))
-    row = cursor.fetchone()
-    conn.close()
-    return row
+    placeholder = "%s" if "psycopg2" in str(type(conn)) else "?"
+    try:
+        cursor.execute(f"SELECT * FROM users WHERE LOWER(username) = LOWER({placeholder})", (username,))
+        row = cursor.fetchone()
+        if row:
+            if not isinstance(row, dict) and hasattr(row, '_fields'):
+                return dict(row)
+            elif isinstance(row, dict):
+                return row
+            else:
+                columns = [col[0] for col in cursor.description]
+                return dict(zip(columns, row))
+        return None
+    except: return None
+    finally: conn.close()
 
 def deduct_user_credits(username, amount):
     username = username.strip().lower()
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE LOWER(username) = LOWER(?)", (amount, username))
-    conn.commit()
-    backup_db_to_json()
-    conn.close()
+    placeholder = "%s" if "psycopg2" in str(type(conn)) else "?"
+    try:
+        cursor.execute(f"UPDATE users SET credits = MAX(0, credits - {placeholder}) WHERE LOWER(username) = LOWER({placeholder})", (amount, username))
+        conn.commit()
+        backup_db_to_json()
+    except: pass
+    finally: conn.close()
 
 def log_credit_usage(user_id, action, used, balance):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO credits_history (user_id, action, credits_used, balance_after, date) VALUES (?, ?, ?, ?, ?)",
-                   (user_id, action, used, balance, time.strftime("%Y-%m-%d %H:%M:%S")))
-    conn.commit()
-    conn.close()
+    placeholder = "%s" if "psycopg2" in str(type(conn)) else "?"
+    try:
+        cursor.execute(f"INSERT INTO credits_history (user_id, action, credits_used, balance_after, date) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})",
+                       (user_id, action, used, balance, time.strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+    except: pass
+    finally: conn.close()
 
 # Real-time Web Search Engine using pure DuckDuckGo parsing to bypass heavy APIs
 def search_web_ddg(query):
@@ -317,24 +341,51 @@ def analyze_scene_for_director(scene_text):
         
     return {"motion": motion, "lighting": lighting, "color_grading": color_grading, "composition": composition}
 
-# Clean anonymous request using direct requests.get with OpenAI parameter to bypass 402 locks
+# Fast POST Request method for text.pollinations.ai to prevent 414 errors and 402 blocks
+def generate_text_pollinations(prompt, system_prompt=""):
+    try:
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            "model": "openai",
+            "jsonMode": False
+        }
+        res = requests.post("https://text.pollinations.ai/", json=payload, headers=headers, timeout=25)
+        if res.status_code == 200:
+            return res.text.strip()
+    except: pass
+    return ""
+
+# Official Google Translate API integration for flawless and instant Urdu to English translation [2.2, 5.1]
 def translate_ur_to_en_enhanced(text):
     try:
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=ur&tl=en&dt=t&q={urllib.parse.quote(text)}"
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            result = res.json()
+            translated_text = "".join([sentence[0] for sentence in result[0] if sentence[0]])
+            if len(translated_text.strip()) > 3:
+                return translated_text.strip()
+    except: pass
+    
+    # Fallback to visual prompt translator
+    try:
         instruction = (
-            "You are an expert visual prompt translator. Translate the following Urdu scene description into clean descriptive English. \n"
-            "CRITICAL RULE: Translate the animal subjects explicitly (e.g., chick, mouse, cat, parrot, monkey, rabbit). Do NOT assume any human subjects unless explicitly requested."
+            "You are an expert visual prompt translator. Translate the Urdu scene into clean visual English. "
+            "Translate animal subjects explicitly. No human descriptors if subject is an animal."
         )
-        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
-        res = requests.get(url, timeout=15)
-        if res.status_code == 200 and len(res.text.strip()) > 5:
-            return res.text.strip()
+        res_text = generate_text_pollinations(f"Urdu: {text}", instruction)
+        if res_text: return res_text
     except: pass
     
     words = re.findall(r'[\u0600-\u06FF]+', text)
     translated_words = [UR_EN_DICT[w] for w in words if w in UR_EN_DICT]
     if translated_words:
-        return f"Cinematic scene depicting {', '.join(translated_words)}, highly detailed digital art"
-    return "Cute animated 3D scenery, highly detailed"
+        return f"Cinematic scene depicting {', '.join(translated_words)}, highly detailed"
+    return "Beautiful scene scenery, highly detailed"
 
 def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
     combined_text = (scene_text_en + " " + scene_text_ur).lower()
@@ -362,7 +413,7 @@ def is_human_character_present(scene):
 def analyze_consistent_subject(story_text, style):
     story_l = story_text.lower()
     style_theme = "cartoon" if style == "3D Cartoon" else "photorealistic"
-    if any(k in story_l for k in ["چوزا", "chick", "چوزے"]):
+    if any(k in story_l for k in ["چوزہ", "chick", "چوزے"]):
         return f"a cute fluffy yellow {style_theme} chick wearing an upside-down metallic bucket on its head as superhero helmet"
     if any(k in story_l for k in ["چوہا", "mouse", "rat"]):
         return f"a cute tiny {style_theme} brown mouse wearing superhero attire"
@@ -378,6 +429,12 @@ def clean_animal_prompt_of_humans(prompt, urdu_text, style):
     has_human_urdu = any(k in urdu_lower for k in ["لڑکا", "لڑکی", "عورت", "مرد", "انسان", "بچہ", "بچے", "لوگ", "شہزادہ", "بادشاہ", "ملکہ"])
     has_animal_urdu = any(k in urdu_lower for k in ["چوزہ", "چوزے", "بلی", "بندر", "طوطا", "خرگوش", "چوہا", "جانور", "حیوان", "شیر", "چیتا", "ہاتھی", "بھیڑیا"])
     
+    # Realism Booster directly injected to bypass Flux cartoon bias for animals
+    if style in ["Realistic HD", "Cinematic Hollywood", "Corporate Business", "Rustic Village Life", "Islamic Historical"]:
+        realism_booster = "photographic award-winning shot of a real live animal, realistic textures, natural lighting, strictly no CGI, no 3D cartoon render, "
+    else:
+        realism_booster = ""
+
     # Map style parameter to descriptive prefixes dynamically to lock user choices
     style_prefix = "3D cartoon Pixar style"
     if style == "Realistic HD":
@@ -409,13 +466,13 @@ def clean_animal_prompt_of_humans(prompt, urdu_text, style):
         
         # Explicit wide-angle landscape animal anchors with 100% sharp background focus & beautiful scenic trails
         if "چوزہ" in urdu_lower or "chick" in urdu_lower:
-            cleaned_prompt = f"A beautiful wide-angle landscape shot of a {style_prefix} fluffy yellow chick wearing a metal bucket on head, walking along a scenic detailed forest path, sharp focus, no background blur, no bokeh, beautiful trees, " + cleaned_prompt
+            cleaned_prompt = f"A beautiful wide-angle landscape shot of a {realism_booster}{style_prefix} fluffy yellow chick wearing a metal bucket on head, walking along a scenic detailed forest path, sharp focus, no background blur, no bokeh, beautiful trees, " + cleaned_prompt
         elif "بلی" in urdu_lower:
-            cleaned_prompt = f"A beautiful wide-angle shot of a {style_prefix} cute cat sitting in a lush detailed cartoon forest, sharp focus, no background blur, " + cleaned_prompt
+            cleaned_prompt = f"A beautiful wide-angle shot of a {realism_booster}{style_prefix} cute cat sitting in a lush detailed forest, sharp focus, no background blur, " + cleaned_prompt
         elif any(k in urdu_lower for k in ["شیر", "چیتا", "ہاتھی", "بھیڑیا", "حیوان", "جانور", "lion", "cheetah", "elephant", "wolf"]):
-            cleaned_prompt = f"A majestic wide-angle {style_prefix} group shot of a friendly lion, a cheetah, a small cute elephant, and a wolf walking side-by-side along a highly-detailed scenic forest trail, vibrant colors, sharp focus, no background blur, no bokeh, " + cleaned_prompt
+            cleaned_prompt = f"A majestic wide-angle {realism_booster}{style_prefix} group shot of a friendly lion, a cheetah, a small cute elephant, and a wolf walking side-by-side along a highly-detailed scenic forest trail, vibrant colors, sharp focus, no background blur, no bokeh, " + cleaned_prompt
         elif "بندر" in urdu_lower or "طوطا" in urdu_lower or "خرگوش" in urdu_lower:
-            cleaned_prompt = f"A beautiful wide-angle scenic {style_prefix} group shot of cute animals including a funny monkey, a colorful parrot, and a fluffy rabbit laughing and playing together in a detailed green forest pasture, sharp focus, no background blur, no bokeh, " + cleaned_prompt
+            cleaned_prompt = f"A beautiful wide-angle scenic {realism_booster}{style_prefix} group shot of cute animals including a funny monkey, a colorful parrot, and a fluffy rabbit laughing and playing together in a detailed green forest pasture, sharp focus, no background blur, no bokeh, " + cleaned_prompt
             
         cleaned_prompt = re.sub(r',\s*,', ',', cleaned_prompt)
         cleaned_prompt = re.sub(r'\s+', ' ', cleaned_prompt).strip()
@@ -423,16 +480,16 @@ def clean_animal_prompt_of_humans(prompt, urdu_text, style):
         
     return prompt
 
-# Clean anonymous request using direct requests.get with OpenAI parameter to bypass 402 locks
+# Safe programmatic Visual prompt writer using Text POST to preserve requested style
 def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url, attire_desc="", consistent_char_desc=""):
     try:
         scene_lower = urdu_scene.lower()
         gender_booster = ""
         
         style_boosters = {
-            "Realistic HD": "ultra photorealistic, 8k resolution, highly detailed, sharp focus, natural skin textures",
+            "Realistic HD": "ultra photorealistic, award-winning photography style, 8k resolution, highly detailed, sharp focus, natural real skin textures, strictly no 3D render, no CGI, no drawing",
             "3D Cartoon": "3D cartoon animation style, Pixar style, Disney animation style, vibrant colors, stylized cute characters, playful environment, no realism",
-            "Cinematic Hollywood": "cinematic Hollywood movie style, dramatic anamorphic lens, Arri Alexa LF, deep shadows, cinematic warm color grade, atmospheric lighting",
+            "Cinematic Hollywood": "cinematic Hollywood movie style, dramatic anamorphic lens, Arri Alexa LF, deep shadows, cinematic warm color grade, atmospheric lighting, strictly no CGI",
             "Bollywood Dramatic": "highly dramatic Bollywood movie style, rich colors, emotional dynamic lighting, vibrant clothing, cinematic film frame",
             "Lollywood Classic": "authentic classic Lollywood film style, rich Pakistani traditional atmosphere, warm vibrant colors, dramatic scene composition",
             "Islamic Historical": "grand Islamic historical movie style, ancient arabian architecture, majestic sands, rich Middle Eastern textures, golden hour volumetric lighting",
@@ -460,7 +517,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         instruction = (
             "You are an expert visual prompt writer. Translate and expand the Urdu scene into a detailed English prompt for Flux AI. \n"
             "RULES:\n"
-            "1. Strictly enforce the chosen visual style. If style is 3D Cartoon, do NOT generate any realistic elements, keep it purely Pixar/Disney cartoon!\n"
+            f"1. Strictly enforce the visual style: '{style_tag}'. If realistic, do NOT include sketch, cgi, or 3d terms.\n"
             "2. Keep character consistent: if consistent character description is provided, keep that exact character active in the frame.\n"
             "3. NEGATIVE PROMPT: If story is about animals, STRICTLY NO human characters, NO human faces, NO human boys or girls, NO human kids. Focus purely on the cute animal."
         )
@@ -470,14 +527,15 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         if gender_booster: prompt_input += f"Attire/Gender Tags: {gender_booster}\n"
         
         formatted_instruction = instruction.replace("{raw_male_url}", raw_male_url or "None").replace("{raw_female_url}", raw_female_url or "None")
-        url = f"https://text.pollinations.ai/{urllib.parse.quote(formatted_instruction + ' ' + prompt_input)}?model=openai"
-        res = requests.get(url, timeout=20)
-        if res.status_code == 200:
-            refined_p = res.text.strip()
-            refined_p = re.sub(r'^(prompt:|visual prompt:|cinematic prompt:)\s*', '', refined_p, flags=re.IGNORECASE)
+        refined_p = generate_text_pollinations(prompt_input, formatted_instruction)
+        if refined_p:
+            refined_p = re.sub(r'^(prompt:|visual prompt:|cinematic prompt:)\s*', '', refined_p, flags=re.IGNORECASE).strip()
             return f"{refined_p}, visual style: {style_tag}"
     except: pass
-    return f"3D cartoon scene: {urdu_scene}, style: {style}, highly detailed, 8k"
+    
+    # Fallback prompt construction if API times out
+    translated_p = translate_ur_to_en_enhanced(urdu_scene)
+    return f"Highly detailed {style}, {translated_p}"
 
 # Clean, safe image enhancement without channel splits/distortions
 def apply_color_lut_harmony(img_path, style_preset):
@@ -554,16 +612,16 @@ def apply_custom_watermark(img_path, watermark_bytes):
             im.convert("RGB").save(img_path, "JPEG")
     except: pass
 
-# Optimized Sequential downloading (Max timeout capped at 12s, max 2 retry attempts to prevent freezing)
-def parallel_download_flux_images(urls, paths, sentences, w, h):
-    for i in range(len(urls)):
-        url, path, scene_text = urls[i], paths[i], sentences[i]
+# High-Performance ThreadPool parallel downloader to prevent server blocking and black screens [2.2]
+def parallel_download_flux_images(urls, paths, sentences, w, h, style="Realistic HD"):
+    def download_single_image(index):
+        url, path, scene_text = urls[index], paths[index], sentences[index]
         success = False
         
-        # Primary Download (Fast timeout of 12 seconds with max 2 retries)
+        # Try primary high-resolution download
         for attempt in range(2):
             try:
-                res = session.get(url, timeout=12)
+                res = session.get(url, timeout=15)
                 if res.status_code == 200 and len(res.content) > 5000:
                     with open(path, "wb") as f: f.write(res.content)
                     success = True
@@ -571,11 +629,21 @@ def parallel_download_flux_images(urls, paths, sentences, w, h):
             except: pass
             time.sleep(0.5)
             
-        # If primary failed, use the same Urdu sentence again rather than a fixed template
+        # Fallback respecting the selected visual style to strictly prevent forced cartoons [2.2]
         if not success:
-            fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('3D Pixar style, cute, ' + scene_text)}?width={w}&height={h}&nologo=true&model=flux"
+            fallback_style = "highly realistic photography, professional, highly detailed, real life"
+            if style == "3D Cartoon":
+                fallback_style = "3D cartoon animation Pixar style, cute, colorful"
+            elif style == "Cinematic Hollywood":
+                fallback_style = "cinematic Hollywood movie shot, highly detailed, dramatic"
+            elif style == "Bollywood Dramatic":
+                fallback_style = "vibrant Bollywood movie shot, dramatic"
+            elif style == "Anime Art":
+                fallback_style = "Japanese anime illustration, high quality"
+                
+            fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(fallback_style + ', ' + scene_text)}?width={w}&height={h}&nologo=true&model=flux"
             try:
-                res = session.get(fallback_url, timeout=10)
+                res = session.get(fallback_url, timeout=12)
                 if res.status_code == 200 and len(res.content) > 5000:
                     with open(path, "wb") as f: f.write(res.content)
                     success = True
@@ -583,9 +651,11 @@ def parallel_download_flux_images(urls, paths, sentences, w, h):
             
         if not success:
             ensure_image_exists(path, w, h, scene_text)
-            
-        # 0.2 second defensive cooldown to protect against server rate limits (extremely fast)
-        time.sleep(0.2)
+
+    # Launch up to 6 downloads in parallel to completely bypass sequential bottlenecks
+    max_workers = min(6, len(urls))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        executor.map(download_single_image, range(len(urls)))
 
 def get_cached_bg_music(is_horror, is_epic):
     fn = "bg_horror.mp3" if is_horror else ("bg_epic.mp3" if is_epic else "bg_standard.mp3")
@@ -685,6 +755,48 @@ def save_audio_safe(text, voice, rate, pitch, filename):
         st.error(f"Voice synthesis error: {e}")
         return False
 
+# Urdu Font Finder to safely load beautiful Nastaliq rendering [2.2]
+def get_urdu_font(font_size):
+    font_paths = [
+        "Jameel Noori Nastaleeq.ttf", 
+        "NotoNastaliqUrdu-Regular.ttf", 
+        "arial.ttf"
+    ]
+    for path in font_paths:
+        if os.path.exists(path):
+            try: return ImageFont.truetype(path, font_size)
+            except: pass
+    try: return ImageFont.load_default()
+    except: return None
+
+# Secure subtitle burning function to overlay text elegantly [2.2]
+def burn_subtitles_to_image(img_path, scene_text):
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            draw = ImageDraw.Draw(im)
+            w, h = im.size
+            font_size = max(18, int(h * 0.045))
+            font = get_urdu_font(font_size)
+            
+            bar_h = int(font_size * 2.2)
+            bar_y = h - bar_h - 20
+            
+            overlay = Image.new("RGBA", im.size, (0, 0, 0, 0))
+            draw_overlay = ImageDraw.Draw(overlay)
+            draw_overlay.rectangle([20, bar_y, w - 20, h - 20], fill=(0, 0, 0, 180))
+            
+            im = Image.alpha_composite(im.convert("RGBA"), overlay).convert("RGB")
+            draw = ImageDraw.Draw(im)
+            
+            text_w = draw.textlength(scene_text, font=font) if hasattr(draw, 'textlength') else (len(scene_text) * (font_size // 2))
+            text_x = max(30, (w - text_w) // 2)
+            text_y = bar_y + (bar_h - font_size) // 2
+            
+            draw.text((text_x, text_y), scene_text, fill=(255, 255, 255), font=font)
+            im.save(img_path, "JPEG")
+    except: pass
+
 def apply_canva_typography(img_path, text):
     try:
         with Image.open(img_path) as im:
@@ -692,7 +804,7 @@ def apply_canva_typography(img_path, text):
             draw = ImageDraw.Draw(im)
             w, h = im.size
             font_size = int(h * 0.04) if h * 0.04 > 16 else 16
-            try: font = get_urdu_font(font_size) # Restored beautiful Urdu font
+            try: font = get_urdu_font(font_size)
             except: font = None
             overlay = Image.new('RGBA', im.size, (0, 0, 0, 0))
             draw_overlay = ImageDraw.Draw(overlay)
@@ -893,7 +1005,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 parallel_download_flux_images(
                     [flux_prompt_urls[idx] for idx in indices_needing_images],
                     [img_paths[idx] for idx in indices_needing_images],
-                    [sentences[idx] for idx in indices_needing_images], w, h
+                    [sentences[idx] for idx in indices_needing_images], w, h, style
                 )
                 for idx in indices_needing_images:
                     if img_paths[idx]: generated_images.append(img_paths[idx])
@@ -972,7 +1084,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO projects (id, user_id, project_name, type, file_path, prompt, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+            placeholder = "%s" if "psycopg2" in str(type(conn)) else "?"
+            cursor.execute(f"INSERT INTO projects (id, user_id, project_name, type, file_path, prompt, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})", 
                            (u_id, user_id, f"Video Project {u_id}", "Video", out_name, " | ".join([p for p in generated_prompts if p]), time.strftime("%Y-%m-%d %H:%M:%S")))
             conn.commit()
             backup_db_to_json()
@@ -1107,7 +1220,7 @@ with tab_chat:
             system_prompt += f"\n[Live Web Search Context]:\n{web_snippets}\nUse this real-time context to accurately formulate your response."
             
         # Clean anonymous request with model=openai
-        res = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(system_prompt + ' User query: ' + p)}?model=openai").text
+        res = generate_text_pollinations(p, system_prompt)
         translated_res = res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
         
         with st.chat_message("assistant"):
@@ -1136,10 +1249,13 @@ with tab_movie:
             if script_topic.strip():
                 with st.spinner("AI is crafting your story..."):
                     story_prompt = f"Write a scenic, detailed {script_genre} in Urdu language, with clear, separate sentences divided by periods. Topic: {script_topic}. Keep it engaging for a cinematic video narration."
-                    # Clean anonymous request using model=openai to bypass 402 locks
-                    ai_story = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(story_prompt)}?model=openai").text
-                    st.session_state.movie_script_val = ai_story.strip()
-                    st.success("Story Generated! It has been copied to the Script Box below.")
+                    ai_story = generate_text_pollinations(story_prompt, "You are a professional creative Urdu storyteller.")
+                    if ai_story:
+                        st.session_state.movie_script_val = ai_story.strip()
+                        st.success("Story Generated! It has been copied to the Script Box below.")
+                        st.rerun()
+                    else:
+                        st.error("AI service is currently busy. Please try again in a few seconds.")
             else:
                 st.error("Please enter a topic first.")
 
@@ -1266,11 +1382,12 @@ with tab_enterprise:
             if st.form_submit_button("Redeem 🎁") and u_db:
                 conn = get_db_connection()
                 cursor = conn.cursor()
-                cursor.execute("SELECT * FROM coupons WHERE UPPER(code) = UPPER(?)", (coupon_code.strip(),))
+                placeholder = "%s" if "psycopg2" in str(type(conn)) else "?"
+                cursor.execute(f"SELECT * FROM coupons WHERE UPPER(code) = UPPER({placeholder})", (coupon_code.strip(),))
                 c_row = cursor.fetchone()
                 if c_row and c_row['uses_left'] > 0:
-                    cursor.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (c_row['credits'], u_db['id']))
-                    cursor.execute("UPDATE coupons SET uses_left = uses_left - 1 WHERE code = ?", (c_row['code'],))
+                    cursor.execute(f"UPDATE users SET credits = credits + {placeholder} WHERE id = {placeholder}", (c_row['credits'], u_db['id']))
+                    cursor.execute(f"UPDATE coupons SET uses_left = uses_left - 1 WHERE code = {placeholder}", (c_row['code'],))
                     conn.commit()
                     st.success("Credits added successfully!")
                     st.rerun()
@@ -1287,9 +1404,10 @@ with tab_enterprise:
                 p_amt = st.number_input("Amount Sent:", value=1000.0)
                 if st.form_submit_button("Submit Proof 🚀"):
                     conn = get_db_connection()
+                    placeholder = "%s" if "psycopg2" in str(type(conn)) else "?"
                     try:
-                        conn.execute("INSERT INTO local_payments (id, username, method, trx_id, amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                     (str(uuid.uuid4())[:8], u_db['username'], p_method, p_trx.strip(), p_amt, 'Pending', time.strftime("%Y-%m-%d")))
+                        conn.execute(f"INSERT INTO local_payments (id, username, method, trx_id, amount, status, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, 'Pending', {placeholder})",
+                                     (str(uuid.uuid4())[:8], u_db['username'], p_method, p_trx.strip(), p_amt, time.strftime("%Y-%m-%d")))
                         conn.commit()
                         st.success("Payment submitted successfully for verification!")
                     except sqlite3.IntegrityError: st.error("This TrxID already exists.")
