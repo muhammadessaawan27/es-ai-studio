@@ -80,9 +80,9 @@ except ImportError:
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V1.0", layout="wide", page_icon="🎬")
 
 if not MOVIEPY_AVAILABLE:
-    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to your requirements.txt.")
+    st.sidebar.error("⚠️ MoviePy library is missing! Video generation will not work. Please add 'moviepy' to requirements.txt.")
 if not EDGE_TTS_AVAILABLE:
-    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to your requirements.txt.")
+    st.sidebar.error("⚠️ edge-tts library is missing! Voice synthesis will not work. Please add 'edge-tts' to requirements.txt.")
 
 if "enable_watermark" not in st.session_state: st.session_state.enable_watermark = True
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
@@ -92,7 +92,6 @@ if "msgs" not in st.session_state: st.session_state.msgs = []
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=st.session_state.enable_watermark)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=st.session_state.enable_bg_music)
-enable_subtitles = st.sidebar.checkbox("Enable Beautiful Urdu Subtitles", value=True)
 custom_watermark_file = st.sidebar.file_uploader("Upload Custom Watermark Logo (Premium Only):", type=["png", "jpg", "jpeg"])
 
 st.session_state.enable_watermark = enable_watermark
@@ -295,29 +294,6 @@ def search_web_ddg(query):
     except: pass
     return ""
 
-# Breathtaking Nastaliq Urdu Font Downloader (downloads Google Noto Nastaliq Urdu dynamically to guarantee beautiful font style)
-def get_urdu_font(font_size=32):
-    font_paths = [
-        "NotoNastaliqUrdu-Regular.ttf",
-        "arial.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/System/Library/Fonts/Supplemental/Arial.ttf"
-    ]
-    for path in font_paths:
-        try: return ImageFont.truetype(path, font_size)
-        except: pass
-    
-    font_url = "https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoNastaliqUrdu/NotoNastaliqUrdu-Regular.ttf"
-    local_font_path = "NotoNastaliqUrdu.ttf"
-    if not os.path.exists(local_font_path):
-        try:
-            r = requests.get(font_url, timeout=10)
-            if r.status_code == 200:
-                with open(local_font_path, "wb") as f: f.write(r.content)
-        except: pass
-    try: return ImageFont.truetype(local_font_path, font_size)
-    except: return ImageFont.load_default()
-
 def analyze_scene_for_director(scene_text):
     text = scene_text.lower()
     motion, lighting, color_grading, composition = "Zoom Out (v40 Default)", "Volumetric Light", "Hollywood Cinematic", "Cinematic Wide Shot"
@@ -341,14 +317,14 @@ def analyze_scene_for_director(scene_text):
         
     return {"motion": motion, "lighting": lighting, "color_grading": color_grading, "composition": composition}
 
-# Clean anonymous request using direct requests.get (never session.get) to stop 402 API key pollution
+# Clean anonymous request using direct requests.get with OpenAI parameter to bypass 402 locks
 def translate_ur_to_en_enhanced(text):
     try:
         instruction = (
             "You are an expert visual prompt translator. Translate the following Urdu scene description into clean descriptive English. \n"
             "CRITICAL RULE: Translate the animal subjects explicitly (e.g., chick, mouse, cat, parrot, monkey, rabbit). Do NOT assume any human subjects unless explicitly requested."
         )
-        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}"
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
         res = requests.get(url, timeout=15)
         if res.status_code == 200 and len(res.text.strip()) > 5:
             return res.text.strip()
@@ -447,7 +423,7 @@ def clean_animal_prompt_of_humans(prompt, urdu_text, style):
         
     return prompt
 
-# Clean anonymous request using direct requests.get (never session.get) to stop 402 API key pollution
+# Clean anonymous request using direct requests.get with OpenAI parameter to bypass 402 locks
 def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url, attire_desc="", consistent_char_desc=""):
     try:
         scene_lower = urdu_scene.lower()
@@ -494,7 +470,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         if gender_booster: prompt_input += f"Attire/Gender Tags: {gender_booster}\n"
         
         formatted_instruction = instruction.replace("{raw_male_url}", raw_male_url or "None").replace("{raw_female_url}", raw_female_url or "None")
-        url = f"https://text.pollinations.ai/{urllib.parse.quote(formatted_instruction + ' ' + prompt_input)}"
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(formatted_instruction + ' ' + prompt_input)}?model=openai"
         res = requests.get(url, timeout=20)
         if res.status_code == 200:
             refined_p = res.text.strip()
@@ -562,46 +538,6 @@ def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
         except:
             try: Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
             except: pass
-
-# Subtitle burner utilizing the official Google Noto Nastaliq Urdu font dynamically to guarantee beautiful Urdu text styling without crashes
-def burn_subtitles_to_image(img_path, text, font_size=28):
-    try:
-        with Image.open(img_path) as im:
-            im = im.convert("RGB")
-            draw = ImageDraw.Draw(im)
-            w, h = im.size
-            
-            # Load Google's Noto Nastaliq Urdu font safely
-            font = get_urdu_font(font_size)
-            
-            # Word wrapping for Urdu text
-            words = text.split(" ")
-            lines = []
-            current_line = ""
-            for word in words:
-                if len(current_line + " " + word) < 32:
-                    current_line += (" " if current_line else "") + word
-                else:
-                    lines.append(current_line)
-                    current_line = word
-            if current_line: lines.append(current_line)
-            
-            line_h = font_size + 12
-            box_h = len(lines) * line_h + 30
-            box_y = h - box_h - 40
-            
-            overlay = Image.new('RGBA', im.size, (0, 0, 0, 0))
-            draw_overlay = ImageDraw.Draw(overlay)
-            draw_overlay.rounded_rectangle([40, box_y, w - 40, h - 40], radius=10, fill=(0, 0, 0, 160))
-            im = Image.alpha_composite(im.convert('RGBA'), overlay).convert('RGB')
-            
-            draw_final = ImageDraw.Draw(im)
-            curr_y = box_y + 15
-            for line in lines:
-                draw_final.text((w // 2, curr_y), line, fill=(255, 255, 255), anchor="mm", font=font)
-                curr_y += line_h
-            im.save(img_path, "JPEG")
-    except: pass # Failsafe wrapper prevents black screen / rendering block on failures
 
 # Apply custom logo watermark to the image directly
 def apply_custom_watermark(img_path, watermark_bytes):
@@ -771,7 +707,7 @@ def apply_canva_typography(img_path, text):
 # ==========================================
 # 4. SINGLE CLICK DIRECT MOVIE GENERATION (V1.0 restored with step progress text and custom watermark)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast", custom_wm_bytes=None, enable_sub=True):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast", custom_wm_bytes=None, enable_sub=False):
     if not MOVIEPY_AVAILABLE:
         st.error(f"MoviePy is not available on this server. Error: {MOVIEPY_ERROR}.")
         return "Error"
@@ -1080,15 +1016,15 @@ st.markdown("""
     
     /* RADIAL GLOW METALLIC SPINNING CONTAINER (GPU optimized, clean white background, electric blue borders) */
     .circular-s {
-        width: 70px !important; height: 70px !important; background: #ffffff !important;
+        width: 50px !important; height: 50px !important; background: #ffffff !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        border: 3px solid #2563eb !important;
+        border: 2px solid #2563eb !important;
         animation: rotateSpins 10s infinite linear;
     }
     
     /* FLAT ELECTRIC BLUE 'S' TEXT */
     .metallic-s {
-        font-family: 'Orbitron', sans-serif; font-size: 38px !important; font-weight: 900;
+        font-family: 'Orbitron', sans-serif; font-size: 28px !important; font-weight: 900;
         color: #2563eb !important;
     }
     
@@ -1170,8 +1106,8 @@ with tab_chat:
         if web_snippets:
             system_prompt += f"\n[Live Web Search Context]:\n{web_snippets}\nUse this real-time context to accurately formulate your response."
             
-        # Removed model=openai to prevent 402 Payment Required errors
-        res = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(system_prompt + ' User query: ' + p)}").text
+        # Clean anonymous request with model=openai
+        res = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(system_prompt + ' User query: ' + p)}?model=openai").text
         translated_res = res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
         
         with st.chat_message("assistant"):
@@ -1185,9 +1121,11 @@ with tab_chat:
 with tab_movie:
     st.write("### 🎥 Movie Studio")
     
-    # Restored selectbox and text input to resolve NameError: name 'gen_mode' is not defined [1.2, 1.3]
-    gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"], key="gen_mode")
-    pollinations_key = st.text_input("Enter Pollinations API Key (if using video mode):", type="password", key="pollinations_key") if "Real AI Video" in st.session_state.gen_mode else ""
+    # Restored selectbox and text input with global session state fallbacks
+    gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"], key="gen_mode_select")
+    st.session_state.gen_mode = gen_mode
+    pollinations_key = st.text_input("Enter Pollinations API Key (if using video mode):", type="password", key="pollinations_key_input") if "Real AI Video" in st.session_state.gen_mode else ""
+    st.session_state.pollinations_key = pollinations_key
     
     # 1. Sglowina AI Script Writer Integration (Step 1 of Auto Script generation)
     st.write("#### 📝 Sglowina AI Script Writer (Optional)")
@@ -1198,8 +1136,8 @@ with tab_movie:
             if script_topic.strip():
                 with st.spinner("AI is crafting your story..."):
                     story_prompt = f"Write a scenic, detailed {script_genre} in Urdu language, with clear, separate sentences divided by periods. Topic: {script_topic}. Keep it engaging for a cinematic video narration."
-                    # Removed model=openai to bypass 402 errors
-                    ai_story = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(story_prompt)}").text
+                    # Clean anonymous request using model=openai to bypass 402 locks
+                    ai_story = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(story_prompt)}?model=openai").text
                     st.session_state.movie_script_val = ai_story.strip()
                     st.success("Story Generated! It has been copied to the Script Box below.")
             else:
@@ -1247,15 +1185,19 @@ with tab_movie:
         }
         active_voice = voice_map.get(mv, "ur-PK-AsadNeural")
         
+        # Safe extraction of gen_mode and pollinations_key to prevent any NameError
+        active_gen_mode = st.session_state.gen_mode
+        active_key = st.session_state.pollinations_key
+        
         with st.spinner("🎬 Generating Sglowina Masterpiece..."):
             v_res = create_cinematic_v40(
                 m_script, active_voice, rate_val, pitch_val, mr, ms, sd, camera_motion, transition_style,
                 enable_watermark, enable_bg_music, uploaded_male_img, uploaded_female_img,
-                enable_islamic_filter, "Automatic", st.session_state.gen_mode, st.session_state.pollinations_key, video_model,
-                custom_wm_bytes=wm_bytes, enable_sub=enable_subtitles
+                enable_islamic_filter, "Automatic", active_gen_mode, active_key, video_model,
+                custom_wm_bytes=wm_bytes, enable_sub=False # Hardcoded subtitles to False as requested (سکرین کی لکھائی مستقل ختم)
             )
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res):
-            st.video(v_res) # Completely removed key parameter from st.video to prevent TypeErrors in older/newer Streamlit releases
+            st.video(v_res) # Completely removed key parameter from st.video to prevent TypeErrors on Streamlit
             st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
         else: st.error(v_res)
 
