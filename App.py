@@ -341,12 +341,21 @@ def analyze_scene_for_director(scene_text):
         
     return {"motion": motion, "lighting": lighting, "color_grading": color_grading, "composition": composition}
 
-# Fast POST Request with automated model-rotation failovers to permanently prevent 402 locks [1, 2]
+# Fast POST Request with automated model-rotation and User-Agent spoofing to bypass Cloudflare rate-limits [1, 2]
 def generate_text_pollinations(prompt, system_prompt=""):
-    models = ["openai", "mistral", "qwen", "llama"]
+    models = ["openai", "deepseek", "gemini", "mistral"]
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+    ]
+    
     for model in models:
         try:
-            headers = {"Content-Type": "application/json"}
+            headers = {
+                "Content-Type": "application/json",
+                "User-Agent": random.choice(user_agents)
+            }
             payload = {
                 "messages": [
                     {"role": "system", "content": system_prompt},
@@ -359,6 +368,17 @@ def generate_text_pollinations(prompt, system_prompt=""):
             if res.status_code == 200 and len(res.text.strip()) > 5:
                 return res.text.strip()
         except: pass
+        
+    # GET Request as bulletproof backup with rotating browser headers
+    try:
+        headers = {"User-Agent": random.choice(user_agents)}
+        clean_p = urllib.parse.quote(prompt[:250])
+        clean_sys = urllib.parse.quote(system_prompt[:250])
+        res = requests.get(f"https://text.pollinations.ai/{clean_p}?model=openai&system={clean_sys}", headers=headers, timeout=12)
+        if res.status_code == 200 and len(res.text.strip()) > 5:
+            return res.text.strip()
+    except: pass
+    
     return ""
 
 # Official Google Translate API integration with backup translation mirror [2.2, 5.1]
@@ -633,8 +653,22 @@ def generate_cinematic_gradient_placeholder(img_path, w, h, scene_text="Sglowina
         try: Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
         except: pass
 
+# Solid verification of file path to check if downloaded JPEG has genuine visual content (or if it's a masked HTML error) [2.2]
+def is_valid_image(img_path):
+    if not os.path.exists(img_path) or os.path.getsize(img_path) < 1000:
+        return False
+    try:
+        with Image.open(img_path) as im:
+            im.verify()
+        return True
+    except:
+        return False
+
 def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
-    if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
+    if not is_valid_image(img_path):
+        try:
+            if os.path.exists(img_path): os.remove(img_path)
+        except: pass
         generate_cinematic_gradient_placeholder(img_path, w, h, scene_text)
 
 # Apply custom logo watermark to the image directly
@@ -653,9 +687,9 @@ def apply_custom_watermark(img_path, watermark_bytes):
     except: pass
 
 # High-Performance ThreadPool parallel downloader with automatic model-rotation and user-agent rotating [2.2]
-def parallel_download_flux_images(urls, paths, sentences, w, h, style="Realistic HD"):
+def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic HD"):
     def download_single_image(index):
-        url, path, scene_text = urls[index], paths[index], sentences[index]
+        url, path, prompt_text = urls[index], paths[index], prompts[index]
         success = False
         
         user_agents = [
@@ -667,10 +701,6 @@ def parallel_download_flux_images(urls, paths, sentences, w, h, style="Realistic
         t_session = requests.Session()
         t_session.headers.update({"User-Agent": random.choice(user_agents)})
         
-        # Clean prompt keywords for secondary failovers
-        clean_prompt_words = re.sub(r'[^a-zA-Z0-9\s,]', '', translate_ur_to_en_enhanced(scene_text))
-        clean_prompt_words = ", ".join(clean_prompt_words.split(",")[:12])[:250]
-        
         image_models = ["flux", "turbo"]
         
         # 1. Try primary high-resolution download with 25s timeout limit [2.2]
@@ -679,8 +709,9 @@ def parallel_download_flux_images(urls, paths, sentences, w, h, style="Realistic
                 res = t_session.get(url, timeout=25)
                 if res.status_code == 200 and len(res.content) > 5000:
                     with open(path, "wb") as f: f.write(res.content)
-                    success = True
-                    break
+                    if is_valid_image(path):
+                        success = True
+                        break
             except: pass
             time.sleep(0.5)
             
@@ -696,19 +727,23 @@ def parallel_download_flux_images(urls, paths, sentences, w, h, style="Realistic
             elif style == "Anime Art":
                 fallback_style = "Japanese anime illustration, high quality"
                 
+            clean_prompt_words = re.sub(r'[^a-zA-Z0-9\s,]', '', prompt_text)
+            clean_prompt_words = ", ".join(clean_prompt_words.split(",")[:12])[:300]
+                
             for img_model in image_models:
                 fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(fallback_style + ', ' + clean_prompt_words)}?width={w}&height={h}&nologo=true&model={img_model}&seed={random.randint(1,99999)}"
                 try:
                     res = t_session.get(fallback_url, timeout=20)
                     if res.status_code == 200 and len(res.content) > 5000:
                         with open(path, "wb") as f: f.write(res.content)
-                        success = True
-                        break
+                        if is_valid_image(path):
+                            success = True
+                            break
                 except: pass
             
         # 3. If everything fails, use our Stunning Procedural Cinematic Gradient
         if not success:
-            generate_cinematic_gradient_placeholder(path, w, h, scene_text)
+            generate_cinematic_gradient_placeholder(path, w, h, prompt_text)
 
     # Launch up to 8 parallel download slots for maximum multi-threaded performance
     max_workers = min(8, len(urls))
@@ -1063,7 +1098,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 parallel_download_flux_images(
                     [flux_prompt_urls[idx] for idx in indices_needing_images],
                     [img_paths[idx] for idx in indices_needing_images],
-                    [sentences[idx] for idx in indices_needing_images], w, h, style
+                    [generated_prompts[idx] for idx in indices_needing_images], w, h, style
                 )
                 for idx in indices_needing_images:
                     if img_paths[idx]: generated_images.append(img_paths[idx])
