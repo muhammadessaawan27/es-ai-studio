@@ -447,15 +447,30 @@ def generate_local_fallback_script(topic, genre):
     else:
         topic_en = translate_ur_to_en_enhanced(topic)
 
-    # 100% Custom visual presentations structured based on user input topic
-    scenes_ur = [
-        f"آئیے آج ہم {topic_ur} کے نہایت ہی اہم اور دلچسب موضوع پر تفصیلی بات کرتے ہیں۔",
-        f"اس معاملے کی گہرائی میں جائیں تو ہمیں {topic_ur} کے کئی اہم اور پوشیدہ پہلو نظر آتے ہیں۔",
-        f"جدید دور کے تقاضوں کے مطابق {topic_ur} ہماری زندگی اور مستقبل پر گہرے اثرات مرتب کر رہا ہے۔",
-        f"اس سفر میں آگے بڑھتے ہوئے ہمیں {topic_ur} کے کچھ بڑے چیلنجز کا سامنا بھی کرنا پڑتا ہے۔",
-        f"لیکن اگر ہم درست حکمت عملی اپنائیں تو {topic_ur} ہمارے لیے بے شمار نئی راہیں کھول سکتا ہے۔",
-        f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur} کا یہ سفر ہماری ترقی اور کامیابی کے لیے نہایت ضروری ہے۔"
-    ]
+    topic_ur_clean = topic_ur.replace("کہانی", "").replace("کی کہانی", "").strip()
+    
+    # Automatically segment templates into creative narratives or informational business documentaries [2.2]
+    creative_keywords = ["ٹارزن", "tarzan", "جن", "بھوت", "ڈراونا", "شیر", "جنگل", "سپر ہیرو", "rabbit", "خرگوش", "بلی", "بادشاہ", "ہیرو", "hero", "ghost", "lion"]
+    is_creative = any(k in topic.lower() or k in topic_ur for k in creative_keywords) or "story" in genre.lower() or "moral" in genre.lower()
+    
+    if is_creative:
+        scenes_ur = [
+            f"پرانے وقتوں کی بات ہے، ایک دور دراز پراسرار مقام پر {topic_ur_clean} کی دھوم مچی ہوئی تھی۔",
+            f"ہر کوئی {topic_ur_clean} کی غیر معمولی طاقت اور حیرت انگیز کارناموں کا تذکرہ کرتا تھا۔",
+            f"ایک دن صبح سویرے، {topic_ur_clean} ایک نئے اور پُرپیچ مہم جوئی پر نکل پڑا جس کی راہ میں کئی خطرات تھے۔",
+            f"راستے میں اس کا سامنا گھنے درختوں، چمکتی ندیوں اور کئی پوشیدہ رکاوٹوں سے ہوا۔",
+            f"اچانک ایک ایسا نازک موڑ آیا جہاں {topic_ur_clean} کو اپنی پوری بہادری کا مظاہرہ کرنا پڑا۔",
+            f"بڑی جدوجہد کے بعد، {topic_ur_clean} نے کامیابی حاصل کی اور پورے علاقے میں خوشی کی لہر دوڑ گئی۔"
+        ]
+    else:
+        scenes_ur = [
+            f"آئیے آج ہم {topic_ur_clean} کے نہایت ہی اہم اور دلچسب موضوع پر تفصیلی بات کرتے ہیں۔",
+            f"اس معاملے کی گہرائی میں جائیں تو ہمیں {topic_ur_clean} کے کئی اہم اور پوشیدہ پہلو نظر آتے ہیں۔",
+            f"جدید دور کے تقاضوں کے مطابق {topic_ur_clean} ہماری زندگی اور مستقبل پر گہرے اثرات مرتب کر رہا ہے۔",
+            f"اس سفر میں آگے بڑھتے ہوئے ہمیں {topic_ur_clean} کے کچھ بڑے چیلنجز کا سامنا بھی کرنا پڑتا ہے۔",
+            f"لیکن اگر ہم درست حکمت عملی اپنائیں تو {topic_ur_clean} ہمارے لیے بے شمار نئی راہیں کھول سکتا ہے۔",
+            f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur_clean} کا یہ سفر ہماری ترقی اور کامیابی کے لیے نہایت ضروری ہے۔"
+        ]
     
     return " ۔ ".join(scenes_ur)
 
@@ -620,7 +635,7 @@ def apply_color_lut_harmony(img_path, style_preset):
                 im = ImageEnhance.Color(im).enhance(1.10)
             elif style_preset == "Dark Gothic / Mystery":
                 im = ImageEnhance.Color(im).enhance(0.75)
-            im.save(img_path, "JPEG")
+            im.save(img_path, "PNG")
     except: pass
 
 def download_scene_sfx(scene_text, u_id, idx):
@@ -657,7 +672,7 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
                 new_w, new_h = int(target_h * im_ratio), target_h
             fg = im.resize((new_w, new_h), resizer)
             bg.paste(fg, ((target_w - new_w) // 2, (target_h - new_h) // 2))
-            bg.save(img_path, "JPEG")
+            bg.save(img_path, "PNG")
     except: pass
 
 # Procedural high-end cinematic soft blue gradient generator to permanently eliminate dead black/gray frames [2.2]
@@ -670,12 +685,12 @@ def generate_cinematic_gradient_placeholder(img_path, w, h, scene_text="Sglowina
             g = int(35 + (15 * (y / h)))
             b = int(70 - (20 * (y / h)))
             draw.line([(0, y), (w, y)], fill=(r, g, b))
-        im.save(img_path, "JPEG")
+        im.save(img_path, "PNG")
     except:
-        try: Image.new("RGB", (w, h), color=(30, 58, 138)).save(img_path, "JPEG")
+        try: Image.new("RGB", (w, h), color=(30, 58, 138)).save(img_path, "PNG")
         except: pass
 
-# Fast draft validation of downloaded JPEG to ensure it has valid decodable pixels [2.2]
+# Fast draft validation of downloaded PNG to ensure it has valid decodable pixels [2.2]
 def is_valid_image(img_path):
     if not os.path.exists(img_path) or os.path.getsize(img_path) < 1000:
         return False
@@ -706,7 +721,7 @@ def apply_custom_watermark(img_path, watermark_bytes):
                 wm_h = int(wm_w * wm_ratio)
                 wm = wm.resize((wm_w, wm_h))
                 im.paste(wm, (im.width - wm_w - 30, im.height - wm_h - 30), wm)
-            im.convert("RGB").save(img_path, "JPEG")
+            im.convert("RGB").save(img_path, "PNG")
     except: pass
 
 # High-Performance ThreadPool parallel downloader with automatic model-rotation and user-agent rotating [2.2]
@@ -808,12 +823,12 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
     cw, ch = make_even(cw), make_even(ch)
     
     # Procedural native PIL resize prior to MoviePy execution (safely avoids ANTIALIAS conflicts) [1, 2]
-    temp_img_path = img_path.replace(".jpg", "_resized.jpg")
+    temp_img_path = img_path.replace(".png", "_resized.png")
     try:
         with Image.open(img_path) as im:
             resizer = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
             resized_im = im.resize((cw, ch), resizer)
-            resized_im.save(temp_img_path, "JPEG")
+            resized_im.save(temp_img_path, "PNG")
     except Exception as e:
         temp_img_path = img_path
 
@@ -843,10 +858,10 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
         st.warning(f"Motion error '{motion}': {ex}. Falling back to static frame.")
         
     try:
-        static_temp = img_path.replace(".jpg", "_static.jpg")
+        static_temp = img_path.replace(".png", "_static.png")
         with Image.open(img_path) as im:
             resizer = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
-            im.resize((w, h), resizer).save(static_temp, "JPEG")
+            im.resize((w, h), resizer).save(static_temp, "PNG")
         return ImageClip(static_temp).set_duration(duration)
     except:
         return ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).set_duration(duration)
@@ -917,7 +932,7 @@ def burn_subtitles_to_image(img_path, scene_text):
             text_y = bar_y + (bar_h - font_size) // 2
             
             draw.text((text_x, text_y), scene_text, fill=(255, 255, 255), font=font)
-            im.save(img_path, "JPEG")
+            im.save(img_path, "PNG")
     except: pass
 
 def apply_canva_typography(img_path, text):
@@ -936,7 +951,7 @@ def apply_canva_typography(img_path, text):
             draw_overlay.rounded_rectangle([30, box_y, w - 30, h - 25], radius=12, fill=(15, 23, 42, 200))
             im = Image.alpha_composite(im.convert('RGBA'), overlay).convert('RGB')
             ImageDraw.Draw(im).text((50, box_y + (box_h - font_size) // 2), text, fill=(255, 255, 255), font=font)
-            im.save(img_path, "JPEG")
+            im.save(img_path, "PNG")
     except: pass
 
 # ==========================================
@@ -1069,7 +1084,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 local_human = is_human_character_present(scene)
                 character_present = local_human or (primary_gender is not None)
                 
-                active_male_ref = raw_male_url if (character_present Whiplash and (primary_gender == "male" or local_human)) else None
+                active_male_ref = raw_male_url if (character_present and (primary_gender == "male" or local_human)) else None
                 active_female_ref = raw_female_url if (character_present and (primary_gender == "female" or local_human)) else None
                 
                 active_heritage = character_heritage
@@ -1118,7 +1133,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 # Safeguard: Truncate prompt passed to Flux to 400 chars to avoid HTTP 414 URI Too Long errors
                 truncated_prompt = refined_p[:400]
                 flux_prompt_urls[i] = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(truncated_prompt)}?width={w_target}&height={h_target}&seed={seed + i * 17}&nologo=true&model=flux"
-                img_paths[i] = f"i_{u_id}_{i}.jpg"
+                img_paths[i] = f"i_{u_id}_{i}.png"
                 
             progress_bar.progress(0.25)
             indices_needing_images = [idx for idx, c in enumerate(clips) if c is None]
@@ -1178,7 +1193,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             valid_clips = [c for c in clips if c is not None]
             if not valid_clips: raise Exception("No valid scenes were generated.")
             
-            final_video = concatenate_videoclips(valid_clips, method="compose").resize((w, h))
+            # Bypassed redundant final composite resize to prevent ANTIALIAS conflicts globally [1, 2]
+            final_video = concatenate_videoclips(valid_clips, method="compose")
             if has_bg_music and cached_bg_path:
                 try:
                     bg_track = AudioFileClip(cached_bg_path).volumex(0.03).set_duration(final_video.duration)
@@ -1201,9 +1217,9 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 try:
                     if file_p != cached_bg_path: 
                         os.remove(file_p)
-                        if file_p.endswith(".jpg"):
-                            for suffix in ["_resized.jpg", "_static.jpg"]:
-                                temp_f = file_p.replace(".jpg", suffix)
+                        if file_p.endswith(".png"):
+                            for suffix in ["_resized.png", "_static.png"]:
+                                temp_f = file_p.replace(".png", suffix)
                                 if os.path.exists(temp_f): os.remove(temp_f)
                 except: pass
                 
