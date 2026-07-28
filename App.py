@@ -447,31 +447,51 @@ def generate_local_fallback_script(topic, genre):
     else:
         topic_en = translate_ur_to_en_enhanced(topic)
 
-    topic_ur_clean = topic_ur.replace("کہانی", "").replace("کی کہانی", "").strip()
+    topic_ur_clean = topic_ur.replace("کہانی", "").replace("کی کہانی", "").replace("کا راز", "").strip()
+    topic_lower = topic.lower()
     
-    # Automatically segment templates into creative narratives or informational business documentaries [2.2]
-    creative_keywords = ["ٹارزن", "tarzan", "جن", "بھوت", "ڈراونا", "شیر", "جنگل", "سپر ہیرو", "rabbit", "خرگوش", "بلی", "بادشاہ", "ہیرو", "hero", "ghost", "lion"]
-    is_creative = any(k in topic.lower() or k in topic_ur for k in creative_keywords) or "story" in genre.lower() or "moral" in genre.lower()
+    # Segment dynamic custom topics cleanly to completely prevent robotic explanations for creative inputs [2.2]
+    horror_keywords = ["کوٹھی", "قبر", "جن", "بھوت", "ڈراونا", "تاریک", "خوف", "راز", "موت", "grave", "ghost", "horror", "scary", "dark", "secret", "haunted"]
+    hero_keywords = ["ٹارزن", "سپر ہیرو", "بہادر", "شیر", "جنگل", "بندر", "خرگوش", "چوزہ", "tarzan", "hero", "superhero", "lion", "jungle", "adventure", "chick", "rabbit"]
+    islamic_keywords = ["مسجد", "نماز", "اسلامی", "تاریخ", "دعا", "نور", "الله", "mosque", "islamic", "historical", "faith", "spiritual"]
     
-    if is_creative:
+    if any(k in topic_lower or k in topic_ur for k in horror_keywords) or "horror" in genre.lower() or "suspense" in genre.lower():
         scenes_ur = [
-            f"پرانے وقتوں کی بات ہے، ایک دور دراز پراسرار مقام پر {topic_ur_clean} کی دھوم مچی ہوئی تھی۔",
-            f"ہر کوئی {topic_ur_clean} کی غیر معمولی طاقت اور حیرت انگیز کارناموں کا تذکرہ کرتا تھا۔",
-            f"ایک دن صبح سویرے، {topic_ur_clean} ایک نئے اور پُرپیچ مہم جوئی پر نکل پڑا جس کی راہ میں کئی خطرات تھے۔",
-            f"راستے میں اس کا سامنا گھنے درختوں، چمکتی ندیوں اور کئی پوشیدہ رکاوٹوں سے ہوا۔",
-            f"اچانک ایک ایسا نازک موڑ آیا جہاں {topic_ur_clean} کو اپنی پوری بہادری کا مظاہرہ کرنا پڑا۔",
-            f"بڑی جدوجہد کے بعد، {topic_ur_clean} نے کامیابی حاصل کی اور پورے علاقے میں خوشی کی لہر دوڑ گئی۔"
+            f"سرد چاندنی رات میں، دور دراز جنگل کے سائے میں {topic_ur_clean} کا ایک ہولناک راز چھپا ہوا تھا۔",
+            f"لوگ دور کھڑے ہو کر {topic_ur_clean} کی طرف دیکھتے اور خوف سے کانپنے لگتے تھے۔",
+            f"ایک رات، ایک نڈر مسافر نے ہمت باندھی اور {topic_ur_clean} کے اس پراسرار سائے کی طرف قدم بڑھائے۔",
+            f"جیسے ہی وہ آگے بڑھا، تیز گرج چمک اور ٹھنڈی ہوا نے اس کا راستہ روکنے کی کوشش کی۔",
+            f"دروازہ کھولتے ہی اس کے سامنے {topic_ur_clean} کا وہ صدیوں پرانا راز آشکار ہو گیا جس نے سب کے رونگٹے کھڑے کر دیے۔",
+            f"اس پُراسرار واقعے کے بعد پورے علاقے پر ایک خوفناک خاموشی چھا گئی جو ہمیشہ یاد رہے گی۔"
+        ]
+    elif any(k in topic_lower or k in topic_ur for k in hero_keywords) or "story" in genre.lower() or "moral" in genre.lower():
+        scenes_ur = [
+            f"ایک قدیم اور پُراسرار سرزمین پر {topic_ur_clean} کی بہادری اور عزم کے قصے گونج رہے تھے۔",
+            f"ہر ایک کی زبان پر {topic_ur_clean} کی بے پناہ طاقت اور حیرت انگیز کارناموں کا تذکرہ تھا۔",
+            f"ایک دن صبح سویرے، {topic_ur_clean} ایک نئے اور پُرخطر مہم جوئی پر روانہ ہوا جس کی راہ میں شدید امتحانات تھے۔",
+            f"راستے میں اس کا سامنا گہرے جنگلات، بلند پہاڑوں اور نہایت خطرناک چیلنجز سے ہوا۔",
+            f"اپنی سچی ہمت اور طاقت کا بھرپور مظاہرہ کرتے ہوئے {topic_ur_clean} نے تمام رکاوٹوں کو جڑ سے اکھاڑ پھینکا۔",
+            f"اس شاندار کامیابی کے بعد پوری سرزمین پر {topic_ur_clean} کی فتح کے شادیانے بجنے لگے۔"
+        ]
+    elif any(k in topic_lower or k in topic_ur for k in islamic_keywords) or "islamic" in genre.lower():
+        scenes_ur = [
+            f"تاریخ کے اوراق میں {topic_ur_clean} کی عظمت اور ایمان کی سچی داستانیں روشن ہیں۔",
+            f"جب ہم {topic_ur_clean} کے اس پاکیزہ سفر کا مطالعہ کرتے ہیں، تو روح ایمان سے تازہ ہو جاتی ہے۔",
+            f"ایک پاکیزہ صبح، لوگ {topic_ur_clean} کے فیض اور برکت کی تلاش میں جمع ہوئے۔",
+            f"دلوں میں سچی عقیدت اور اللہ پر بھرپور یقین لیے سب نے امن اور سلامتی کا راستہ اختیار کیا۔",
+            f"آسمان سے نازل ہونے والے خوبصورت سفید نور کی برکت سے سب کی دعائیں مستجاب ہوئیں۔",
+            f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur_clean} کا یہ پاکیزہ پیغام ہمارے ایمان کی مضبوطی کا باعث ہے۔"
         ]
     else:
         scenes_ur = [
-            f"آئیے آج ہم {topic_ur_clean} کے نہایت ہی اہم اور دلچسب موضوع پر تفصیلی بات کرتے ہیں۔",
-            f"اس معاملے کی گہرائی میں جائیں تو ہمیں {topic_ur_clean} کے کئی اہم اور پوشیدہ پہلو نظر آتے ہیں۔",
-            f"جدید دور کے تقاضوں کے مطابق {topic_ur_clean} ہماری زندگی اور مستقبل پر گہرے اثرات مرتب کر رہا ہے۔",
-            f"اس سفر میں آگے بڑھتے ہوئے ہمیں {topic_ur_clean} کے کچھ بڑے چیلنجز کا سامنا بھی کرنا پڑتا ہے۔",
-            f"لیکن اگر ہم درست حکمت عملی اپنائیں تو {topic_ur_clean} ہمارے لیے بے شمار نئی راہیں کھول سکتا ہے۔",
-            f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur_clean} کا یہ سفر ہماری ترقی اور کامیابی کے لیے نہایت ضروری ہے۔"
+            f"آئیے آج ہم {topic_ur_clean} کے نہایت ہی اہم اور عملی پہلوؤں پر تفصیلی روشنی ڈالتے ہیں۔",
+            f"جب ہم {topic_ur_clean} کے اس وسیع میدان کا مطالعہ کرتے ہیں، تو ہمیں اس کے دور رس نتائج معلوم ہوتے ہیں۔",
+            f"موجودہ دور کی تیز رفتار ٹیکنالوجی میں {topic_ur_clean} ایک سنگِ میل ثابت ہو رہا ہے۔",
+            f"اس معلوماتی سفر میں ہمیں {topic_ur_clean} کے عملی طریقوں اور چیلنجز کو بھی سمجھنا ہوگا۔",
+            f"بہترین حکمت عملی اور سائنسی تحقیق کی مدد سے ہم {topic_ur_clean} کے میدان میں غیر معمولی کامیابی پا سکتے ہیں۔",
+            f"یہ ثابت ہوتا ہے کہ {topic_ur_clean} کا یہ جدید مطالعہ ہمارے علم اور عمل کی ترقی کے لیے بنیادی حیثیت رکھتا ہے۔"
         ]
-    
+        
     return " ۔ ".join(scenes_ur)
 
 def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
@@ -696,8 +716,7 @@ def is_valid_image(img_path):
         return False
     try:
         with Image.open(img_path) as im:
-            im.draft(im.mode, (32, 32))
-            im.load()
+            im.load() # Safely decodes header & pixel arrays on PNG and JPEGs without draft dependency
         return True
     except:
         return False
@@ -1129,10 +1148,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                         except Exception as e:
                             st.warning(f"Video clip loading failed: {e}. Switching to photo fallback...")
                 
-                w_target, h_target = make_even(w * 1.25), make_even(h * 1.25)
-                # Safeguard: Truncate prompt passed to Flux to 400 chars to avoid HTTP 414 URI Too Long errors
-                truncated_prompt = refined_p[:400]
-                flux_prompt_urls[i] = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(truncated_prompt)}?width={w_target}&height={h_target}&seed={seed + i * 17}&nologo=true&model=flux"
+                # Bypassed redundant resolution scaling to ensure consistent 1024x1024 limit compliance
+                flux_prompt_urls[i] = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p[:400])}?width={w}&height={h}&seed={seed + i * 17}&nologo=true&model=flux"
                 img_paths[i] = f"i_{u_id}_{i}.png"
                 
             progress_bar.progress(0.25)
