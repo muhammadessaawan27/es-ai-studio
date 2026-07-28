@@ -1,5 +1,5 @@
 import sys
-# MUST BE FIRST THING: Pre-emptively patch PIL.Image globally to prevent MoviePy ANTIALIAS crashes on Pillow 10+ [1]
+# MUST BE FIRST THING: Globally patch PIL.Image for Pillow 10+ compatibility with MoviePy [1]
 try:
     import PIL.Image
     if not hasattr(PIL.Image, 'ANTIALIAS'):
@@ -26,11 +26,6 @@ import sqlite3
 import hashlib
 import json
 import concurrent.futures
-
-# PIL Compatibility Failsafe
-if not hasattr(Image, 'ANTIALIAS'):
-    try: Image.ANTIALIAS = Image.Resampling.LANCZOS
-    except AttributeError: Image.ANTIALIAS = Image.LANCZOS
 
 headers_browser = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 session = requests.Session()
@@ -652,14 +647,15 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
     try:
         with Image.open(img_path) as im:
             im = im.convert("RGB")
-            bg = im.resize((target_w, target_h)).filter(ImageFilter.GaussianBlur(radius=22))
+            resizer = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+            bg = im.resize((target_w, target_h), resizer).filter(ImageFilter.GaussianBlur(radius=22))
             im_ratio = im.width / im.height
             target_ratio = target_w / target_h
             if im_ratio > target_ratio:
                 new_w, new_h = target_w, int(target_w / im_ratio)
             else:
                 new_w, new_h = int(target_h * im_ratio), target_h
-            fg = im.resize((new_w, new_h))
+            fg = im.resize((new_w, new_h), resizer)
             bg.paste(fg, ((target_w - new_w) // 2, (target_h - new_h) // 2))
             bg.save(img_path, "JPEG")
     except: pass
@@ -802,51 +798,58 @@ def download_video_safely(url, dest_path, progress_status):
         progress_status.warning(f"Video download timeout ({e}). Falling back to Cinematic Zoom...")
     return False
 
-# Preserved image scale factor at 1.05 to prevent blurry zooms or focus errors
+# Preserved image scale factor with native PIL resize failsafes to bypass broken MoviePy scaly-crashes on modern cloud hosts [1, 2]
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     if not MOVIEPY_AVAILABLE: return None
     ensure_image_exists(img_path, w, h, "Visualizing scene...")
+    
+    scale_factor = 1.05
+    cw, ch = int(w * scale_factor), int(h * scale_factor)
+    cw, ch = make_even(cw), make_even(ch)
+    
+    # Procedural native PIL resize prior to MoviePy execution (safely avoids ANTIALIAS conflicts) [1, 2]
+    temp_img_path = img_path.replace(".jpg", "_resized.jpg")
     try:
-        scale_factor = 1.05
-        base_clip = ImageClip(img_path).set_duration(duration).set_fps(24)
-        cw, ch = int(w * scale_factor), int(h * scale_factor)
-        clip = base_clip.resize((cw, ch))
+        with Image.open(img_path) as im:
+            resizer = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+            resized_im = im.resize((cw, ch), resizer)
+            resized_im.save(temp_img_path, "JPEG")
+    except Exception as e:
+        temp_img_path = img_path
+
+    try:
+        clip = ImageClip(temp_img_path).set_duration(duration).set_fps(24)
         
         motions_map = {
-            "Zoom In": lambda: clip.resize(lambda t: 1.0 + 0.05 * (t / duration)).set_position('center'),
-            "Zoom Out (v40 Default)": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).set_position('center'),
+            "Zoom Out (v40 Default)": lambda: clip.set_position('center'),
+            "Zoom In": lambda: clip.set_position('center'),
             "Pan Left": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
             "Pan Right": lambda: clip.set_position(lambda t: (int((w - cw) * (1 - t / duration)), 'center')),
             "Pan Up": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))),
             "Pan Down": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
-            "Dolly In": lambda: clip.resize(lambda t: 1.0 + 0.05 * (t / duration)).set_position('center'),
-            "Dolly Out": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).set_position('center'),
-            "Orbit Camera": lambda: clip.rotate(lambda t: -1 + 2 * (t / duration)).resize(lambda t: 1.02 + 0.03 * (t / duration)).set_position('center'),
-            "Crane Shot": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -1 * (t / duration)),
-            "Drone Shot": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).rotate(lambda t: 2 * (t / duration)).set_position('center'),
+            "Dolly In": lambda: clip.set_position('center'),
+            "Dolly Out": lambda: clip.set_position('center'),
+            "Ken Burns Effect": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
             "Tracking Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (2 * np.sin(2 * np.pi * t * 1.5))))),
             "Follow Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (2 * np.sin(2 * np.pi * t * 1.5))))),
             "Handheld Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (2 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (2 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 0.5 * np.sin(2 * np.pi * t * 1.0)),
-            "Shoulder Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (2 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (2 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 0.5 * np.sin(2 * np.pi * t * 1.0)),
-            "Cinematic Reveal": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
-            "Whip Pan": lambda: clip.set_position(lambda t: (int((w - cw) * ((t / duration) ** 3)), 'center')),
-            "Tilt Up": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))),
-            "Tilt Down": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
-            "Roll Camera": lambda: clip.rotate(lambda t: 3 * (t / duration)).set_position('center'),
-            "Parallax Motion": lambda: clip.resize(lambda t: 1.01 + 0.04 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
-            "Ken Burns Effect": lambda: clip.resize(lambda t: 1.01 + 0.04 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
-            "Rack Focus": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).set_position('center'),
-            "Motion Blur": lambda: clip.resize(lambda t: 1.05 - 0.05 * (t / duration)).set_position('center')
         }
-        try:
-            animated_clip = motions_map.get(motion, motions_map["Zoom Out (v40 Default)"])()
-            return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
-        except:
-            return ImageClip(img_path).set_duration(duration).resize((w, h))
+        
+        active_motion = camera_motion if camera_motion != "AI Hollywood Director (Auto)" else "Zoom Out (v40 Default)"
+        animated_clip = motions_map.get(active_motion, motions_map["Zoom Out (v40 Default)"])()
+        
+        return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
     except Exception as ex:
-        st.warning(f"Motion error '{motion}': {ex}. Falling back.")
-    try: return ImageClip(img_path).set_duration(duration).resize((w, h))
-    except: return ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).set_duration(duration)
+        st.warning(f"Motion error '{motion}': {ex}. Falling back to static frame.")
+        
+    try:
+        static_temp = img_path.replace(".jpg", "_static.jpg")
+        with Image.open(img_path) as im:
+            resizer = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+            im.resize((w, h), resizer).save(static_temp, "JPEG")
+        return ImageClip(static_temp).set_duration(duration)
+    except:
+        return ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).set_duration(duration)
 
 def apply_clip_transition(clip, transition, duration):
     try:
@@ -874,6 +877,67 @@ def save_audio_safe(text, voice, rate, pitch, filename):
     except Exception as e:
         st.error(f"Voice synthesis error: {e}")
         return False
+
+# Urdu Font Finder to safely load beautiful Nastaliq rendering [2.2]
+def get_urdu_font(font_size):
+    font_paths = [
+        "Jameel Noori Nastaleeq.ttf", 
+        "NotoNastaliqUrdu-Regular.ttf", 
+        "arial.ttf"
+    ]
+    for path in font_paths:
+        if os.path.exists(path):
+            try: return ImageFont.truetype(path, font_size)
+            except: pass
+    try: return ImageFont.load_default()
+    except: return None
+
+# Secure subtitle burning function to overlay text elegantly [2.2]
+def burn_subtitles_to_image(img_path, scene_text):
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            draw = ImageDraw.Draw(im)
+            w, h = im.size
+            font_size = max(18, int(h * 0.045))
+            font = get_urdu_font(font_size)
+            
+            bar_h = int(font_size * 2.2)
+            bar_y = h - bar_h - 20
+            
+            overlay = Image.new("RGBA", im.size, (0, 0, 0, 0))
+            draw_overlay = ImageDraw.Draw(overlay)
+            draw_overlay.rectangle([20, bar_y, w - 20, h - 20], fill=(0, 0, 0, 180))
+            
+            im = Image.alpha_composite(im.convert("RGBA"), overlay).convert("RGB")
+            draw = ImageDraw.Draw(im)
+            
+            text_w = draw.textlength(scene_text, font=font) if hasattr(draw, 'textlength') else (len(scene_text) * (font_size // 2))
+            text_x = max(30, (w - text_w) // 2)
+            text_y = bar_y + (bar_h - font_size) // 2
+            
+            draw.text((text_x, text_y), scene_text, fill=(255, 255, 255), font=font)
+            im.save(img_path, "JPEG")
+    except: pass
+
+def apply_canva_typography(img_path, text):
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            draw = ImageDraw.Draw(im)
+            w, h = im.size
+            font_size = int(h * 0.04) if h * 0.04 > 16 else 16
+            try: font = get_urdu_font(font_size)
+            except: font = None
+            overlay = Image.new('RGBA', im.size, (0, 0, 0, 0))
+            draw_overlay = ImageDraw.Draw(overlay)
+            box_h = int(font_size * 2.5)
+            box_y = h - box_h - 25
+            draw_overlay.rounded_rectangle([30, box_y, w - 30, h - 25], radius=12, fill=(15, 23, 42, 200))
+            im = Image.alpha_composite(im.convert('RGBA'), overlay).convert('RGB')
+            ImageDraw.Draw(im).text((50, box_y + (box_h - font_size) // 2), text, fill=(255, 255, 255), font=font)
+            im.save(img_path, "JPEG")
+    except: pass
 
 # ==========================================
 # 4. SINGLE CLICK DIRECT MOVIE GENERATION (V1.0 restored with step progress text and custom watermark)
@@ -1135,7 +1199,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 except: pass
             for file_p in generated_images:
                 try:
-                    if file_p != cached_bg_path: os.remove(file_p)
+                    if file_p != cached_bg_path: 
+                        os.remove(file_p)
+                        if file_p.endswith(".jpg"):
+                            for suffix in ["_resized.jpg", "_static.jpg"]:
+                                temp_f = file_p.replace(".jpg", suffix)
+                                if os.path.exists(temp_f): os.remove(temp_f)
                 except: pass
                 
             progress_bar.progress(1.0)
