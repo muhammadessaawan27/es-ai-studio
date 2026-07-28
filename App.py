@@ -341,28 +341,42 @@ def analyze_scene_for_director(scene_text):
         
     return {"motion": motion, "lighting": lighting, "color_grading": color_grading, "composition": composition}
 
-# Fast POST Request method for text.pollinations.ai to prevent 414 errors and 402 blocks
+# Fast POST Request with automated model-rotation failovers to permanently prevent 402 locks [1, 2]
 def generate_text_pollinations(prompt, system_prompt=""):
-    try:
-        headers = {"Content-Type": "application/json"}
-        payload = {
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
-            "model": "openai",
-            "jsonMode": False
-        }
-        res = requests.post("https://text.pollinations.ai/", json=payload, headers=headers, timeout=25)
-        if res.status_code == 200:
-            return res.text.strip()
-    except: pass
+    models = ["openai", "mistral", "qwen", "llama"]
+    for model in models:
+        try:
+            headers = {"Content-Type": "application/json"}
+            payload = {
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                "model": model,
+                "jsonMode": False
+            }
+            res = requests.post("https://text.pollinations.ai/", json=payload, headers=headers, timeout=15)
+            if res.status_code == 200 and len(res.text.strip()) > 5:
+                return res.text.strip()
+        except: pass
     return ""
 
-# Official Google Translate API integration for flawless and instant Urdu to English translation [2.2, 5.1]
+# Official Google Translate API integration with backup translation mirror [2.2, 5.1]
 def translate_ur_to_en_enhanced(text):
+    # Mirror 1: Official Translate API
     try:
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=ur&tl=en&dt=t&q={urllib.parse.quote(text)}"
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            result = res.json()
+            translated_text = "".join([sentence[0] for sentence in result[0] if sentence[0]])
+            if len(translated_text.strip()) > 3:
+                return translated_text.strip()
+    except: pass
+    
+    # Mirror 2: Alternate Web API Translate
+    try:
+        url = f"https://translate.google.com/translate_a/single?client=at&sl=ur&tl=en&dt=t&q={urllib.parse.quote(text)}"
         res = requests.get(url, timeout=10)
         if res.status_code == 200:
             result = res.json()
@@ -489,7 +503,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         style_boosters = {
             "Realistic HD": "ultra photorealistic, award-winning photography style, 8k resolution, highly detailed, sharp focus, natural real skin textures, strictly no 3D render, no CGI, no drawing",
             "3D Cartoon": "3D cartoon animation style, Pixar style, Disney animation style, vibrant colors, stylized cute characters, playful environment, no realism",
-            "Cinematic Hollywood": "cinematic Hollywood movie style, dramatic anamorphic lens, Arri Alexa LF, deep shadows, cinematic warm color grade, atmospheric lighting, strictly no CGI",
+            "Cinematic Hollywood": "cinematic Hollywood movie style, dramatic atmospheric lighting, anamorphic lens, high-fidelity movie frame, rich realistic textures, professional cinematography, strictly no CGI",
             "Bollywood Dramatic": "highly dramatic Bollywood movie style, rich colors, emotional dynamic lighting, vibrant clothing, cinematic film frame",
             "Lollywood Classic": "authentic classic Lollywood film style, rich Pakistani traditional atmosphere, warm vibrant colors, dramatic scene composition",
             "Islamic Historical": "grand Islamic historical movie style, ancient arabian architecture, majestic sands, rich Middle Eastern textures, golden hour volumetric lighting",
@@ -587,15 +601,41 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
             bg.save(img_path, "JPEG")
     except: pass
 
-# Solid clean dark slate gray failsafe (No glowing purple orbs)
+# Procedural high-end cinematic soft light leaks background generator to eliminate dead black/gray frames [2.2]
+def generate_cinematic_gradient_placeholder(img_path, w, h, scene_text="Sglowina AI"):
+    try:
+        base = Image.new("RGB", (w, h))
+        draw = ImageDraw.Draw(base)
+        
+        # Soft atmospheric vertical lighting gradient
+        for y in range(h):
+            r = int(12 + (24 * (y / h)))
+            g = int(20 + (4 * (y / h)))
+            b = int(38 - (18 * (y / h)))
+            draw.line([(0, y), (w, y)], fill=(r, g, b))
+            
+        # Translucent warm golden sun leak overlay
+        aura = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        aura_draw = ImageDraw.Draw(aura)
+        cx, cy = w // 2, h // 2
+        rx, ry = int(w * 0.45), int(h * 0.45)
+        
+        for r_offset in range(100, 0, -5):
+            alpha = int(22 * (1 - (r_offset / 100)))
+            aura_draw.ellipse([cx - rx * (r_offset/100), cy - ry * (r_offset/100), 
+                               cx + rx * (r_offset/100), cy + ry * (r_offset/100)], 
+                              fill=(245, 200, 50, alpha))
+                              
+        base = Image.alpha_composite(base.convert("RGBA"), aura).convert("RGB")
+        base = base.filter(ImageFilter.GaussianBlur(radius=6))
+        base.save(img_path, "JPEG")
+    except:
+        try: Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
+        except: pass
+
 def ensure_image_exists(img_path, w, h, scene_text="Sglowina AI"):
     if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
-        try:
-            base = Image.new("RGB", (w, h), color=(30, 41, 59))
-            base.save(img_path, "JPEG")
-        except:
-            try: Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
-            except: pass
+        generate_cinematic_gradient_placeholder(img_path, w, h, scene_text)
 
 # Apply custom logo watermark to the image directly
 def apply_custom_watermark(img_path, watermark_bytes):
@@ -612,16 +652,31 @@ def apply_custom_watermark(img_path, watermark_bytes):
             im.convert("RGB").save(img_path, "JPEG")
     except: pass
 
-# High-Performance ThreadPool parallel downloader to prevent server blocking and black screens [2.2]
+# High-Performance ThreadPool parallel downloader with automatic model-rotation and user-agent rotating [2.2]
 def parallel_download_flux_images(urls, paths, sentences, w, h, style="Realistic HD"):
     def download_single_image(index):
         url, path, scene_text = urls[index], paths[index], sentences[index]
         success = False
         
-        # Try primary high-resolution download
+        user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+        ]
+        
+        t_session = requests.Session()
+        t_session.headers.update({"User-Agent": random.choice(user_agents)})
+        
+        # Clean prompt keywords for secondary failovers
+        clean_prompt_words = re.sub(r'[^a-zA-Z0-9\s,]', '', translate_ur_to_en_enhanced(scene_text))
+        clean_prompt_words = ", ".join(clean_prompt_words.split(",")[:12])[:250]
+        
+        image_models = ["flux", "turbo"]
+        
+        # 1. Try primary high-resolution download with 25s timeout limit [2.2]
         for attempt in range(2):
             try:
-                res = session.get(url, timeout=15)
+                res = t_session.get(url, timeout=25)
                 if res.status_code == 200 and len(res.content) > 5000:
                     with open(path, "wb") as f: f.write(res.content)
                     success = True
@@ -629,7 +684,7 @@ def parallel_download_flux_images(urls, paths, sentences, w, h, style="Realistic
             except: pass
             time.sleep(0.5)
             
-        # Fallback respecting the selected visual style to strictly prevent forced cartoons [2.2]
+        # 2. Try rotating through alternative models & endpoints on failure
         if not success:
             fallback_style = "highly realistic photography, professional, highly detailed, real life"
             if style == "3D Cartoon":
@@ -641,19 +696,22 @@ def parallel_download_flux_images(urls, paths, sentences, w, h, style="Realistic
             elif style == "Anime Art":
                 fallback_style = "Japanese anime illustration, high quality"
                 
-            fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(fallback_style + ', ' + scene_text)}?width={w}&height={h}&nologo=true&model=flux"
-            try:
-                res = session.get(fallback_url, timeout=12)
-                if res.status_code == 200 and len(res.content) > 5000:
-                    with open(path, "wb") as f: f.write(res.content)
-                    success = True
-            except: pass
+            for img_model in image_models:
+                fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(fallback_style + ', ' + clean_prompt_words)}?width={w}&height={h}&nologo=true&model={img_model}&seed={random.randint(1,99999)}"
+                try:
+                    res = t_session.get(fallback_url, timeout=20)
+                    if res.status_code == 200 and len(res.content) > 5000:
+                        with open(path, "wb") as f: f.write(res.content)
+                        success = True
+                        break
+                except: pass
             
+        # 3. If everything fails, use our Stunning Procedural Cinematic Gradient
         if not success:
-            ensure_image_exists(path, w, h, scene_text)
+            generate_cinematic_gradient_placeholder(path, w, h, scene_text)
 
-    # Launch up to 6 downloads in parallel to completely bypass sequential bottlenecks
-    max_workers = min(6, len(urls))
+    # Launch up to 8 parallel download slots for maximum multi-threaded performance
+    max_workers = min(8, len(urls))
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         executor.map(download_single_image, range(len(urls)))
 
