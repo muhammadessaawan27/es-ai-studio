@@ -1069,7 +1069,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 local_human = is_human_character_present(scene)
                 character_present = local_human or (primary_gender is not None)
                 
-                active_male_ref = raw_male_url if (character_present and (primary_gender == "male" or local_human)) else None
+                active_male_ref = raw_male_url if (character_present Whiplash and (primary_gender == "male" or local_human)) else None
                 active_female_ref = raw_female_url if (character_present and (primary_gender == "female" or local_human)) else None
                 
                 active_heritage = character_heritage
