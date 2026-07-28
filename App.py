@@ -1,3 +1,13 @@
+import sys
+# MUST BE FIRST THING: Pre-emptively patch PIL.Image globally to prevent MoviePy ANTIALIAS crashes on Pillow 10+ [1]
+try:
+    import PIL.Image
+    if not hasattr(PIL.Image, 'ANTIALIAS'):
+        PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS if hasattr(PIL.Image, 'Resampling') else 1
+    sys.modules['PIL.Image'] = PIL.Image
+except:
+    pass
+
 import streamlit as st
 import asyncio
 import requests
@@ -341,7 +351,7 @@ def analyze_scene_for_director(scene_text):
         
     return {"motion": motion, "lighting": lighting, "color_grading": color_grading, "composition": composition}
 
-# Fast POST Request on Unified Endpoint utilizing 100% Free OpenAI-Fast bypass parameters
+# Fast POST Request on Unified Endpoint utilizing 100% Free OpenAI-Fast bypass parameters [2.2.5, 3.3.1]
 def generate_text_pollinations(prompt, system_prompt=""):
     models = ["openai-fast", "openai", "mistral"]
     user_agents = [
@@ -444,12 +454,12 @@ def generate_local_fallback_script(topic, genre):
 
     # 100% Custom visual presentations structured based on user input topic
     scenes_ur = [
-        f"آئیے آج ہم {topic_ur} کے نہایت ہی اہم اور دلچسپ موضوع پر تفصیلی بات کرتے ہیں۔",
+        f"آئیے آج ہم {topic_ur} کے نہایت ہی اہم اور دلچسب موضوع پر تفصیلی بات کرتے ہیں۔",
         f"اس معاملے کی گہرائی میں جائیں تو ہمیں {topic_ur} کے کئی اہم اور پوشیدہ پہلو نظر آتے ہیں۔",
-        f"جدید دور کے تقاضوں کے مطابق {topic_ur} ہماری روزمرہ زندگی اور مستقبل پر گہرے اثرات مرتب کر رہا ہے۔",
-        f"اس سفر میں آگے بڑھتے ہوئے ہمیں {topic_ur} کے کچھ بڑے چیلنجز اور اہم امتحانات کا سامنا بھی کرنا پڑتا ہے۔",
-        f"لیکن اگر ہم درست حکمت عملی اور عزم اپنائیں تو {topic_ur} ہمارے لیے بے شمار نئی راہیں کھول سکتا ہے۔",
-        f"آخر میں یہ بات بالکل واضح ہو جاتی ہے کہ {topic_ur} کا یہ سفر ہماری کامیابی اور ترقی کے لیے نہایت ضروری ہے۔"
+        f"جدید دور کے تقاضوں کے مطابق {topic_ur} ہماری زندگی اور مستقبل پر گہرے اثرات مرتب کر رہا ہے۔",
+        f"اس سفر میں آگے بڑھتے ہوئے ہمیں {topic_ur} کے کچھ بڑے چیلنجز کا سامنا بھی کرنا پڑتا ہے۔",
+        f"لیکن اگر ہم درست حکمت عملی اپنائیں تو {topic_ur} ہمارے لیے بے شمار نئی راہیں کھول سکتا ہے۔",
+        f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur} کا یہ سفر ہماری ترقی اور کامیابی کے لیے نہایت ضروری ہے۔"
     ]
     
     return " ۔ ".join(scenes_ur)
@@ -710,7 +720,7 @@ def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic H
         success = False
         
         user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, Scientific/Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
         ]
@@ -1311,9 +1321,10 @@ with tab_movie:
             else:
                 st.error("Please enter a topic first.")
 
-    # Script Box
-    script_box_default = st.session_state.get("movie_script_val", "")
-    m_script = st.text_area("Enter Movie Script (Urdu/English):", value=script_box_default, height=150)
+    # Bound to state key movie_script_val to ensure instant UI refresh on st.rerun() [2.2]
+    if "movie_script_val" not in st.session_state:
+        st.session_state.movie_script_val = ""
+    m_script = st.text_area("Enter Movie Script (Urdu/English):", key="movie_script_val", height=150)
     enable_islamic_filter = st.checkbox("Enable Islamic Safety Filter 🛡️", value=True)
     
     col_up1, col_up2 = st.columns(2)
