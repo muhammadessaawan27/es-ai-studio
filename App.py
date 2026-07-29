@@ -444,7 +444,7 @@ def translate_ur_to_en_enhanced(text):
     return "Beautiful scene scenery, highly detailed"
 
 # SaaS-Ready Dynamic Story Explainer Engine (100% dynamic, matches ANY custom topic instantly!) [2.2]
-def generate_local_fallback_script(topic, genre):
+def generate_local_fallback_script(topic, genre, style):
     topic = topic.strip()
     topic_ur = topic
     
@@ -464,47 +464,43 @@ def generate_local_fallback_script(topic, genre):
     topic_lower = topic.lower()
     
     # Segment dynamic custom topics cleanly to completely prevent robotic explanations for creative inputs [2.2]
-    horror_keywords = ["کوٹھی", "قبر", "جن", "بھوت", "ڈراونا", "تاریک", "خوف", "راز", "موت", "grave", "ghost", "horror", "scary", "dark", "secret", "haunted"]
-    hero_keywords = ["ٹارزن", "سپر ہیرو", "بہادر", "شیر", "جنگل", "بندر", "خرگوش", "چوزہ", "tarzan", "hero", "superhero", "lion", "jungle", "adventure", "chick", "rabbit"]
-    islamic_keywords = ["مسجد", "نماز", "اسلامی", "تاریخ", "دعا", "نور", "الله", "mosque", "islamic", "historical", "faith", "spiritual"]
-    
-    if any(k in topic_lower or k in topic_ur for k in horror_keywords) or "horror" in genre.lower() or "suspense" in genre.lower():
+    if "News" in style or "news" in genre.lower():
         scenes_ur = [
-            f"سرد چاندنی رات میں، دور دراز جنگل کے سائے میں {topic_ur_clean} کا ایک ہولناک راز چھپا ہوا تھا۔",
-            f"لوگ دور کھڑے ہو کر {topic_ur_clean} کی طرف دیکھتے اور خوف سے کانپنے لگتے تھے۔",
-            f"ایک رات، ایک نڈر مسافر نے ہمت باندھی اور {topic_ur_clean} کے اس پراسرار سائے کی طرف قدم بڑھائے۔",
-            f"جیسے ہی وہ آگے بڑھا، تیز گرج چمک اور ٹھنڈی ہوا نے اس کا راستہ روکنے کی کوشش کی۔",
-            f"دروازہ کھولتے ہی اس کے سامنے {topic_ur_clean} کا وہ صدیوں پرانا راز آشکار ہو گیا جس نے سب کے رونگٹے کھڑے کر دیے۔",
-            f"اس پُراسرار واقعے کے بعد پورے علاقے پر ایک خوفناک خاموشی چھا گئی جو ہمیشہ یاد رہے گی۔"
+            f"خبر نامہ میں خوش آمدید، آج کی سب سے بڑی سرخی {topic_ur_clean} کے متعلق ہے۔",
+            f"ذرائع کے مطابق، {topic_ur_clean} کے اس بڑے معاملے پر تفتیش کاروں نے نئی تحقیقات کا آغاز کر دیا ہے۔",
+            f"موقع پر موجود نمائندے کی رپورٹ کے مطابق، {topic_ur_clean} کے اس لائیو منظر نے سب کو حیران کر دیا ہے۔",
+            f"عوامی حلقوں میں اس وقت {topic_ur_clean} کے اثرات اور اس کے ممکنہ نتائج پر گرما گرم بحث جاری ہے۔",
+            f"ماہرین کا کہنا ہے کہ آنے والے دنوں میں ہمیں {topic_ur_clean} کے بارے میں مزید سنسنی خیز خبریں دیکھنے کو ملیں گی۔",
+            f"ہم اس لائیو نشریات میں {topic_ur_clean} کی اپ ڈیٹ آپ تک مسلسل پہنچاتے رہیں گے۔"
         ]
-    elif any(k in topic_lower or k in topic_ur for k in hero_keywords) or "story" in genre.lower() or "moral" in genre.lower():
+    elif "Trailer" in style or "horror" in genre.lower() or "suspense" in genre.lower() or "کوٹھی" in topic_ur_clean:
         scenes_ur = [
-            f"ایک قدیم اور پُراسرار سرزمین پر {topic_ur_clean} کی بہادری اور عزم کے قصے گونج رہے تھے۔",
-            f"ہر ایک کی زبان پر {topic_ur_clean} کی بے پناہ طاقت اور حیرت انگیز کارناموں کا تذکرہ تھا۔",
-            f"ایک دن صبح سویرے، {topic_ur_clean} ایک نئے اور پُرخطر مہم جوئی پر روانہ ہوا جس کی راہ میں شدید امتحانات تھے۔",
-            f"راستے میں اس کا سامنا گہرے جنگلات، بلند پہاڑوں اور نہایت خطرناک چیلنجز سے ہوا۔",
-            f"اپنی سچی ہمت اور طاقت کا بھرپور مظاہرہ کرتے ہوئے {topic_ur_clean} نے تمام رکاوٹوں کو جڑ سے اکھاڑ پھینکا۔",
-            f"اس شاندار کامیابی کے بعد پوری سرزمین پر {topic_ur_clean} کی فتح کے شادیانے بجنے لگے۔"
+            f"ایک پُراسرار گہرے دھندلے بادلوں کے پیچھے، {topic_ur_clean} کا ایک ایسا بھیانک راز دفن تھا جو اب باہر آنے والا ہے۔",
+            f"کوئی نہیں جانتا تھا کہ {topic_ur_clean} کی اس ہولناک حقیقت کے پیچھے کیا خوفناک سچائی چھپی ہوئی ہے۔",
+            f"اس طوفانی رات، ایک نڈر مسافر نے {topic_ur_clean} کے اس پراسرار سائے کا پیچھا کرنے کا فیصلہ کیا۔",
+            f"جیسے ہی وہ آگے بڑھا، ایک لرزہ خیز آواز گونجی اور پورے علاقے کی زمین کانپنے لگی۔",
+            f"جب آخری دروازہ کھلا، تو {topic_ur_clean} کا وہ سچ سامنے آیا جس نے سب کی عقلوں کو دنگ کر کے رکھ دیا۔",
+            f"اس سنسنی خیز داستان کا اصل فیصلہ اب ہونے والا ہے، کیا آپ تیار ہیں؟"
         ]
-    elif any(k in topic_lower or k in topic_ur for k in islamic_keywords) or "islamic" in genre.lower():
+    elif any(k in topic_ur_clean for k in ["ٹارزن", "سپر ہیرو", "بہادر", "شیر", "جنگل", "بندر", "خرگوش", "چوزہ"]):
         scenes_ur = [
-            f"تاریخ کے اوراق میں {topic_ur_clean} کی عظمت اور ایمان کی سچی داستانیں روشن ہیں۔",
-            f"جب ہم {topic_ur_clean} کے اس پاکیزہ سفر کا مطالعہ کرتے ہیں، تو روح ایمان سے تازہ ہو جاتی ہے۔",
-            f"ایک پاکیزہ صبح، لوگ {topic_ur_clean} کے فیض اور برکت کی تلاش میں جمع ہوئے۔",
-            f"دلوں میں سچی عقیدت اور اللہ پر بھرپور یقین لیے سب نے امن اور سلامتی کا راستہ اختیار کیا۔",
-            f"آسمان سے نازل ہونے والے خوبصورت سفید نور کی برکت سے سب کی دعائیں مستجاب ہوئیں۔",
-            f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur_clean} کا یہ پاکیزہ پیغام ہمارے ایمان کی مضبوطی کا باعث ہے۔"
+            f"پرانے وقتوں کی بات ہے، ایک دور دراز پراسرار مقام پر {topic_ur_clean} کی بہادری کے قصے زبان زدِ عام تھے۔",
+            f"ہر کوئی {topic_ur_clean} کی غیر معمولی طاقت اور حیرت انگیز کارناموں کی تعریف کرتا تھا۔",
+            f"ایک دن صبح سویرے، {topic_ur_clean} ایک نئے اور پُرپیچ مہم جوئی پر نکل پڑا جس کی راہ میں شدید چیلنجز تھے۔",
+            f"راستے میں اس کا سامنا گہرے چمکتے جنگلات، بہتی ندیوں اور خطرناک رکاوٹوں سے ہوا۔",
+            f"اچانک ایک ایسا نازک موڑ آیا جہاں {topic_ur_clean} کو اپنی سچی ہمت اور دلیری کا مظاہرہ کرنا پڑا۔",
+            f"اپنی بے مثال ہمت کی بدولت، {topic_ur_clean} نے شاندار فتح حاصل کی اور سب ہنسی خوشی رہنے لگے۔"
         ]
     else:
         scenes_ur = [
-            f"آئیے آج ہم {topic_ur_clean} کے نہایت ہی اہم اور عملی پہلوؤں پر تفصیلی روشنی ڈالتے ہیں۔",
-            f"جب ہم {topic_ur_clean} کے اس وسیع میدان کا مطالعہ کرتے ہیں، تو ہمیں اس کے دور رس نتائج معلوم ہوتے ہیں۔",
-            f"موجودہ دور کی تیز رفتار ٹیکنالوجی میں {topic_ur_clean} ایک سنگِ میل ثابت ہو رہا ہے۔",
+            f"آئیے آج ہم {topic_ur_clean} کے نہایت ہی اہم اور معلوماتی پہلوؤں پر تفصیلی روشنی ڈالتے ہیں۔",
+            f"جب ہم {topic_ur_clean} کے اس وسیع موضوع کی گہرائی کا مطالعہ کرتے ہیں، تو ہمیں حیرت انگیز حقائق معلوم ہوتے ہیں۔",
+            f"جدید دور کی تیز رفتار تبدیلیوں میں {topic_ur_clean} ہمارے علم اور عمل کے لیے ایک سنگِ میل ثابت ہو رہا ہے۔",
             f"اس معلوماتی سفر میں ہمیں {topic_ur_clean} کے عملی طریقوں اور چیلنجز کو بھی سمجھنا ہوگا۔",
-            f"بہترین حکمت عملی اور سائنسی تحقیق کی مدد سے ہم {topic_ur_clean} کے میدان میں غیر معمولی کامیابی پا سکتے ہیں۔",
-            f"یہ ثابت ہوتا ہے کہ {topic_ur_clean} کا یہ جدید مطالعہ ہمارے علم اور عمل کی ترقی کے لیے بنیادی حیثیت رکھتا ہے۔"
+            f"بہترین حکمت عملی اور جدید تحقیق کی مدد سے ہم {topic_ur_clean} کے میدان میں غیر معمولی کامیابی پا سکتے ہیں۔",
+            f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur_clean} کا یہ جدید تصور ہماری ترقی اور فکری بلندی کے لیے بنیادی حیثیت رکھتا ہے۔"
         ]
-        
+    
     return " ۔ ".join(scenes_ur)
 
 def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
@@ -608,6 +604,8 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         
         style_boosters = {
             "Realistic HD": "ultra photorealistic, award-winning photography style, 8k resolution, highly detailed, sharp focus, natural real skin textures, strictly no 3D render, no CGI, no drawing",
+            "Sglowina News Studio (نیوز رپورٹ)": "photorealistic professional news studio setup, high-tech broadcasting television background, crisp studio lighting, clear realistic news anchor reporter, real-life capture",
+            "Cinematic Movie Trailer (پرومو ٹریلر)": "intense high-budget epic movie trailer shot, dramatic action cinematography, high contrast movie frame, dark shadows, highly suspenseful atmosphere, extremely detailed",
             "3D Cartoon": "3D cartoon animation style, Pixar style, Disney animation style, vibrant colors, stylized cute characters, playful environment, no realism",
             "Cinematic Hollywood": "cinematic Hollywood movie style, dramatic atmospheric lighting, anamorphic lens, high-fidelity movie frame, rich realistic textures, professional cinematography, strictly no CGI",
             "Bollywood Dramatic": "highly dramatic Bollywood movie style, rich colors, emotional dynamic lighting, vibrant clothing, cinematic film frame",
@@ -1178,6 +1176,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                         except Exception as e:
                             st.warning(f"Video clip loading failed: {e}. Switching to photo fallback...")
                 
+                # Bypassed redundant resolution scaling to ensure consistent 1024x1024 limit compliance
                 flux_prompt_urls[i] = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p[:400])}?width={w}&height={h}&seed={seed + i * 17}&nologo=true&model=flux"
                 img_paths[i] = f"i_{u_id}_{i}.png"
                 
@@ -1300,7 +1299,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 except: pass
             for file_p in generated_images:
                 try:
-                    if file_p != cached_bg_path: os.remove(file_p)
+                    if file_p != cached_bg_path: 
+                        os.remove(file_p)
+                        if file_p.endswith(".png"):
+                            for suffix in ["_resized.png", "_static.png"]:
+                                temp_f = file_p.replace(".png", suffix)
+                                if os.path.exists(temp_f): os.remove(temp_f)
                 except: pass
             progress_bar.empty()
             return f"Error Details: {e}"
@@ -1454,7 +1458,7 @@ with tab_movie:
                     # Core Sglowina Local Engine failover - runs locally in 0.001s if API key gets rate-limited/blocked [2.2]
                     if not ai_story or len(ai_story.strip()) < 10:
                         st.info("💡 Sglowina Local Explainer Engine is compiling a custom cinematic script for you...")
-                        ai_story = generate_local_fallback_script(script_topic, script_genre)
+                        ai_story = generate_local_fallback_script(script_topic, script_genre, "Realistic HD")
                         
                     st.session_state.movie_script_val = ai_story.strip()
                     st.success("Story Generated! It has been copied to the Script Box below.")
@@ -1472,30 +1476,31 @@ with tab_movie:
     with col_up1: uploaded_male_img = st.file_uploader("Upload Male Reference Image:", type=["jpg", "png", "jpeg"])
     with col_up2: uploaded_female_img = st.file_uploader("Upload Female Reference Image:", type=["jpg", "png", "jpeg"])
 
-    st.sidebar.subheader("🎵 Background Music Gallery")
-    bg_music_theme = st.sidebar.selectbox("Background Music Vibe:", [
-        "Hollywood Dramatic (فلمی اور ڈرامہ)",
-        "News Explainer (معلوماتی اور خبریں)",
-        "Horror Suspense (خوفناک اور پراسرار)",
-        "Cartoon & Kids Story (کارٹون کہانی)",
-        "Business & Tech (کارپوریٹ اور بزنس)",
-        "AI Space Ambient (خلائی اور جدید)"
-    ])
-
-    st.sidebar.subheader("🎬 Video Pace & Output Mode")
-    video_pace = st.sidebar.selectbox("Video Output Mode / Pace:", [
-        "Standard Narrated Story (عام کہانی)",
-        "Fast-Paced Cinematic Trailer (ٹریلر اور پرومو)"
-    ])
+    # Moved Background Music Theme and Video Pace options directly to the main screen to prevent sidebar collapsing bugs on mobile [2]
+    col_main_s1, col_main_s2 = st.columns(2)
+    with col_main_s1:
+        bg_music_theme = st.selectbox("Select Background Music Theme:", [
+            "Hollywood Dramatic (فلمی اور ڈرامہ)",
+            "News Explainer (معلوماتی اور خبریں)",
+            "Horror Suspense (خوفناک اور پراسرار)",
+            "Cartoon & Kids Story (کارٹون کہانی)",
+            "Business & Tech (کارپوریٹ اور بزنس)",
+            "AI Space Ambient (خلائی اور جدید)"
+        ])
+    with col_main_s2:
+        video_pace = st.selectbox("Select Video Output Mode & Pace:", [
+            "Standard Narrated Story (عام کہانی)",
+            "Fast-Paced Cinematic Trailer (ٹریلر اور پرومو)"
+        ])
 
     mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9 = st.columns(9)
     # Multi-Language Edge-TTS Voices Support Added (Urdu PK & IN, English, Arabic, Persian) [2]
-    with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)", "Urdu India Male (Salman)", "Urdu India Female (Gul)", "English US Male (Guy)", "English US Female (Jenny)", "Arabic Egypt Male (Shakir)", "Persian Male (Farid)"])
+    with mc1: mv = st.selectbox("Voice:", ["Urdu India Male (Salman)", "Urdu India Female (Gul)", "Urdu Male (Asad)", "Urdu Female (Uzma)", "English US Male (Guy)", "English US Female (Jenny)", "Arabic Egypt Male (Shakir)", "Persian Male (Farid)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["-10% (Slow)", "+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch:", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    # Style Dropdown reordered with Realistic HD first, added Hollywood, Bollywood, Lollywood, Corporate Business, Islamic & Educational/Learning styles
-    with mc5: ms = st.selectbox("Style:", ["Realistic HD", "3D Cartoon", "Cinematic Hollywood", "Bollywood Dramatic", "Lollywood Classic", "Islamic Historical", "Corporate Business", "Educational Explainer", "Anime Art", "Logo Design", "Rustic Village Life", "Dark Gothic / Mystery"])
+    # Explicit selectable News Studio and Cinematic Movie Trailer styles added directly on the main panel Style dropdown [2]
+    with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Sglowina News Studio (نیوز رپورٹ)", "Cinematic Movie Trailer (پرومو ٹریلر)", "3D Cartoon", "Cinematic Hollywood", "Bollywood Dramatic", "Lollywood Classic", "Islamic Historical", "Corporate Business", "Educational Explainer", "Anime Art", "Logo Design", "Rustic Village Life", "Dark Gothic / Mystery"])
     with mc6: camera_motion = st.selectbox("Camera Motion:", ["AI Hollywood Director (Auto)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down", "Dolly In", "Dolly Out", "Orbit Camera", "Crane Shot", "Drone Shot", "Tracking Shot", "Follow Shot", "Handheld Camera", "Shoulder Camera", "Cinematic Reveal", "Whip Pan", "Tilt Up", "Tilt Down", "Roll Camera", "Parallax Motion", "Ken Burns Effect", "Rack Focus", "Motion Blur"])
     with mc7: transition_style = st.selectbox("Transition Effect:", ["Cross Dissolve (Fade)", "Instant Cut"])
     with mc8: video_model = st.selectbox("AI Video Model:", ["wan-fast", "seedance", "veo"])
