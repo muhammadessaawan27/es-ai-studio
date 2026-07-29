@@ -34,6 +34,19 @@ session.headers.update(headers_browser)
 AUDIO_CACHE_DIR = "audio_cache"
 os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
 DB_BACKUP_FILE = "sglowina_saas_backup.json"
+TRANSITION_SFX_FILE = "transition_whoosh.mp3"
+
+# Download professional clean transition whoosh sound effect on startup
+def download_transition_sfx():
+    if os.path.exists(TRANSITION_SFX_FILE) and os.path.getsize(TRANSITION_SFX_FILE) > 5000:
+        return
+    try:
+        res = requests.get("https://www.soundjay.com/button/sounds/button-20.mp3", timeout=12)
+        if res.status_code == 200:
+            with open(TRANSITION_SFX_FILE, "wb") as f: f.write(res.content)
+    except: pass
+
+download_transition_sfx()
 
 # Global Session State Registration to permanently prevent NameErrors
 if "gen_mode" not in st.session_state:
@@ -805,13 +818,23 @@ def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic H
         # Minimal delay to protect connection pools
         time.sleep(0.3)
 
-def get_cached_bg_music(is_horror, is_epic):
-    fn = "bg_horror.mp3" if is_horror else ("bg_epic.mp3" if is_epic else "bg_standard.mp3")
-    url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" if is_horror else ("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" if is_epic else "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3")
+# Background Music Gallery Theme Caching Engine [2.2]
+def get_cached_bg_music(theme):
+    theme_urls = {
+        "Hollywood Dramatic (فلمی اور ڈرامہ)": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+        "News Explainer (معلوماتی اور خبریں)": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+        "Horror Suspense (خوفناک اور پراسرار)": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
+        "Cartoon & Kids Story (کارٹون کہانی)": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
+        "Business & Tech (کارپوریٹ اور بزنس)": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+        "AI Space Ambient (خلائی اور جدید)": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
+    }
+    url = theme_urls.get(theme, "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3")
+    fn = f"bg_{hashlib.md5(theme.encode()).hexdigest()[:8]}.mp3"
     cf = os.path.join(AUDIO_CACHE_DIR, fn)
-    if os.path.exists(cf) and os.path.getsize(cf) > 100000: return cf
+    if os.path.exists(cf) and os.path.getsize(cf) > 100000:
+        return cf
     try:
-        res = session.get(url, timeout=15, verify=False)
+        res = session.get(url, timeout=20, verify=False)
         if res.status_code == 200:
             with open(cf, "wb") as f: f.write(res.content)
             return cf
@@ -831,11 +854,12 @@ def download_video_safely(url, dest_path, progress_status):
     return False
 
 # Preserved image scale factor with native PIL resize failsafes to bypass broken MoviePy scaly-crashes on modern cloud hosts [1, 2]
-def apply_camera_motion_v40(img_path, motion, duration, w, h):
+def apply_camera_motion_v40(img_path, motion, duration, w, h, video_pace="Standard Narrated Story (عام کہانی)"):
     if not MOVIEPY_AVAILABLE: return None
     ensure_image_exists(img_path, w, h, "Visualizing scene...")
     
-    scale_factor = 1.05
+    # Increase zoom speed dynamically if Fast-Paced Cinematic Trailer is enabled [2]
+    scale_factor = 1.15 if "Trailer" in video_pace else 1.05
     cw, ch = int(w * scale_factor), int(h * scale_factor)
     cw, ch = make_even(cw), make_even(ch)
     
@@ -867,7 +891,7 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
             "Handheld Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (2 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (2 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 0.5 * np.sin(2 * np.pi * t * 1.0)),
         }
         
-        active_motion = camera_motion if camera_motion != "AI Hollywood Director (Auto)" else "Zoom Out (v40 Default)"
+        active_motion = motion if motion != "AI Hollywood Director (Auto)" else "Zoom Out (v40 Default)"
         animated_clip = motions_map.get(active_motion, motions_map["Zoom Out (v40 Default)"])()
         
         return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
@@ -910,10 +934,71 @@ def save_audio_safe(text, voice, rate, pitch, filename):
         st.error(f"Voice synthesis error: {e}")
         return False
 
+# Urdu Font Finder to safely load beautiful Nastaliq rendering [2.2]
+def get_urdu_font(font_size):
+    font_paths = [
+        "Jameel Noori Nastaleeq.ttf", 
+        "NotoNastaliqUrdu-Regular.ttf", 
+        "arial.ttf"
+    ]
+    for path in font_paths:
+        if os.path.exists(path):
+            try: return ImageFont.truetype(path, font_size)
+            except: pass
+    try: return ImageFont.load_default()
+    except: return None
+
+# Secure subtitle burning function to overlay text elegantly [2.2]
+def burn_subtitles_to_image(img_path, scene_text):
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            draw = ImageDraw.Draw(im)
+            w, h = im.size
+            font_size = max(18, int(h * 0.045))
+            font = get_urdu_font(font_size)
+            
+            bar_h = int(font_size * 2.2)
+            bar_y = h - bar_h - 20
+            
+            overlay = Image.new("RGBA", im.size, (0, 0, 0, 0))
+            draw_overlay = ImageDraw.Draw(overlay)
+            draw_overlay.rectangle([20, bar_y, w - 20, h - 20], fill=(0, 0, 0, 180))
+            
+            im = Image.alpha_composite(im.convert("RGBA"), overlay).convert("RGB")
+            draw = ImageDraw.Draw(im)
+            
+            text_w = draw.textlength(scene_text, font=font) if hasattr(draw, 'textlength') else (len(scene_text) * (font_size // 2))
+            text_x = max(30, (w - text_w) // 2)
+            text_y = bar_y + (bar_h - font_size) // 2
+            
+            draw.text((text_x, text_y), scene_text, fill=(255, 255, 255), font=font)
+            im.save(img_path, "PNG")
+    except: pass
+
+def apply_canva_typography(img_path, text):
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            draw = ImageDraw.Draw(im)
+            w, h = im.size
+            font_size = int(h * 0.04) if h * 0.04 > 16 else 16
+            try: font = get_urdu_font(font_size)
+            except: font = None
+            overlay = Image.new('RGBA', im.size, (0, 0, 0, 0))
+            draw_overlay = ImageDraw.Draw(overlay)
+            box_h = int(font_size * 2.5)
+            box_y = h - box_h - 25
+            draw_overlay.rounded_rectangle([30, box_y, w - 30, h - 25], radius=12, fill=(15, 23, 42, 200))
+            im = Image.alpha_composite(im.convert('RGBA'), overlay).convert('RGB')
+            ImageDraw.Draw(im).text((50, box_y + (box_h - font_size) // 2), text, fill=(255, 255, 255), font=font)
+            im.save(img_path, "PNG")
+    except: pass
+
 # ==========================================
 # 4. SINGLE CLICK DIRECT MOVIE GENERATION (V1.0 restored with step progress text and custom watermark)
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast", custom_wm_bytes=None, enable_sub=False):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free)", pollinations_key="", video_model="wan-fast", custom_wm_bytes=None, enable_sub=False, bg_music_theme="Hollywood Dramatic (فلمی اور ڈرامہ)", video_pace="Standard Narrated Story (عام کہانی)"):
     if not MOVIEPY_AVAILABLE:
         st.error(f"MoviePy is not available on this server. Error: {MOVIEPY_ERROR}.")
         return "Error"
@@ -1008,16 +1093,20 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 
                 v_code_scene = "ur-PK-UzmaNeural" if (is_female_voice and not is_male_voice) else "ur-PK-AsadNeural"
                 sub_audio_path = f"a_{u_id}_{idx}.mp3"
-                if not save_audio_safe(scene, v_code_scene, rate, pitch, sub_audio_path):
+                
+                # Dynamic Speech Sanitizer: Remove bracketed visual instructions so they are NOT spoken out loud [2.2]
+                clean_narration_text = re.sub(r'\[.*?\]|\(.*?\)|（.*?）|【.*?】|［.*?］', '', scene).strip()
+                if len(clean_narration_text) < 2:
+                    clean_narration_text = scene
+                    
+                if not save_audio_safe(clean_narration_text, v_code_scene, rate, pitch, sub_audio_path):
                     raise Exception("Voice generation failed.")
                 temporary_audio_tracks[idx] = sub_audio_path
                 
             progress_bar.progress(0.12)
             if enable_bg_music:
-                story_lower = story.lower()
-                is_horror = any(k in story_lower or k in story for k in ["قبر", "عذاب", "موت", "خوف", "جن", "grave", "death", "scary", "ghost"])
-                is_epic = any(k in story_lower or k in story for k in ["بادشاہ", "تخت", "محل", "سلطنت", "king", "queen", "throne", "palace"])
-                cached_bg_path = get_cached_bg_music(is_horror, is_epic)
+                # Load chosen custom background music theme dynamically [2.2]
+                cached_bg_path = get_cached_bg_music(bg_music_theme)
                 if cached_bg_path and os.path.exists(cached_bg_path): has_bg_music = True
                 
             progress_bar.progress(0.18)
@@ -1050,6 +1139,10 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 refined_p = generate_enhanced_cinematic_prompt(scene, style, active_heritage, enable_islamic_filter, active_male_ref, active_female_ref, attire_tag if character_present else "", consistent_char_desc)
                 # Enforce programmatic human stripper cleaner to strictly protect animal visual fidelity & lock selected style
                 refined_p = clean_animal_prompt_of_humans(refined_p, scene, style)
+                
+                # Auto-inject intense trailer prompt tags dynamically if Fast-Paced Cinematic Trailer is enabled [2]
+                if "Trailer" in video_pace:
+                    refined_p = "epic high-budget movie trailer shot, intense dramatic shadows, high contrast action framing, highly suspenseful cinematic masterpiece, " + refined_p
                 
                 if not is_spiritual and character_present:
                     refined_p += " [Avoid cross-gender blending, anatomically correct]"
@@ -1085,7 +1178,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                         except Exception as e:
                             st.warning(f"Video clip loading failed: {e}. Switching to photo fallback...")
                 
-                # Bypassed redundant resolution scaling to ensure consistent 1024x1024 limit compliance
                 flux_prompt_urls[i] = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p[:400])}?width={w}&height={h}&seed={seed + i * 17}&nologo=true&model=flux"
                 img_paths[i] = f"i_{u_id}_{i}.png"
                 
@@ -1127,18 +1219,27 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 
                 dir_settings = analyze_scene_for_director(scene)
                 active_motion = camera_motion if camera_motion != "AI Hollywood Director (Auto)" else dir_settings["motion"]
-                clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h)
+                clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h, video_pace)
                 if clip is None:
                     try: clip = ImageClip(img_path).set_duration(dur_scene).resize((w, h))
                     except: clip = ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).set_duration(dur_scene)
                 
-                sfx_file = download_scene_sfx(scene, u_id, i)
-                if sfx_file and os.path.exists(sfx_file):
-                    sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
-                    clip = clip.set_audio(CompositeAudioClip([scene_voice_clip.volumex(1.2), sfx_audio]))
-                    generated_images.append(sfx_file)
+                # Mix transition swoosh sound effect dynamically at the start of each scene [2.2]
+                if os.path.exists(TRANSITION_SFX_FILE):
+                    try:
+                        t_sfx = AudioFileClip(TRANSITION_SFX_FILE).volumex(0.12).set_duration(1.0)
+                        sfx_file = download_scene_sfx(scene, u_id, i)
+                        if sfx_file and os.path.exists(sfx_file):
+                            sfx_audio = AudioFileClip(sfx_file).volumex(0.10).set_duration(dur_scene)
+                            # Dynamic volume leveling: boosting spoken voice and ducking music [2]
+                            clip = clip.set_audio(CompositeAudioClip([scene_voice_clip.volumex(1.4), sfx_audio, t_sfx.set_start(0)]))
+                            generated_images.append(sfx_file)
+                        else:
+                            clip = clip.set_audio(CompositeAudioClip([scene_voice_clip.volumex(1.4), t_sfx.set_start(0)]))
+                    except:
+                        clip = clip.set_audio(scene_voice_clip.volumex(1.4))
                 else:
-                    clip = clip.set_audio(scene_voice_clip.volumex(1.2))
+                    clip = clip.set_audio(scene_voice_clip.volumex(1.4))
                     
                 clips[i] = apply_clip_transition(clip, transition_style, dur_scene)
                 
@@ -1151,6 +1252,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
             final_video = concatenate_videoclips(valid_clips, method="compose")
             if has_bg_music and cached_bg_path:
                 try:
+                    # Dynamic background music volume ducking [2]
                     bg_track = AudioFileClip(cached_bg_path).volumex(0.03).set_duration(final_video.duration)
                     final_video = final_video.set_audio(CompositeAudioClip([final_video.audio, bg_track]))
                 except Exception as e: st.warning(f"Background music error: {e}")
@@ -1370,9 +1472,25 @@ with tab_movie:
     with col_up1: uploaded_male_img = st.file_uploader("Upload Male Reference Image:", type=["jpg", "png", "jpeg"])
     with col_up2: uploaded_female_img = st.file_uploader("Upload Female Reference Image:", type=["jpg", "png", "jpeg"])
 
+    st.sidebar.subheader("🎵 Background Music Gallery")
+    bg_music_theme = st.sidebar.selectbox("Background Music Vibe:", [
+        "Hollywood Dramatic (فلمی اور ڈرامہ)",
+        "News Explainer (معلوماتی اور خبریں)",
+        "Horror Suspense (خوفناک اور پراسرار)",
+        "Cartoon & Kids Story (کارٹون کہانی)",
+        "Business & Tech (کارپوریٹ اور بزنس)",
+        "AI Space Ambient (خلائی اور جدید)"
+    ])
+
+    st.sidebar.subheader("🎬 Video Pace & Output Mode")
+    video_pace = st.sidebar.selectbox("Video Output Mode / Pace:", [
+        "Standard Narrated Story (عام کہانی)",
+        "Fast-Paced Cinematic Trailer (ٹریلر اور پرومو)"
+    ])
+
     mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9 = st.columns(9)
-    # Multi-Language Edge-TTS Voices Support Added (Urdu, English, Arabic, Persian)
-    with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)", "English US Male (Guy)", "English US Female (Jenny)", "Arabic Egypt Male (Shakir)", "Persian Male (Farid)"])
+    # Multi-Language Edge-TTS Voices Support Added (Urdu PK & IN, English, Arabic, Persian) [2]
+    with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)", "Urdu India Male (Salman)", "Urdu India Female (Gul)", "English US Male (Guy)", "English US Female (Jenny)", "Arabic Egypt Male (Shakir)", "Persian Male (Farid)"])
     with mc2: mv_rate = st.selectbox("Voice Speed:", ["-10% (Slow)", "+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)"])
     with mc3: mv_pitch = st.selectbox("Voice Pitch:", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
@@ -1396,6 +1514,8 @@ with tab_movie:
         voice_map = {
             "Urdu Male (Asad)": "ur-PK-AsadNeural",
             "Urdu Female (Uzma)": "ur-PK-UzmaNeural",
+            "Urdu India Male (Salman)": "ur-IN-SalmanNeural",
+            "Urdu India Female (Gul)": "ur-IN-GulNeural",
             "English US Male (Guy)": "en-US-GuyNeural",
             "English US Female (Jenny)": "en-US-JennyNeural",
             "Arabic Egypt Male (Shakir)": "ar-EG-ShakirNeural",
@@ -1412,7 +1532,7 @@ with tab_movie:
                 m_script, active_voice, rate_val, pitch_val, mr, ms, sd, camera_motion, transition_style,
                 enable_watermark, enable_bg_music, uploaded_male_img, uploaded_female_img,
                 enable_islamic_filter, "Automatic", active_gen_mode, active_key, video_model,
-                custom_wm_bytes=wm_bytes, enable_sub=False # Hardcoded subtitles to False as requested (سکرین کی لکھائی مستقل ختم)
+                custom_wm_bytes=wm_bytes, enable_sub=False, bg_music_theme=bg_music_theme, video_pace=video_pace # Hardcoded subtitles to False as requested (سکرین کی لکھائی مستقل ختم)
             )
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res):
             st.video(v_res) # Completely removed key parameter from st.video to prevent TypeErrors on Streamlit
