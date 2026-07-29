@@ -41,7 +41,7 @@ def download_transition_sfx():
     if os.path.exists(TRANSITION_SFX_FILE) and os.path.getsize(TRANSITION_SFX_FILE) > 5000:
         return
     try:
-        res = requests.get("https://www.soundjay.com/button/sounds/button-20.mp3", timeout=12)
+        res = requests.get("https://www.soundjay.com/mechanical/sounds/whoosh-1.mp3", timeout=12)
         if res.status_code == 200:
             with open(TRANSITION_SFX_FILE, "wb") as f: f.write(res.content)
     except: pass
@@ -359,7 +359,7 @@ def analyze_scene_for_director(scene_text):
         
     return {"motion": motion, "lighting": lighting, "color_grading": color_grading, "composition": composition}
 
-# Fast POST Request on Unified Endpoint utilizing 100% Free OpenAI-Fast bypass parameters [2.2.5, 3.3.1]
+# Fast POST Request on Unified Endpoint utilizing 100% Free OpenAI-Fast bypass parameters
 def generate_text_pollinations(prompt, system_prompt=""):
     models = ["openai-fast", "openai", "mistral"]
     user_agents = [
@@ -493,7 +493,7 @@ def generate_local_fallback_script(topic, genre, style):
         ]
     else:
         scenes_ur = [
-            f"آئیے آج ہم {topic_ur_clean} کے نہایت ہی اہم اور معلوماتی پہلوؤں پر تفصیلی روشنی ڈالتے ہیں۔",
+            f"آئیے آج ہم {topic_ur_clean} کے نہایت ہی اہم اور عملی پہلوؤں پر تفصیلی روشنی ڈالتے ہیں۔",
             f"جب ہم {topic_ur_clean} کے اس وسیع موضوع کی گہرائی کا مطالعہ کرتے ہیں، تو ہمیں حیرت انگیز حقائق معلوم ہوتے ہیں۔",
             f"جدید دور کی تیز رفتار تبدیلیوں میں {topic_ur_clean} ہمارے علم اور عمل کے لیے ایک سنگِ میل ثابت ہو رہا ہے۔",
             f"اس معلوماتی سفر میں ہمیں {topic_ur_clean} کے عملی طریقوں اور چیلنجز کو بھی سمجھنا ہوگا۔",
@@ -502,6 +502,41 @@ def generate_local_fallback_script(topic, genre, style):
         ]
     
     return " ۔ ".join(scenes_ur)
+
+# Highly Intelligent Speech Sanitizer to permanently strip out visual scene descriptors, scene headers, and non-spoken cues [2]
+def sanitize_speech_text(text):
+    # 1. Remove all content within brackets globally
+    text = re.sub(r'\[.*?\]|\(.*?\)|（.*?）|【.*?】|［.*?］|\{.*?\}', '', text)
+    
+    cleaned_lines = []
+    for line in text.split("\n"):
+        line_strip = line.strip()
+        if not line_strip:
+            continue
+            
+        # Skip pure bullet numbers or numbering patterns
+        if re.match(r'^[\d\.\-\s]+$', line_strip):
+            continue
+            
+        # Skip scene/intro/outro headers and duration labels completely
+        if re.match(r'^(scene|scene\s*\d+|منظر\s*\d+|part\s*\d+|حصہ\s*\d+|promo|trailer|intro|outro|60\s*second|60\s*سیکنڈ)\b', line_strip, re.IGNORECASE):
+            continue
+            
+        # Parse "Voiceover: spoken content" patterns and extract only the vocal part [2]
+        speak_match = re.search(r'(voiceover|narration|dialogue|audio|speaks|voice|آواز|مکالمہ|کہانی|بولیں|بولتا ہے)\s*:\s*(.*)', line_strip, re.IGNORECASE)
+        if speak_match:
+            spoken_part = speak_match.group(2).strip()
+            if spoken_part:
+                cleaned_lines.append(spoken_part)
+            continue
+            
+        # Skip visual instructions, prompts, settings, camera descriptors entirely [2]
+        if re.match(r'^(visual|prompt|background|image|video|camera|setting|scene|منظر|تصویر|پرامپٹ|پس\s*منظر)\s*:\s*', line_strip, re.IGNORECASE):
+            continue
+            
+        cleaned_lines.append(line_strip)
+        
+    return " ".join(cleaned_lines).strip()
 
 def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
     combined_text = (scene_text_en + " " + scene_text_ur).lower()
@@ -754,8 +789,8 @@ def apply_custom_watermark(img_path, watermark_bytes):
             im.convert("RGB").save(img_path, "PNG")
     except: pass
 
-# Rate-limit friendly sequential downloader to completely prevent shared-IP concurrent blocks [2.2]
-def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic HD"):
+# Rate-limit friendly sequential downloader that injects API keys for bypass unthrottled downloads [2.2]
+def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic HD", api_key=""):
     user_agents = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
@@ -770,10 +805,15 @@ def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic H
         t_session = requests.Session()
         t_session.headers.update({"User-Agent": random.choice(user_agents)})
         
+        # Injects Premium key directly if active to completely bypass IP blocks [2.2]
+        active_url = url
+        if api_key:
+            active_url += f"&key={api_key}"
+        
         # 1. Primary high-resolution attempt with solid timeout
         for attempt in range(2):
             try:
-                res = t_session.get(url, timeout=25)
+                res = t_session.get(active_url, timeout=25)
                 if res.status_code == 200 and len(res.content) > 5000:
                     with open(path, "wb") as f: f.write(res.content)
                     if is_valid_image(path):
@@ -799,6 +839,8 @@ def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic H
                 
             for img_model in ["flux", "turbo"]:
                 fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(fallback_style + ', ' + clean_prompt_words)}?width={w}&height={h}&nologo=true&model={img_model}&seed={random.randint(1,99999)}"
+                if api_key:
+                    fallback_url += f"&key={api_key}"
                 try:
                     res = t_session.get(fallback_url, timeout=15)
                     if res.status_code == 200 and len(res.content) > 5000:
@@ -813,20 +855,20 @@ def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic H
         if not success:
             generate_cinematic_gradient_placeholder(path, w, h, prompt_text)
             
-        # Minimal delay to protect connection pools
+        # Cooldown protection delay
         time.sleep(0.3)
 
 # Background Music Gallery Theme Caching Engine [2.2]
 def get_cached_bg_music(theme):
     theme_urls = {
-        "Hollywood Dramatic (فلمی اور ڈرامہ)": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-        "News Explainer (معلوماتی اور خبریں)": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-        "Horror Suspense (خوفناک اور پراسرار)": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
-        "Cartoon & Kids Story (کارٹون کہانی)": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
-        "Business & Tech (کارپوریٹ اور بزنس)": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-        "AI Space Ambient (خلائی اور جدید)": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
+        "Hollywood Dramatic (فلمی اور ڈرامہ)": "https://www.soundjay.com/free-music/sounds/heart-of-the-sea-01.mp3",
+        "News Explainer (معلوماتی اور خبریں)": "https://www.soundjay.com/free-music/sounds/around-the-lake-01.mp3",
+        "Horror Suspense (خوفناک اور پراسرار)": "https://www.soundjay.com/free-music/sounds/after-the-rain-01.mp3",
+        "Cartoon & Kids Story (کارٹون کہانی)": "https://www.soundjay.com/free-music/sounds/bright-and-breezy-01.mp3",
+        "Business & Tech (کارپوریٹ اور بزنس)": "https://www.soundjay.com/free-music/sounds/ambient-tech-01.mp3",
+        "AI Space Ambient (خلائی اور جدید)": "https://www.soundjay.com/free-music/sounds/sky-gazer-01.mp3"
     }
-    url = theme_urls.get(theme, "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3")
+    url = theme_urls.get(theme, "https://www.soundjay.com/free-music/sounds/heart-of-the-sea-01.mp3")
     fn = f"bg_{hashlib.md5(theme.encode()).hexdigest()[:8]}.mp3"
     cf = os.path.join(AUDIO_CACHE_DIR, fn)
     if os.path.exists(cf) and os.path.getsize(cf) > 100000:
@@ -1093,9 +1135,9 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 sub_audio_path = f"a_{u_id}_{idx}.mp3"
                 
                 # Dynamic Speech Sanitizer: Remove bracketed visual instructions so they are NOT spoken out loud [2.2]
-                clean_narration_text = re.sub(r'\[.*?\]|\(.*?\)|（.*?）|【.*?】|［.*?］', '', scene).strip()
+                clean_narration_text = sanitize_speech_text(scene)
                 if len(clean_narration_text) < 2:
-                    clean_narration_text = scene
+                    clean_narration_text = "اگلا منظر۔"
                     
                 if not save_audio_safe(clean_narration_text, v_code_scene, rate, pitch, sub_audio_path):
                     raise Exception("Voice generation failed.")
@@ -1188,7 +1230,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 parallel_download_flux_images(
                     [flux_prompt_urls[idx] for idx in indices_needing_images],
                     [img_paths[idx] for idx in indices_needing_images],
-                    [generated_prompts[idx] for idx in indices_needing_images], w, h, style
+                    [generated_prompts[idx] for idx in indices_needing_images], w, h, style, active_api_key
                 )
                 for idx in indices_needing_images:
                     if img_paths[idx]: generated_images.append(img_paths[idx])
