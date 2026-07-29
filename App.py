@@ -171,6 +171,34 @@ def get_public_url(uploaded_file):
 
     return None
 
+# Advanced Multimodal Vision AI Image Analyzer
+def describe_reference_image(image_url):
+    if not image_url:
+        return ""
+    try:
+        payload = {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Describe the person's gender, ethnicity, facial features, hair, apparel, and style in 15 words or less. Example: 'A beautiful young Pakistani Muslim girl wearing a clean red headscarf, brown eyes.'"},
+                        {"type": "image_url", "image_url": {"url": image_url}}
+                    ]
+                }
+            ],
+            "model": "openai",
+            "jsonMode": False
+        }
+        res = requests.post("https://gen.pollinations.ai/v1/chat/completions", json=payload, timeout=12)
+        if res.status_code == 200:
+            data = res.json()
+            if "choices" in data and len(data["choices"]) > 0:
+                desc = data["choices"][0]["message"]["content"].strip()
+                desc = re.sub(r'^(description|this is|image shows|the photo shows)\s*:\s*', '', desc, flags=re.IGNORECASE)
+                return desc
+    except: pass
+    return ""
+
 def get_db_connection():
     pg_url = os.environ.get("DATABASE_URL")
     if pg_url:
@@ -466,6 +494,7 @@ def translate_ur_to_en_enhanced(text):
         return f"Cinematic scene depicting {', '.join(translated_words)}, highly detailed"
     return "Beautiful scene scenery, highly detailed"
 
+# SaaS-Ready Dynamic Story & Product Promo Explainer Engine
 def generate_local_fallback_script(topic, genre, style):
     topic = topic.strip()
     topic_ur = topic
@@ -482,11 +511,22 @@ def generate_local_fallback_script(topic, genre, style):
     topic_ur_clean = topic_ur.replace("کہانی", "").replace("کی کہانی", "").replace("کا راز", "").strip()
     topic_lower = topic.lower()
     
+    # Marketing and Product Keywords
+    promo_keywords = ["lipstick", "cream", "product", "shampoo", "soap", "beauty", "cosmetic", "sale", "brand", "business", "پروڈکٹ", "خوبصورتی", "لپسٹک", "کریم", "شیمپو", "صابن", "برانڈ", "تشہیر", "مارکیٹنگ", "پروموشن", "بزنس", "دکان", "خریدیں", "خرید"]
     horror_keywords = ["کوٹھی", "قبر", "جن", "بھوت", "ڈراونا", "تاریک", "خوف", "راز", "موت", "grave", "ghost", "horror", "scary", "dark", "secret", "haunted"]
     hero_keywords = ["ٹارزن", "سپر ہیرو", "بہادر", "شیر", "جنگل", "بندر", "خرگوش", "چوزہ", "tarzan", "hero", "superhero", "lion", "jungle", "adventure", "chick", "rabbit"]
     islamic_keywords = ["مسجد", "نماز", "اسلامی", "تاریخ", "دعا", "نور", "الله", "mosque", "islamic", "historical", "faith", "spiritual"]
     
-    if any(k in topic_lower or k in topic_ur for k in horror_keywords) or "horror" in genre.lower() or "suspense" in genre.lower():
+    if any(k in topic_lower or k in topic_ur for k in promo_keywords) or "business" in genre.lower() or "promo" in genre.lower() or "advertisement" in genre.lower():
+        scenes_ur = [
+            f"کیا آپ اپنے لائف اسٹائل کو مزید خوبصورت اور پرکشش بنانا چاہتے ہیں؟ پیش ہے {topic_ur_clean} جو آپ کی زندگی میں لائے گا ایک نیا نکھار۔",
+            f"یہ شاندار {topic_ur_clean} خاص طور پر جدید تقاضوں اور اعلیٰ ترین معیار کو مدنظر رکھ کر تیار کیا گیا ہے۔",
+            f"اس کا بے مثال استعمال نہ صرف آپ کی خوبصورتی اور اعتماد میں اضافہ کرتا ہے بلکہ آپ کو دیتا ہے ایک پرفیکٹ اور لگژری احساس۔",
+            f"ہر بار جب آپ {topic_ur_clean} استعمال کرتے ہیں، تو لوگ آپ کی طرف متوجہ ہوئے بغیر نہیں رہ سکتے۔",
+            f"معیار پر کوئی سمجھوتہ نہیں، یہی وجہ ہے کہ سمجھدار اور خوبصورت لوگ صرف {topic_ur_clean} پر ہی بھروسہ کرتے ہیں۔",
+            f"آج ہی {topic_ur_clean} حاصل کریں اور اپنے حسن اور شخصیت کو چار چاند لگائیں، کیونکہ آپ اس کے حقدار ہیں۔"
+        ]
+    elif any(k in topic_lower or k in topic_ur for k in horror_keywords) or "horror" in genre.lower() or "suspense" in genre.lower():
         scenes_ur = [
             f"سرد چاندنی رات میں، دور دراز جنگل کے سائے میں {topic_ur_clean} کا ایک ہولناک راز چھپا ہوا تھا۔",
             f"لوگ دور کھڑے ہو کر {topic_ur_clean} کی طرف دیکھتے اور خوف سے کانپنے لگتے تھے۔",
@@ -500,7 +540,7 @@ def generate_local_fallback_script(topic, genre, style):
             f"ایک قدیم اور پُراسرار سرزمین پر {topic_ur_clean} کی بہادری اور عزم کے قصے گونج رہے تھے۔",
             f"ہر ایک کی زبان پر {topic_ur_clean} کی بے پناہ طاقت اور حیرت انگیز کارناموں کا تذکرہ تھا۔",
             f"ایک دن صبح سویرے، {topic_ur_clean} ایک نئے اور پُرخطر مہم جوئی پر روانہ ہوا جس کی راہ میں شدید امتحانات تھے۔",
-            f"راستے میں اس کا سامنا گہرے جنگلات، بلند پہاڑوں اور نہایت خطرناک چیلنجز سے ہوا۔",
+            f"راستے میں اس کا سامنا گہرے جنگلات, بلند پہاڑوں اور نہایت خطرناک چیلنجز سے ہوا۔",
             f"اپنی سچی ہمت اور طاقت کا بھرپور مظاہرہ کرتے ہوئے {topic_ur_clean} نے تمام رکاوٹوں کو جڑ سے اکھاڑ پھینکا۔",
             f"اس شاندار کامیابی کے بعد پوری سرزمین پر {topic_ur_clean} کی فتح کے شادیانے بجنے لگے۔"
         ]
@@ -518,7 +558,7 @@ def generate_local_fallback_script(topic, genre, style):
             f"آئیے آج ہم {topic_ur_clean} کے نہایت ہی اہم اور عملی پہلوؤں پر تفصیلی روشنی ڈالتے ہیں۔",
             f"جب ہم {topic_ur_clean} کے اس وسیع موضوع کی گہرائی کا مطالعہ کرتے ہیں، تو ہمیں حیرت انگیز حقائق معلوم ہوتے ہیں۔",
             f"موجودہ دور کی تیز رفتار ٹیکنالوجی میں {topic_ur_clean} ہمارے علم اور عمل کے لیے ایک سنگِ میل ثابت ہو رہا ہے۔",
-            f"اس معلوماتی سفر میں ہمیں {topic_ur_clean} کے عملی طریقوں اور چیلنجز کو بھی سمجھنا ہوگا۔",
+            f"اس معلوماتی سفر میں ہمیں {topic_ur_clean} کے عملی طریقوں اور چیلنجز کو بھی سمجھنا گا۔",
             f"بہترین حکمت عملی اور سائنسی تحقیق کی مدد سے ہم {topic_ur_clean} کے میدان میں غیر معمولی کامیابی پا سکتے ہیں۔",
             f"یہ ثابت ہوتا ہے کہ {topic_ur_clean} کا یہ جدید تصور ہماری ترقی اور فکری بلندی کے لیے بنیادی حیثیت رکھتا ہے۔"
         ]
@@ -666,6 +706,16 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         }
         style_tag = style_boosters.get(style, "cinematic film style, highly detailed")
         
+        # Beauty booster for commercial and product promo genres (PREVENTS DIRT AND BLEMISHES)
+        beauty_booster = ""
+        is_cosmetic = any(k in urdu_scene.lower() or k in style.lower() for k in ["lipstick", "cream", "shampoo", "soap", "beauty", "cosmetic", "makeup", "لپسٹک", "کریم", "صابن", "خوبصورتی"])
+        if is_cosmetic:
+            beauty_booster = (
+                "flawless smooth glowing skin, professional commercial makeup, airbrushed high-end beauty advertising portrait, "
+                "elegant lips, perfect single lip shape, high-fashion aesthetic, zero skin blemishes, no wrinkles, no freckles, "
+                "no spots, hyper-clean facial skin, single anatomically correct mouth, professional studio lighting, preventing overlapping lips or duplicate mouths"
+            )
+
         if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
             if any(k in scene_lower for k in ["larki", "woman", "female", "girl", "عورت", "لڑکی", "زارا", "سارہ"]):
                 gender_booster = f"beautiful elegant Eastern woman, realistic facial features, wearing traditional modest cotton Shalwar Kameez {attire_desc or 'with clean dupatta elegantly draped over head as hijab'}, modest posture"
@@ -689,6 +739,7 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         if consistent_char_desc:
             prompt_input += f"Consistent Subject Memory (Main Character): {consistent_char_desc}\n"
         if gender_booster: prompt_input += f"Attire/Gender Tags: {gender_booster}\n"
+        if beauty_booster: prompt_input += f"Beauty Enhancement Guidelines: {beauty_booster}\n"
         
         formatted_instruction = instruction.replace("{raw_male_url}", raw_male_url or "None").replace("{raw_female_url}", raw_female_url or "None")
         refined_p = generate_text_pollinations(prompt_input, formatted_instruction)
@@ -1064,6 +1115,16 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
         raw_male_url = get_public_url(uploaded_male_img) if uploaded_male_img else None
         raw_female_url = get_public_url(uploaded_female_img) if uploaded_female_img else None
         
+        # Analyze uploaded files dynamically to generate strict visual guidelines
+        male_desc = ""
+        female_desc = ""
+        if raw_male_url:
+            with st.spinner("Analyzing Male Reference Image..."):
+                male_desc = describe_reference_image(raw_male_url)
+        if raw_female_url:
+            with st.spinner("Analyzing Female Reference Image..."):
+                female_desc = describe_reference_image(raw_female_url)
+
         active_api_key = pollinations_key.strip()
         if not active_api_key:
             conn = get_db_connection()
@@ -1152,20 +1213,25 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 local_human = is_human_character_present(scene)
                 character_present = local_human or (primary_gender is not None)
                 
-                # Robust Reference Image Fallback Flow
+                # Dynamic Reference Image Assignment based on scene context
                 ref_url = None
-                if primary_gender == "female":
+                char_visual_reference = ""
+                if is_human_character_present(scene) or primary_gender:
+                    if "larki" in scene.lower() or "girl" in scene.lower() or "woman" in scene.lower() or primary_gender == "female":
+                        ref_url = raw_female_url
+                        char_visual_reference = female_desc
+                    else:
+                        ref_url = raw_male_url
+                        char_visual_reference = male_desc
+                if not ref_url:
                     ref_url = raw_female_url or raw_male_url
-                elif primary_gender == "male":
-                    ref_url = raw_male_url or raw_female_url
-                else:
-                    ref_url = raw_male_url or raw_female_url
-                
+                    char_visual_reference = female_desc or male_desc
+
                 active_heritage = character_heritage
                 if character_heritage == "Automatic" or not character_heritage:
                     active_heritage = "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)" if (any(k in scene.lower() for k in female_keywords + male_keywords) or primary_gender) else "Western / Modern"
                 
-                refined_p = generate_enhanced_cinematic_prompt(scene, style, active_heritage, enable_islamic_filter, raw_male_url, raw_female_url, attire_tag if character_present else "", consistent_char_desc)
+                refined_p = generate_enhanced_cinematic_prompt(scene, style, active_heritage, enable_islamic_filter, raw_male_url, raw_female_url, attire_tag if character_present else "", char_visual_reference or consistent_char_desc)
                 refined_p = clean_animal_prompt_of_humans(refined_p, scene, style)
                 
                 if "Trailer" in video_pace:
@@ -1463,13 +1529,23 @@ with tab_movie:
     
     st.write("#### 📝 Sglowina AI Script Writer (Optional)")
     with st.expander("Write a story automatically with Sglowina AI"):
-        script_genre = st.selectbox("Story Genre:", ["Moral Animal Story", "Islamic Historical Story", "Business Explainer Script", "Hollywood Action Plot", "Fun Educational Kid Story"])
-        script_topic = st.text_input("Enter Topic/Theme:", placeholder="e.g. A brave rabbit saving the forest")
+        script_genre = st.selectbox("Story Genre:", ["Product Promo & Advertisement (مصنوعات کی تشہیر)", "Moral Animal Story", "Islamic Historical Story", "Business Explainer Script", "Hollywood Action Plot", "Fun Educational Kid Story"])
+        script_topic = st.text_input("Enter Topic/Theme:", placeholder="e.g. A luxury lipstick with smooth cherry red finish")
         if st.button("Generate Script with AI ✨"):
             if script_topic.strip():
                 with st.spinner("AI is crafting your story..."):
                     story_prompt = f"Write a scenic, detailed {script_genre} in Urdu language, with clear, separate sentences divided by periods. Topic: {script_topic}. Keep it engaging for a cinematic video narration."
-                    ai_story = generate_text_pollinations(story_prompt, "You are a professional creative Urdu storyteller.")
+                    
+                    system_msg = "You are a professional creative Urdu storyteller."
+                    if script_genre in ["Business Explainer Script", "Product Promo & Advertisement (مصنوعات کی تشہیر)"]:
+                        system_msg = (
+                            "You are an expert marketing copywriter and commercial ad director. "
+                            "Write a highly persuasive, captivating, and luxury commercial promo script in Urdu. "
+                            "Focus heavily on praising the brand/product benefits, luxury feel, premium quality, and emotional appeal. "
+                            "Do NOT write a generic fiction story; write an attractive advertisement script."
+                        )
+                    
+                    ai_story = generate_text_pollinations(story_prompt, system_msg)
                     
                     if not ai_story or len(ai_story.strip()) < 10:
                         st.info("💡 Sglowina Local Explainer Engine is compiling a custom cinematic script for you...")
@@ -1557,7 +1633,6 @@ with tab_image:
     p_i = st.text_area("Describe Image:", height=100)
     char_desc_img = st.text_input("Consistent Character Description:", placeholder="e.g. A young girl with blue eyes")
     
-    # Consistent Character Reference for Single Image Studio
     uploaded_ref_img = st.file_uploader("Upload Reference Image (for character consistency):", type=["jpg", "png", "jpeg"], key="visual_studio_ref")
     
     canva_overlay_text = st.text_input("Canva Text Overlay:", placeholder="e.g. Studio Title")
@@ -1571,10 +1646,19 @@ with tab_image:
         if u_db and u_db['credits'] >= 2 * count:
             dim = {"Square (1:1)": (1024, 1024), "YouTube HD": (1280, 720), "TikTok": (720, 1280)}
             w, h = dim.get(i_size, (1024, 1024))
-            final_p = p_i
-            if char_desc_img.strip(): final_p = f"Character is {char_desc_img.strip()}. {p_i}"
             
             raw_ref_url = get_public_url(uploaded_ref_img) if uploaded_ref_img else None
+            ref_desc = ""
+            if raw_ref_url:
+                with st.spinner("Analyzing Reference Image..."):
+                    ref_desc = describe_reference_image(raw_ref_url)
+            
+            final_p = p_i
+            if ref_desc:
+                final_p = f"Subject matches this description: {ref_desc}. {p_i}"
+            elif char_desc_img.strip():
+                final_p = f"Character is {char_desc_img.strip()}. {p_i}"
+                
             img_data = fetch_img_failover(f"{final_p}, visual style: {i_style}", w, h, random.randint(1,999999), ref_url=raw_ref_url)
             if img_data:
                 img_path = "temp_canvas_image.jpg"
