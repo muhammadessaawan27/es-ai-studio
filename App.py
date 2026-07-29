@@ -466,6 +466,7 @@ def translate_ur_to_en_enhanced(text):
         return f"Cinematic scene depicting {', '.join(translated_words)}, highly detailed"
     return "Beautiful scene scenery, highly detailed"
 
+# SaaS-Ready Dynamic Story & Product Promo Explainer Engine [BUG FIX: Professional Advertisement Copier Mode Included]
 def generate_local_fallback_script(topic, genre, style):
     topic = topic.strip()
     topic_ur = topic
@@ -482,11 +483,22 @@ def generate_local_fallback_script(topic, genre, style):
     topic_ur_clean = topic_ur.replace("کہانی", "").replace("کی کہانی", "").replace("کا راز", "").strip()
     topic_lower = topic.lower()
     
+    # Marketing and Product Keywords
+    promo_keywords = ["lipstick", "cream", "product", "shampoo", "soap", "beauty", "cosmetic", "sale", "brand", "business", "پروڈکٹ", "خوبصورتی", "لپسٹک", "کریم", "شیمپو", "صابن", "برانڈ", "تشہیر", "مارکیٹنگ", "پروموشن", "بزنس", "دکان", "خریدیں", "خرید"]
     horror_keywords = ["کوٹھی", "قبر", "جن", "بھوت", "ڈراونا", "تاریک", "خوف", "راز", "موت", "grave", "ghost", "horror", "scary", "dark", "secret", "haunted"]
     hero_keywords = ["ٹارزن", "سپر ہیرو", "بہادر", "شیر", "جنگل", "بندر", "خرگوش", "چوزہ", "tarzan", "hero", "superhero", "lion", "jungle", "adventure", "chick", "rabbit"]
     islamic_keywords = ["مسجد", "نماز", "اسلامی", "تاریخ", "دعا", "نور", "الله", "mosque", "islamic", "historical", "faith", "spiritual"]
     
-    if any(k in topic_lower or k in topic_ur for k in horror_keywords) or "horror" in genre.lower() or "suspense" in genre.lower():
+    if any(k in topic_lower or k in topic_ur for k in promo_keywords) or "business" in genre.lower() or "promo" in genre.lower() or "advertisement" in genre.lower():
+        scenes_ur = [
+            f"کیا آپ اپنے لائف اسٹائل کو مزید خوبصورت اور پرکشش بنانا چاہتے ہیں؟ پیش ہے {topic_ur_clean} جو آپ کی زندگی میں لائے گا ایک نیا نکھار۔",
+            f"یہ شاندار {topic_ur_clean} خاص طور پر جدید تقاضوں اور اعلیٰ ترین معیار کو مدنظر رکھ کر تیار کیا گیا ہے۔",
+            f"اس کا بے مثال استعمال نہ صرف آپ کی خوبصورتی اور اعتماد میں اضافہ کرتا ہے بلکہ آپ کو دیتا ہے ایک پرفیکٹ اور لگژری احساس۔",
+            f"ہر بار جب آپ {topic_ur_clean} استعمال کرتے ہیں، تو لوگ آپ کی طرف متوجہ ہوئے بغیر نہیں رہ سکتے۔",
+            f"معیار پر کوئی سمجھوتہ نہیں، یہی وجہ ہے کہ سمجھدار اور خوبصورت لوگ صرف {topic_ur_clean} پر ہی بھروسہ کرتے ہیں۔",
+            f"آج ہی {topic_ur_clean} حاصل کریں اور اپنے حسن اور شخصیت کو چار چاند لگائیں، کیونکہ آپ اس کے حقدار ہیں۔"
+        ]
+    elif any(k in topic_lower or k in topic_ur for k in horror_keywords) or "horror" in genre.lower() or "suspense" in genre.lower():
         scenes_ur = [
             f"سرد چاندنی رات میں، دور دراز جنگل کے سائے میں {topic_ur_clean} کا ایک ہولناک راز چھپا ہوا تھا۔",
             f"لوگ دور کھڑے ہو کر {topic_ur_clean} کی طرف دیکھتے اور خوف سے کانپنے لگتے تھے۔",
@@ -1463,13 +1475,25 @@ with tab_movie:
     
     st.write("#### 📝 Sglowina AI Script Writer (Optional)")
     with st.expander("Write a story automatically with Sglowina AI"):
-        script_genre = st.selectbox("Story Genre:", ["Moral Animal Story", "Islamic Historical Story", "Business Explainer Script", "Hollywood Action Plot", "Fun Educational Kid Story"])
-        script_topic = st.text_input("Enter Topic/Theme:", placeholder="e.g. A brave rabbit saving the forest")
+        # Added dedicated Marketing/Promo genre to the dropdown
+        script_genre = st.selectbox("Story Genre:", ["Product Promo & Advertisement (مصنوعات کی تشہیر)", "Moral Animal Story", "Islamic Historical Story", "Business Explainer Script", "Hollywood Action Plot", "Fun Educational Kid Story"])
+        script_topic = st.text_input("Enter Topic/Theme:", placeholder="e.g. A luxury lipstick with smooth cherry red finish")
         if st.button("Generate Script with AI ✨"):
             if script_topic.strip():
                 with st.spinner("AI is crafting your story..."):
                     story_prompt = f"Write a scenic, detailed {script_genre} in Urdu language, with clear, separate sentences divided by periods. Topic: {script_topic}. Keep it engaging for a cinematic video narration."
-                    ai_story = generate_text_pollinations(story_prompt, "You are a professional creative Urdu storyteller.")
+                    
+                    # Direct UI prompt optimization for business scripts and ads
+                    system_msg = "You are a professional creative Urdu storyteller."
+                    if script_genre in ["Business Explainer Script", "Product Promo & Advertisement (مصنوعات کی تشہیر)"]:
+                        system_msg = (
+                            "You are an expert marketing copywriter and commercial ad director. "
+                            "Write a highly persuasive, captivating, and luxury commercial promo script in Urdu. "
+                            "Focus heavily on praising the brand/product benefits, luxury feel, premium quality, and emotional appeal. "
+                            "Do NOT write a generic fiction story; write an attractive advertisement script."
+                        )
+                    
+                    ai_story = generate_text_pollinations(story_prompt, system_msg)
                     
                     if not ai_story or len(ai_story.strip()) < 10:
                         st.info("💡 Sglowina Local Explainer Engine is compiling a custom cinematic script for you...")
