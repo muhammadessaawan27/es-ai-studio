@@ -48,11 +48,13 @@ def download_transition_sfx():
 
 download_transition_sfx()
 
-# Global Session State Registration to permanently prevent NameErrors
+# Global Session State Registration to permanently prevent NameErrors and persistent logins on connection loss
 if "gen_mode" not in st.session_state:
     st.session_state.gen_mode = "Cinematic Photo Zoom & Pan (100% Free & Unlimited)"
 if "pollinations_key" not in st.session_state:
     st.session_state.pollinations_key = ""
+if "logged_in_user" not in st.session_state:
+    st.session_state.logged_in_user = "demo_user"
 
 # Expanded Urdu to English Dictionary
 UR_EN_DICT = {
@@ -104,7 +106,6 @@ if not EDGE_TTS_AVAILABLE:
 
 if "enable_watermark" not in st.session_state: st.session_state.enable_watermark = True
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
-if "logged_in_user" not in st.session_state: st.session_state.logged_in_user = "demo_user"
 if "msgs" not in st.session_state: st.session_state.msgs = []
 
 st.sidebar.subheader("🎬 Video Settings")
@@ -540,7 +541,7 @@ def generate_local_fallback_script(topic, genre, style):
             f"ایک قدیم اور پُراسرار سرزمین پر {topic_ur_clean} کی بہادری اور عزم کے قصے گونج رہے تھے۔",
             f"ہر ایک کی زبان پر {topic_ur_clean} کی بے پناہ طاقت اور حیرت انگیز کارناموں کا تذکرہ تھا۔",
             f"ایک دن صبح سویرے، {topic_ur_clean} ایک نئے اور پُرخطر مہم جوئی پر روانہ ہوا جس کی راہ میں شدید امتحانات تھے۔",
-            f"راستے میں اس کا سامنا گہرے جنگلات, بلند پہاڑوں اور نہایت خطرناک چیلنجز سے ہوا۔",
+            f"راستے میں اس کا سامنا گہرے جنگلات، بلند پہاڑوں اور نہایت خطرناک چیلنجز سے ہوا۔",
             f"اپنی سچی ہمت اور طاقت کا بھرپور مظاہرہ کرتے ہوئے {topic_ur_clean} نے تمام رکاوٹوں کو جڑ سے اکھاڑ پھینکا۔",
             f"اس شاندار کامیابی کے بعد پوری سرزمین پر {topic_ur_clean} کی فتح کے شادیانے بجنے لگے۔"
         ]
@@ -551,7 +552,7 @@ def generate_local_fallback_script(topic, genre, style):
             f"ایک پاکیزہ صبح، لوگ {topic_ur_clean} کے فیض اور برکت کی تلاش میں جمع ہوئے۔",
             f"دلوں میں سچی عقیدت اور اللہ پر بھرپور یقین لیے سب نے امن اور سلامتی کا راستہ اختیار کیا۔",
             f"آسمان سے نازل ہونے والے خوبصورت سفید نور کی برکت سے سب کی دعائیں مستجاب ہوئیں۔",
-            f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur_clean} کا یہ پاکیزہ پیغام ہمارے ایمان کی مضبوطی کا باعث ہے۔"
+            f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur_clean} کا یہ پیغام ہمارے ایمان کی مضبوطی کا باعث ہے۔"
         ]
     else:
         scenes_ur = [
@@ -936,6 +937,7 @@ def loop_video_clip_safely(clip, target_duration):
     except:
         return clip.set_duration(target_duration)
 
+# Dynamic Continuously Gliding Ken Burns Zoom-In Engine Upgrade [2]
 def apply_camera_motion_v40(img_path, motion, duration, w, h, video_pace="Standard Narrated Story (عام کہانی)"):
     if not MOVIEPY_AVAILABLE: return None
     ensure_image_exists(img_path, w, h, "Visualizing scene...")
@@ -956,34 +958,18 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h, video_pace="Standa
     try:
         clip = ImageClip(temp_img_path).set_duration(duration).set_fps(24)
         
-        motions_map = {
-            "Zoom Out (v40 Default)": lambda: clip.set_position('center'),
-            "Zoom In": lambda: clip.set_position('center'),
-            "Pan Left": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
-            "Pan Right": lambda: clip.set_position(lambda t: (int((w - cw) * (1 - t / duration)), 'center')),
-            "Pan Up": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))),
-            "Pan Down": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
-            "Dolly In": lambda: clip.set_position('center'),
-            "Dolly Out": lambda: clip.set_position('center'),
-            "Ken Burns Effect": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
-            "Tracking Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (2 * np.sin(2 * np.pi * t * 1.5))))),
-            "Follow Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (2 * np.sin(2 * np.pi * t * 1.5))))),
-            "Handheld Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (2 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (2 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 0.5 * np.sin(2 * np.pi * t * 1.0)),
-        }
-        
-        active_motion = motion if motion != "AI Hollywood Director (Auto)" else "Zoom Out (v40 Default)"
-        animated_clip = motions_map.get(active_motion, motions_map["Zoom Out (v40 Default)"])()
+        # Continuous mathematical scaling zoom to permanently feel like moving cinematic b-roll [2]
+        animated_clip = clip.resize(lambda t: 1.0 + 0.045 * t)
         
         return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
     except Exception as ex:
-        st.warning(f"Motion error '{motion}': {ex}. Falling back to static frame.")
+        st.warning(f"Motion error: {ex}. Falling back to standard slide.")
         
     try:
         static_temp = img_path.replace(".png", "_static.png")
         generate_cinematic_gradient_placeholder(static_temp, w, h, "Sglowina Fallback")
         return ImageClip(static_temp).set_duration(duration)
     except:
-        # Avoid black screens globally by rendering a beautiful soft gradient clip
         fb_img = f"temp_err_fb_{uuid.uuid4().hex[:6]}.png"
         generate_cinematic_gradient_placeholder(fb_img, w, h, "Sglowina AI")
         return ImageClip(fb_img).set_duration(duration)
@@ -1115,7 +1101,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
         raw_male_url = get_public_url(uploaded_male_img) if uploaded_male_img else None
         raw_female_url = get_public_url(uploaded_female_img) if uploaded_female_img else None
         
-        # Analyze uploaded files dynamically to generate strict visual guidelines
+        # Analyze uploaded files dynamically to generate strict visual guidelines [2]
         male_desc = ""
         female_desc = ""
         if raw_male_url:
@@ -1413,9 +1399,17 @@ st.markdown("""
     
     .stApp { background: #f8fafc !important; color: #0f172a !important; font-family: 'Inter', sans-serif; }
     
+    /* GORGEOUS BOLD BLUE-PINK GRADIENT GLOW TITLE */
     .glow-title { 
-        font-size: 1.2rem !important; font-weight: 300 !important; font-family: 'Inter', sans-serif;
-        color: #1e3a8a !important; letter-spacing: 2px; margin: 0 !important;
+        font-size: 2.2rem !important; 
+        font-weight: 900 !important; 
+        font-family: 'Inter', sans-serif;
+        background: linear-gradient(135deg, #ec4899 0%, #2563eb 100%) !important;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        letter-spacing: 1px; 
+        margin: 0 !important;
+        text-shadow: 2px 2px 8px rgba(236, 72, 153, 0.2);
     }
     
     .dashboard-header {
@@ -1527,6 +1521,10 @@ with tab_movie:
     pollinations_key = st.text_input("Enter Pollinations API Key (if using video mode):", type="password", key="pollinations_key_input") if "Real AI Video" in st.session_state.gen_mode else ""
     st.session_state.pollinations_key = pollinations_key
     
+    # Live Warn logic for empty API keys in Video Motion Mode [2]
+    if "Real AI Video" in st.session_state.gen_mode and not st.session_state.pollinations_key.strip():
+        st.warning("⚠️ آپ نے 'Real AI Video Motion' سلیکٹ کیا ہے لیکن API Key داخل نہیں کی۔ بغیر پیڈ Key کے سرور موومنٹ جنریٹ نہیں کرے گا اور مجبوراً تصویروں والا پریمیم سلائیڈ شو بنے گا۔")
+
     st.write("#### 📝 Sglowina AI Script Writer (Optional)")
     with st.expander("Write a story automatically with Sglowina AI"):
         script_genre = st.selectbox("Story Genre:", ["Product Promo & Advertisement (مصنوعات کی تشہیر)", "Moral Animal Story", "Islamic Historical Story", "Business Explainer Script", "Hollywood Action Plot", "Fun Educational Kid Story"])
