@@ -48,13 +48,11 @@ def download_transition_sfx():
 
 download_transition_sfx()
 
-# Global Session State Registration to permanently prevent NameErrors and persistent logins on connection loss
+# Global Session State Registration to permanently prevent NameErrors
 if "gen_mode" not in st.session_state:
     st.session_state.gen_mode = "Cinematic Photo Zoom & Pan (100% Free & Unlimited)"
 if "pollinations_key" not in st.session_state:
     st.session_state.pollinations_key = ""
-if "logged_in_user" not in st.session_state:
-    st.session_state.logged_in_user = "demo_user"
 
 # Expanded Urdu to English Dictionary
 UR_EN_DICT = {
@@ -106,6 +104,7 @@ if not EDGE_TTS_AVAILABLE:
 
 if "enable_watermark" not in st.session_state: st.session_state.enable_watermark = True
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
+if "logged_in_user" not in st.session_state: st.session_state.logged_in_user = "demo_user"
 if "msgs" not in st.session_state: st.session_state.msgs = []
 
 st.sidebar.subheader("🎬 Video Settings")
@@ -171,34 +170,6 @@ def get_public_url(uploaded_file):
     except: pass
 
     return None
-
-# Advanced Multimodal Vision AI Image Analyzer
-def describe_reference_image(image_url):
-    if not image_url:
-        return ""
-    try:
-        payload = {
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Describe the person's gender, ethnicity, facial features, hair, apparel, and style in 15 words or less. Example: 'A beautiful young Pakistani Muslim girl wearing a clean red headscarf, brown eyes.'"},
-                        {"type": "image_url", "image_url": {"url": image_url}}
-                    ]
-                }
-            ],
-            "model": "openai",
-            "jsonMode": False
-        }
-        res = requests.post("https://gen.pollinations.ai/v1/chat/completions", json=payload, timeout=12)
-        if res.status_code == 200:
-            data = res.json()
-            if "choices" in data and len(data["choices"]) > 0:
-                desc = data["choices"][0]["message"]["content"].strip()
-                desc = re.sub(r'^(description|this is|image shows|the photo shows)\s*:\s*', '', desc, flags=re.IGNORECASE)
-                return desc
-    except: pass
-    return ""
 
 def get_db_connection():
     pg_url = os.environ.get("DATABASE_URL")
@@ -495,7 +466,6 @@ def translate_ur_to_en_enhanced(text):
         return f"Cinematic scene depicting {', '.join(translated_words)}, highly detailed"
     return "Beautiful scene scenery, highly detailed"
 
-# SaaS-Ready Dynamic Story & Product Promo Explainer Engine
 def generate_local_fallback_script(topic, genre, style):
     topic = topic.strip()
     topic_ur = topic
@@ -512,22 +482,11 @@ def generate_local_fallback_script(topic, genre, style):
     topic_ur_clean = topic_ur.replace("کہانی", "").replace("کی کہانی", "").replace("کا راز", "").strip()
     topic_lower = topic.lower()
     
-    # Marketing and Product Keywords
-    promo_keywords = ["lipstick", "cream", "product", "shampoo", "soap", "beauty", "cosmetic", "sale", "brand", "business", "پروڈکٹ", "خوبصورتی", "لپسٹک", "کریم", "شیمپو", "صابن", "برانڈ", "تشہیر", "مارکیٹنگ", "پروموشن", "بزنس", "دکان", "خریدیں", "خرید"]
     horror_keywords = ["کوٹھی", "قبر", "جن", "بھوت", "ڈراونا", "تاریک", "خوف", "راز", "موت", "grave", "ghost", "horror", "scary", "dark", "secret", "haunted"]
     hero_keywords = ["ٹارزن", "سپر ہیرو", "بہادر", "شیر", "جنگل", "بندر", "خرگوش", "چوزہ", "tarzan", "hero", "superhero", "lion", "jungle", "adventure", "chick", "rabbit"]
     islamic_keywords = ["مسجد", "نماز", "اسلامی", "تاریخ", "دعا", "نور", "الله", "mosque", "islamic", "historical", "faith", "spiritual"]
     
-    if any(k in topic_lower or k in topic_ur for k in promo_keywords) or "business" in genre.lower() or "promo" in genre.lower() or "advertisement" in genre.lower():
-        scenes_ur = [
-            f"کیا آپ اپنے لائف اسٹائل کو مزید خوبصورت اور پرکشش بنانا چاہتے ہیں؟ پیش ہے {topic_ur_clean} جو آپ کی زندگی میں لائے گا ایک نیا نکھار۔",
-            f"یہ شاندار {topic_ur_clean} خاص طور پر جدید تقاضوں اور اعلیٰ ترین معیار کو مدنظر رکھ کر تیار کیا گیا ہے۔",
-            f"اس کا بے مثال استعمال نہ صرف آپ کی خوبصورتی اور اعتماد میں اضافہ کرتا ہے بلکہ آپ کو دیتا ہے ایک پرفیکٹ اور لگژری احساس۔",
-            f"ہر بار جب آپ {topic_ur_clean} استعمال کرتے ہیں، تو لوگ آپ کی طرف متوجہ ہوئے بغیر نہیں رہ سکتے۔",
-            f"معیار پر کوئی سمجھوتہ نہیں، یہی وجہ ہے کہ سمجھدار اور خوبصورت لوگ صرف {topic_ur_clean} پر ہی بھروسہ کرتے ہیں۔",
-            f"آج ہی {topic_ur_clean} حاصل کریں اور اپنے حسن اور شخصیت کو چار چاند لگائیں، کیونکہ آپ اس کے حقدار ہیں۔"
-        ]
-    elif any(k in topic_lower or k in topic_ur for k in horror_keywords) or "horror" in genre.lower() or "suspense" in genre.lower():
+    if any(k in topic_lower or k in topic_ur for k in horror_keywords) or "horror" in genre.lower() or "suspense" in genre.lower():
         scenes_ur = [
             f"سرد چاندنی رات میں، دور دراز جنگل کے سائے میں {topic_ur_clean} کا ایک ہولناک راز چھپا ہوا تھا۔",
             f"لوگ دور کھڑے ہو کر {topic_ur_clean} کی طرف دیکھتے اور خوف سے کانپنے لگتے تھے۔",
@@ -552,7 +511,7 @@ def generate_local_fallback_script(topic, genre, style):
             f"ایک پاکیزہ صبح، لوگ {topic_ur_clean} کے فیض اور برکت کی تلاش میں جمع ہوئے۔",
             f"دلوں میں سچی عقیدت اور اللہ پر بھرپور یقین لیے سب نے امن اور سلامتی کا راستہ اختیار کیا۔",
             f"آسمان سے نازل ہونے والے خوبصورت سفید نور کی برکت سے سب کی دعائیں مستجاب ہوئیں۔",
-            f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur_clean} کا یہ جدید تصور ہماری ترقی اور فکری بلندی کے لیے بنیادی حیثیت رکھتا ہے۔"
+            f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur_clean} کا یہ پاکیزہ پیغام ہمارے ایمان کی مضبوطی کا باعث ہے۔"
         ]
     else:
         scenes_ur = [
@@ -707,16 +666,6 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         }
         style_tag = style_boosters.get(style, "cinematic film style, highly detailed")
         
-        # Beauty booster for commercial and product promo genres (PREVENTS DIRT AND BLEMISHES)
-        beauty_booster = ""
-        is_cosmetic = any(k in urdu_scene.lower() or k in style.lower() for k in ["lipstick", "cream", "shampoo", "soap", "beauty", "cosmetic", "makeup", "لپسٹک", "کریم", "صابن", "خوبصورتی"])
-        if is_cosmetic:
-            beauty_booster = (
-                "flawless smooth glowing skin, professional commercial makeup, airbrushed high-end beauty advertising portrait, "
-                "elegant lips, perfect single lip shape, high-fashion aesthetic, zero skin blemishes, no wrinkles, no freckles, "
-                "no spots, hyper-clean facial skin, single anatomically correct mouth, professional studio lighting, preventing overlapping lips or duplicate mouths"
-            )
-
         if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
             if any(k in scene_lower for k in ["larki", "woman", "female", "girl", "عورت", "لڑکی", "زارا", "سارہ"]):
                 gender_booster = f"beautiful elegant Eastern woman, realistic facial features, wearing traditional modest cotton Shalwar Kameez {attire_desc or 'with clean dupatta elegantly draped over head as hijab'}, modest posture"
@@ -740,7 +689,6 @@ def generate_enhanced_cinematic_prompt(urdu_scene, style, character_heritage, en
         if consistent_char_desc:
             prompt_input += f"Consistent Subject Memory (Main Character): {consistent_char_desc}\n"
         if gender_booster: prompt_input += f"Attire/Gender Tags: {gender_booster}\n"
-        if beauty_booster: prompt_input += f"Beauty Enhancement Guidelines: {beauty_booster}\n"
         
         formatted_instruction = instruction.replace("{raw_male_url}", raw_male_url or "None").replace("{raw_female_url}", raw_female_url or "None")
         refined_p = generate_text_pollinations(prompt_input, formatted_instruction)
@@ -848,7 +796,7 @@ def apply_custom_watermark(img_path, watermark_bytes):
             im.convert("RGB").save(img_path, "PNG")
     except: pass
 
-# Parallel Downloader utilizing ThreadPool with SAFE visual download URLs (Bypasses invalid parameters) [2]
+# Parallel Downloader utilizing ThreadPool and injecting reference images correctly
 def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic HD", api_key=""):
     user_agents = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -937,7 +885,6 @@ def loop_video_clip_safely(clip, target_duration):
     except:
         return clip.set_duration(target_duration)
 
-# Dynamic Continuously Gliding Ken Burns Zoom-In Engine Upgrade (Scipy-free pan to prevent crashes) [2]
 def apply_camera_motion_v40(img_path, motion, duration, w, h, video_pace="Standard Narrated Story (عام کہانی)"):
     if not MOVIEPY_AVAILABLE: return None
     ensure_image_exists(img_path, w, h, "Visualizing scene...")
@@ -958,31 +905,37 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h, video_pace="Standa
     try:
         clip = ImageClip(temp_img_path).set_duration(duration).set_fps(24)
         
-        # Continuous mathematical scaling zoom to permanently feel like moving cinematic b-roll [2]
-        animated_clip = clip.resize(lambda t: 1.0 + 0.045 * t)
+        motions_map = {
+            "Zoom Out (v40 Default)": lambda: clip.set_position('center'),
+            "Zoom In": lambda: clip.set_position('center'),
+            "Pan Left": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
+            "Pan Right": lambda: clip.set_position(lambda t: (int((w - cw) * (1 - t / duration)), 'center')),
+            "Pan Up": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))),
+            "Pan Down": lambda: clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration)))),
+            "Dolly In": lambda: clip.set_position('center'),
+            "Dolly Out": lambda: clip.set_position('center'),
+            "Ken Burns Effect": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center')),
+            "Tracking Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (2 * np.sin(2 * np.pi * t * 1.5))))),
+            "Follow Shot": lambda: clip.set_position(lambda t: (int((w - cw) * (t / duration)), int((h - ch)/2 + (2 * np.sin(2 * np.pi * t * 1.5))))),
+            "Handheld Camera": lambda: clip.set_position(lambda t: (int((w - cw)/2 + (2 * np.sin(2 * np.pi * t * 2.0))), int((h - ch)/2 + (2 * np.cos(2 * np.pi * t * 1.7))))).rotate(lambda t: 0.5 * np.sin(2 * np.pi * t * 1.0)),
+        }
+        
+        active_motion = motion if motion != "AI Hollywood Director (Auto)" else "Zoom Out (v40 Default)"
+        animated_clip = motions_map.get(active_motion, motions_map["Zoom Out (v40 Default)"])()
         
         return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
     except Exception as ex:
-        # Fallback to pure panning which is 100% scipy-free and perfectly stable on cloud servers! [2]
-        try:
-            cw_p, ch_p = int(w * 1.1), int(h * 1.1)
-            cw_p, ch_p = make_even(cw_p), make_even(ch_p)
-            temp_p = img_path.replace(".png", "_pan_resized.png")
-            with Image.open(img_path) as im:
-                resizer = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
-                im.resize((cw_p, ch_p), resizer).save(temp_p, "PNG")
-                
-            clip = ImageClip(temp_p).set_duration(duration).set_fps(24)
-            animated_clip = clip.set_position(lambda t: (int((w - cw_p) * (t / duration)), 'center'))
-            return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
-        except:
-            # Safer static fallback to ensure the actual image is shown under every condition [2]
-            try:
-                return ImageClip(img_path).set_duration(duration).resize((w, h))
-            except:
-                fb_img = f"temp_err_fb_{uuid.uuid4().hex[:6]}.png"
-                generate_cinematic_gradient_placeholder(fb_img, w, h, "Sglowina AI")
-                return ImageClip(fb_img).set_duration(duration)
+        st.warning(f"Motion error '{motion}': {ex}. Falling back to static frame.")
+        
+    try:
+        static_temp = img_path.replace(".png", "_static.png")
+        generate_cinematic_gradient_placeholder(static_temp, w, h, "Sglowina Fallback")
+        return ImageClip(static_temp).set_duration(duration)
+    except:
+        # Avoid black screens globally by rendering a beautiful soft gradient clip
+        fb_img = f"temp_err_fb_{uuid.uuid4().hex[:6]}.png"
+        generate_cinematic_gradient_placeholder(fb_img, w, h, "Sglowina AI")
+        return ImageClip(fb_img).set_duration(duration)
 
 def apply_clip_transition(clip, transition, duration):
     try:
@@ -995,7 +948,8 @@ def apply_clip_transition(clip, transition, duration):
 def fetch_img_failover(prompt, w, h, seed, ref_url=None):
     try:
         url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
-        # Bypassed redundant &image parameter in Image API to prevent 400 Bad Request / 500 Server Errors globally [2]
+        if ref_url:
+            url += f"&image={urllib.parse.quote(ref_url)}"
         res = session.get(url, timeout=30)
         if res.status_code == 200: return res.content
     except: pass
@@ -1110,16 +1064,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
         raw_male_url = get_public_url(uploaded_male_img) if uploaded_male_img else None
         raw_female_url = get_public_url(uploaded_female_img) if uploaded_female_img else None
         
-        # Analyze uploaded files dynamically to generate strict visual guidelines [2]
-        male_desc = ""
-        female_desc = ""
-        if raw_male_url:
-            with st.spinner("Analyzing Male Reference Image..."):
-                male_desc = describe_reference_image(raw_male_url)
-        if raw_female_url:
-            with st.spinner("Analyzing Female Reference Image..."):
-                female_desc = describe_reference_image(raw_female_url)
-
         active_api_key = pollinations_key.strip()
         if not active_api_key:
             conn = get_db_connection()
@@ -1208,25 +1152,20 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 local_human = is_human_character_present(scene)
                 character_present = local_human or (primary_gender is not None)
                 
-                # Dynamic Reference Image Assignment based on scene context
+                # Robust Reference Image Fallback Flow
                 ref_url = None
-                char_visual_reference = ""
-                if is_human_character_present(scene) or primary_gender:
-                    if "larki" in scene.lower() or "girl" in scene.lower() or "woman" in scene.lower() or primary_gender == "female":
-                        ref_url = raw_female_url
-                        char_visual_reference = female_desc
-                    else:
-                        ref_url = raw_male_url
-                        char_visual_reference = male_desc
-                if not ref_url:
+                if primary_gender == "female":
                     ref_url = raw_female_url or raw_male_url
-                    char_visual_reference = female_desc or male_desc
-
+                elif primary_gender == "male":
+                    ref_url = raw_male_url or raw_female_url
+                else:
+                    ref_url = raw_male_url or raw_female_url
+                
                 active_heritage = character_heritage
                 if character_heritage == "Automatic" or not character_heritage:
                     active_heritage = "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)" if (any(k in scene.lower() for k in female_keywords + male_keywords) or primary_gender) else "Western / Modern"
                 
-                refined_p = generate_enhanced_cinematic_prompt(scene, style, active_heritage, enable_islamic_filter, raw_male_url, raw_female_url, attire_tag if character_present else "", char_visual_reference or consistent_char_desc)
+                refined_p = generate_enhanced_cinematic_prompt(scene, style, active_heritage, enable_islamic_filter, raw_male_url, raw_female_url, attire_tag if character_present else "", consistent_char_desc)
                 refined_p = clean_animal_prompt_of_humans(refined_p, scene, style)
                 
                 if "Trailer" in video_pace:
@@ -1269,8 +1208,10 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                         except Exception as e:
                             st.warning(f"Video clip loading failed: {e}. Switching to photo fallback...")
                 
-                # Flux Image Generation (Removed buggy &image parameter to prevent API errors) [2]
+                # Flux Image Generation with direct reference image injection
                 flux_prompt_urls[i] = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p[:400])}?width={w}&height={h}&seed={seed + i * 17}&nologo=true&model=flux"
+                if ref_url:
+                    flux_prompt_urls[i] += f"&image={urllib.parse.quote(ref_url)}"
                 img_paths[i] = f"i_{u_id}_{i}.png"
                 
             progress_bar.progress(0.25)
@@ -1311,12 +1252,10 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 if clip is None:
                     try: clip = ImageClip(img_path).set_duration(dur_scene).resize((w, h))
                     except:
-                        # Avoid black screens on motion fallback failures (safely falls back to actual image) [2]
-                        try: clip = ImageClip(img_path).set_duration(dur_scene).resize((w, h))
-                        except:
-                            fb_name = f"fallback_{u_id}_{i}.png"
-                            generate_cinematic_gradient_placeholder(fb_name, w, h, "Sglowina Fallback")
-                            clip = ImageClip(fb_name).set_duration(dur_scene)
+                        # Avoid black screens on motion fallback failures
+                        fb_name = f"fallback_{u_id}_{i}.png"
+                        generate_cinematic_gradient_placeholder(fb_name, w, h, "Sglowina Fallback")
+                        clip = ImageClip(fb_name).set_duration(dur_scene)
                 
                 if os.path.exists(TRANSITION_SFX_FILE):
                     try:
@@ -1362,7 +1301,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     if file_p != cached_bg_path: 
                         os.remove(file_p)
                         if file_p.endswith(".png"):
-                            for suffix in ["_resized.png", "_static.png", "_pan_resized.png"]:
+                            for suffix in ["_resized.png", "_static.png"]:
                                 temp_f = file_p.replace(".png", suffix)
                                 if os.path.exists(temp_f): os.remove(temp_f)
                 except: pass
@@ -1391,7 +1330,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     if file_p != cached_bg_path: 
                         os.remove(file_p)
                         if file_p.endswith(".png"):
-                            for suffix in ["_resized.png", "_static.png", "_pan_resized.png"]:
+                            for suffix in ["_resized.png", "_static.png"]:
                                 temp_f = file_p.replace(".png", suffix)
                                 if os.path.exists(temp_f): os.remove(temp_f)
                 except: pass
@@ -1408,17 +1347,9 @@ st.markdown("""
     
     .stApp { background: #f8fafc !important; color: #0f172a !important; font-family: 'Inter', sans-serif; }
     
-    /* GORGEOUS BOLD BLUE-PINK GRADIENT GLOW TITLE */
     .glow-title { 
-        font-size: 2.2rem !important; 
-        font-weight: 900 !important; 
-        font-family: 'Inter', sans-serif;
-        background: linear-gradient(135deg, #ec4899 0%, #2563eb 100%) !important;
-        -webkit-background-clip: text !important;
-        -webkit-text-fill-color: transparent !important;
-        letter-spacing: 1px; 
-        margin: 0 !important;
-        text-shadow: 2px 2px 8px rgba(236, 72, 153, 0.2);
+        font-size: 1.2rem !important; font-weight: 300 !important; font-family: 'Inter', sans-serif;
+        color: #1e3a8a !important; letter-spacing: 2px; margin: 0 !important;
     }
     
     .dashboard-header {
@@ -1530,29 +1461,15 @@ with tab_movie:
     pollinations_key = st.text_input("Enter Pollinations API Key (if using video mode):", type="password", key="pollinations_key_input") if "Real AI Video" in st.session_state.gen_mode else ""
     st.session_state.pollinations_key = pollinations_key
     
-    # Live Warn logic for empty API keys in Video Motion Mode [2]
-    if "Real AI Video" in st.session_state.gen_mode and not st.session_state.pollinations_key.strip():
-        st.warning("⚠️ آپ نے 'Real AI Video Motion' سلیکٹ کیا ہے لیکن API Key داخل نہیں کی۔ بغیر پیڈ Key کے سرور موومنٹ جنریٹ نہیں کرے گا اور مجبوراً تصویروں والا پریمیم سلائیڈ شو بنے گا۔")
-
     st.write("#### 📝 Sglowina AI Script Writer (Optional)")
     with st.expander("Write a story automatically with Sglowina AI"):
-        script_genre = st.selectbox("Story Genre:", ["Product Promo & Advertisement (مصنوعات کی تشہیر)", "Moral Animal Story", "Islamic Historical Story", "Business Explainer Script", "Hollywood Action Plot", "Fun Educational Kid Story"])
-        script_topic = st.text_input("Enter Topic/Theme:", placeholder="e.g. A luxury lipstick with smooth cherry red finish")
+        script_genre = st.selectbox("Story Genre:", ["Moral Animal Story", "Islamic Historical Story", "Business Explainer Script", "Hollywood Action Plot", "Fun Educational Kid Story"])
+        script_topic = st.text_input("Enter Topic/Theme:", placeholder="e.g. A brave rabbit saving the forest")
         if st.button("Generate Script with AI ✨"):
             if script_topic.strip():
                 with st.spinner("AI is crafting your story..."):
                     story_prompt = f"Write a scenic, detailed {script_genre} in Urdu language, with clear, separate sentences divided by periods. Topic: {script_topic}. Keep it engaging for a cinematic video narration."
-                    
-                    system_msg = "You are a professional creative Urdu storyteller."
-                    if script_genre in ["Business Explainer Script", "Product Promo & Advertisement (مصنوعات کی تشہیر)"]:
-                        system_msg = (
-                            "You are an expert marketing copywriter and commercial ad director. "
-                            "Write a highly persuasive, captivating, and luxury commercial promo script in Urdu. "
-                            "Focus heavily on praising the brand/product benefits, luxury feel, premium quality, and emotional appeal. "
-                            "Do NOT write a generic fiction story; write an attractive advertisement script."
-                        )
-                    
-                    ai_story = generate_text_pollinations(story_prompt, system_msg)
+                    ai_story = generate_text_pollinations(story_prompt, "You are a professional creative Urdu storyteller.")
                     
                     if not ai_story or len(ai_story.strip()) < 10:
                         st.info("💡 Sglowina Local Explainer Engine is compiling a custom cinematic script for you...")
@@ -1640,6 +1557,7 @@ with tab_image:
     p_i = st.text_area("Describe Image:", height=100)
     char_desc_img = st.text_input("Consistent Character Description:", placeholder="e.g. A young girl with blue eyes")
     
+    # Consistent Character Reference for Single Image Studio
     uploaded_ref_img = st.file_uploader("Upload Reference Image (for character consistency):", type=["jpg", "png", "jpeg"], key="visual_studio_ref")
     
     canva_overlay_text = st.text_input("Canva Text Overlay:", placeholder="e.g. Studio Title")
@@ -1653,19 +1571,10 @@ with tab_image:
         if u_db and u_db['credits'] >= 2 * count:
             dim = {"Square (1:1)": (1024, 1024), "YouTube HD": (1280, 720), "TikTok": (720, 1280)}
             w, h = dim.get(i_size, (1024, 1024))
+            final_p = p_i
+            if char_desc_img.strip(): final_p = f"Character is {char_desc_img.strip()}. {p_i}"
             
             raw_ref_url = get_public_url(uploaded_ref_img) if uploaded_ref_img else None
-            ref_desc = ""
-            if raw_ref_url:
-                with st.spinner("Analyzing Reference Image..."):
-                    ref_desc = describe_reference_image(raw_ref_url)
-            
-            final_p = p_i
-            if ref_desc:
-                final_p = f"Subject matches this description: {ref_desc}. {p_i}"
-            elif char_desc_img.strip():
-                final_p = f"Character is {char_desc_img.strip()}. {p_i}"
-                
             img_data = fetch_img_failover(f"{final_p}, visual style: {i_style}", w, h, random.randint(1,999999), ref_url=raw_ref_url)
             if img_data:
                 img_path = "temp_canvas_image.jpg"
