@@ -359,7 +359,7 @@ def analyze_scene_for_director(scene_text):
         
     return {"motion": motion, "lighting": lighting, "color_grading": color_grading, "composition": composition}
 
-# Fast POST Request on Unified Endpoint utilizing 100% Free OpenAI-Fast bypass parameters
+# Fast POST Request on Unified Endpoint utilizing 100% Free OpenAI-Fast bypass parameters [2.2.5, 3.3.1]
 def generate_text_pollinations(prompt, system_prompt=""):
     models = ["openai-fast", "openai", "mistral"]
     user_agents = [
@@ -464,43 +464,47 @@ def generate_local_fallback_script(topic, genre, style):
     topic_lower = topic.lower()
     
     # Segment dynamic custom topics cleanly to completely prevent robotic explanations for creative inputs [2.2]
-    if "News" in style or "news" in genre.lower():
+    horror_keywords = ["کوٹھی", "قبر", "جن", "بھوت", "ڈراونا", "تاریک", "خوف", "راز", "موت", "grave", "ghost", "horror", "scary", "dark", "secret", "haunted"]
+    hero_keywords = ["ٹارزن", "سپر ہیرو", "بہادر", "شیر", "جنگل", "بندر", "خرگوش", "چوزہ", "tarzan", "hero", "superhero", "lion", "jungle", "adventure", "chick", "rabbit"]
+    islamic_keywords = ["مسجد", "نماز", "اسلامی", "تاریخ", "دعا", "نور", "الله", "mosque", "islamic", "historical", "faith", "spiritual"]
+    
+    if any(k in topic_lower or k in topic_ur for k in horror_keywords) or "horror" in genre.lower() or "suspense" in genre.lower():
         scenes_ur = [
-            f"خبر نامہ میں خوش آمدید، آج کی سب سے بڑی سرخی {topic_ur_clean} کے متعلق ہے۔",
-            f"ذرائع کے مطابق، {topic_ur_clean} کے اس بڑے معاملے پر تفتیش کاروں نے نئی تحقیقات کا آغاز کر دیا ہے۔",
-            f"موقع پر موجود نمائندے کی رپورٹ کے مطابق، {topic_ur_clean} کے اس لائیو منظر نے سب کو حیران کر دیا ہے۔",
-            f"عوامی حلقوں میں اس وقت {topic_ur_clean} کے اثرات اور اس کے ممکنہ نتائج پر گرما گرم بحث جاری ہے۔",
-            f"ماہرین کا کہنا ہے کہ آنے والے دنوں میں ہمیں {topic_ur_clean} کے بارے میں مزید سنسنی خیز خبریں دیکھنے کو ملیں گی۔",
-            f"ہم اس لائیو نشریات میں {topic_ur_clean} کی اپ ڈیٹ آپ تک مسلسل پہنچاتے رہیں گے۔"
+            f"سرد چاندنی رات میں، دور دراز جنگل کے سائے میں {topic_ur_clean} کا ایک ہولناک راز چھپا ہوا تھا۔",
+            f"لوگ دور کھڑے ہو کر {topic_ur_clean} کی طرف دیکھتے اور خوف سے کانپنے لگتے تھے۔",
+            f"ایک رات، ایک نڈر مسافر نے ہمت باندھی اور {topic_ur_clean} کے اس پراسرار سائے کی طرف قدم بڑھائے۔",
+            f"جیسے ہی وہ آگے بڑھا، تیز گرج چمک اور ٹھنڈی ہوا نے اس کا راستہ روکنے کی کوشش کی۔",
+            f"دروازہ کھولتے ہی اس کے سامنے {topic_ur_clean} کا وہ صدیوں پرانا راز آشکار ہو گیا جس نے سب کے رونگٹے کھڑے کر دیے۔",
+            f"اس پُراسرار واقعے کے بعد پورے علاقے پر ایک خوفناک خاموشی چھا گئی جو ہمیشہ یاد رہے گی۔"
         ]
-    elif "Trailer" in style or "horror" in genre.lower() or "suspense" in genre.lower() or "کوٹھی" in topic_ur_clean:
+    elif any(k in topic_lower or k in topic_ur for k in hero_keywords) or "story" in genre.lower() or "moral" in genre.lower():
         scenes_ur = [
-            f"ایک پُراسرار گہرے دھندلے بادلوں کے پیچھے، {topic_ur_clean} کا ایک ایسا بھیانک راز دفن تھا جو اب باہر آنے والا ہے۔",
-            f"کوئی نہیں جانتا تھا کہ {topic_ur_clean} کی اس ہولناک حقیقت کے پیچھے کیا خوفناک سچائی چھپی ہوئی ہے۔",
-            f"اس طوفانی رات، ایک نڈر مسافر نے {topic_ur_clean} کے اس پراسرار سائے کا پیچھا کرنے کا فیصلہ کیا۔",
-            f"جیسے ہی وہ آگے بڑھا، ایک لرزہ خیز آواز گونجی اور پورے علاقے کی زمین کانپنے لگی۔",
-            f"جب آخری دروازہ کھلا، تو {topic_ur_clean} کا وہ سچ سامنے آیا جس نے سب کی عقلوں کو دنگ کر کے رکھ دیا۔",
-            f"اس سنسنی خیز داستان کا اصل فیصلہ اب ہونے والا ہے، کیا آپ تیار ہیں؟"
+            f"ایک قدیم اور پُراسرار سرزمین پر {topic_ur_clean} کی بہادری اور عزم کے قصے گونج رہے تھے۔",
+            f"ہر ایک کی زبان پر {topic_ur_clean} کی بے پناہ طاقت اور حیرت انگیز کارناموں کا تذکرہ تھا۔",
+            f"ایک دن صبح سویرے، {topic_ur_clean} ایک نئے اور پُرخطر مہم جوئی پر روانہ ہوا جس کی راہ میں شدید امتحانات تھے۔",
+            f"راستے میں اس کا سامنا گہرے جنگلات، بلند پہاڑوں اور نہایت خطرناک چیلنجز سے ہوا۔",
+            f"اپنی سچی ہمت اور طاقت کا بھرپور مظاہرہ کرتے ہوئے {topic_ur_clean} نے تمام رکاوٹوں کو جڑ سے اکھاڑ پھینکا۔",
+            f"اس شاندار کامیابی کے بعد پوری سرزمین پر {topic_ur_clean} کی فتح کے شادیانے بجنے لگے۔"
         ]
-    elif any(k in topic_ur_clean for k in ["ٹارزن", "سپر ہیرو", "بہادر", "شیر", "جنگل", "بندر", "خرگوش", "چوزہ"]):
+    elif any(k in topic_lower or k in topic_ur for k in islamic_keywords) or "islamic" in genre.lower():
         scenes_ur = [
-            f"پرانے وقتوں کی بات ہے، ایک دور دراز پراسرار مقام پر {topic_ur_clean} کی بہادری کے قصے زبان زدِ عام تھے۔",
-            f"ہر کوئی {topic_ur_clean} کی غیر معمولی طاقت اور حیرت انگیز کارناموں کی تعریف کرتا تھا۔",
-            f"ایک دن صبح سویرے، {topic_ur_clean} ایک نئے اور پُرپیچ مہم جوئی پر نکل پڑا جس کی راہ میں شدید چیلنجز تھے۔",
-            f"راستے میں اس کا سامنا گہرے چمکتے جنگلات، بہتی ندیوں اور خطرناک رکاوٹوں سے ہوا۔",
-            f"اچانک ایک ایسا نازک موڑ آیا جہاں {topic_ur_clean} کو اپنی سچی ہمت اور دلیری کا مظاہرہ کرنا پڑا۔",
-            f"اپنی بے مثال ہمت کی بدولت، {topic_ur_clean} نے شاندار فتح حاصل کی اور سب ہنسی خوشی رہنے لگے۔"
+            f"تاریخ کے اوراق میں {topic_ur_clean} کی عظمت اور ایمان کی سچی داستانیں روشن ہیں۔",
+            f"جب ہم {topic_ur_clean} کے اس پاکیزہ سفر کا مطالعہ کرتے ہیں، تو روح ایمان سے تازہ ہو جاتی ہے۔",
+            f"ایک پاکیزہ صبح، لوگ {topic_ur_clean} کے فیض اور برکت کی تلاش میں جمع ہوئے۔",
+            f"دلوں میں سچی عقیدت اور اللہ پر بھرپور یقین لیے سب نے امن اور سلامتی کا راستہ اختیار کیا۔",
+            f"آسمان سے نازل ہونے والے خوبصورت سفید نور کی برکت سے سب کی دعائیں مستجاب ہوئیں۔",
+            f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur_clean} کا یہ پاکیزہ پیغام ہمارے ایمان کی مضبوطی کا باعث ہے۔"
         ]
     else:
         scenes_ur = [
             f"آئیے آج ہم {topic_ur_clean} کے نہایت ہی اہم اور عملی پہلوؤں پر تفصیلی روشنی ڈالتے ہیں۔",
             f"جب ہم {topic_ur_clean} کے اس وسیع موضوع کی گہرائی کا مطالعہ کرتے ہیں، تو ہمیں حیرت انگیز حقائق معلوم ہوتے ہیں۔",
-            f"جدید دور کی تیز رفتار تبدیلیوں میں {topic_ur_clean} ہمارے علم اور عمل کے لیے ایک سنگِ میل ثابت ہو رہا ہے۔",
+            f"موجودہ دور کی تیز رفتار ٹیکنالوجی میں {topic_ur_clean} ہمارے علم اور عمل کے لیے ایک سنگِ میل ثابت ہو رہا ہے۔",
             f"اس معلوماتی سفر میں ہمیں {topic_ur_clean} کے عملی طریقوں اور چیلنجز کو بھی سمجھنا ہوگا۔",
-            f"بہترین حکمت عملی اور جدید تحقیق کی مدد سے ہم {topic_ur_clean} کے میدان میں غیر معمولی کامیابی پا سکتے ہیں۔",
-            f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur_clean} کا یہ جدید تصور ہماری ترقی اور فکری بلندی کے لیے بنیادی حیثیت رکھتا ہے۔"
+            f"بہترین حکمت عملی اور سائنسی تحقیق کی مدد سے ہم {topic_ur_clean} کے میدان میں غیر معمولی کامیابی پا سکتے ہیں۔",
+            f"یہ ثابت ہوتا ہے کہ {topic_ur_clean} کا یہ جدید تصور ہماری ترقی اور فکری بلندی کے لیے بنیادی حیثیت رکھتا ہے۔"
         ]
-    
+        
     return " ۔ ".join(scenes_ur)
 
 # Highly Intelligent Speech Sanitizer to permanently strip out visual scene descriptors, scene headers, and non-spoken cues [2]
@@ -789,74 +793,42 @@ def apply_custom_watermark(img_path, watermark_bytes):
             im.convert("RGB").save(img_path, "PNG")
     except: pass
 
-# Rate-limit friendly sequential downloader that injects API keys for bypass unthrottled downloads [2.2]
+# Controlled Parallel Downloader utilizing ThreadPool with strict 12s timeout limit to permanently prevent cascading freezes [2]
 def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic HD", api_key=""):
     user_agents = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
     ]
     
-    # Safely download images sequentially to respect server-side rate limits [2.2]
-    for index in range(len(urls)):
+    def download_single_image(index):
         url, path, prompt_text = urls[index], paths[index], prompts[index]
         success = False
         
         t_session = requests.Session()
         t_session.headers.update({"User-Agent": random.choice(user_agents)})
         
-        # Injects Premium key directly if active to completely bypass IP blocks [2.2]
+        # Append API key if present
         active_url = url
         if api_key:
             active_url += f"&key={api_key}"
+            
+        # Single direct attempt with strict 12-second timeout (No nesting retry/model loops to prevent hanging) [2]
+        try:
+            res = t_session.get(active_url, timeout=12)
+            if res.status_code == 200 and len(res.content) > 5000:
+                with open(path, "wb") as f: f.write(res.content)
+                if is_valid_image(path):
+                    success = True
+        except: pass
         
-        # 1. Primary high-resolution attempt with solid timeout
-        for attempt in range(2):
-            try:
-                res = t_session.get(active_url, timeout=25)
-                if res.status_code == 200 and len(res.content) > 5000:
-                    with open(path, "wb") as f: f.write(res.content)
-                    if is_valid_image(path):
-                        success = True
-                        break
-            except: pass
-            time.sleep(0.5)
-            
-        # 2. Sequential fallback with rotated models to bypass rate-limits [2.2]
-        if not success:
-            fallback_style = "highly realistic photography, professional, highly detailed, real life"
-            if style == "3D Cartoon":
-                fallback_style = "3D cartoon animation Pixar style, cute, colorful"
-            elif style == "Cinematic Hollywood":
-                fallback_style = "cinematic Hollywood movie shot, highly detailed, dramatic"
-            elif style == "Bollywood Dramatic":
-                fallback_style = "vibrant Bollywood movie shot, dramatic"
-            elif style == "Anime Art":
-                fallback_style = "Japanese anime illustration, high quality"
-                
-            clean_prompt_words = re.sub(r'[^a-zA-Z0-9\s,]', '', prompt_text)
-            clean_prompt_words = ", ".join(clean_prompt_words.split(",")[:12])[:300]
-                
-            for img_model in ["flux", "turbo"]:
-                fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(fallback_style + ', ' + clean_prompt_words)}?width={w}&height={h}&nologo=true&model={img_model}&seed={random.randint(1,99999)}"
-                if api_key:
-                    fallback_url += f"&key={api_key}"
-                try:
-                    res = t_session.get(fallback_url, timeout=15)
-                    if res.status_code == 200 and len(res.content) > 5000:
-                        with open(path, "wb") as f: f.write(res.content)
-                        if is_valid_image(path):
-                            success = True
-                            break
-                except: pass
-                time.sleep(0.3)
-            
-        # 3. Last Resort: Procedural Cinematic Gradient
+        # If download fails, instantly generate procedural warm blue gradient (Absolutely no waiting!) [2]
         if not success:
             generate_cinematic_gradient_placeholder(path, w, h, prompt_text)
-            
-        # Cooldown protection delay
-        time.sleep(0.3)
+
+    # Controlling thread pool to maximum 4 workers to prevent server/socket jams [2]
+    max_workers = min(4, len(urls))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        executor.map(download_single_image, range(len(urls)))
 
 # Background Music Gallery Theme Caching Engine [2.2]
 def get_cached_bg_music(theme):
