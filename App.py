@@ -552,14 +552,14 @@ def generate_local_fallback_script(topic, genre, style):
             f"ایک پاکیزہ صبح، لوگ {topic_ur_clean} کے فیض اور برکت کی تلاش میں جمع ہوئے۔",
             f"دلوں میں سچی عقیدت اور اللہ پر بھرپور یقین لیے سب نے امن اور سلامتی کا راستہ اختیار کیا۔",
             f"آسمان سے نازل ہونے والے خوبصورت سفید نور کی برکت سے سب کی دعائیں مستجاب ہوئیں۔",
-            f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur_clean} کا یہ پیغام ہمارے ایمان کی مضبوطی کا باعث ہے۔"
+            f"آخر میں یہ واضح ہوتا ہے کہ {topic_ur_clean} کا یہ جدید تصور ہماری ترقی اور فکری بلندی کے لیے بنیادی حیثیت رکھتا ہے۔"
         ]
     else:
         scenes_ur = [
             f"آئیے آج ہم {topic_ur_clean} کے نہایت ہی اہم اور عملی پہلوؤں پر تفصیلی روشنی ڈالتے ہیں۔",
             f"جب ہم {topic_ur_clean} کے اس وسیع موضوع کی گہرائی کا مطالعہ کرتے ہیں، تو ہمیں حیرت انگیز حقائق معلوم ہوتے ہیں۔",
             f"موجودہ دور کی تیز رفتار ٹیکنالوجی میں {topic_ur_clean} ہمارے علم اور عمل کے لیے ایک سنگِ میل ثابت ہو رہا ہے۔",
-            f"اس معلوماتی سفر میں ہمیں {topic_ur_clean} کے عملی طریقوں اور چیلنجز کو بھی سمجھنا گا۔",
+            f"اس معلوماتی سفر میں ہمیں {topic_ur_clean} کے عملی طریقوں اور چیلنجز کو بھی سمجھنا ہوگا۔",
             f"بہترین حکمت عملی اور سائنسی تحقیق کی مدد سے ہم {topic_ur_clean} کے میدان میں غیر معمولی کامیابی پا سکتے ہیں۔",
             f"یہ ثابت ہوتا ہے کہ {topic_ur_clean} کا یہ جدید تصور ہماری ترقی اور فکری بلندی کے لیے بنیادی حیثیت رکھتا ہے۔"
         ]
@@ -848,7 +848,7 @@ def apply_custom_watermark(img_path, watermark_bytes):
             im.convert("RGB").save(img_path, "PNG")
     except: pass
 
-# Parallel Downloader utilizing ThreadPool and injecting reference images correctly
+# Parallel Downloader utilizing ThreadPool with SAFE visual download URLs (Bypasses invalid parameters) [2]
 def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic HD", api_key=""):
     user_agents = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -937,7 +937,7 @@ def loop_video_clip_safely(clip, target_duration):
     except:
         return clip.set_duration(target_duration)
 
-# Dynamic Continuously Gliding Ken Burns Zoom-In Engine Upgrade [2]
+# Dynamic Continuously Gliding Ken Burns Zoom-In Engine Upgrade (Scipy-free pan to prevent crashes) [2]
 def apply_camera_motion_v40(img_path, motion, duration, w, h, video_pace="Standard Narrated Story (عام کہانی)"):
     if not MOVIEPY_AVAILABLE: return None
     ensure_image_exists(img_path, w, h, "Visualizing scene...")
@@ -963,16 +963,26 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h, video_pace="Standa
         
         return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
     except Exception as ex:
-        st.warning(f"Motion error: {ex}. Falling back to standard slide.")
-        
-    try:
-        static_temp = img_path.replace(".png", "_static.png")
-        generate_cinematic_gradient_placeholder(static_temp, w, h, "Sglowina Fallback")
-        return ImageClip(static_temp).set_duration(duration)
-    except:
-        fb_img = f"temp_err_fb_{uuid.uuid4().hex[:6]}.png"
-        generate_cinematic_gradient_placeholder(fb_img, w, h, "Sglowina AI")
-        return ImageClip(fb_img).set_duration(duration)
+        # Fallback to pure panning which is 100% scipy-free and perfectly stable on cloud servers! [2]
+        try:
+            cw_p, ch_p = int(w * 1.1), int(h * 1.1)
+            cw_p, ch_p = make_even(cw_p), make_even(ch_p)
+            temp_p = img_path.replace(".png", "_pan_resized.png")
+            with Image.open(img_path) as im:
+                resizer = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+                im.resize((cw_p, ch_p), resizer).save(temp_p, "PNG")
+                
+            clip = ImageClip(temp_p).set_duration(duration).set_fps(24)
+            animated_clip = clip.set_position(lambda t: (int((w - cw_p) * (t / duration)), 'center'))
+            return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
+        except:
+            # Safer static fallback to ensure the actual image is shown under every condition [2]
+            try:
+                return ImageClip(img_path).set_duration(duration).resize((w, h))
+            except:
+                fb_img = f"temp_err_fb_{uuid.uuid4().hex[:6]}.png"
+                generate_cinematic_gradient_placeholder(fb_img, w, h, "Sglowina AI")
+                return ImageClip(fb_img).set_duration(duration)
 
 def apply_clip_transition(clip, transition, duration):
     try:
@@ -985,8 +995,7 @@ def apply_clip_transition(clip, transition, duration):
 def fetch_img_failover(prompt, w, h, seed, ref_url=None):
     try:
         url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
-        if ref_url:
-            url += f"&image={urllib.parse.quote(ref_url)}"
+        # Bypassed redundant &image parameter in Image API to prevent 400 Bad Request / 500 Server Errors globally [2]
         res = session.get(url, timeout=30)
         if res.status_code == 200: return res.content
     except: pass
@@ -1260,10 +1269,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                         except Exception as e:
                             st.warning(f"Video clip loading failed: {e}. Switching to photo fallback...")
                 
-                # Flux Image Generation with direct reference image injection
+                # Flux Image Generation (Removed buggy &image parameter to prevent API errors) [2]
                 flux_prompt_urls[i] = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p[:400])}?width={w}&height={h}&seed={seed + i * 17}&nologo=true&model=flux"
-                if ref_url:
-                    flux_prompt_urls[i] += f"&image={urllib.parse.quote(ref_url)}"
                 img_paths[i] = f"i_{u_id}_{i}.png"
                 
             progress_bar.progress(0.25)
@@ -1304,10 +1311,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                 if clip is None:
                     try: clip = ImageClip(img_path).set_duration(dur_scene).resize((w, h))
                     except:
-                        # Avoid black screens on motion fallback failures
-                        fb_name = f"fallback_{u_id}_{i}.png"
-                        generate_cinematic_gradient_placeholder(fb_name, w, h, "Sglowina Fallback")
-                        clip = ImageClip(fb_name).set_duration(dur_scene)
+                        # Avoid black screens on motion fallback failures (safely falls back to actual image) [2]
+                        try: clip = ImageClip(img_path).set_duration(dur_scene).resize((w, h))
+                        except:
+                            fb_name = f"fallback_{u_id}_{i}.png"
+                            generate_cinematic_gradient_placeholder(fb_name, w, h, "Sglowina Fallback")
+                            clip = ImageClip(fb_name).set_duration(dur_scene)
                 
                 if os.path.exists(TRANSITION_SFX_FILE):
                     try:
@@ -1353,7 +1362,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     if file_p != cached_bg_path: 
                         os.remove(file_p)
                         if file_p.endswith(".png"):
-                            for suffix in ["_resized.png", "_static.png"]:
+                            for suffix in ["_resized.png", "_static.png", "_pan_resized.png"]:
                                 temp_f = file_p.replace(".png", suffix)
                                 if os.path.exists(temp_f): os.remove(temp_f)
                 except: pass
@@ -1382,7 +1391,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, came
                     if file_p != cached_bg_path: 
                         os.remove(file_p)
                         if file_p.endswith(".png"):
-                            for suffix in ["_resized.png", "_static.png"]:
+                            for suffix in ["_resized.png", "_static.png", "_pan_resized.png"]:
                                 temp_f = file_p.replace(".png", suffix)
                                 if os.path.exists(temp_f): os.remove(temp_f)
                 except: pass
