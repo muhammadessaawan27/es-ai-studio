@@ -743,24 +743,23 @@ def apply_custom_watermark(img_path, watermark_bytes):
             im.convert("RGB").save(img_path, "PNG")
     except: pass
 
-# High-Performance ThreadPool parallel downloader with automatic model-rotation and user-agent rotating [2.2]
+# Rate-limit friendly sequential downloader to completely prevent shared-IP concurrent blocks [2.2]
 def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic HD"):
-    def download_single_image(index):
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+    ]
+    
+    # Safely download images sequentially to respect server-side rate limits [2.2]
+    for index in range(len(urls)):
         url, path, prompt_text = urls[index], paths[index], prompts[index]
         success = False
-        
-        user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
-        ]
         
         t_session = requests.Session()
         t_session.headers.update({"User-Agent": random.choice(user_agents)})
         
-        image_models = ["flux", "turbo"]
-        
-        # 1. Try primary high-resolution download with 25s timeout limit [2.2]
+        # 1. Primary high-resolution attempt with solid timeout
         for attempt in range(2):
             try:
                 res = t_session.get(url, timeout=25)
@@ -772,7 +771,7 @@ def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic H
             except: pass
             time.sleep(0.5)
             
-        # 2. Try rotating through alternative models & endpoints on failure
+        # 2. Sequential fallback with rotated models to bypass rate-limits [2.2]
         if not success:
             fallback_style = "highly realistic photography, professional, highly detailed, real life"
             if style == "3D Cartoon":
@@ -787,25 +786,24 @@ def parallel_download_flux_images(urls, paths, prompts, w, h, style="Realistic H
             clean_prompt_words = re.sub(r'[^a-zA-Z0-9\s,]', '', prompt_text)
             clean_prompt_words = ", ".join(clean_prompt_words.split(",")[:12])[:300]
                 
-            for img_model in image_models:
+            for img_model in ["flux", "turbo"]:
                 fallback_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(fallback_style + ', ' + clean_prompt_words)}?width={w}&height={h}&nologo=true&model={img_model}&seed={random.randint(1,99999)}"
                 try:
-                    res = t_session.get(fallback_url, timeout=20)
+                    res = t_session.get(fallback_url, timeout=15)
                     if res.status_code == 200 and len(res.content) > 5000:
                         with open(path, "wb") as f: f.write(res.content)
                         if is_valid_image(path):
                             success = True
                             break
                 except: pass
+                time.sleep(0.3)
             
-        # 3. If everything fails, use our Stunning Procedural Cinematic Gradient
+        # 3. Last Resort: Procedural Cinematic Gradient
         if not success:
             generate_cinematic_gradient_placeholder(path, w, h, prompt_text)
-
-    # Launch up to 8 parallel download slots for maximum multi-threaded performance
-    max_workers = min(8, len(urls))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        executor.map(download_single_image, range(len(urls)))
+            
+        # Minimal delay to protect connection pools
+        time.sleep(0.3)
 
 def get_cached_bg_music(is_horror, is_epic):
     fn = "bg_horror.mp3" if is_horror else ("bg_epic.mp3" if is_epic else "bg_standard.mp3")
@@ -911,67 +909,6 @@ def save_audio_safe(text, voice, rate, pitch, filename):
     except Exception as e:
         st.error(f"Voice synthesis error: {e}")
         return False
-
-# Urdu Font Finder to safely load beautiful Nastaliq rendering [2.2]
-def get_urdu_font(font_size):
-    font_paths = [
-        "Jameel Noori Nastaleeq.ttf", 
-        "NotoNastaliqUrdu-Regular.ttf", 
-        "arial.ttf"
-    ]
-    for path in font_paths:
-        if os.path.exists(path):
-            try: return ImageFont.truetype(path, font_size)
-            except: pass
-    try: return ImageFont.load_default()
-    except: return None
-
-# Secure subtitle burning function to overlay text elegantly [2.2]
-def burn_subtitles_to_image(img_path, scene_text):
-    try:
-        with Image.open(img_path) as im:
-            im = im.convert("RGB")
-            draw = ImageDraw.Draw(im)
-            w, h = im.size
-            font_size = max(18, int(h * 0.045))
-            font = get_urdu_font(font_size)
-            
-            bar_h = int(font_size * 2.2)
-            bar_y = h - bar_h - 20
-            
-            overlay = Image.new("RGBA", im.size, (0, 0, 0, 0))
-            draw_overlay = ImageDraw.Draw(overlay)
-            draw_overlay.rectangle([20, bar_y, w - 20, h - 20], fill=(0, 0, 0, 180))
-            
-            im = Image.alpha_composite(im.convert("RGBA"), overlay).convert("RGB")
-            draw = ImageDraw.Draw(im)
-            
-            text_w = draw.textlength(scene_text, font=font) if hasattr(draw, 'textlength') else (len(scene_text) * (font_size // 2))
-            text_x = max(30, (w - text_w) // 2)
-            text_y = bar_y + (bar_h - font_size) // 2
-            
-            draw.text((text_x, text_y), scene_text, fill=(255, 255, 255), font=font)
-            im.save(img_path, "PNG")
-    except: pass
-
-def apply_canva_typography(img_path, text):
-    try:
-        with Image.open(img_path) as im:
-            im = im.convert("RGB")
-            draw = ImageDraw.Draw(im)
-            w, h = im.size
-            font_size = int(h * 0.04) if h * 0.04 > 16 else 16
-            try: font = get_urdu_font(font_size)
-            except: font = None
-            overlay = Image.new('RGBA', im.size, (0, 0, 0, 0))
-            draw_overlay = ImageDraw.Draw(overlay)
-            box_h = int(font_size * 2.5)
-            box_y = h - box_h - 25
-            draw_overlay.rounded_rectangle([30, box_y, w - 30, h - 25], radius=12, fill=(15, 23, 42, 200))
-            im = Image.alpha_composite(im.convert('RGBA'), overlay).convert('RGB')
-            ImageDraw.Draw(im).text((50, box_y + (box_h - font_size) // 2), text, fill=(255, 255, 255), font=font)
-            im.save(img_path, "PNG")
-    except: pass
 
 # ==========================================
 # 4. SINGLE CLICK DIRECT MOVIE GENERATION (V1.0 restored with step progress text and custom watermark)
