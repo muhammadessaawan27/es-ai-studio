@@ -1,7 +1,2 @@
 streamlit
-requests
-pillow
-edge-tts
-numpy
-moviepy
-psycopg2-binary
+scrapetube
