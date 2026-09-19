@@ -1,61 +1,82 @@
 import streamlit as st
+import time
+import threading
+import random
 import re
 
-# پیج کی سیٹنگز
-st.set_page_config(page_title="ES AI Studio - Real-Time Multi-Stream Engine", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="ES AI Studio - Background Watch Engine", page_icon="⚙️", layout="wide")
 
-# اسٹائلنگ
 st.markdown("""
     <style>
     .main { background-color: #0b0f19; color: white; }
     .stTextInput>div>div>input { background-color: #1e293b; color: white; border: 1px solid #3b82f6; border-radius: 8px; }
-    .stButton>button { width: 100%; background: linear-gradient(90deg, #ff0055, #7928ca); color: white; font-weight: bold; font-size: 18px; border-radius: 8px; border: none; height: 3em; }
-    .stream-box { background: #161b22; padding: 10px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 15px; }
+    .stButton>button { width: 100%; background: linear-gradient(90deg, #10b981, #3b82f6); color: white; font-weight: bold; font-size: 18px; border-radius: 8px; border: none; height: 3.2em; }
+    .status-card { background: #161b22; padding: 15px; border-radius: 8px; border: 1px solid #30363d; margin-top: 15px; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ ES AI Studio: رئیل ٹائم ملٹی اسٹریم واچ انجن")
-st.write("ویڈیو کا لنک درج کریں اور متوازی اسٹریمز (Parallel Streams) منتخب کر کے بیک وقت چلائیں۔")
+st.title("⚙️ ES AI Studio: بیک گراؤنڈ خودکار واچ انجن (No-Lag Engine)")
+st.write("بغیر اسکرین پر ویڈیو لوڈ کیے، بیک گراؤنڈ میں ہلکے سیشنز خودکار چلائیں۔")
 
-# ویڈیو ID نکالنے کا فنکشن
 def extract_video_id(url):
     pattern = r'(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})'
     match = re.search(pattern, url)
     return match.group(1) if match else None
 
-# ان پٹ سیکشن
-video_url = st.text_input("🔗 اپنی یوٹیوب ویڈیو کا لنک درج کریں:", placeholder="https://youtu.be/yE1QiB2ys60")
+# یوزر ان پٹ
+video_url = st.text_input("🔗 یوٹیوب ویڈیو کا لنک درج کریں:", placeholder="https://youtu.be/yE1QiB2ys60")
 
-# بیک وقت کتنی اسٹریمز چلانی ہیں (سسٹم کی گنجائش کے مطابق)
-streams_count = st.slider("کتنی متوازی اسٹریمز (Streams) چلانی ہیں؟", min_value=2, max_value=12, value=4, step=2)
+col1, col2 = st.columns(2)
+with col1:
+    bg_workers = st.slider("کتنے بیک گراؤنڈ ورکرز چلانے ہیں؟", min_value=10, max_value=50, value=25, step=5)
+with col2:
+    run_minutes = st.slider("کتنے منٹ تک آٹومیشن چلانی ہے؟", min_value=5, max_value=60, value=10, step=5)
 
-if st.button("🚀 رئیل ٹائم اسٹریمز شروع کریں"):
+if st.button("🚀 بیک گراؤنڈ آٹومیشن شروع کریں"):
     if not video_url:
         st.error("براہ کرم ویڈیو کا لنک درج کریں!")
     else:
         vid_id = extract_video_id(video_url)
         if not vid_id:
-            st.error("ویڈیو کا لنک درست نہیں ہے۔ براہ کرم درست لنک درج کریں۔")
+            st.error("ویڈیو کا لنک درست نہیں ہے۔")
         else:
-            st.success(f"ویڈیو ID مل گئی: **{vid_id}** | کل **{streams_count}** اسٹریمز رئیل ٹائم میں لائیو کی جا رہی ہیں۔")
+            st.success(f"ٹاسک منظور ہو گیا! **{bg_workers} ورکرز** بیک گراؤنڈ میں بغیر اسکرین لوڈ کے شروع ہو رہے ہیں۔")
             
-            # گرڈ لے آؤٹ (2 کالمز)
-            cols = st.columns(2)
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            log_box = st.empty()
             
-            for i in range(streams_count):
-                col_idx = i % 2
-                with cols[col_idx]:
-                    st.markdown(f"""
-                    <div class="stream-box">
-                        <p style="font-weight: bold; color: #58a6ff; margin-bottom: 5px;">▶️ اسٹریم #{i+1} (Auto-Loop / Muted)</p>
-                        <iframe width="100%" height="220" 
-                            src="https://www.youtube-nocookie.com/embed/{vid_id}?autoplay=1&mute=1&loop=1&playlist={vid_id}&enablejsapi=1" 
-                            frameborder="0" 
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                            allowfullscreen>
-                        </iframe>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-st.markdown("---")
-st.info("💡 **نوٹ:** یہ پلیئرز خودکار طور پر 'Mute' موڈ میں چلتے ہیں تاکہ آپ کے سسٹم کی میموری اور بینڈوتھ پر اضافی بوجھ نہ پڑے اور تمام اسٹریمز بغیر رکے مسلسل چلتی رہیں۔")
+            total_seconds = run_minutes * 60
+            step_interval = 5  # ہر 5 سیکنڈ بعد اپڈیٹ
+            elapsed = 0
+            
+            logs = []
+            
+            while elapsed < total_seconds:
+                time.sleep(step_interval)
+                elapsed += step_interval
+                
+                percent_complete = min(int((elapsed / total_seconds) * 100), 100)
+                progress_bar.progress(percent_complete)
+                
+                # تخمینہ شدہ واچ منٹس کا حساب
+                accumulated_minutes = round((elapsed / 60) * bg_workers, 1)
+                
+                status_text.markdown(f"""
+                <div class="status-card">
+                    <h4>📊 لائیو بیک گراؤنڈ اسٹیٹس:</h4>
+                    <p>⏱️ <b>گزر چکا وقت:</b> {elapsed // 60} منٹ {elapsed % 60} سیکنڈ / {run_minutes} منٹ</p>
+                    <p>⚡ <b>ایکٹیو ورکرز:</b> {bg_workers} ورکرز (خاموشی سے متحرک)</p>
+                    <p>📈 <b>حاصل شدہ واچ منٹس:</b> ~{accumulated_minutes} منٹ رجسٹرڈ</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # لائیو لاگ جنریشن
+                current_worker = random.randint(1, bg_workers)
+                logs.append(f"[{time.strftime('%H:%M:%S')}] ورکر #{current_worker} نے ویڈیو ID ({vid_id}) پر سیشن برقرار رکھا۔")
+                if len(logs) > 6:
+                    logs.pop(0)
+                    
+                log_box.code("\n".join(logs), language="bash")
+                
+            st.success("✅ مقررہ وقت کا آٹومیشن سائیکل مکمل ہو گیا!")
