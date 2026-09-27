@@ -39,9 +39,6 @@ SGLOWINA_BIO = (
     "proudly developed by Muhammad Essa Awan & Saba Wahid."
 )
 
-# ==========================================
-# STREAMLIT PAGE CONFIG & SESSION STATES
-# ==========================================
 st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V2.1", layout="wide", page_icon="🎬")
 
 if "enable_watermark" not in st.session_state:
@@ -292,33 +289,13 @@ def analyze_scene_for_director(scene_text):
     elif any(k in text for k in ["essa", "he", "him", "man", "male", "boy", "warrior", "king"]):
         composition = "Cinematic masculine close-up portrait, focus on eyes and facial details"
         motion = "Zoom In"
-    elif any(k in text for k in ["together", "couple", "they", "them", "sitting with", "walking with"]):
-        composition = "Cinematic medium shot of a couple, side-by-side interacting"
-        motion = "Orbit Camera"
-    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "mud"]):
-        composition = "Cinematic wide-angle establishing landscape shot, highly atmospheric environment"
+    elif any(k in text for k in ["tractor", "drive", "car", "run", "chase", "action", "speed"]):
+        composition = "Dynamic moving cinematic tracking shot with realistic motion physics"
+        motion = "Tracking Shot"
+    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "field"]):
+        composition = "Cinematic wide-angle establishing landscape shot"
         motion = "Drone Shot"
 
-    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag"]):
-        motion = "Tracking Shot"
-    elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
-        motion = "Dolly In"
-        lighting = "Dark Cinematic, Horror Shadows"
-        color_grading = "Horror Green"
-    elif any(k in text for k in ["fight", "battle", "sword", "war"]):
-        motion = "Handheld Camera"
-    elif any(k in text for k in ["walk", "stroll"]):
-        motion = "Follow Shot"
-    elif any(k in text for k in ["think", "silent", "quiet", "meditate"]):
-        motion = "Ken Burns Effect"
-        
-    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine"]):
-        lighting = "Golden Hour"
-        color_grading = "Warm"
-    elif any(k in text for k in ["night", "midnight", "moon"]):
-        lighting = "Moonlight"
-        color_grading = "Cold Blue"
-        
     return {
         "motion": motion,
         "lighting": lighting,
@@ -329,12 +306,8 @@ def analyze_scene_for_director(scene_text):
 def translate_ur_to_en_enhanced(text):
     try:
         instruction = (
-            "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into highly descriptive English visual instructions. \n"
-            "CRITICAL RULES: \n"
-            "1. Explicitly identify the main subjects.\n"
-            "2. Do NOT blend genders.\n"
-            "3. Ensure anatomical perfection.\n"
-            "4. Output ONLY the English translation and detailed visual descriptions."
+            "Translate this Urdu scene into a highly descriptive English visual prompt for video generation. "
+            "Describe the characters, objects, action, and motion clearly with photorealistic 8k detail."
         )
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
         res = session.get(url, timeout=15)
@@ -348,16 +321,13 @@ def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
     combined_text = (scene_text_en + " " + scene_text_ur).lower()
     spiritual_keywords = [
         "prophet", "sahaba", "saint", "angel", "god", "allah", "messenger", "nooh", "musa", "isa", "ibrahim", "yousuf", "muhammad", 
-        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر",
-        "grave", "shroud", "hell", "heaven", "paradise", "pious", "aulia", "angels", "holy dome", "mosque"
+        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر"
     ]
     if any(k in combined_text for k in spiritual_keywords):
         safe_prompt = (
             "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light emanating from the heavens, "
-            "sacred light beam, peaceful glowing ancient background, majestic natural mountains and glowing golden sand, "
-            "awe-inspiring holy atmosphere, highly detailed cosmic sky. "
-            "STRICTLY NO human faces, NO visible bodies, NO portraits, NO human figures. "
-            "Pure sacred light, beautiful symbolic representation."
+            "sacred light beam, peaceful glowing ancient background, majestic natural mountains. "
+            "STRICTLY NO human faces, NO visible bodies, NO portraits. Pure sacred light."
         )
         return True, safe_prompt
     return False, scene_text_en
@@ -369,43 +339,18 @@ def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, ch
         
         if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
             if any(k in scene_lower for k in ["صبا", "saba", "woman", "female", "girl"]):
-                gender_booster = (
-                    "beautiful elegant Eastern Pakistani Punjabi Pathan woman, realistic South Asian sharp facial features, "
-                    "wearing traditional modest cotton Shalwar Kameez with a clean modest Dupatta elegantly draped over her head as a hijab, "
-                    "extremely realistic, 8k resolution, highly detailed, strictly no western look, modest posture"
-                )
+                gender_booster = "beautiful Eastern Pakistani woman wearing traditional modest Shalwar Kameez with Dupatta hijab, 8k resolution"
             elif any(k in scene_lower for k in ["عیسی", "essa", "man", "male", "boy"]):
-                gender_booster = (
-                    "handsome majestic Eastern Pakistani Punjabi Pathan man, highly realistic South Asian facial structure, "
-                    "wearing a traditional modest cotton Shalwar Kameez with high collar, neat short Islamic beard, "
-                    "strictly no western look, photorealistic, 8k resolution"
-                )
-            else:
-                gender_booster = (
-                    "traditional modest Eastern Islamic attire, Shalwar Kameez, modest clothing, "
-                    "Pakistani/Arabian traditional South Asian features, strictly no western exposure"
-                )
-        elif character_heritage == "Ancient Arabian":
-            gender_booster = "wearing ancient traditional Arabian flowing historical robes, classic desert turban, Middle Eastern facial features"
-        elif character_heritage == "Western / Modern":
-            gender_booster = "modern stylish contemporary Western clothing, jeans and jacket"
-        elif character_heritage == "Far Eastern":
-            gender_booster = "traditional East Asian oriental attire"
-
-        instruction = (
-            "You are an expert Hollywood visual artist and prompt engineer. Analyze the Urdu scene and write a descriptive English prompt for Flux.\n"
-            "STRICT RULES: Gender separation, no female beards, modest attire, no human depictions for sacred Islamic topics. Output ONLY final prompt."
-        )
+                gender_booster = "handsome Eastern Pakistani man wearing traditional modest Shalwar Kameez with short neat beard, 8k resolution"
         
+        instruction = "Write a highly detailed English visual prompt for Flux image and video generation based on the scene."
         prompt_input = f"Urdu Scene: {urdu_scene}\n"
         if char_memory: prompt_input += f"Character Memory: {char_memory}\n"
         if gender_booster: prompt_input += f"Attire tags: {gender_booster}\n"
         if scene_memory: prompt_input += f"Scene Memory: {scene_memory}\n"
-        if raw_male_url: prompt_input += f"Male reference image URL: {raw_male_url}\n"
-        if raw_female_url: prompt_input += f"Female reference image URL: {raw_female_url}\n"
 
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' ' + prompt_input)}?model=openai"
-        res = session.get(url, timeout=20)
+        res = session.get(url, timeout=15)
         if res.status_code == 200:
             refined_p = res.text.strip()
             return re.sub(r'^(prompt:|visual prompt:|cinematic prompt:)\s*', '', refined_p, flags=re.IGNORECASE)
@@ -415,23 +360,13 @@ def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, ch
 
 def apply_color_lut_harmony(img_path, style_preset):
     try:
+        if not os.path.exists(img_path): return
         with Image.open(img_path) as im:
             im = im.convert("RGB")
             if style_preset in ["Realistic HD", "Cinematic Film"]:
                 r, g, b = im.split()
                 r = r.point(lambda i: int(i * 1.05))
                 b = b.point(lambda i: int(i * 0.95))
-                im = Image.merge("RGB", (r, g, b))
-            elif style_preset == "Dark Gothic / Mystery":
-                im = ImageEnhance.Color(im).enhance(0.7)
-                r, g, b = im.split()
-                b = b.point(lambda i: int(i * 1.10))
-                im = Image.merge("RGB", (r, g, b))
-            elif style_preset == "Historical Epic":
-                r, g, b = im.split()
-                r = r.point(lambda i: int(i * 1.08))
-                g = g.point(lambda i: int(i * 1.02))
-                b = b.point(lambda i: int(i * 0.90))
                 im = Image.merge("RGB", (r, g, b))
             im = ImageEnhance.Contrast(im).enhance(1.08)
             im.save(img_path, "JPEG")
@@ -441,21 +376,17 @@ def apply_color_lut_harmony(img_path, style_preset):
 def download_scene_sfx(scene_text, u_id, idx):
     text = scene_text.lower()
     sfx_url = None
-    if any(k in text for k in ["rain", "storm", "thunder", "clouds", "بارش", "طوفان"]):
+    if any(k in text for k in ["rain", "storm", "thunder", "بارش", "طوفان"]):
         sfx_url = "https://www.soundjay.com/nature/sounds/rain-07.mp3"
-    elif any(k in text for k in ["sword", "fight", "battle", "clash", "تلوار", "جنگ"]):
-        sfx_url = "https://www.soundjay.com/mechanical/sounds/cutlery-clink-1.mp3"
-    elif any(k in text for k in ["forest", "jungle", "birds", "nature", "درخت", "جنگل"]):
+    elif any(k in text for k in ["tractor", "engine", "drive", "car"]):
+        sfx_url = "https://www.soundjay.com/transportation/sounds/tractor-engine-1.mp3"
+    elif any(k in text for k in ["forest", "jungle", "درخت", "جنگل"]):
         sfx_url = "https://www.soundjay.com/nature/sounds/forest-wind-1.mp3"
-    elif any(k in text for k in ["fire", "burn", "flame", "آگ"]):
-        sfx_url = "https://www.soundjay.com/nature/sounds/fire-1.mp3"
-    elif any(k in text for k in ["wind", "breeze", "ہوا"]):
-        sfx_url = "https://www.soundjay.com/nature/sounds/wind-howl-01.mp3"
         
     if sfx_url:
         sfx_filename = f"sfx_{u_id}_{idx}.mp3"
         try:
-            res = session.get(sfx_url, timeout=10)
+            res = session.get(sfx_url, timeout=8)
             if res.status_code == 200:
                 with open(sfx_filename, "wb") as f:
                     f.write(res.content)
@@ -466,7 +397,100 @@ def download_scene_sfx(scene_text, u_id, idx):
 
 def apply_blurred_background_padding(img_path, target_w, target_h):
     try:
+        if not os.path.exists(img_path): return
         with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            bg = im.resize((target_w, target_h)).filter(ImageFilter.GaussianBlur(radius=20))
+            im_ratio = im.width / im.height
+            target_ratio = target_w / target_h
+            if im_ratio > target_ratio:
+                new_w = target_w
+                new_h = int(target_w / im_ratio)
+            else:
+                new_h = target_h
+                new_w = int(target_h * im_ratio)
+            fg = im.resize((new_w, new_h))
+            px = (target_w - new_w) // 2
+            py = (target_h - new_h) // 2
+            bg.paste(fg, (px, py))
+            bg.save(img_path, "JPEG")
+    except Exception:
+        pass
+
+def parallel_download_flux_images(urls, paths, w, h):
+    def download_single(url, path):
+        try:
+            res = session.get(url, timeout=35)
+            if res.status_code == 200 and len(res.content) > 5000:
+                with open(path, "wb") as f:
+                    f.write(res.content)
+                return True
+        except Exception:
+            pass
+        # Failover image creation to guarantee no NoneType crash
+        try:
+            im = Image.new("RGB", (w, h), color=(20, 24, 33))
+            draw = ImageDraw.Draw(im)
+            draw.text((w//4, h//2), "Sglowina Cinematic Scene", fill=(220, 220, 220))
+            im.save(path, "JPEG")
+            return True
+        except Exception:
+            return False
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(download_single, urls[i], paths[i]) for i in range(len(urls))]
+        concurrent.futures.wait(futures)
+
+# BULLETPROOF CAMERA MOTION (NEVER RETURNS NONE)
+def apply_camera_motion_v40(img_path, motion, duration, w, h):
+    try:
+        if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
+            im = Image.new("RGB", (w, h), color=(15, 23, 42))
+            im.save(img_path, "JPEG")
+
+        scale_factor = 1.25
+        base_clip = ImageClip(img_path).set_duration(duration).set_fps(24)
+        cw, ch = int(w * scale_factor), int(h * scale_factor)
+        clip = base_clip.resize((cw, ch))
+        
+        if motion == "Zoom In":
+            animated_clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
+        elif motion == "Tracking Shot":
+            animated_clip = clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
+        elif motion == "Drone Shot":
+            animated_clip = clip.resize(lambda t: 1.25 - 0.25 * (t / duration)).set_position('center')
+        else:
+            animated_clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
+
+        return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
+    except Exception:
+        return ImageClip(img_path).set_duration(duration).resize((w, h))
+
+def apply_clip_transition(clip, transition, duration):
+    try:
+        if clip is not None:
+            if transition == "Cross Dissolve (Fade)":
+                return clip.fadein(0.3).fadeout(0.3)
+            elif transition == "Flash Transition (White Glow)":
+                return clip.fadein(0.2).fadeout(0.2)
+    except Exception:
+        pass
+    return clip
+
+def save_audio_safe(text, voice, rate, pitch, filename):
+    try:
+        async def amain():
+            communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
+            await communicate.save(filename)
+        asyncio.run(amain())
+        return True
+    except Exception:
+        return False
+
+# ==========================================
+# RENDER ENGINE CORE (WITH BULLETPROOF CHECKS)
+# ==========================================
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Autoopen(img_path) as im:
             im = im.convert("RGB")
             bg = im.resize((target_w, target_h)).filter(ImageFilter.GaussianBlur(radius=22))
             im_ratio = im.width / im.height
