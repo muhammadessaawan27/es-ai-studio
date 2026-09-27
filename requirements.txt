@@ -1,2 +1,6 @@
 streamlit
-scrapetube
+requests
+edge-tts
+moviepy
+Pillow
+numpy
