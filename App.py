@@ -1,142 +1,132 @@
 import os
 import subprocess
-import asyncio
-import json
-import urllib.request
-import urllib.parse
 import streamlit as st
-import speech_recognition as sr
-import edge_tts
 
 # Page Setup
-st.set_page_config(page_title="ES AI Studio - 4K Slowed & Reverb Master", layout="wide")
+st.set_page_config(page_title="ES Studio - Fast Action Clipper & Slowed Reverb", layout="wide")
 
-st.title("🎧 ES Studio: 4K Ultra HD & Slowed + Reverb Engine")
-st.write("گانے اور ویڈیوز کو کاپی رائٹ فری 'Slowed + Reverb' اور 4K سنیماٹک لک میں تبدیل کریں۔")
+st.title("⚡ ES الٹرا فاسٹ اسٹوڈیو: فلم کلپر اور لوفی ریورب انجن")
 
-# 1. Native Zero-Error Google Translate Function (No broken libraries)
-def translate_text(text, target_lang="ur"):
-    try:
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target_lang}&dt=t&q={urllib.parse.quote(text)}"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        response = urllib.request.urlopen(req)
-        data = json.loads(response.read().decode("utf-8"))
-        translated = "".join([sentence[0] for sentence in data[0] if sentence[0]])
-        return translated if translated else text
-    except Exception:
-        return text
+# Create Two Separate Tabs
+tab1, tab2 = st.tabs(["🎬 1. فلم کلپر اور ہائی لائٹس (Action / Horror / Adventure)", "🎧 2. گانے اور لوفی (Slowed + Reverb Engine)"])
 
-# Sidebar Controls
-st.sidebar.header("🎛️ ماسٹرنگ سیٹنگز")
-
-# Mode Selection
-engine_mode = st.sidebar.selectbox(
-    "1. موڈ منتخب کریں:",
-    [
-        "🔥 4K Aesthetic + Slowed & Reverb (گانے اور فلمیں)",
-        "⚡ 4K Crystal Clear (صرف ویڈیو کوالٹی اور اینٹی کاپی رائٹ)",
-        "🎙️ مکمل AI اردو / انگلش ڈبنگ"
-    ]
-)
-
-# Resolution Selection
-target_res = st.sidebar.selectbox(
-    "2. ویڈیو کوالٹی اور سائز:",
-    [
-        "4K Ultra HD (3840x2160 - لینڈ اسکیپ)",
-        "4K Ultra Shorts (2160x3840 - ٹک ٹاک / ریلز 9:16)",
-        "1080p Full HD (1920x1080)"
-    ]
-)
-
-# Audio Tuning for Slowed + Reverb
-st.sidebar.subheader("🎵 Slowed & Reverb ایڈجسٹمنٹ")
-slow_rate = st.sidebar.slider("سلو اسپیڈ اور پچ ڈراپ (Slow Factor)", min_value=0.80, max_value=0.96, value=0.88, step=0.01)
-reverb_depth = st.sidebar.slider("ریورب کی گہرائی (Echo / Reverb)", min_value=30, max_value=90, value=60, step=5)
-bass_boost = st.sidebar.slider("بیس بوسٹ (Bass Boost dB)", min_value=0, max_value=10, value=5)
-
-# Video Upload
-uploaded_file = st.file_uploader("ویڈیو یا گانا اپلوڈ کریں (MP4, MKV, MOV, WebM)", type=["mp4", "mkv", "mov", "webm"])
-
-async def generate_tts(text, voice, output_audio_path):
-    communicate = edge_tts.Communicate(text, voice)
-    await communicate.save(output_audio_path)
-
-def process_dubbing(input_video_path, target_lang):
-    st.info("🎙️ آڈیو اسکین اور AI ڈبنگ تیار ہو رہی ہے...")
-    extracted_audio = "temp_extracted.wav"
-    subprocess.run(["ffmpeg", "-y", "-i", input_video_path, "-vn", "-ar", "16000", "-ac", "1", extracted_audio], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+# ==========================================
+# 🎬 TAB 1: MOVIE HIGHLIGHT CUTTER & ANTI-COPYRIGHT
+# ==========================================
+with tab1:
+    st.subheader("مووی میں سے فائٹ، ہارر یا ایڈونچر سین کاٹیں")
     
-    recognizer = sr.Recognizer()
-    transcribed_text = ""
-    try:
-        with sr.AudioFile(extracted_audio) as source:
-            audio_data = recognizer.record(source)
-            transcribed_text = recognizer.recognize_google(audio_data)
-    except Exception:
-        transcribed_text = "Action sequence sound"
-    
-    dubbed_audio_file = "dubbed_voice.mp3"
-    
-    if target_lang == "ur":
-        translated = translate_text(transcribed_text, "ur")
-        asyncio.run(generate_tts(translated, "ur-PK-AsadNeural", dubbed_audio_file))
+    col1, col2 = st.columns(2)
+    with col1:
+        scene_type = st.selectbox(
+            "سین کی قسم منتخب کریں:",
+            [
+                "⚔️ فائٹ اور ایکشن سینز (Fight / Action)",
+                "👻 خوفناک اور ہارر مناظر (Horror / Suspense)",
+                "🏔️ ایڈونچر اور کلائمیکس (Adventure / Climax)",
+                "⏱️ مینوئل اسٹارٹ ٹائم (Manual Time Cut)"
+            ]
+        )
+    with col2:
+        clip_duration = st.slider("کلپ کا دورانیہ (منٹ میں):", min_value=1, max_value=20, value=10)
+        
+    start_minute = 0
+    if "فائٹ" in scene_type:
+        start_minute = 35  # Common fight block interval
+    elif "خوفناک" in scene_type:
+        start_minute = 50  # Horror peak interval
+    elif "ایڈونچر" in scene_type:
+        start_minute = 20  # Adventure start interval
     else:
-        translated = translate_text(transcribed_text, "en")
-        asyncio.run(generate_tts(translated, "en-US-ChristopherNeural", dubbed_audio_file))
-        
-    return dubbed_audio_file
+        start_minute = st.number_input("ویڈیو کس منٹ سے کاٹنا شروع کرے؟ (Start Minute)", min_value=0, max_value=300, value=15)
 
-if uploaded_file is not None:
-    input_path = "input_media.mp4"
-    output_path = "output_4k_mastered.mp4"
-    
-    with open(input_path, "wb") as f:
-        f.write(uploaded_file.read())
+    movie_file = st.file_uploader("فلم یا لمبی ویڈیو اپلوڈ کریں:", type=["mp4", "mkv", "mov", "webm"], key="movie_uploader")
+
+    if movie_file is not None:
+        input_movie = "input_movie.mp4"
+        output_clip = "highlight_clip.mp4"
         
-    st.success("✅ فائل کامیابی سے اپلوڈ ہو گئی!")
+        with open(input_movie, "wb") as f:
+            f.write(movie_file.read())
+            
+        st.success("✅ مووی فائل لوڈ ہو گئی!")
+        
+        if st.button("⚡ فوری 10 منٹ کا کلپ نکالیں (Fast Cut)"):
+            with st.spinner("سیکنڈوں میں کلپ کٹ اور اینٹی کاپی رائٹ فلٹر لگایا جا رہا ہے..."):
+                start_seconds = start_minute * 60
+                duration_seconds = clip_duration * 60
+                
+                # Ultra fast seek + Flip + Pitch shift for Anti-Copyright
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-ss", str(start_seconds),
+                    "-t", str(duration_seconds),
+                    "-i", input_movie,
+                    "-vf", "hflip,eq=contrast=1.05:saturation=1.1",
+                    "-af", "atempo=1.04,asetrate=44100*1.02",
+                    "-c:v", "libx264", "-preset", "ultrafast",
+                    "-c:a", "aac",
+                    output_clip
+                ]
+                
+                subprocess.run(cmd)
+                
+                if os.path.exists(output_clip):
+                    st.success("🎉 کلپ کامیابی سے تیار ہے!")
+                    st.video(output_clip)
+                    with open(output_clip, "rb") as f:
+                        st.download_button("📥 تیار شدہ کلپ ڈاؤنلوڈ کریں", f, file_name="movie_highlight_clip.mp4", mime="video/mp4")
+
+# ==========================================
+# 🎧 TAB 2: SLOWED + REVERB MASTERING
+# ==========================================
+with tab2:
+    st.subheader("گانے کو وائرل Slowed + Reverb اور بھاری آواز میں تبدیل کریں")
     
-    if st.button("🚀 4K Slowed & Reverb پروسیسنگ شروع کریں"):
-        with st.spinner("AI 4K اپ اسکیلنگ، کلر گریڈنگ اور ریورب مکسنگ کر رہا ہے..."):
+    col_a, col_b = st.columns(2)
+    with col_a:
+        slow_factor = st.slider("سلو اسپیڈ اور ڈیپ آواز (Slow Speed):", min_value=0.80, max_value=0.96, value=0.88, step=0.01)
+        reverb_level = st.slider("ریورب و گونج (Reverb / Echo):", min_value=20, max_value=80, value=50, step=5)
+    with col_b:
+        bass_level = st.slider("بیس بوسٹ (Heavy Bass Boost):", min_value=0, max_value=12, value=6)
+        video_size = st.selectbox("ویڈیو آؤٹ پٹ فارمیٹ:", ["16:9 لینڈ اسکیپ (YouTube)", "9:16 موبائل ریلز (Shorts/TikTok)"])
+
+    song_file = st.file_uploader("گانا یا چھوٹی ویڈیو اپلوڈ کریں:", type=["mp4", "mkv", "mp3", "wav"], key="song_uploader")
+
+    if song_file is not None:
+        input_song = "input_song_media.mp4"
+        output_song = "slowed_reverb_final.mp4"
+        
+        with open(input_song, "wb") as f:
+            f.write(song_file.read())
             
-            # --- 1. Video Filter Pipeline ---
-            v_filters = []
-            if "3840x2160" in target_res:
-                v_filters.append("scale=3840:2160:flags=lanczos")
-            elif "2160x3840" in target_res:
-                v_filters.append("scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840")
-            else:
-                v_filters.append("scale=1920:1080:flags=lanczos")
+        st.success("✅ فائل کامیابی سے لوڈ ہو گئی!")
+        
+        if st.button("🚀 Slowed + Reverb تیار کریں"):
+            with st.spinner("لوفی ریورب اور آڈیو ماسٹرنگ جاری ہے..."):
+                sample_rate = int(44100 * slow_factor)
+                af_filter = f"asetrate={sample_rate},aresample=44100,aecho=0.8:0.88:{reverb_level}:0.4,bass=g={bass_level}:f=110"
                 
-            v_filters.append("unsharp=5:5:1.0:3:3:0.5")
-            v_filters.append("eq=contrast=1.08:saturation=1.20:brightness=0.01")
-            vf_str = ",".join(v_filters)
-            
-            # --- 2. Audio Filter Pipeline ---
-            cmd = ["ffmpeg", "-y", "-i", input_path]
-            
-            if "Slowed & Reverb" in engine_mode:
-                sample_rate = int(44100 * slow_rate)
-                af_str = f"asetrate={sample_rate},aresample=44100,aecho=0.8:0.88:{reverb_depth}:0.4,bass=g={bass_boost}:f=110:w=0.6"
-                cmd += ["-vf", vf_str, "-af", af_str, "-c:v", "libx264", "-crf", "18", "-preset", "fast", "-c:a", "aac", "-b:a", "320k", output_path]
+                vf_filter = "eq=contrast=1.06:saturation=1.15"
+                if "9:16" in video_size:
+                    vf_filter += ",scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920"
+                else:
+                    vf_filter += ",scale=1920:1080:force_original_aspect_ratio=decrease"
+                    
+                cmd_song = [
+                    "ffmpeg", "-y",
+                    "-i", input_song,
+                    "-vf", vf_filter,
+                    "-af", af_filter,
+                    "-c:v", "libx264", "-preset", "ultrafast",
+                    "-c:a", "aac", "-b:a", "320k",
+                    output_song
+                ]
                 
-            elif "مکمل AI اردو" in engine_mode:
-                dubbed_audio = process_dubbing(input_path, "ur")
-                cmd += ["-i", dubbed_audio, "-map", "0:v:0", "-map", "1:a:0", "-vf", vf_str, "-c:v", "libx264", "-crf", "18", "-preset", "fast", "-c:a", "aac", "-shortest", output_path]
+                subprocess.run(cmd_song)
                 
-            else:
-                af_str = "atempo=1.03,asetrate=44100*1.02,bass=g=3:f=100"
-                cmd += ["-vf", vf_str, "-af", af_str, "-c:v", "libx264", "-crf", "18", "-preset", "fast", "-c:a", "aac", output_path]
-            
-            subprocess.run(cmd)
-            
-            if os.path.exists(output_path):
-                st.success("🎉 آپ کا 4K Slowed & Reverb شاہکار تیار ہے!")
-                st.video(output_path)
-                with open(output_path, "rb") as file:
-                    st.download_button(
-                        label="📥 4K الٹرا ایچ ڈی ویڈیو ڈاؤنلوڈ کریں",
-                        data=file,
-                        file_name="4k_slowed_reverb_master.mp4",
-                        mime="video/mp4"
-    )
+                if os.path.exists(output_song):
+                    st.success("🎉 آپ کا Slowed + Reverb تیار ہے!")
+                    st.video(output_song)
+                    with open(output_song, "rb") as f:
+                        st.download_button("📥 Slowed + Reverb ویڈیو ڈاؤنلوڈ کریں", f, file_name="slowed_reverb_master.mp4", mime="video/mp4")
