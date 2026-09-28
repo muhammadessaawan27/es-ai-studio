@@ -466,6 +466,189 @@ def download_scene_sfx(scene_text, u_id, idx):
     elif any(k in text for k in ["forest", "jungle", "birds", "nature", "درخت", "جنگل"]):
         sfx_url = "https://www.soundjay.com/nature/sounds/forest-wind-1.mp3"
     elif any(k in text for k in ["fire", "burn", "flame", "آگ"]):
+        sfx_url = "https://www.soundjay.com/nature/same))
+    conn.commit()
+    conn.close()
+
+def log_credit_usage(user_id, action, used, balance):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO credits_history (user_id, action, credits_used, balance_after, date) VALUES (?, ?, ?, ?, ?)",
+                   (user_id, action, used, balance, time.strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+
+# AI Director Analyzer
+def analyze_scene_for_director(scene_text):
+    text = scene_text.lower()
+    motion = "Zoom Out (v40 Default)"
+    lighting = "Volumetric Light"
+    color_grading = "Hollywood Cinematic"
+    composition = "Medium Shot, Rule of Thirds"
+    
+    if any(k in text for k in ["saba", "she", "her", "woman", "female", "girl"]):
+        composition = "Tight close-up portrait shot, extreme details of female face, emotional expression"
+        motion = "Push In"
+    elif any(k in text for k in ["essa", "he", "him", "man", "male", "boy", "warrior", "king"]):
+        composition = "Cinematic masculine close-up portrait, focus on eyes and facial details"
+        motion = "Zoom In"
+    elif any(k in text for k in ["together", "couple", "they", "them", "sitting with", "walking with"]):
+        composition = "Cinematic medium shot of a couple, side-by-side interacting"
+        motion = "Orbit Camera"
+    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "mud", "field"]):
+        composition = "Cinematic wide-angle establishing landscape shot, highly atmospheric environment"
+        motion = "Drone Shot"
+
+    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag", "tractor", "drive", "car"]):
+        motion = "Tracking Shot"
+    elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
+        motion = "Dolly In"
+        lighting = "Dark Cinematic, Horror Shadows"
+        color_grading = "Horror Green"
+    elif any(k in text for k in ["fight", "battle", "sword", "war"]):
+        motion = "Handheld Camera"
+    elif any(k in text for k in ["walk", "stroll"]):
+        motion = "Follow Shot"
+    elif any(k in text for k in ["think", "silent", "quiet", "meditate"]):
+        motion = "Ken Burns Effect"
+        
+    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine"]):
+        lighting = "Golden Hour"
+        color_grading = "Warm"
+    elif any(k in text for k in ["night", "midnight", "moon"]):
+        lighting = "Moonlight"
+        color_grading = "Cold Blue"
+        
+    return {
+        "motion": motion,
+        "lighting": lighting,
+        "color_grading": color_grading,
+        "composition": composition
+    }
+
+def translate_ur_to_en_enhanced(text):
+    try:
+        instruction = (
+            "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into highly descriptive English visual instructions. \n"
+            "CRITICAL RULES: \n"
+            "1. Explicitly identify the main subjects.\n"
+            "2. Do NOT blend genders.\n"
+            "3. Ensure anatomical perfection.\n"
+            "4. Output ONLY the English translation and visual descriptions."
+        )
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
+        res = session.get(url, timeout=15)
+        if res.status_code == 200:
+            return res.text.strip()
+    except Exception:
+        pass
+    return text
+
+def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
+    combined_text = (scene_text_en + " " + scene_text_ur).lower()
+    spiritual_keywords = [
+        "prophet", "sahaba", "saint", "angel", "god", "allah", "messenger", "nooh", "musa", "isa", "ibrahim", "yousuf", "muhammad", 
+        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر",
+        "grave", "shroud", "hell", "heaven", "paradise", "pious", "aulia", "angels", "holy dome", "mosque"
+    ]
+    if any(k in combined_text for k in spiritual_keywords):
+        safe_prompt = (
+            "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light emanating from the heavens, "
+            "sacred light beam, peaceful glowing ancient background, majestic natural mountains and glowing golden sand, "
+            "awe-inspiring holy atmosphere, highly detailed cosmic sky. "
+            "STRICTLY NO human faces, NO visible bodies, NO portraits, NO human figures. "
+            "Pure sacred light, beautiful symbolic representation."
+        )
+        return True, safe_prompt
+    return False, scene_text_en
+
+def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
+    try:
+        scene_lower = urdu_scene.lower()
+        gender_booster = ""
+        
+        if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
+            if any(k in scene_lower for k in ["صبا", "saba", "woman", "female", "girl"]):
+                gender_booster = (
+                    "beautiful elegant Eastern Pakistani Punjabi Pathan woman, realistic South Asian sharp facial features, "
+                    "wearing traditional modest cotton Shalwar Kameez with a clean modest Dupatta elegantly draped over her head as a hijab, "
+                    "extremely realistic, 8k resolution, highly detailed, strictly no western look, modest posture"
+                )
+            elif any(k in scene_lower for k in ["عیسی", "essa", "man", "male", "boy"]):
+                gender_booster = (
+                    "handsome majestic Eastern Pakistani Punjabi Pathan man, highly realistic South Asian facial structure, "
+                    "wearing a traditional modest cotton Shalwar Kameez with high collar, neat short Islamic beard, "
+                    "strictly no western look, photorealistic, 8k resolution"
+                )
+            else:
+                gender_booster = (
+                    "traditional modest Eastern Islamic attire, Shalwar Kameez, modest clothing, "
+                    "Pakistani/Arabian traditional South Asian features, strictly no western exposure"
+                )
+        elif character_heritage == "Ancient Arabian":
+            gender_booster = "wearing ancient traditional Arabian flowing historical robes, classic desert turban, Middle Eastern facial features"
+        elif character_heritage == "Western / Modern":
+            gender_booster = "modern stylish contemporary Western clothing, jeans and jacket"
+        elif character_heritage == "Far Eastern":
+            gender_booster = "traditional East Asian oriental attire"
+
+        instruction = (
+            "You are an expert Hollywood visual artist and prompt engineer. Analyze the Urdu scene and write a descriptive English prompt for Flux.\n"
+            "STRICT RULES: Gender separation, no female beards, modest attire, no human depictions for sacred Islamic topics. Output ONLY final prompt."
+        )
+        
+        prompt_input = f"Urdu Scene: {urdu_scene}\n"
+        if char_memory: prompt_input += f"Character Memory: {char_memory}\n"
+        if gender_booster: prompt_input += f"Attire tags: {gender_booster}\n"
+        if scene_memory: prompt_input += f"Scene Memory: {scene_memory}\n"
+        if raw_male_url: prompt_input += f"Male reference image URL: {raw_male_url}\n"
+        if raw_female_url: prompt_input += f"Female reference image URL: {raw_female_url}\n"
+
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' ' + prompt_input)}?model=openai"
+        res = session.get(url, timeout=20)
+        if res.status_code == 200:
+            refined_p = res.text.strip()
+            return re.sub(r'^(prompt:|visual prompt:|cinematic prompt:)\s*', '', refined_p, flags=re.IGNORECASE)
+    except Exception:
+        pass
+    return f"Cinematic film scene: {urdu_scene}, highly detailed, 8k"
+
+def apply_color_lut_harmony(img_path, style_preset):
+    try:
+        if not os.path.exists(img_path): return
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            if style_preset in ["Realistic HD", "Cinematic Film"]:
+                r, g, b = im.split()
+                r = r.point(lambda i: int(i * 1.05))
+                b = b.point(lambda i: int(i * 0.95))
+                im = Image.merge("RGB", (r, g, b))
+            elif style_preset == "Dark Gothic / Mystery":
+                im = ImageEnhance.Color(im).enhance(0.7)
+                r, g, b = im.split()
+                b = b.point(lambda i: int(i * 1.10))
+                im = Image.merge("RGB", (r, g, b))
+            elif style_preset == "Historical Epic":
+                r, g, b = im.split()
+                r = r.point(lambda i: int(i * 1.08))
+                g = g.point(lambda i: int(i * 1.02))
+                b = b.point(lambda i: int(i * 0.90))
+                im = Image.merge("RGB", (r, g, b))
+            im = ImageEnhance.Contrast(im).enhance(1.08)
+            im.save(img_path, "JPEG")
+    except Exception:
+        pass
+
+def download_scene_sfx(scene_text, u_id, idx):
+    text = scene_text.lower()
+    sfx_url = None
+    if any(k in text for k in ["rain", "storm", "thunder", "clouds", "بارش", "طوفان"]):
+        sfx_url = "https://www.soundjay.com/nature/sounds/rain-07.mp3"
+    elif any(k in text for k in ["sword", "fight", "battle", "clash", "تلوار", "جنگ"]):
+        sfx_url = "https://www.soundjay.com/mechanical/sounds/cutlery-clink-1.mp3"
+    elif any(k in text for k in ["forest", "jungle", "birds", "nature", "درخت", "جنگل"]):
+        sfx_url = "https://www.soundjay.com/nature/sounds/forest-wind-1.mp3"
+    elif any(k in text for k in ["fire", "burn", "flame", "آگ"]):
         sfx_url = "https://www.soundjay.com/nature/s>
     </html>
     """
