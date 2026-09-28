@@ -1,16 +1,14 @@
 import os
 import subprocess
-import base64
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 import imageio_ffmpeg
 import yt_dlp
 
 st.set_page_config(page_title="ES Ultimate AI Studio", page_icon="⚡", layout="wide")
 
-st.title("⚡ ES الٹرا اسمارٹ اسٹوڈیو (آٹو ڈیٹیکشن اور آٹو ڈاؤنلوڈر)")
-st.write("ویڈیو کے مواد کی خودکار پہچان (کامیڈی، فلم، گانا) اور رات کو سوتے وقت خود بخود ڈاؤنلوڈنگ انجن۔")
+st.title("⚡ ES الٹرا اسمارٹ اینٹی کاپی رائٹ اسٹوڈیو")
+st.write("ویڈیو کیٹگری کی خودکار پہچان، 7 لیئر اینٹی کاپی رائٹ فلٹرز اور وائرل میٹا ڈیٹا پیک۔")
 
 FFMPEG_BIN = imageio_ffmpeg.get_ffmpeg_exe()
 
@@ -28,12 +26,12 @@ tab1, tab2, tab3 = st.tabs([
 input_video = "input_master_video.mp4"
 output_video = "output_bypass_video.mp4"
 
-# 1. Smart Inspector: Inspects real video title, tags and category
+# 1. Smart Inspector: Inspects real video title and category
 def inspect_and_fetch_media(url, target_path=input_video):
     if os.path.exists(target_path):
         os.remove(target_path)
         
-    info_dict = {}
+    info_dict = {'title': 'Special Video', 'categories': ['Entertainment']}
     try:
         ydl_opts = {
             'format': 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
@@ -50,12 +48,10 @@ def inspect_and_fetch_media(url, target_path=input_video):
             meta = ydl.extract_info(url, download=True)
             info_dict['title'] = meta.get('title', 'Viral Video')
             info_dict['tags'] = meta.get('tags', [])
-            info_dict['description'] = meta.get('description', '')
             info_dict['categories'] = meta.get('categories', ['Entertainment'])
     except Exception:
-        # Fallback for Direct MP4 links
-        info_dict['title'] = "Special Video Highlight"
-        info_dict['categories'] = ['Entertainment']
+        # Fallback for Direct MP4 / Cloud links
+        info_dict['title'] = "Custom Video Highlight"
         try:
             with requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, stream=True, timeout=30) as r:
                 r.raise_for_status()
@@ -67,22 +63,21 @@ def inspect_and_fetch_media(url, target_path=input_video):
 
     return info_dict
 
-# 2. Smart Genre-Based Metadata & Thumbnail Generator
+# 2. Smart Genre-Based Metadata & Thumbnail Prompt Generator
 def generate_smart_metadata(info):
     title = info.get('title', 'Video')
     t_lower = title.lower()
     
-    # Auto-detect Genre
     if any(k in t_lower for k in ['kapil', 'comedy', 'funny', 'laugh', 'joke', 'hasna', 'standup', 'prank']):
         genre = "Comedy"
         safe_titles = [
-            f"😂 Non-Stop Laugh Attack! | {title[:40]}... Best Comedy Moments",
-            f"🤣 Kapil Sharma Ultimate Comedy Special | Uncut Funny Scenes",
-            f"🔥 When Laughter Goes Out of Control! | {title[:45]}"
+            f"😂 Non-Stop Laugh Attack! | {title[:40]}... Best Funny Moments",
+            f"🤣 Kapil Sharma Comedy Special | Uncut Hilarious Scenes",
+            f"🔥 When Laughter Goes Wild! | {title[:45]}"
         ]
         hashtags = f"#KapilSharmaShow #ComedyShow #FunnyVideo #StandupComedy #HindiComedy #LaughOutLoud #ViralComedy"
         thumb_prompt = (
-            f"Ultra realistic 8K YouTube thumbnail for Indian comedy show '{title[:30]}', "
+            f"Ultra realistic 8K YouTube thumbnail for comedy show '{title[:30]}', "
             f"comedian laughing loudly with hilarious facial expression on a bright modern comedy stage, "
             f"golden studio lighting, colorful background with laughing audience silhouettes, extremely sharp, cinematic, 16:9 aspect ratio."
         )
@@ -91,8 +86,8 @@ def generate_smart_metadata(info):
         genre = "Music"
         safe_titles = [
             f"🎧 Deep Emotional Vibes | {title[:40]} (Slowed + Reverb Lo-Fi)",
-            f"🌙 Midnight Lo-Fi Chill | {title[:40]} | Relax & Study",
-            f"✨ Pure Nostalgia | {title[:40]} (Aesthetic 4K Master)"
+            f"🌙 Midnight Lo-Fi Chill | {title[:40]} | Relax & Chill",
+            f"✨ Pure Nostalgia Vibes | {title[:40]} (4K Master)"
         ]
         hashtags = f"#SlowedAndReverb #LofiRemix #ChillVibes #BollywoodLofi #MidnightVibes #AestheticAudio #ViralMusic"
         thumb_prompt = (
@@ -101,7 +96,7 @@ def generate_smart_metadata(info):
         )
         
     else:
-        genre = "Action / Cinema"
+        genre = "Action / Movie"
         safe_titles = [
             f"🔥 The Real Climax Scene | {title[:40]}... Explained in Urdu/Hindi",
             f"⚡ Unstoppable Hero Returns! | {title[:45]} Special Cut",
@@ -115,25 +110,6 @@ def generate_smart_metadata(info):
         
     return genre, safe_titles, hashtags, thumb_prompt
 
-# 3. Automatic Auto-Save Trigger for Mobile/PC (Downloads while you sleep)
-def auto_download_trigger(file_path, download_name="es_protected_video.mp4"):
-    try:
-        with open(file_path, "rb") as f:
-            b64_data = base64.b64encode(f.read()).decode()
-        dl_script = f"""
-        <script>
-            var a = document.createElement('a');
-            a.href = 'data:video/mp4;base64,{b64_data}';
-            a.download = '{download_name}';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        </script>
-        """
-        components.html(dl_script, height=0)
-    except Exception:
-        pass
-
 # =========================================================
 # 🎬 TAB 1: FULL MOVIE / SHOW MODE
 # =========================================================
@@ -141,11 +117,11 @@ with tab1:
     st.subheader("پوری ویڈیو / شو کو اینٹی کاپی رائٹ فلٹرز میں پروسیس کریں")
     
     style_choice = st.selectbox("حفاظتی اسٹائل:", ["🛡️ کینوس بلر فریم (سب سے زیادہ محفوظ)", "⚡ فل اسکرین الٹرا اینٹی ہیش"], key="s_t1")
-    url_input_1 = st.text_input("🔗 یوٹیوب یا ویڈیو کا لنک یہاں پیسٹ کریں (جیسے کپل شرما شو یا فلم):", placeholder="https://youtu.be/...", key="url_t1")
+    url_input_1 = st.text_input("🔗 ویڈیو یا شو کا لنک درج کریں (جیسے کپل شرما شو یا فلم):", placeholder="https://youtu.be/...", key="url_t1")
     
-    if st.button("🚀 خودکار پروسیس اور آٹو سیو شروع کریں", type="primary", key="run_t1"):
+    if st.button("🚀 پروسیسنگ شروع کریں", type="primary", key="run_t1"):
         if url_input_1:
-            with st.spinner("ویڈیو کو اسکین، کٹ اور 7 لیئر اینٹی کاپی رائٹ فلٹرز لگائے جا رہے ہیں..."):
+            with st.spinner("ویڈیو اسکین، کٹ اور 7 لیئر اینٹی کاپی رائٹ فلٹرز لگ رہے ہیں..."):
                 info = inspect_and_fetch_media(url_input_1, input_video)
                 if os.path.exists(input_video) and os.path.getsize(input_video) > 50000:
                     vf_str = "[0:v]scale=1920:1080,boxblur=20:5[bg];[0:v]hflip,scale=1600:900,eq=contrast=1.07:saturation=1.14:brightness=0.01,noise=alls=2:allf=t+u,vignette=PI/4[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2" if "کینوس" in style_choice else "hflip,crop=iw*0.94:ih*0.94,eq=contrast=1.08:saturation=1.15,noise=alls=2:allf=t+u,vignette=PI/4"
@@ -156,26 +132,26 @@ with tab1:
                     st.session_state.detected_info = info
                     st.session_state.process_ready = True
                 else:
-                    st.error("❌ ویڈیو ڈاؤنلوڈ نہیں ہو سکی۔ براہ کرم لنک چیک کریں۔")
+                    st.error("❌ ویڈیو ڈاؤنلوڈ نہیں ہو سکی۔ براہ کرم درست لنک درج کریں۔")
 
 # =========================================================
 # ⚔️ TAB 2: CLIP CUTTER MODE
 # =========================================================
 with tab2:
-    st.subheader("مووی یا شو سے 10 منٹ کا کلپ کاٹیں")
+    st.subheader("ویڈیو یا شو سے 10 منٹ کا کلپ کاٹیں")
     
     c1, c2 = st.columns(2)
     with c1:
-        scene_type = st.selectbox("سین کا آغاز:", ["⚔️ ایکشن / کامیڈی پیک (منٹ 30)", "👻 سسپنس (منٹ 45)", "🏔️ انٹرویو و آغاز (منٹ 15)", "⏱️ کسٹم منٹ"], key="s_t2")
+        scene_type = st.selectbox("سین کا آغاز:", ["⚔️ اہم سین / کامیڈی پیک (منٹ 30)", "👻 سسپنس (منٹ 45)", "🏔️ آغاز (منٹ 15)", "⏱️ کسٹم منٹ"], key="s_t2")
     with c2:
         clip_len = st.slider("دورانیہ (منٹ):", 1, 20, 10, key="len_t2")
         
     start_min = 30 if "30" in scene_type else 45 if "45" in scene_type else 15 if "15" in scene_type else st.number_input("اسٹارٹ منٹ:", 0, 300, 10)
     url_input_2 = st.text_input("🔗 ویڈیو کا لنک درج کریں:", placeholder="https://youtu.be/...", key="url_t2")
 
-    if st.button("🚀 کلپ کاٹیں اور آٹو ڈاؤنلوڈ کریں", type="primary", key="run_t2"):
+    if st.button("🚀 کلپ کاٹیں اور اینٹی کاپی رائٹ لگائیں", type="primary", key="run_t2"):
         if url_input_2:
-            with st.spinner("ویڈیو اسکین کر کے کلپ کٹ کیا جا رہا ہے..."):
+            with st.spinner("ویڈیو اسکین اور کلپ کٹ ہو رہا ہے..."):
                 info = inspect_and_fetch_media(url_input_2, input_video)
                 if os.path.exists(input_video) and os.path.getsize(input_video) > 50000:
                     start_sec = start_min * 60
@@ -222,19 +198,16 @@ with tab3:
                     st.error("❌ گانے کا لنک لوڈ نہیں ہو سکا۔")
 
 # =========================================================
-# 📦 OUTPUT + AUTO-DOWNLOAD + SMART METADATA
+# 📦 OUTPUT + DOWNLOAD + SMART METADATA PACK
 # =========================================================
 if st.session_state.process_ready and os.path.exists(output_video):
     st.divider()
-    st.success("🎉 ویڈیو مکمل تیار ہے! ڈاؤنلوڈنگ خود بخود آپ کے موبائل میں شروع کر دی گئی ہے۔")
-    
-    # Auto-trigger download straight to mobile gallery/downloads
-    auto_download_trigger(output_video, "es_protected_master.mp4")
+    st.success("🎉 ویڈیو مکمل تیار ہے! نیچے سبز بٹن سے فوراً ڈاؤنلوڈ کریں:")
     
     st.video(output_video)
     with open(output_video, "rb") as f:
         st.download_button(
-            label="📥 اگر آٹو ڈاؤنلوڈ نہ ہوا ہو تو یہاں کلک کریں",
+            label="📥 یہاں کلک کریں اور ویڈیو ڈاؤنلوڈ کریں (Download MP4)",
             data=f,
             file_name="es_protected_master.mp4",
             mime="video/mp4",
@@ -247,7 +220,7 @@ if st.session_state.process_ready and os.path.exists(output_video):
     
     c_meta1, c_meta2 = st.columns(2)
     with c_meta1:
-        st.markdown(f"### 😂 محفوظ وائرل ٹائٹلز ({genre}):")
+        st.markdown(f"### 🔥 محفوظ وائرل ٹائٹلز ({genre}):")
         for i, t in enumerate(titles, 1):
             st.code(t, language="text")
             
@@ -256,5 +229,5 @@ if st.session_state.process_ready and os.path.exists(output_video):
 
     with c_meta2:
         st.markdown("### 🎨 AI تھمب نیل پرامپٹ (Thumbnail Prompt):")
-        st.info("💡 اسے کاپی کر کے Midjourney یا Bing Creator میں ڈالیں اور اسی شو کا تھمب نیل بنائیں۔")
+        st.info("💡 اسے Midjourney یا Bing Creator میں ڈال کر اسی شو کا نیا تھمب نیل بنائیں۔")
         st.code(prompt, language="text")
