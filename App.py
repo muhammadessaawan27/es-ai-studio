@@ -130,6 +130,7 @@ st.session_state.enable_bg_music = enable_bg_music
 render_semaphore = threading.Semaphore(value=2)
 active_renderers = 0
 render_lock = threading.Lock()
+db_lock = threading.Lock()
 
 def make_even(val):
     return int(val) if int(val) % 2 == 0 else int(val) + 1
@@ -209,7 +210,7 @@ def burn_viral_subtitles(img_path, caption_text, is_vertical=True):
         pass
 
 # ==========================================
-# 3. DATABASE & PERSISTENCE LAYER
+# 3. THREAD-SAFE DATABASE LAYER (POSTGRESQL & SQLITE WAL)
 # ==========================================
 def get_db_connection():
     pg_url = os.environ.get("DATABASE_URL")
@@ -219,103 +220,111 @@ def get_db_connection():
             return psycopg2.connect(pg_url)
         except Exception:
             pass
-    conn = sqlite3.connect("sglowina_saas_v21.db", check_same_thread=False, timeout=30.0)
+    conn = sqlite3.connect("sglowina_saas_v21.db", check_same_thread=False, timeout=60.0)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=60000;")
     except Exception:
         pass
     return conn
 
+@st.cache_resource
 def init_db_v21():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    is_sqlite = not hasattr(conn, "closed")
-    serial_primary = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sqlite else "SERIAL PRIMARY KEY"
-    
-    cursor.execute(f"""
-        CREATE TABLE IF NOT EXISTS users (
-            id {serial_primary},
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            plan TEXT DEFAULT 'Free',
-            credits INTEGER DEFAULT 50,
-            role TEXT DEFAULT 'User',
-            status TEXT DEFAULT 'Active',
-            created_at TEXT
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS projects (
-            id TEXT PRIMARY KEY,
-            user_id INTEGER,
-            project_name TEXT,
-            type TEXT,
-            file_path TEXT,
-            prompt TEXT,
-            created_at TEXT,
-            is_favorite INTEGER DEFAULT 0
-        )
-    """)
-    cursor.execute(f"""
-        CREATE TABLE IF NOT EXISTS credits_history (
-            id {serial_primary},
-            user_id INTEGER,
-            action TEXT,
-            credits_used INTEGER,
-            balance_after INTEGER,
-            date TEXT
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS local_payments (
-            id TEXT PRIMARY KEY,
-            username TEXT,
-            method TEXT,
-            trx_id TEXT UNIQUE,
-            amount REAL,
-            status TEXT DEFAULT 'Pending',
-            created_at TEXT
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS coupons (
-            code TEXT PRIMARY KEY,
-            credits INTEGER,
-            uses_left INTEGER
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS system_config (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )
-    """)
-    
-    cursor.execute("SELECT COUNT(*) FROM coupons WHERE code = 'ESSASABA'")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO coupons (code, credits, uses_left) VALUES ('ESSASABA', 100, 1000)")
-    
-    h_admin = hash_password("786")
-    for adm, mail in [("essasaba", "essasaba@sglowina.ai"), ("essa_awan", "essa@sglowina.ai")]:
-        cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (adm,))
-        if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                           (adm, mail, h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
-        else:
-            cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = ?", (h_admin, adm))
-                       
-    h_saba = hash_password("1234")
-    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                       ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", 5000, "Admin", "2026-07-21"))
-    else:
-        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = ?", (h_saba,))
-                       
-    conn.commit()
-    conn.close()
+    with db_lock:
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            is_sqlite = not hasattr(conn, "closed")
+            serial_primary = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sqlite else "SERIAL PRIMARY KEY"
+            
+            cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS users (
+                    id {serial_primary},
+                    username TEXT UNIQUE NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    plan TEXT DEFAULT 'Free',
+                    credits INTEGER DEFAULT 50,
+                    role TEXT DEFAULT 'User',
+                    status TEXT DEFAULT 'Active',
+                    created_at TEXT
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS projects (
+                    id TEXT PRIMARY KEY,
+                    user_id INTEGER,
+                    project_name TEXT,
+                    type TEXT,
+                    file_path TEXT,
+                    prompt TEXT,
+                    created_at TEXT,
+                    is_favorite INTEGER DEFAULT 0
+                )
+            """)
+            cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS credits_history (
+                    id {serial_primary},
+                    user_id INTEGER,
+                    action TEXT,
+                    credits_used INTEGER,
+                    balance_after INTEGER,
+                    date TEXT
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS local_payments (
+                    id TEXT PRIMARY KEY,
+                    username TEXT,
+                    method TEXT,
+                    trx_id TEXT UNIQUE,
+                    amount REAL,
+                    status TEXT DEFAULT 'Pending',
+                    created_at TEXT
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS coupons (
+                    code TEXT PRIMARY KEY,
+                    credits INTEGER,
+                    uses_left INTEGER
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS system_config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """)
+            
+            cursor.execute("SELECT COUNT(*) FROM coupons WHERE code = 'ESSASABA'")
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("INSERT INTO coupons (code, credits, uses_left) VALUES ('ESSASABA', 100, 1000)")
+            
+            h_admin = hash_password("786")
+            for adm, mail in [("essasaba", "essasaba@sglowina.ai"), ("essa_awan", "essa@sglowina.ai")]:
+                cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (adm,))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                   (adm, mail, h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+                else:
+                    cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = ?", (h_admin, adm))
+                               
+            h_saba = hash_password("1234")
+            cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                               ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", 5000, "Admin", "2026-07-21"))
+            else:
+                cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = ?", (h_saba, "saba_wahid"))
+                               
+            conn.commit()
+        except Exception:
+            pass
+        finally:
+            conn.close()
+    return True
 
 init_db_v21()
 
@@ -325,55 +334,68 @@ init_db_v21()
 def register_saas_user(username, email, password):
     username = username.strip().lower()
     email = email.strip().lower()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        h = hash_password(password)
-        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                       (username, email, h, 'Free', 50, 'User', time.strftime("%Y-%m-%d")))
-        conn.commit()
-        return True, "User registered successfully!"
-    except Exception:
-        return False, "Username or Email already exists."
-    finally:
-        conn.close()
+    with db_lock:
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            h = hash_password(password)
+            cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                           (username, email, h, 'Free', 50, 'User', time.strftime("%Y-%m-%d")))
+            conn.commit()
+            return True, "User registered successfully!"
+        except Exception:
+            return False, "Username or Email already exists."
+        finally:
+            conn.close()
 
 def authenticate_user(username, password):
     username = username.strip().lower()
     password = password.strip()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT password_hash FROM users WHERE LOWER(username) = LOWER(?)", (username,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return verify_password(password, row['password_hash'])
-    return False
+    with db_lock:
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT password_hash FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+            row = cursor.fetchone()
+            if row:
+                return verify_password(password, row['password_hash'])
+            return False
+        finally:
+            conn.close()
 
 def get_user_data(username):
     username = username.strip().lower()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,))
-    row = cursor.fetchone()
-    conn.close()
-    return row
+    with db_lock:
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+            row = cursor.fetchone()
+            return row
+        finally:
+            conn.close()
 
 def deduct_user_credits(username, amount):
     username = username.strip().lower()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE LOWER(username) = LOWER(?)", (amount, username))
-    conn.commit()
-    conn.close()
+    with db_lock:
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE LOWER(username) = LOWER(?)", (amount, username))
+            conn.commit()
+        finally:
+            conn.close()
 
 def log_credit_usage(user_id, action, used, balance):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO credits_history (user_id, action, credits_used, balance_after, date) VALUES (?, ?, ?, ?, ?)",
-                   (user_id, action, used, balance, time.strftime("%Y-%m-%d %H:%M:%S")))
-    conn.commit()
-    conn.close()
+    with db_lock:
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO credits_history (user_id, action, credits_used, balance_after, date) VALUES (?, ?, ?, ?, ?)",
+                           (user_id, action, used, balance, time.strftime("%Y-%m-%d %H:%M:%S")))
+            conn.commit()
+        finally:
+            conn.close()
 
 def translate_ur_to_en_enhanced(text):
     try:
@@ -644,12 +666,15 @@ def render_master_video_pipeline(scenes_list, voice_code, ratio_choice, enable_s
             progress_bar.progress(1.0)
             status.success("🎉 Video Generated Successfully!")
             
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO projects (id, user_id, project_name, type, file_path, prompt, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                           (u_id, user_id, f"Video {u_id}", "Video", out_name, " | ".join(generated_prompts), time.strftime("%Y-%m-%d %H:%M:%S")))
-            conn.commit()
-            conn.close()
+            with db_lock:
+                conn = get_db_connection()
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("INSERT INTO projects (id, user_id, project_name, type, file_path, prompt, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+                                   (u_id, user_id, f"Video {u_id}", "Video", out_name, " | ".join(generated_prompts), time.strftime("%Y-%m-%d %H:%M:%S")))
+                    conn.commit()
+                finally:
+                    conn.close()
             
             deduct_user_credits(st.session_state.logged_in_user, 15)
             log_credit_usage(user_id, "Video Generation", 15, user_db['credits'] - 15)
@@ -981,17 +1006,18 @@ with tab_enterprise:
             p_amount = st.number_input("Amount Sent (PKR):", min_value=500.0, value=1000.0, step=100.0)
             if st.form_submit_button("Submit Payment Proof 🚀"):
                 if p_trx_id.strip():
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    try:
-                        cursor.execute("INSERT INTO local_payments (id, username, method, trx_id, amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                       (str(uuid.uuid4())[:8], u_db['username'], p_method, p_trx_id.strip(), p_amount, 'Pending', time.strftime("%Y-%m-%d %H:%M:%S")))
-                        conn.commit()
-                        st.success("Payment submitted! Administrator will verify and credit your coins.")
-                    except sqlite3.IntegrityError:
-                        st.error("This TrxID has already been submitted.")
-                    finally:
-                        conn.close()
+                    with db_lock:
+                        conn = get_db_connection()
+                        try:
+                            cursor = conn.cursor()
+                            cursor.execute("INSERT INTO local_payments (id, username, method, trx_id, amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                           (str(uuid.uuid4())[:8], u_db['username'], p_method, p_trx_id.strip(), p_amount, 'Pending', time.strftime("%Y-%m-%d %H:%M:%S")))
+                            conn.commit()
+                            st.success("Payment submitted! Administrator will verify and credit your coins.")
+                        except sqlite3.IntegrityError:
+                            st.error("This TrxID has already been submitted.")
+                        finally:
+                            conn.close()
     else:
         st.warning("Please sign in first.")
 
