@@ -2,3 +2,5 @@ streamlit
 SpeechRecognition
 edge-tts
 pydub
+streamlit
+yt-dlp
