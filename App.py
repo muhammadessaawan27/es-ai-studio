@@ -1,16 +1,30 @@
 import os
 import subprocess
 import asyncio
+import json
+import urllib.request
+import urllib.parse
 import streamlit as st
 import speech_recognition as sr
 import edge_tts
-from googletrans import Translator
 
 # Page Setup
 st.set_page_config(page_title="ES AI Studio - 4K Slowed & Reverb Master", layout="wide")
 
 st.title("🎧 ES Studio: 4K Ultra HD & Slowed + Reverb Engine")
 st.write("گانے اور ویڈیوز کو کاپی رائٹ فری 'Slowed + Reverb' اور 4K سنیماٹک لک میں تبدیل کریں۔")
+
+# 1. Native Zero-Error Google Translate Function (No broken libraries)
+def translate_text(text, target_lang="ur"):
+    try:
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target_lang}&dt=t&q={urllib.parse.quote(text)}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        response = urllib.request.urlopen(req)
+        data = json.loads(response.read().decode("utf-8"))
+        translated = "".join([sentence[0] for sentence in data[0] if sentence[0]])
+        return translated if translated else text
+    except Exception:
+        return text
 
 # Sidebar Controls
 st.sidebar.header("🎛️ ماسٹرنگ سیٹنگز")
@@ -20,7 +34,7 @@ engine_mode = st.sidebar.selectbox(
     "1. موڈ منتخب کریں:",
     [
         "🔥 4K Aesthetic + Slowed & Reverb (گانے اور فلمیں)",
-        "⚡ 4K Crystal Clear (صرف ویڈیو کوالٹی اور ہلکا اینٹی کاپی رائٹ)",
+        "⚡ 4K Crystal Clear (صرف ویڈیو کوالٹی اور اینٹی کاپی رائٹ)",
         "🎙️ مکمل AI اردو / انگلش ڈبنگ"
     ]
 )
@@ -49,7 +63,7 @@ async def generate_tts(text, voice, output_audio_path):
     await communicate.save(output_audio_path)
 
 def process_dubbing(input_video_path, target_lang):
-    st.info("🎙️ آڈیو اسکین اور AI ٹرانسلیشن جاری ہے...")
+    st.info("🎙️ آڈیو اسکین اور AI ڈبنگ تیار ہو رہی ہے...")
     extracted_audio = "temp_extracted.wav"
     subprocess.run(["ffmpeg", "-y", "-i", input_video_path, "-vn", "-ar", "16000", "-ac", "1", extracted_audio], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
@@ -60,22 +74,15 @@ def process_dubbing(input_video_path, target_lang):
             audio_data = recognizer.record(source)
             transcribed_text = recognizer.recognize_google(audio_data)
     except Exception:
-        transcribed_text = "Awesome action sequence sound"
+        transcribed_text = "Action sequence sound"
     
-    translator = Translator()
     dubbed_audio_file = "dubbed_voice.mp3"
     
     if target_lang == "ur":
-        try:
-            translated = translator.translate(transcribed_text, dest="ur").text
-        except Exception:
-            translated = transcribed_text
+        translated = translate_text(transcribed_text, "ur")
         asyncio.run(generate_tts(translated, "ur-PK-AsadNeural", dubbed_audio_file))
     else:
-        try:
-            translated = translator.translate(transcribed_text, dest="en").text
-        except Exception:
-            translated = transcribed_text
+        translated = translate_text(transcribed_text, "en")
         asyncio.run(generate_tts(translated, "en-US-ChristopherNeural", dubbed_audio_file))
         
     return dubbed_audio_file
@@ -132,4 +139,4 @@ if uploaded_file is not None:
                         data=file,
                         file_name="4k_slowed_reverb_master.mp4",
                         mime="video/mp4"
-                      )
+    )
