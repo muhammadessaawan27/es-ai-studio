@@ -1,6 +1,4 @@
 streamlit
-SpeechRecognition
-edge-tts
-pydub
-streamlit
+imageio-ffmpeg
 yt-dlp
+requests
