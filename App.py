@@ -132,6 +132,8 @@ active_renderers = 0
 render_lock = threading.Lock()
 db_lock = threading.Lock()
 
+DB_NAME = "sglowina_v25_master.db"
+
 def make_even(val):
     return int(val) if int(val) % 2 == 0 else int(val) + 1
 
@@ -143,20 +145,15 @@ def verify_password(password, hashed):
     salt = b"sglowina_saas_salt_1234"
     return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000).hex() == hashed
 
-def get_public_url(uploaded_file):
-    try:
-        file_bytes = uploaded_file.getvalue()
-        url = "https://tmpfiles.org/api/v1/upload"
-        files = {'file': (uploaded_file.name, file_bytes, uploaded_file.type)}
-        res = requests.post(url, files=files, timeout=12)
-        if res.status_code == 200:
-            data = res.json()
-            if data.get("status") == "success":
-                temp_url = data["data"]["url"]
-                return temp_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
-    except Exception:
-        pass
-    return None
+def get_mood_music_url(full_story_text):
+    text = full_story_text.lower()
+    if any(k in text for k in ["خوفناک", "خوف", "ڈر", "قبر", "موت", "جن", "بھوت", "تاریک", "horror", "scary", "ghost", "dark", "death", "grave", "blood", "haunted"]):
+        return "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"  # Dark Ambient / Mystery
+    elif any(k in text for k in ["جنگ", "تلوار", "بادشاہ", "لڑائی", "دشمن", "میدان", "فتح", "war", "sword", "battle", "fight", "king", "epic", "warrior", "army"]):
+        return "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"  # Cinematic Epic Orchestral
+    elif any(k in text for k in ["اللہ", "نبی", "رسول", "مسجد", "دعا", "سکون", "روحانی", "peace", "holy", "divine", "prayer", "spiritual", "nature", "forest"]):
+        return "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"  # Serene Soft Ambient
+    return "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"  # Neutral Melodic Background
 
 def burn_viral_subtitles(img_path, caption_text, is_vertical=True):
     try:
@@ -167,7 +164,7 @@ def burn_viral_subtitles(img_path, caption_text, is_vertical=True):
             txt_layer = Image.new("RGBA", im.size, (255, 255, 255, 0))
             draw = ImageDraw.Draw(txt_layer)
             
-            font_size = max(26, int(im.width / (20 if is_vertical else 30)))
+            font_size = max(24, int(im.width / (22 if is_vertical else 34)))
             try:
                 font = ImageFont.truetype("arial.ttf", font_size)
             except Exception:
@@ -176,11 +173,11 @@ def burn_viral_subtitles(img_path, caption_text, is_vertical=True):
             words = caption_text.strip().split()
             lines = []
             curr_line = []
-            max_words_per_line = 5 if is_vertical else 9
+            max_words = 4 if is_vertical else 8
             
             for w in words:
                 curr_line.append(w)
-                if len(curr_line) >= max_words_per_line:
+                if len(curr_line) >= max_words:
                     lines.append(" ".join(curr_line))
                     curr_line = []
             if curr_line:
@@ -192,14 +189,14 @@ def burn_viral_subtitles(img_path, caption_text, is_vertical=True):
             text_h = bbox[3] - bbox[1]
             
             x = (im.width - text_w) // 2
-            y = int(im.height * 0.72) if is_vertical else (im.height - text_h - 50)
+            y = int(im.height * 0.72) if is_vertical else (im.height - text_h - 40)
             
-            pad = 18
+            pad = 16
             draw.rounded_rectangle(
                 [(x - pad, y - pad), (x + text_w + pad, y + text_h + pad)],
                 radius=14,
-                fill=(0, 0, 0, 180),
-                outline=(245, 158, 11, 220),
+                fill=(0, 0, 0, 190),
+                outline=(245, 158, 11, 230),
                 width=2
             )
             
@@ -210,7 +207,7 @@ def burn_viral_subtitles(img_path, caption_text, is_vertical=True):
         pass
 
 # ==========================================
-# 3. THREAD-SAFE DATABASE LAYER (POSTGRESQL & SQLITE WAL)
+# 3. THREAD-SAFE DATABASE LAYER
 # ==========================================
 def get_db_connection():
     pg_url = os.environ.get("DATABASE_URL")
@@ -220,7 +217,7 @@ def get_db_connection():
             return psycopg2.connect(pg_url)
         except Exception:
             pass
-    conn = sqlite3.connect("sglowina_saas_v21.db", check_same_thread=False, timeout=60.0)
+    conn = sqlite3.connect(DB_NAME, check_same_thread=False, timeout=60.0)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA journal_mode=WAL;")
@@ -230,7 +227,7 @@ def get_db_connection():
     return conn
 
 @st.cache_resource
-def init_db_v21():
+def init_db_v25():
     with db_lock:
         conn = get_db_connection()
         try:
@@ -251,6 +248,23 @@ def init_db_v21():
                     created_at TEXT
                 )
             """)
+            
+            if is_sqlite:
+                cursor.execute("PRAGMA table_info(users)")
+                existing_cols = [row[1] for row in cursor.fetchall()]
+                for col_name, col_def in [
+                    ("plan", "TEXT DEFAULT 'Free'"),
+                    ("credits", "INTEGER DEFAULT 50"),
+                    ("role", "TEXT DEFAULT 'User'"),
+                    ("status", "TEXT DEFAULT 'Active'"),
+                    ("created_at", "TEXT")
+                ]:
+                    if col_name not in existing_cols:
+                        try:
+                            cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def};")
+                        except Exception:
+                            pass
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS projects (
                     id TEXT PRIMARY KEY,
@@ -304,20 +318,26 @@ def init_db_v21():
             
             h_admin = hash_password("786")
             for adm, mail in [("essasaba", "essasaba@sglowina.ai"), ("essa_awan", "essa@sglowina.ai")]:
-                cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (adm,))
-                if cursor.fetchone()[0] == 0:
-                    cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                   (adm, mail, h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
-                else:
-                    cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = ?", (h_admin, adm))
+                try:
+                    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (adm,))
+                    if cursor.fetchone()[0] == 0:
+                        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                       (adm, mail, h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+                    else:
+                        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = ?", (h_admin, adm))
+                except Exception:
+                    pass
                                
             h_saba = hash_password("1234")
-            cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
-            if cursor.fetchone()[0] == 0:
-                cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                               ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", 5000, "Admin", "2026-07-21"))
-            else:
-                cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = ?", (h_saba, "saba_wahid"))
+            try:
+                cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                   ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", 5000, "Admin", "2026-07-21"))
+                else:
+                    cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = ?", (h_saba, "saba_wahid"))
+            except Exception:
+                pass
                                
             conn.commit()
         except Exception:
@@ -326,7 +346,7 @@ def init_db_v21():
             conn.close()
     return True
 
-init_db_v21()
+init_db_v25()
 
 # ==========================================
 # 4. AUTH & USAGE HELPERS
@@ -399,35 +419,24 @@ def log_credit_usage(user_id, action, used, balance):
 
 def translate_ur_to_en_enhanced(text):
     try:
-        instruction = "Translate this Urdu story scene into an English visual prompt for AI video. Output ONLY the visual prompt."
-        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' ' + text)}?model=openai"
-        res = session.get(url, timeout=12)
+        instruction = (
+            "Translate this story sentence into a detailed Hollywood visual prompt for AI image generation. "
+            "Make it atmospheric, descriptive and visually stunning. Output ONLY the visual prompt in English."
+        )
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Scene: ' + text)}?model=openai"
+        res = session.get(url, timeout=15)
         if res.status_code == 200 and len(res.text) > 5:
             return res.text.strip()
     except Exception:
         pass
-    return text
-
-def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
-    combined_text = (scene_text_en + " " + scene_text_ur).lower()
-    spiritual_keywords = [
-        "prophet", "sahaba", "saint", "angel", "god", "allah", "messenger", "nooh", "musa", "isa", "ibrahim", "yousuf", "muhammad", 
-        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "غوث", "قطب", "امام"
-    ]
-    if any(k in combined_text for k in spiritual_keywords):
-        safe_prompt = (
-            "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light emanating from the heavens, "
-            "sacred light beam, peaceful glowing ancient background, majestic natural mountains. STRICTLY NO human faces, NO human figures."
-        )
-        return True, safe_prompt
-    return False, scene_text_en
+    return f"Cinematic ultra-realistic visual scene representing: {text}, 8k resolution, photorealistic"
 
 def generate_faceless_script(niche, topic, language):
     try:
         instruction = (
-            f"You are a viral YouTube Shorts and TikTok content creator. Generate a 4-scene viral short video script about '{topic}' in the niche '{niche}'.\n"
+            f"You are an expert viral content creator. Write a 4-scene suspenseful script about '{topic}' in the niche '{niche}'.\n"
             f"Language: {language}.\n"
-            "Format your output strictly with 4 lines separated by newlines. Each line must be a single powerful narration sentence."
+            "Format: Exactly 4 lines separated by newlines. Each line must be a powerful narration sentence."
         )
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction)}?model=openai"
         res = session.get(url, timeout=15)
@@ -439,16 +448,16 @@ def generate_faceless_script(niche, topic, language):
         pass
     if language == "Urdu":
         return [
-            f"کیا آپ جانتے ہیں کہ {topic} کے پیچھے کیا راز چھپا ہے؟",
-            "تاریخ کے اوراق پلٹیں تو اس کے ایسے حیران کن حقائق ملتے ہیں جو ہوش اڑا دیتے ہیں۔",
-            "اس کے بارے میں جاننے کے بعد لوگ حیران رہ گئے۔",
-            "مزید ایسی پراسرار معلومات کے لیے ہمارے ساتھ جڑے رہیں۔"
+            f"کیا آپ جانتے ہیں کہ {topic} کے پیچھے کیا خوفناک راز چھپا ہے؟",
+            "رات کے اندھیرے میں جب سب سو رہے تھے تو ایک پراسرار واقعہ پیش آیا۔",
+            "عینی شاہدین کے مطابق اس منظر نے سب کے دل دہلا دیے۔",
+            "مزید ایسے ہوش اڑا دینے والے واقعات کے لیے ہمارے ساتھ جڑے رہیں۔"
         ]
     return [
-        f"Did you know the incredible hidden truth behind {topic}?",
-        "When we look into history, the shocking facts leave everyone speechless.",
-        "Experts could hardly believe what they discovered.",
-        "Follow for more mind-blowing daily facts!"
+        f"Did you know the terrifying hidden mystery behind {topic}?",
+        "In the dead of the night, something unimaginable took place.",
+        "Witnesses could hardly believe what was unfolding before their eyes.",
+        "Follow for more mind-blowing viral mysteries!"
     ]
 
 def apply_blurred_background_padding(img_path, target_w, target_h):
@@ -473,31 +482,43 @@ def apply_blurred_background_padding(img_path, target_w, target_h):
     except Exception:
         pass
 
-def parallel_download_flux_images(urls, paths):
-    def download_single(url, path):
+def download_single_flux_image(prompt, path, w, h):
+    clean_p = urllib.parse.quote(prompt[:300])
+    seed = random.randint(1, 999999)
+    urls = [
+        f"https://image.pollinations.ai/prompt/{clean_p}?width={w}&height={h}&seed={seed}&nologo=true&model=flux",
+        f"https://image.pollinations.ai/prompt/{clean_p}?width={w}&height={h}&seed={seed}&nologo=true",
+        f"https://image.pollinations.ai/prompt/cinematic%20atmospheric%20scene%20{clean_p[:100]}?width={w}&height={h}&seed={seed}&nologo=true"
+    ]
+    for url in urls:
         try:
-            res = session.get(url, timeout=35)
-            if res.status_code == 200 and len(res.content) > 5000:
+            res = session.get(url, timeout=25)
+            if res.status_code == 200 and len(res.content) > 8000:
                 with open(path, "wb") as f:
                     f.write(res.content)
                 return True
         except Exception:
-            pass
-        try:
-            im = Image.new("RGB", (1280, 720), color=(15, 23, 42))
-            im.save(path, "JPEG")
-            return True
-        except Exception:
-            return False
+            continue
+            
+    try:
+        # High quality gradient fallback image if all network calls fail (NEVER pure black)
+        im = Image.new("RGB", (w, h), color=(25, 20, 35))
+        draw = ImageDraw.Draw(im)
+        draw.rectangle([(0, int(h*0.6)), (w, h)], fill=(40, 30, 55))
+        im.save(path, "JPEG")
+        return True
+    except Exception:
+        return False
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(download_single, urls[i], paths[i]) for i in range(len(urls))]
+def parallel_download_flux_images(prompts, paths, w, h):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(download_single_flux_image, prompts[i], paths[i], w, h) for i in range(len(prompts))]
         concurrent.futures.wait(futures)
 
-def apply_camera_motion_v40(img_path, motion_idx, duration, w, h):
+def apply_camera_motion_v40(img_path, motion_choice, duration, w, h):
     try:
         if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
-            Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
+            download_single_flux_image("cinematic atmospheric scenery", img_path, w, h)
             
         scale_factor = 1.25
         base_clip = safe_duration(ImageClip(img_path), duration)
@@ -505,12 +526,14 @@ def apply_camera_motion_v40(img_path, motion_idx, duration, w, h):
         cw, ch = int(w * scale_factor), int(h * scale_factor)
         clip = safe_resize(base_clip, (cw, ch))
         
-        if motion_idx % 3 == 0:
-            animated_clip = safe_position(safe_resize(clip, lambda t: 1.0 + 0.12 * (t / max(duration, 0.1))), 'center')
-        elif motion_idx % 3 == 1:
+        if motion_choice == "Zoom In":
+            animated_clip = safe_position(safe_resize(clip, lambda t: 1.0 + 0.15 * (t / max(duration, 0.1))), 'center')
+        elif motion_choice == "Pan Left":
             animated_clip = safe_position(clip, lambda t: (int((w - cw) * (t / max(duration, 0.1))), 'center'))
+        elif motion_choice == "Pan Right":
+            animated_clip = safe_position(clip, lambda t: (int((w - cw) * (1 - t / max(duration, 0.1))), 'center'))
         else:
-            animated_clip = safe_position(safe_resize(clip, lambda t: 1.12 - 0.12 * (t / max(duration, 0.1))), 'center')
+            animated_clip = safe_position(safe_resize(clip, lambda t: 1.15 - 0.15 * (t / max(duration, 0.1))), 'center')
 
         comp = CompositeVideoClip([animated_clip], size=(w, h))
         return safe_duration(comp, duration)
@@ -532,7 +555,7 @@ def save_audio_safe(text, voice, rate, pitch, filename):
 # ==========================================
 # 5. MASTER UNIVERSAL VIDEO RENDER ENGINE
 # ==========================================
-def render_master_video_pipeline(scenes_list, voice_code, ratio_choice, enable_subtitles=True, enable_bg=True, is_faceless=False):
+def render_master_video_pipeline(scenes_list, voice_code, rate_val, pitch_val, ratio_choice, motion_choice="Zoom Out (v40 Default)", enable_subtitles=True, enable_bg=True, is_faceless=False):
     u_id = str(uuid.uuid4())[:8]
     
     global active_renderers
@@ -567,7 +590,7 @@ def render_master_video_pipeline(scenes_list, voice_code, ratio_choice, enable_s
             
         try:
             progress_bar.progress(0.10)
-            status.info("🎙️ Synthesizing Neural Voices (Edge-TTS)...")
+            status.info(f"🎙️ Synthesizing Voice (Pitch: {pitch_val}, Speed: {rate_val})...")
             
             for idx, scene in enumerate(scenes_list):
                 v_code = voice_code
@@ -577,15 +600,16 @@ def render_master_video_pipeline(scenes_list, voice_code, ratio_choice, enable_s
                     v_code = "ur-PK-AsadNeural"
                     
                 sub_audio = f"a_{u_id}_{idx}.mp3"
-                save_audio_safe(scene, v_code, "+0%", "+0Hz", sub_audio)
+                save_audio_safe(scene, v_code, rate_val, pitch_val, sub_audio)
                 temporary_audio_tracks.append(sub_audio)
                 
             progress_bar.progress(0.25)
             if enable_bg:
-                status.info("🎵 Mixing Atmospheric Soundtracks...")
-                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+                full_text = " ".join(scenes_list)
+                bg_url = get_mood_music_url(full_text)
+                status.info("🎵 Mixing Mood-Matched Atmospheric Soundtracks...")
                 try:
-                    res_bg = session.get(bg_url, timeout=8)
+                    res_bg = session.get(bg_url, timeout=10)
                     if res_bg.status_code == 200:
                         with open(bg_music_f, 'wb') as f:
                             f.write(res_bg.content)
@@ -602,27 +626,22 @@ def render_master_video_pipeline(scenes_list, voice_code, ratio_choice, enable_s
             w, h = make_even(w), make_even(h)
             is_vertical = (h > w)
             
-            flux_prompt_urls = []
             img_paths = []
             
             for i, scene in enumerate(scenes_list):
                 en_prompt = translate_ur_to_en_enhanced(scene)
                 generated_prompts.append(en_prompt)
-                
-                w_t, h_t = make_even(w * 1.2), make_even(h * 1.2)
-                img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(en_prompt + ', 8k cinematic hyperrealistic') }?width={w_t}&height={h_t}&seed={random.randint(1,99999)}&nologo=true&model=flux"
-                flux_prompt_urls.append(img_url)
-                
                 img_p = f"i_{u_id}_{i}.jpg"
                 img_paths.append(img_p)
                 generated_images.append(img_p)
                 
             progress_bar.progress(0.45)
-            status.info("🎨 Rendering Photorealistic Cinematic Visuals...")
-            parallel_download_flux_images(flux_prompt_urls, img_paths)
+            status.info("🎨 Rendering High-Definition Visual Scenes (No Black Screens)...")
+            w_t, h_t = make_even(w * 1.2), make_even(h * 1.2)
+            parallel_download_flux_images(generated_prompts, img_paths, w_t, h_t)
             
             progress_bar.progress(0.70)
-            status.info("🎞️ Stitching Motion Frames & Viral Subtitles...")
+            status.info("🎞️ Stitching Motion & Styling Subtitles...")
             
             clips = []
             for i, scene in enumerate(scenes_list):
@@ -636,20 +655,20 @@ def render_master_video_pipeline(scenes_list, voice_code, ratio_choice, enable_s
                 voice_clip = AudioFileClip(sub_audio)
                 dur = max(voice_clip.duration, 1.8)
                 
-                anim_clip = apply_camera_motion_v40(img_p, i, dur, w, h)
+                anim_clip = apply_camera_motion_v40(img_p, motion_choice, dur, w, h)
                 anim_clip = safe_audio(anim_clip, voice_clip)
                 anim_clip = safe_fadeout(safe_fadein(anim_clip, 0.25), 0.25)
                 clips.append(anim_clip)
                 
             progress_bar.progress(0.88)
-            status.info("🚀 Assembling Master Render MP4...")
+            status.info("🚀 Assembling Master Render Video...")
             
             final_video = concatenate_videoclips(clips, method="compose")
             final_video = safe_resize(final_video, (w, h))
             
             if has_bg_music and os.path.exists(bg_music_f):
                 try:
-                    bg_clip = safe_volume(AudioFileClip(bg_music_f), 0.05)
+                    bg_clip = safe_volume(AudioFileClip(bg_music_f), 0.06)
                     bg_clip = safe_duration(bg_clip, final_video.duration)
                     final_video = safe_audio(final_video, CompositeAudioClip([final_video.audio, bg_clip]))
                 except Exception:
@@ -772,7 +791,7 @@ with tab_auth:
 # -----------------
 with tab_faceless:
     st.write("### ⚡ 1-Click Automated Viral Faceless Shorts Generator")
-    st.info("💡 صرف عنوان لکھیں، AI خودکار اسکرپٹ، نیورل وائس، 8K امیجز، اور ٹک ٹاک اسٹائل سب ٹائٹلز کے ساتھ پوری شارٹ ویڈیو تیار کرے گا!")
+    st.info("💡 صرف عنوان لکھیں، AI خودکار سکرپٹ، بھاری آواز، 8K HD سینز، اور ٹک ٹاک اسٹائل سب ٹائٹلز کے ساتھ پوری ویڈیو تیار کرے گا!")
     
     fc1, fc2, fc3 = st.columns(3)
     with fc1:
@@ -793,18 +812,43 @@ with tab_faceless:
             "en-US-JennyNeural (English Female)"
         ])
 
-    f_topic = st.text_input("Enter Topic / Concept (ویڈیو کا عنوان لکھیں):", placeholder="مثال: بحیرہ برمودا کا خوفناک سچ یا کائنات کے پراسرار سیارے")
+    sc1, sc2, sc3 = st.columns(3)
+    with sc1:
+        f_speed = st.selectbox("Shorts Voice Speed (رفتار):", ["+0% (Normal)", "-10% (Slow)", "+10% (Fast)", "-20% (Very Slow)"], key="f_spd")
+    with sc2:
+        f_pitch = st.selectbox("Shorts Voice Pitch (آواز کا بھاری پن):", [
+            "Deep (مردانہ بھاری آواز)",
+            "Very Deep (انتہائی موٹی/ہارر آواز)",
+            "Normal (نارمل)",
+            "High (پتلی آواز)"
+        ], key="f_ptch")
+    with sc3:
+        f_motion = st.selectbox("Camera Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right"], key="f_mot")
+
+    f_topic = st.text_input("Enter Topic / Concept (ویڈیو کا عنوان لکھیں):", placeholder="مثال: بحیرہ برمودا کا خوفناک سچ یا تاریک جنگل کا بھوت")
     f_subtitles = st.checkbox("Burn TikTok-Style Glowing Subtitles (ویڈیو پر الفاظ لکھے جائیں) 🔤", value=True)
     
     if st.button("Generate 1-Click Viral Short 🚀"):
         if f_topic.strip():
             with st.spinner("⚡ AI is generating viral script, voice, visual frames, and subtitles..."):
+                pitch_map = {
+                    "Deep (مردانہ بھاری آواز)": "-15Hz",
+                    "Very Deep (انتہائی موٹی/ہارر آواز)": "-28Hz",
+                    "Normal (نارمل)": "+0Hz",
+                    "High (پتلی آواز)": "+15Hz"
+                }
+                speed_clean = f_speed.split(" ")[0]
+                pitch_clean = pitch_map.get(f_pitch, "+0Hz")
                 v_code_clean = f_voice.split(" ")[0]
+                
                 script_lines = generate_faceless_script(f_niche, f_topic, f_lang)
                 v_out = render_master_video_pipeline(
                     scenes_list=script_lines,
                     voice_code=v_code_clean,
+                    rate_val=speed_clean,
+                    pitch_val=pitch_clean,
                     ratio_choice="TikTok/Reels (9:16)",
+                    motion_choice=f_motion,
                     enable_subtitles=f_subtitles,
                     enable_bg=enable_bg_music,
                     is_faceless=True
@@ -821,23 +865,45 @@ with tab_faceless:
 # TAB 3: PRO MOVIE STUDIO (MANUAL SCRIPT)
 # -----------------
 with tab_movie:
-    st.write("### 🎬 Pro Master Studio (Full Manual Script)")
-    m_script = st.text_area("Enter Movie Script (Urdu/English):", height=130, placeholder="مثال: ایک کسان شام کے وقت ٹریکٹر چلا رہا تھا۔ اچانک آسمان پر گرج چمک شروع ہو گئی۔")
+    st.write("### 🎬 Pro Master Studio (Full Manual Script & Complete Voice Controls)")
+    m_script = st.text_area("Enter Movie Script (Urdu/English):", height=130, placeholder="مثال: رات کا وقت تھا اور جنگل میں شدید بارش اور طوفان شروع ہو گیا تھا۔ عیسیٰ نے اپنی تلوار نکالی اور دشمن کا مقابلہ کیا۔")
     
-    col_v1, col_v2, col_v3 = st.columns(3)
-    with col_v1: mv = st.selectbox("Voice:", ["ur-PK-AsadNeural (Male)", "ur-PK-UzmaNeural (Female)"])
-    with col_v2: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    with col_v3: m_sub = st.checkbox("Include Text Overlay", value=True)
+    col_v1, col_v2, col_v3, col_v4, col_v5 = st.columns(5)
+    with col_v1: mv = st.selectbox("Voice Actor:", ["ur-PK-AsadNeural (Male)", "ur-PK-UzmaNeural (Female)"])
+    with col_v2: mv_rate = st.selectbox("Speed (رفتار):", ["+0% (Normal)", "-10% (Slow)", "+10% (Fast)", "-20% (Very Slow)"])
+    with col_v3: mv_pitch = st.selectbox("Pitch (آواز کا بھاری پن):", [
+        "Deep (مردانہ بھاری آواز)",
+        "Very Deep (انتہائی موٹی/ہارر آواز)",
+        "Normal (نارمل)",
+        "High (پتلی آواز)"
+    ])
+    with col_v4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
+    with col_v5: camera_motion = st.selectbox("Motion:", ["Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right"])
+    
+    m_sub = st.checkbox("Include Caption Overlay", value=True, key="m_sub_check")
     
     if st.button("Generate Custom Movie 🎥"):
         if m_script.strip():
-            with st.spinner("🎬 Rendering Custom Film..."):
+            with st.spinner("🎬 Rendering Custom Film with Voice Modulation..."):
+                pitch_map = {
+                    "Deep (مردانہ بھاری آواز)": "-15Hz",
+                    "Very Deep (انتہائی موٹی/ہارر آواز)": "-28Hz",
+                    "Normal (نارمل)": "+0Hz",
+                    "High (پتلی آواز)": "+15Hz"
+                }
+                rate_val = mv_rate.split(" ")[0]
+                pitch_val = pitch_map.get(mv_pitch, "+0Hz")
+                
                 sentences = [s.strip() for s in re.split(r'[۔.!]', m_script) if len(s.strip()) > 3]
                 if not sentences: sentences = [m_script]
+                
                 v_res = render_master_video_pipeline(
                     scenes_list=sentences,
                     voice_code=mv.split(" ")[0],
+                    rate_val=rate_val,
+                    pitch_val=pitch_val,
                     ratio_choice=mr,
+                    motion_choice=camera_motion,
                     enable_subtitles=m_sub,
                     enable_bg=enable_bg_music,
                     is_faceless=False
@@ -851,7 +917,7 @@ with tab_movie:
             st.warning("Please enter a script.")
 
 # -----------------
-# TAB 4: LIVE AR COMPANION (MUSE AI) - VISION FIXED
+# TAB 4: LIVE AR COMPANION (MUSE AI)
 # -----------------
 with tab_companion:
     st.write("### 🧸 Live Camera AR Companion")
