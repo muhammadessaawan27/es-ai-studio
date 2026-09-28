@@ -1,12 +1,12 @@
 import os
 import subprocess
+import urllib.request
 import streamlit as st
-import yt_dlp
 
 st.set_page_config(page_title="ES Ultimate AI Studio", page_icon="🛡️", layout="wide")
 
 st.title("🛡️ ES الٹرا اینٹی کاپی رائٹ اسٹوڈیو")
-st.write("یوٹیوب اور میٹا کے خودکار Content ID کو بائی پاس کرنے والا ملٹی لیئر ویڈیو انجن۔")
+st.write("یوٹیوب اور میٹا کے Content ID کو بائی پاس کرنے والا ملٹی لیئر ویڈیو پروسیسر۔")
 
 if "process_ready" not in st.session_state:
     st.session_state.process_ready = False
@@ -20,28 +20,13 @@ tab1, tab2, tab3 = st.tabs([
 input_video = "input_master_video.mp4"
 output_video = "output_bypass_video.mp4"
 
-# Android Client Bypass for YouTube Bot Check
-def fetch_video(url):
+# Direct URL Downloader (Zero 403 Errors for Direct Links & Cloud Storage)
+def download_direct_url(url):
     if os.path.exists(input_video):
         os.remove(input_video)
-        
-    ydl_opts = {
-        'format': 'best[ext=mp4]/best',
-        'outtmpl': input_video,
-        'quiet': True,
-        'no_warnings': True,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android', 'ios', 'web_creator']
-            }
-        },
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-            'Accept-Language': 'en-US,en;q=0.9',
-        }
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req) as response, open(input_video, "wb") as out_file:
+        out_file.write(response.read())
 
 # Advanced 7-Layer Anti-Copyright Video Filter
 def get_anti_copyright_filter(mode="canvas"):
@@ -65,13 +50,20 @@ with tab1:
         ]
     )
     
-    movie_url_tab1 = st.text_input("فلم کا لنک درج کریں (YouTube / Drive / Direct MP4):", key="t1_url")
+    source_type_1 = st.radio("ویڈیو کیسے دینی ہے؟", ["📁 اپنے موبائل/کمپیوٹر سے فائل اپلوڈ کریں", "🔗 ڈائریکٹ MP4 / کلاؤڈ لنک درج کریں"], key="src_t1")
     
-    if st.button("📥 لنک سے فلم حاصل کریں", key="t1_fetch"):
-        if movie_url_tab1:
-            with st.spinner("یوٹیوب بوٹ بائی پاس کر کے ویڈیو حاصل کی جا رہی ہے..."):
+    if source_type_1 == "📁 اپنے موبائل/کمپیوٹر سے فائل اپلوڈ کریں":
+        file_1 = st.file_uploader("مووی فائل منتخب کریں:", type=["mp4", "mkv", "mov", "webm"], key="f_t1")
+        if file_1 is not None:
+            with open(input_video, "wb") as f:
+                f.write(file_1.read())
+            st.success("✅ فائل کامیابی سے لوڈ ہو گئی!")
+    else:
+        url_1 = st.text_input("ڈائریکٹ MP4 / گوگل ڈرائیو لنک درج کریں:", placeholder="https://example.com/video.mp4", key="u_t1")
+        if url_1 and st.button("📥 لنک سے ویڈیو حاصل کریں", key="btn_u_t1"):
+            with st.spinner("ویڈیو سرور پر ڈاؤنلوڈ ہو رہی ہے..."):
                 try:
-                    fetch_video(movie_url_tab1)
+                    download_direct_url(url_1)
                     if os.path.exists(input_video):
                         st.success("✅ ویڈیو کامیابی سے ڈاؤنلوڈ ہو گئی!")
                 except Exception as e:
@@ -110,20 +102,27 @@ with tab2:
         
     start_min = 30 if "30" in scene_type else 45 if "45" in scene_type else 15 if "15" in scene_type else st.number_input("اسٹارٹ منٹ:", 0, 300, 10)
     
-    movie_url_tab2 = st.text_input("فلم کا لنک درج کریں:", key="t2_url")
-    if st.button("📥 لنک سے ویڈیو لوڈ کریں", key="t2_fetch"):
-        if movie_url_tab2:
+    source_type_2 = st.radio("ویڈیو کا ذریعہ:", ["📁 فائل اپلوڈ کریں", "🔗 ڈائریکٹ ویڈیو لنک"], key="src_t2")
+    
+    if source_type_2 == "📁 فائل اپلوڈ کریں":
+        file_2 = st.file_uploader("ویڈیو منتخب کریں:", type=["mp4", "mkv", "mov", "webm"], key="f_t2")
+        if file_2 is not None:
+            with open(input_video, "wb") as f:
+                f.write(file_2.read())
+            st.success("✅ فائل لوڈ ہو گئی!")
+    else:
+        url_2 = st.text_input("ڈائریکٹ MP4 لنک درج کریں:", key="u_t2")
+        if url_2 and st.button("📥 ڈاؤنلوڈ کریں", key="btn_u_t2"):
             with st.spinner("ویڈیو لوڈ ہو رہی ہے..."):
                 try:
-                    fetch_video(movie_url_tab2)
-                    if os.path.exists(input_video):
-                        st.success("✅ ویڈیو کامیابی سے ڈاؤنلوڈ ہو گئی!")
+                    download_direct_url(url_2)
+                    st.success("✅ ویڈیو تیار ہے!")
                 except Exception as e:
-                    st.error(f"❌ خرابی: {str(e)}")
+                    st.error(f"خرابی: {str(e)}")
 
     if os.path.exists(input_video):
         if st.button("🚀 کلپ کاٹیں اور اینٹی کاپی رائٹ لگائیں", type="primary", key="t2_run"):
-            with st.spinner("مخصوص منٹ سے کلپ کٹ کیا جا رہا ہے..."):
+            with st.spinner("کلپ کٹ کر کے فلٹرز لگائے جا رہے ہیں..."):
                 start_sec = start_min * 60
                 dur_sec = clip_len * 60
                 vf = "hflip,crop=iw*0.95:ih*0.95,eq=contrast=1.08:saturation=1.15,noise=alls=2:allf=t+u,vignette=PI/4"
@@ -152,7 +151,7 @@ with tab3:
     reverb_val = st.slider("گونج / Reverb:", 20, 80, 50, 5)
     bass_val = st.slider("بیس بوسٹ:", 0, 12, 6)
     
-    song_file = st.file_uploader("گانا یا ویڈیو سلیکٹ کریں:", type=["mp4", "mp3", "wav"])
+    song_file = st.file_uploader("گانا یا ویڈیو فائل منتخب کریں:", type=["mp4", "mp3", "wav"], key="s_f")
     if song_file is not None:
         with open("temp_song.mp4", "wb") as f:
             f.write(song_file.read())
@@ -166,11 +165,11 @@ with tab3:
 # Download Section
 if st.session_state.process_ready and os.path.exists(output_video):
     st.divider()
-    st.success("🎉 ویڈیو تیار ہے! نیچے سے ڈاؤنلوڈ کریں:")
+    st.success("🎉 ویڈیو مکمل تیار ہے! نیچے بٹن سے ڈاؤنلوڈ کریں:")
     st.video(output_video)
     with open(output_video, "rb") as f:
         st.download_button(
-            label="📥 یہاں کلک کر کے تیار شدہ ویڈیو ڈاؤنلوڈ کریں",
+            label="📥 تیار شدہ ویڈیو ڈاؤنلوڈ کریں",
             data=f,
             file_name="es_protected_media.mp4",
             mime="video/mp4",
