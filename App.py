@@ -826,7 +826,7 @@ with tab_movie:
             st.warning("Please enter a script.")
 
 # -----------------
-# TAB 4: LIVE AR COMPANION (MUSE AI)
+# TAB 4: LIVE AR COMPANION (MUSE AI) - VISION FIXED
 # -----------------
 with tab_companion:
     st.write("### 🧸 Live Camera AR Companion")
@@ -841,7 +841,7 @@ with tab_companion:
             #video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
             .hud { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; z-index: 10; }
             .badge { background: rgba(0,0,0,0.8); color: #10b981; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; border: 1px solid #10b981; }
-            .subs { position: absolute; bottom: 65px; left: 10px; right: 10px; background: rgba(15,23,42,0.9); color: #fff; padding: 8px 12px; border-radius: 10px; font-size: 13px; text-align: right; direction: rtl; z-index: 10; min-height: 40px; }
+            .subs { position: absolute; bottom: 65px; left: 10px; right: 10px; background: rgba(15,23,42,0.92); color: #fff; padding: 10px 14px; border-radius: 12px; font-size: 14px; text-align: right; direction: rtl; z-index: 10; min-height: 45px; border: 1px solid #f59e0b; line-height: 1.4; }
             .controls { position: absolute; bottom: 10px; left: 10px; right: 10px; display: flex; gap: 8px; z-index: 20; }
             .btn { flex: 1; background: linear-gradient(45deg, #f59e0b, #ec4899); color: #000; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 13px; }
             .overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 30; }
@@ -853,8 +853,8 @@ with tab_companion:
             <div class="hud"><div class="badge" id="lbl">READY</div><div style="color:#f59e0b; font-weight:bold; font-size:12px;">🧸 MUSE AI</div></div>
             <div class="subs" id="sub">کیمرہ کھولیں اور بٹن دبائیں، میں دیکھ کر بولوں گا!</div>
             <div class="controls" id="ctrl" style="display:none;">
-                <button class="btn" onclick="ask('اردو میں دیکھ کر بتاؤ یہ کیا ہے؟')">📸 دیکھ کر بتاؤ (اردو)</button>
-                <button class="btn" onclick="ask('Describe in English concisely.')">🌐 In English</button>
+                <button class="btn" onclick="ask('اردو میں دیکھ کر بتاؤ یہ کیا ہے اور کیسا دکھتا ہے؟')">📸 دیکھ کر بتاؤ (اردو)</button>
+                <button class="btn" onclick="ask('Describe what you see in concise English.')">🌐 In English</button>
             </div>
             <div class="overlay" id="startScr">
                 <h3 style="color:#fff; margin-bottom:10px;">🧸 MUSE Live Vision</h3>
@@ -862,9 +862,8 @@ with tab_companion:
             </div>
         </div>
         <canvas id="cvs" style="display:none;"></canvas>
-        <audio id="spk" autoplay></audio>
         <script>
-            let v = document.getElementById('video'), s = document.getElementById('startScr'), c = document.getElementById('ctrl'), sub = document.getElementById('sub'), lbl = document.getElementById('lbl'), aud = document.getElementById('spk');
+            let v = document.getElementById('video'), s = document.getElementById('startScr'), c = document.getElementById('ctrl'), sub = document.getElementById('sub'), lbl = document.getElementById('lbl');
             async function start() {
                 try {
                     s.style.display = 'none'; c.style.display = 'flex';
@@ -874,22 +873,50 @@ with tab_companion:
                 } catch(e){ alert("کیمرہ پرمیشن دیں: " + e.message); }
             }
             async function ask(p) {
-                lbl.innerText = "THINKING..."; sub.innerText = "سوچ رہا ہوں...";
+                lbl.innerText = "SEEING..."; sub.innerText = "👀 دیکھ رہا ہوں، ایک لمحہ...";
                 let cv = document.getElementById('cvs'); cv.width = v.videoWidth || 640; cv.height = v.videoHeight || 480;
                 cv.getContext('2d').drawImage(v, 0, 0, cv.width, cv.height);
-                let b64 = cv.toDataURL('image/jpeg', 0.75).split(',')[1];
+                let b64 = cv.toDataURL('image/jpeg', 0.8).split(',')[1];
                 try {
                     let r = await fetch("https://text.pollinations.ai/openai", {
                         method: "POST", headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ model: "openai", messages: [{ role: "user", content: [{ type: "text", text: "Look at this image. Answer in 2 short sweet sentences: " + p }, { type: "image_url", image_url: { url: "data:image/jpeg;base64," + b64 } }] }] })
+                        body: JSON.stringify({ 
+                            model: "openai-large", 
+                            messages: [{ 
+                                role: "user", 
+                                content: [
+                                    { type: "text", text: "You are looking at this camera snapshot. Describe directly in 2 natural sweet sentences in the requested language: " + p }, 
+                                    { type: "image_url", image_url: { url: "data:image/jpeg;base64," + b64 } }
+                                ] 
+                            }] 
+                        })
                     });
-                    let txt = await r.text();
-                    sub.innerText = "🧸: " + txt; speak(txt);
-                } catch(e) { sub.innerText = e.message; }
-                finally { lbl.innerText = "READY"; }
+                    let data = await r.json();
+                    let reply = "";
+                    if (data && data.choices && data.choices[0] && data.choices[0].message) {
+                        reply = data.choices[0].message.content;
+                    } else if (typeof data === "string") {
+                        reply = data;
+                    } else {
+                        reply = "میں نے منظر دیکھ لیا ہے لیکن وضاحت موصول نہیں ہو سکی۔";
+                    }
+                    reply = reply.replace(/<think>[\\s\\S]*?<\\/think>/g, '').trim();
+                    sub.innerText = "🧸: " + reply; 
+                    speak(reply);
+                } catch(e) { 
+                    sub.innerText = "ایرر: دوبارہ کوشش کریں۔"; 
+                } finally { 
+                    lbl.innerText = "READY"; 
+                }
             }
             function speak(t) {
-                try { aud.src = "https://text.pollinations.ai/" + encodeURIComponent(t.substring(0, 200)) + "?model=openai-audio"; aud.play(); } catch(e){}
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    let utter = new SpeechSynthesisUtterance(t);
+                    utter.lang = 'ur-PK';
+                    utter.rate = 1.0;
+                    window.speechSynthesis.speak(utter);
+                }
             }
         </script>
     </body>
