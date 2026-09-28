@@ -27,7 +27,7 @@ except ImportError:
     from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
 
 # ==========================================
-# BROWSER SESSION & CONSTANTS
+# BROWSER SESSION STABILITY HEADERS
 # ==========================================
 headers_browser = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -41,9 +41,9 @@ SGLOWINA_BIO = (
 )
 
 # ==========================================
-# STREAMLIT CONFIGURATION
+# STREAMLIT INITIALIZATION & GLOBAL STATES
 # ==========================================
-st.set_page_config(page_title="Sglowina AI - Autonomous Live Studio", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V3.8", layout="wide", page_icon="🎬")
 
 if "enable_watermark" not in st.session_state:
     st.session_state.enable_watermark = True
@@ -54,7 +54,7 @@ if "logged_in_user" not in st.session_state:
 if "msgs" not in st.session_state:
     st.session_state.msgs = []
 
-st.sidebar.subheader("🎬 Video & Audio Settings")
+st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=st.session_state.enable_watermark)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=st.session_state.enable_bg_music)
 
@@ -86,7 +86,8 @@ def get_public_url(uploaded_file):
             data = res.json()
             if data.get("status") == "success":
                 temp_url = data["data"]["url"]
-                return temp_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+                raw_url = temp_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+                return raw_url
     except Exception:
         pass
     return None
@@ -116,14 +117,15 @@ def apply_canva_typography(img_path, overlay_text):
         pass
 
 # ==========================================
-# DATABASE LAYER (PostgreSQL & SQLite WAL)
+# 2. DYNAMIC DATABASE LAYER (PostgreSQL & SQLite WAL)
 # ==========================================
 def get_db_connection():
     pg_url = os.environ.get("DATABASE_URL")
     if pg_url:
         try:
             import psycopg2
-            return psycopg2.connect(pg_url)
+            conn = psycopg2.connect(pg_url)
+            return conn
         except Exception:
             pass
     conn = sqlite3.connect("sglowina_saas_v21.db", check_same_thread=False, timeout=30.0)
@@ -137,6 +139,7 @@ def get_db_connection():
 def init_db_v21():
     conn = get_db_connection()
     cursor = conn.cursor()
+    
     is_sqlite = not hasattr(conn, "closed")
     serial_primary = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sqlite else "SERIAL PRIMARY KEY"
     
@@ -153,6 +156,7 @@ def init_db_v21():
             created_at TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS projects (
             id TEXT PRIMARY KEY,
@@ -165,6 +169,7 @@ def init_db_v21():
             is_favorite INTEGER DEFAULT 0
         )
     """)
+    
     cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS credits_history (
             id {serial_primary},
@@ -175,6 +180,7 @@ def init_db_v21():
             date TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS local_payments (
             id TEXT PRIMARY KEY,
@@ -186,6 +192,7 @@ def init_db_v21():
             created_at TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS characters (
             id TEXT PRIMARY KEY,
@@ -195,6 +202,7 @@ def init_db_v21():
             reference_data TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS scenes (
             id TEXT PRIMARY KEY,
@@ -205,6 +213,7 @@ def init_db_v21():
             camera_style TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS coupons (
             code TEXT PRIMARY KEY,
@@ -212,6 +221,7 @@ def init_db_v21():
             uses_left INTEGER
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS system_config (
             key TEXT PRIMARY KEY,
@@ -224,24 +234,37 @@ def init_db_v21():
         cursor.execute("INSERT INTO coupons (code, credits, uses_left) VALUES ('ESSASABA', 100, 1000)")
     
     h_admin = hash_password("786")
-    for u, e in [("essasaba", "essasaba@sglowina.ai"), ("essa_awan", "essa@sglowina.ai")]:
-        cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (u,))
-        if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                           (u, e, h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
-                           
+    
+    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'essasaba'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       ("essasaba", "essasaba@sglowina.ai", h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+    else:
+        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'essasaba'", (h_admin,))
+
+    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'essa_awan'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       ("essa_awan", "essa@sglowina.ai", h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+    else:
+        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'essa_awan'", (h_admin,))
+                       
     h_saba = hash_password("1234")
     cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                        ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", 5000, "Admin", "2026-07-21"))
+    else:
+        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'saba_wahid'", (h_saba,))
                        
     conn.commit()
     conn.close()
 
 init_db_v21()
 
-# Auth Helpers
+# ==========================================
+# 3. ENTERPRISE AUTHENTICATION HELPERS
+# ==========================================
 def register_saas_user(username, email, password):
     username = username.strip().lower()
     email = email.strip().lower()
@@ -282,6 +305,173 @@ def get_user_data(username):
 def deduct_user_credits(username, amount):
     username = username.strip().lower()
     conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE LOWER(username) = LOWER(?)", (amount, username))
+    conn.commit()
+    conn.close()
+
+def log_credit_usage(user_id, action, used, balance):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO credits_history (user_id, action, credits_used, balance_after, date) VALUES (?, ?, ?, ?, ?)",
+                   (user_id, action, used, balance, time.strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+
+# AI Director Analyzer
+def analyze_scene_for_director(scene_text):
+    text = scene_text.lower()
+    motion = "Zoom Out (v40 Default)"
+    lighting = "Volumetric Light"
+    color_grading = "Hollywood Cinematic"
+    composition = "Medium Shot, Rule of Thirds"
+    
+    if any(k in text for k in ["saba", "she", "her", "woman", "female", "girl"]):
+        composition = "Tight close-up portrait shot, extreme details of female face, emotional expression"
+        motion = "Push In"
+    elif any(k in text for k in ["essa", "he", "him", "man", "male", "boy", "warrior", "king"]):
+        composition = "Cinematic masculine close-up portrait, focus on eyes and facial details"
+        motion = "Zoom In"
+    elif any(k in text for k in ["together", "couple", "they", "them", "sitting with", "walking with"]):
+        composition = "Cinematic medium shot of a couple, side-by-side interacting"
+        motion = "Orbit Camera"
+    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "mud", "field"]):
+        composition = "Cinematic wide-angle establishing landscape shot, highly atmospheric environment"
+        motion = "Drone Shot"
+
+    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag", "tractor", "drive", "car"]):
+        motion = "Tracking Shot"
+    elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
+        motion = "Dolly In"
+        lighting = "Dark Cinematic, Horror Shadows"
+        color_grading = "Horror Green"
+    elif any(k in text for k in ["fight", "battle", "sword", "war"]):
+        motion = "Handheld Camera"
+    elif any(k in text for k in ["walk", "stroll"]):
+        motion = "Follow Shot"
+    elif any(k in text for k in ["think", "silent", "quiet", "meditate"]):
+        motion = "Ken Burns Effect"
+        
+    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine"]):
+        lighting = "Golden Hour"
+        color_grading = "Warm"
+    elif any(k in text for k in ["night", "midnight", "moon"]):
+        lighting = "Moonlight"
+        color_grading = "Cold Blue"
+        
+    return {
+        "motion": motion,
+        "lighting": lighting,
+        "color_grading": color_grading,
+        "composition": composition
+    }
+
+def translate_ur_to_en_enhanced(text):
+    try:
+        instruction = (
+            "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into highly descriptive English visual instructions. \n"
+            "CRITICAL RULES: \n"
+            "1. Explicitly identify the main subjects.\n"
+            "2. Do NOT blend genders.\n"
+            "3. Ensure anatomical perfection.\n"
+            "4. Output ONLY the English translation and visual descriptions."
+        )
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
+        res = session.get(url, timeout=15)
+        if res.status_code == 200:
+            return res.text.strip()
+    except Exception:
+        pass
+    return text
+
+def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
+    combined_text = (scene_text_en + " " + scene_text_ur).lower()
+    spiritual_keywords = [
+        "prophet", "sahaba", "saint", "angel", "god", "allah", "messenger", "nooh", "musa", "isa", "ibrahim", "yousuf", "muhammad", 
+        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر",
+        "grave", "shroud", "hell", "heaven", "paradise", "pious", "aulia", "angels", "holy dome", "mosque"
+    ]
+    if any(k in combined_text for k in spiritual_keywords):
+        safe_prompt = (
+            "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light emanating from the heavens, "
+            "sacred light beam, peaceful glowing ancient background, majestic natural mountains and glowing golden sand, "
+            "awe-inspiring holy atmosphere, highly detailed cosmic sky. "
+            "STRICTLY NO human faces, NO visible bodies, NO portraits, NO human figures. "
+            "Pure sacred light, beautiful symbolic representation."
+        )
+        return True, safe_prompt
+    return False, scene_text_en
+
+def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
+    try:
+        scene_lower = urdu_scene.lower()
+        gender_booster = ""
+        
+        if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
+            if any(k in scene_lower for k in ["صبا", "saba", "woman", "female", "girl"]):
+                gender_booster = (
+                    "beautiful elegant Eastern Pakistani Punjabi Pathan woman, realistic South Asian sharp facial features, "
+                    "wearing traditional modest cotton Shalwar Kameez with a clean modest Dupatta elegantly draped over her head as a hijab, "
+                    "extremely realistic, 8k resolution, highly detailed, strictly no western look, modest posture"
+                )
+            elif any(k in scene_lower for k in ["عیسی", "essa", "man", "male", "boy"]):
+                gender_booster = (
+                    "handsome majestic Eastern Pakistani Punjabi Pathan man, highly realistic South Asian facial structure, "
+                    "wearing a traditional modest cotton Shalwar Kameez with high collar, neat short Islamic beard, "
+                    "strictly no western look, photorealistic, 8k resolution"
+                )
+            else:
+                gender_booster = (
+                    "traditional modest Eastern Islamic attire, Shalwar Kameez, modest clothing, "
+                    "Pakistani/Arabian traditional South Asian features, strictly no western exposure"
+                )
+        elif character_heritage == "Ancient Arabian":
+            gender_booster = "wearing ancient traditional Arabian flowing historical robes, classic desert turban, Middle Eastern facial features"
+        elif character_heritage == "Western / Modern":
+            gender_booster = "modern stylish contemporary Western clothing, jeans and jacket"
+        elif character_heritage == "Far Eastern":
+            gender_booster = "traditional East Asian oriental attire"
+
+        instruction = (
+            "You are an expert Hollywood visual artist and prompt engineer. Analyze the Urdu scene and write a descriptive English prompt for Flux.\n"
+            "STRICT RULES: Gender separation, no female beards, modest attire, no human depictions for sacred Islamic topics. Output ONLY final prompt."
+        )
+        
+        prompt_input = f"Urdu Scene: {urdu_scene}\n"
+        if char_memory: prompt_input += f"Character Memory: {char_memory}\n"
+        if gender_booster: prompt_input += f"Attire tags: {gender_booster}\n"
+        if scene_memory: prompt_input += f"Scene Memory: {scene_memory}\n"
+        if raw_male_url: prompt_input += f"Male reference image URL: {raw_male_url}\n"
+        if raw_female_url: prompt_input += f"Female reference image URL: {raw_female_url}\n"
+
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' ' + prompt_input)}?model=openai"
+        res = session.get(url, timeout=20)
+        if res.status_code == 200:
+            refined_p = res.text.strip()
+            return re.sub(r'^(prompt:|visual prompt:|cinematic prompt:)\s*', '', refined_p, flags=re.IGNORECASE)
+    except Exception:
+        pass
+    return f"Cinematic film scene: {urdu_scene}, highly detailed, 8k"
+
+def apply_color_lut_harmony(img_path, style_preset):
+    try:
+        if not os.path.exists(img_path): return
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            if style_preset in ["Realistic HD", "Cinematic Film"]:
+                r, g, b = im.split()
+                r = r.point(lambda i: int(i * 1.05))
+                b = b.point(lambda i: int(i * 0.95))
+                im = Image.merge("RGB", (r, g, b))
+            elif style_preset == "Dark Gothic / Mystery":
+                im = ImageEnhance.Color(im).enhance(0.7)
+                r, g, b = im.split()
+                b = b.point(lambda i: int(i * 1.10))
+                im = Image.merge("RGB", (r, g, b))
+            elif style_preset == "Historical Epic":
+                r, g, b = im.split()
+                r = r.point(lambda i: int(i * 1.08))
+et_db_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE LOWER(username) = LOWER(?)", (amount, username))
     conn.commit()
