@@ -1,6 +1,6 @@
-streamlit
-requests
-edge-tts
-moviepy
-Pillow
-numpy
+streamlit>=1.35.0
+edge-tts>=6.1.10
+moviepy>=1.0.3
+pillow>=10.2.0
+requests>=2.31.0
+google-generativeai>=0.5.0
