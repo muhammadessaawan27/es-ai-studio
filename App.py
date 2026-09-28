@@ -1,97 +1,125 @@
 import os
 import subprocess
+import time
 import streamlit as st
 
-# Page Setup
-st.set_page_config(page_title="ES Studio - Fast Action Clipper & Slowed Reverb", layout="wide")
+# 1. Page Configuration
+st.set_page_config(page_title="ES AI Ultra Studio", page_icon="⚡", layout="wide")
 
-st.title("⚡ ES الٹرا فاسٹ اسٹوڈیو: فلم کلپر اور لوفی ریورب انجن")
+st.title("⚡ ES AI اسٹوڈیو: فاسٹ ویڈیو کٹر اور لوفی ریورب")
 
-# Create Two Separate Tabs
-tab1, tab2 = st.tabs(["🎬 1. فلم کلپر اور ہائی لائٹس (Action / Horror / Adventure)", "🎧 2. گانے اور لوفی (Slowed + Reverb Engine)"])
+# Maintain Download States (تاکہ ڈاؤنلوڈ بٹن غائب نہ ہو)
+if "movie_ready" not in st.session_state:
+    st.session_state.movie_ready = False
+if "song_ready" not in st.session_state:
+    st.session_state.song_ready = False
 
-# ==========================================
-# 🎬 TAB 1: MOVIE HIGHLIGHT CUTTER & ANTI-COPYRIGHT
-# ==========================================
+tab1, tab2 = st.tabs(["🎬 1. مووی ہائی لائٹ کٹر (فائٹ / ہارر / ایڈونچر)", "🎧 2. گانے اور لوفی (Slowed + Reverb)"])
+
+# =========================================================
+# 🎬 TAB 1: MOVIE CUTTER
+# =========================================================
 with tab1:
-    st.subheader("مووی میں سے فائٹ، ہارر یا ایڈونچر سین کاٹیں")
+    st.subheader("بڑی مووی میں سے 10 منٹ کا سین سیکنڈوں میں نکالیں")
     
     col1, col2 = st.columns(2)
     with col1:
         scene_type = st.selectbox(
             "سین کی قسم منتخب کریں:",
             [
-                "⚔️ فائٹ اور ایکشن سینز (Fight / Action)",
-                "👻 خوفناک اور ہارر مناظر (Horror / Suspense)",
+                "⚔️ فائٹ اور ایکشن سین (Fight / Action)",
+                "👻 خوفناک / سسپنس سین (Horror / Suspense)",
                 "🏔️ ایڈونچر اور کلائمیکس (Adventure / Climax)",
-                "⏱️ مینوئل اسٹارٹ ٹائم (Manual Time Cut)"
+                "⏱️ کسٹم ٹائم (اپنی مرضی کے منٹ سے کاٹیں)"
             ]
         )
     with col2:
         clip_duration = st.slider("کلپ کا دورانیہ (منٹ میں):", min_value=1, max_value=20, value=10)
-        
+
     start_minute = 0
     if "فائٹ" in scene_type:
-        start_minute = 35  # Common fight block interval
+        start_minute = 30
     elif "خوفناک" in scene_type:
-        start_minute = 50  # Horror peak interval
+        start_minute = 45
     elif "ایڈونچر" in scene_type:
-        start_minute = 20  # Adventure start interval
+        start_minute = 15
     else:
-        start_minute = st.number_input("ویڈیو کس منٹ سے کاٹنا شروع کرے؟ (Start Minute)", min_value=0, max_value=300, value=15)
+        start_minute = st.number_input("مووی کس منٹ سے کاٹنا شروع کرے؟", min_value=0, max_value=300, value=10)
 
-    movie_file = st.file_uploader("فلم یا لمبی ویڈیو اپلوڈ کریں:", type=["mp4", "mkv", "mov", "webm"], key="movie_uploader")
+    movie_file = st.file_uploader("فلم یا ویڈیو فائل سلیکٹ کریں (300MB سے 2GB):", type=["mp4", "mkv", "mov", "avi", "webm"], key="m_file")
 
     if movie_file is not None:
         input_movie = "input_movie.mp4"
-        output_clip = "highlight_clip.mp4"
+        output_clip = "movie_highlight_final.mp4"
         
-        with open(input_movie, "wb") as f:
-            f.write(movie_file.read())
-            
-        st.success("✅ مووی فائل لوڈ ہو گئی!")
-        
-        if st.button("⚡ فوری 10 منٹ کا کلپ نکالیں (Fast Cut)"):
-            with st.spinner("سیکنڈوں میں کلپ کٹ اور اینٹی کاپی رائٹ فلٹر لگایا جا رہا ہے..."):
-                start_seconds = start_minute * 60
-                duration_seconds = clip_duration * 60
-                
-                # Ultra fast seek + Flip + Pitch shift for Anti-Copyright
-                cmd = [
-                    "ffmpeg", "-y",
-                    "-ss", str(start_seconds),
-                    "-t", str(duration_seconds),
-                    "-i", input_movie,
-                    "-vf", "hflip,eq=contrast=1.05:saturation=1.1",
-                    "-af", "atempo=1.04,asetrate=44100*1.02",
-                    "-c:v", "libx264", "-preset", "ultrafast",
-                    "-c:a", "aac",
-                    output_clip
-                ]
-                
-                subprocess.run(cmd)
-                
-                if os.path.exists(output_clip):
-                    st.success("🎉 کلپ کامیابی سے تیار ہے!")
-                    st.video(output_clip)
-                    with open(output_clip, "rb") as f:
-                        st.download_button("📥 تیار شدہ کلپ ڈاؤنلوڈ کریں", f, file_name="movie_highlight_clip.mp4", mime="video/mp4")
+        # Fast chunk write
+        if not os.path.exists(input_movie) or os.path.getsize(input_movie) != movie_file.size:
+            progress_bar = st.progress(0, text="فائل سرور پر محفوظ ہو رہی ہے...")
+            with open(input_movie, "wb") as f:
+                chunk_size = 10 * 1024 * 1024 # 10MB Chunks
+                bytes_written = 0
+                while chunk := movie_file.read(chunk_size):
+                    f.write(chunk)
+                    bytes_written += len(chunk)
+                    percent = int((bytes_written / movie_file.size) * 100)
+                    progress_bar.progress(percent, text=f"اپلوڈ جاری ہے: {percent}% مکمل")
+            progress_bar.empty()
+            st.success(f"✅ فائل کامیابی سے لوڈ ہو گئی! ({round(movie_file.size / (1024*1024), 1)} MB)")
 
-# ==========================================
-# 🎧 TAB 2: SLOWED + REVERB MASTERING
-# ==========================================
+        if st.button("🚀 کلپ کاٹنا شروع کریں (Start Fast Cut)", type="primary"):
+            status_box = st.status("پروگرام ویڈیو کٹ کر رہا ہے...", expanded=True)
+            status_box.write("1️⃣ مطلوبہ ایکشن ٹائم تلاش کیا جا رہا ہے...")
+            
+            start_seconds = start_minute * 60
+            duration_seconds = clip_duration * 60
+            
+            status_box.write("2️⃣ اینٹی کاپی رائٹ فلٹر اور ویڈیو رینڈرنگ جاری ہے...")
+            
+            cmd = [
+                "ffmpeg", "-y",
+                "-ss", str(start_seconds),
+                "-t", str(duration_seconds),
+                "-i", input_movie,
+                "-vf", "hflip,eq=contrast=1.06:saturation=1.12",
+                "-af", "atempo=1.03,asetrate=44100*1.02",
+                "-c:v", "libx264", "-preset", "ultrafast",
+                "-c:a", "aac",
+                output_clip
+            ]
+            
+            subprocess.run(cmd)
+            status_box.update(label="✅ پروسیسنگ مکمل ہو گئی!", state="complete", expanded=False)
+            st.session_state.movie_ready = True
+
+        # Persistent Download Area
+        if st.session_state.movie_ready and os.path.exists(output_clip):
+            st.divider()
+            st.success("🎉 آپ کا 10 منٹ کا کلپ تیار ہے! نیچے سے ڈاؤنلوڈ کریں:")
+            st.video(output_clip)
+            with open(output_clip, "rb") as f:
+                st.download_button(
+                    label="📥 یہاں کلک کریں اور کلپ ڈاؤنلوڈ کریں (Download MP4)",
+                    data=f,
+                    file_name="movie_highlight_clip.mp4",
+                    mime="video/mp4",
+                    use_container_width=True
+                )
+
+# =========================================================
+# 🎧 TAB 2: SLOWED + REVERB
+# =========================================================
 with tab2:
-    st.subheader("گانے کو وائرل Slowed + Reverb اور بھاری آواز میں تبدیل کریں")
+    st.subheader("گانے کو وائرل Slowed + Reverb اور لوفی بنائیں")
     
     col_a, col_b = st.columns(2)
     with col_a:
-        slow_factor = st.slider("سلو اسپیڈ اور ڈیپ آواز (Slow Speed):", min_value=0.80, max_value=0.96, value=0.88, step=0.01)
-        reverb_level = st.slider("ریورب و گونج (Reverb / Echo):", min_value=20, max_value=80, value=50, step=5)
+        slow_factor = st.slider("سلو اسپیڈ اور بھاری آواز:", min_value=0.80, max_value=0.96, value=0.88, step=0.01)
+        reverb_level = st.slider("ریورب و گونج (Echo):", min_value=20, max_value=80, value=50, step=5)
     with col_b:
-        bass_level = st.slider("بیس بوسٹ (Heavy Bass Boost):", min_value=0, max_value=12, value=6)
-        video_size = st.selectbox("ویڈیو آؤٹ پٹ فارمیٹ:", ["16:9 لینڈ اسکیپ (YouTube)", "9:16 موبائل ریلز (Shorts/TikTok)"])
+        bass_level = st.slider("بیس بوسٹ (Heavy Bass):", min_value=0, max_value=12, value=6)
+        video_size = st.selectbox("ویڈیو کا سائز منتخب کریں:", ["16:9 لینڈ اسکیپ (YouTube)", "9:16 فل موبائل اسکرین (Shorts/TikTok)"])
 
-    song_file = st.file_uploader("گانا یا چھوٹی ویڈیو اپلوڈ کریں:", type=["mp4", "mkv", "mp3", "wav"], key="song_uploader")
+    song_file = st.file_uploader("گانا یا ویڈیو فائل سلیکٹ کریں:", type=["mp4", "mkv", "mp3", "wav"], key="s_file")
 
     if song_file is not None:
         input_song = "input_song_media.mp4"
@@ -100,10 +128,10 @@ with tab2:
         with open(input_song, "wb") as f:
             f.write(song_file.read())
             
-        st.success("✅ فائل کامیابی سے لوڈ ہو گئی!")
+        st.success("✅ فائل لوڈ ہو گئی!")
         
-        if st.button("🚀 Slowed + Reverb تیار کریں"):
-            with st.spinner("لوفی ریورب اور آڈیو ماسٹرنگ جاری ہے..."):
+        if st.button("🚀 Slowed + Reverb تیار کریں", type="primary"):
+            with st.spinner("آڈیو ماسٹرنگ اور 4K اینہانسمنٹ جاری ہے..."):
                 sample_rate = int(44100 * slow_factor)
                 af_filter = f"asetrate={sample_rate},aresample=44100,aecho=0.8:0.88:{reverb_level}:0.4,bass=g={bass_level}:f=110"
                 
@@ -124,9 +152,17 @@ with tab2:
                 ]
                 
                 subprocess.run(cmd_song)
-                
-                if os.path.exists(output_song):
-                    st.success("🎉 آپ کا Slowed + Reverb تیار ہے!")
-                    st.video(output_song)
-                    with open(output_song, "rb") as f:
-                        st.download_button("📥 Slowed + Reverb ویڈیو ڈاؤنلوڈ کریں", f, file_name="slowed_reverb_master.mp4", mime="video/mp4")
+                st.session_state.song_ready = True
+
+        if st.session_state.song_ready and os.path.exists(output_song):
+            st.divider()
+            st.success("🎉 آپ کا Slowed + Reverb تیار ہے!")
+            st.video(output_song)
+            with open(output_song, "rb") as f:
+                st.download_button(
+                    label="📥 Slowed + Reverb ویڈیو ڈاؤنلوڈ کریں",
+                    data=f,
+                    file_name="slowed_reverb_master.mp4",
+                    mime="video/mp4",
+                    use_container_width=True
+        )
