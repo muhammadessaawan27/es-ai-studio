@@ -1,5 +1,6 @@
 import os
 import subprocess
+import gc
 import requests
 import streamlit as st
 import imageio_ffmpeg
@@ -8,9 +9,19 @@ import yt_dlp
 st.set_page_config(page_title="ES Ultimate AI Studio", page_icon="⚡", layout="wide")
 
 st.title("⚡ ES الٹرا اسمارٹ اینٹی کاپی رائٹ اسٹوڈیو")
-st.write("ویڈیو کیٹگری کی خودکار پہچان، 7 لیئر اینٹی کاپی رائٹ فلٹرز اور وائرل میٹا ڈیٹا پیک۔")
+st.write("ویڈیو کیٹگری کی خودکار پہچان، 7 لیئر اینٹی کاپی رائٹ فلٹرز اور خودکار میموری کلینر۔")
 
 FFMPEG_BIN = imageio_ffmpeg.get_ffmpeg_exe()
+
+# Memory Auto-Cleaner (سرور کی ریم کو فل ہونے سے بچاتا ہے)
+def cleanup_temp_files():
+    for f in ["input_master_video.mp4", "temp_song.mp4"]:
+        if os.path.exists(f):
+            try:
+                os.remove(f)
+            except Exception:
+                pass
+    gc.collect()
 
 if "process_ready" not in st.session_state:
     st.session_state.process_ready = False
@@ -26,11 +37,8 @@ tab1, tab2, tab3 = st.tabs([
 input_video = "input_master_video.mp4"
 output_video = "output_bypass_video.mp4"
 
-# 1. Smart Inspector: Inspects real video title and category
 def inspect_and_fetch_media(url, target_path=input_video):
-    if os.path.exists(target_path):
-        os.remove(target_path)
-        
+    cleanup_temp_files()
     info_dict = {'title': 'Special Video', 'categories': ['Entertainment']}
     try:
         ydl_opts = {
@@ -50,7 +58,6 @@ def inspect_and_fetch_media(url, target_path=input_video):
             info_dict['tags'] = meta.get('tags', [])
             info_dict['categories'] = meta.get('categories', ['Entertainment'])
     except Exception:
-        # Fallback for Direct MP4 / Cloud links
         info_dict['title'] = "Custom Video Highlight"
         try:
             with requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, stream=True, timeout=30) as r:
@@ -63,7 +70,6 @@ def inspect_and_fetch_media(url, target_path=input_video):
 
     return info_dict
 
-# 2. Smart Genre-Based Metadata & Thumbnail Prompt Generator
 def generate_smart_metadata(info):
     title = info.get('title', 'Video')
     t_lower = title.lower()
@@ -121,10 +127,10 @@ with tab1:
     
     if st.button("🚀 پروسیسنگ شروع کریں", type="primary", key="run_t1"):
         if url_input_1:
-            with st.spinner("ویڈیو اسکین، کٹ اور 7 لیئر اینٹی کاپی رائٹ فلٹرز لگ رہے ہیں..."):
+            with st.spinner("ویڈیو اسکین، کٹ اور اینٹی کاپی رائٹ فلٹرز لگ رہے ہیں..."):
                 info = inspect_and_fetch_media(url_input_1, input_video)
                 if os.path.exists(input_video) and os.path.getsize(input_video) > 50000:
-                    vf_str = "[0:v]scale=1920:1080,boxblur=20:5[bg];[0:v]hflip,scale=1600:900,eq=contrast=1.07:saturation=1.14:brightness=0.01,noise=alls=2:allf=t+u,vignette=PI/4[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2" if "کینوس" in style_choice else "hflip,crop=iw*0.94:ih*0.94,eq=contrast=1.08:saturation=1.15,noise=alls=2:allf=t+u,vignette=PI/4"
+                    vf_str = "[0:v]scale=1920:1080,boxblur=20:5[bg];[0:v]hflip,scale=1600:900,eq=contrast=1.07:saturation=1.14:brightness=0.01,noise=alls=2:allf=t+u,vignette=PI/4[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2" if "کینوس" in style_choice else "hflip,crop=iw*0.94:ih*0.94,eq=contrast=1.08:saturation=1.15:brightness=0.01,noise=alls=2:allf=t+u,vignette=PI/4"
                     af_str = "atempo=1.04,asetrate=44100*1.02,bass=g=2:f=100"
                     
                     cmd = [FFMPEG_BIN, "-y", "-i", input_video, "-filter_complex" if "کینوس" in style_choice else "-vf", vf_str, "-af", af_str, "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-b:a", "192k", output_video]
@@ -132,7 +138,7 @@ with tab1:
                     st.session_state.detected_info = info
                     st.session_state.process_ready = True
                 else:
-                    st.error("❌ ویڈیو ڈاؤنلوڈ نہیں ہو سکی۔ براہ کرم درست لنک درج کریں۔")
+                    st.error("❌ ویڈیو ڈاؤنلوڈ نہیں ہو سکی۔ براہ کرم لنک چیک کریں۔")
 
 # =========================================================
 # ⚔️ TAB 2: CLIP CUTTER MODE
@@ -202,7 +208,7 @@ with tab3:
 # =========================================================
 if st.session_state.process_ready and os.path.exists(output_video):
     st.divider()
-    st.success("🎉 ویڈیو مکمل تیار ہے! نیچے سبز بٹن سے فوراً ڈاؤنلوڈ کریں:")
+    st.success("🎉 ویڈیو مکمل تیار ہے! نیچے بٹن سے فوراً ڈاؤنلوڈ کریں:")
     
     st.video(output_video)
     with open(output_video, "rb") as f:
@@ -220,7 +226,7 @@ if st.session_state.process_ready and os.path.exists(output_video):
     
     c_meta1, c_meta2 = st.columns(2)
     with c_meta1:
-        st.markdown(f"### 🔥 محفوظ وائرل ٹائٹلز ({genre}):")
+        st.markdown(f"### 😂 محفوظ وائرل ٹائٹلز ({genre}):")
         for i, t in enumerate(titles, 1):
             st.code(t, language="text")
             
@@ -229,5 +235,5 @@ if st.session_state.process_ready and os.path.exists(output_video):
 
     with c_meta2:
         st.markdown("### 🎨 AI تھمب نیل پرامپٹ (Thumbnail Prompt):")
-        st.info("💡 اسے Midjourney یا Bing Creator میں ڈال کر اسی شو کا نیا تھمب نیل بنائیں۔")
+        st.info("💡 اسے Midjourney یا Bing Creator میں ڈال کر نیا تھمب نیل بنائیں۔")
         st.code(prompt, language="text")
