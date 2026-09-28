@@ -8,7 +8,7 @@ import time
 import re
 import uuid
 import random
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+from PIL import Image, ImageDraw, ImageFont, ImageStat, ImageFilter, ImageEnhance
 import io
 import base64
 import numpy as np
@@ -19,7 +19,7 @@ import hashlib
 import concurrent.futures
 
 # ==========================================
-# MOVIEPY IMPORTS
+# MOVIEPY CINEMATIC IMPORTS
 # ==========================================
 try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
@@ -27,15 +27,23 @@ except ImportError:
     from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
 
 # ==========================================
-# STREAMLIT PAGE CONFIG & GLOBALS
+# BROWSER SESSION & CONSTANTS
 # ==========================================
-st.set_page_config(page_title="Sglowina AI - Cute Mascot Companion", layout="wide", page_icon="🧸")
-
 headers_browser = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 session = requests.Session()
 session.headers.update(headers_browser)
+
+SGLOWINA_BIO = (
+    "Sglowina AI is an advanced generative AI cinematic video, vision & image production platform, "
+    "proudly developed by Muhammad Essa Awan & Saba Wahid."
+)
+
+# ==========================================
+# STREAMLIT CONFIGURATION
+# ==========================================
+st.set_page_config(page_title="Sglowina AI - Autonomous Live Studio", layout="wide", page_icon="🎬")
 
 if "enable_watermark" not in st.session_state:
     st.session_state.enable_watermark = True
@@ -45,28 +53,96 @@ if "logged_in_user" not in st.session_state:
     st.session_state.logged_in_user = "demo_user"
 if "msgs" not in st.session_state:
     st.session_state.msgs = []
-if "avatar_reply" not in st.session_state:
-    st.session_state.avatar_reply = "السلام علیکم! میں آپ کا پیارا AI دوست ہوں۔ کیمرے سے مجھے کچھ دکھائیں یا مائیک پر بات کریں!"
+
+st.sidebar.subheader("🎬 Video & Audio Settings")
+enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=st.session_state.enable_watermark)
+enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=st.session_state.enable_bg_music)
+
+st.session_state.enable_watermark = enable_watermark
+st.session_state.enable_bg_music = enable_bg_music
 
 render_semaphore = threading.Semaphore(value=2)
+active_renderers = 0
+render_lock = threading.Lock()
 
 def make_even(val):
     return int(val) if int(val) % 2 == 0 else int(val) + 1
 
+def hash_password(password):
+    salt = b"sglowina_saas_salt_1234"
+    return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000).hex()
+
+def verify_password(password, hashed):
+    salt = b"sglowina_saas_salt_1234"
+    return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000).hex() == hashed
+
+def get_public_url(uploaded_file):
+    try:
+        file_bytes = uploaded_file.getvalue()
+        url = "https://tmpfiles.org/api/v1/upload"
+        files = {'file': (uploaded_file.name, file_bytes, uploaded_file.type)}
+        res = requests.post(url, files=files, timeout=12)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get("status") == "success":
+                temp_url = data["data"]["url"]
+                return temp_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+    except Exception:
+        pass
+    return None
+
+def apply_canva_typography(img_path, overlay_text):
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGBA")
+            txt_overlay = Image.new("RGBA", im.size, (255, 255, 255, 0))
+            draw = ImageDraw.Draw(txt_overlay)
+            font_size = max(24, int(im.width / 25))
+            try:
+                font = ImageFont.truetype("arial.ttf", font_size)
+            except Exception:
+                font = ImageFont.load_default()
+
+            bbox = draw.textbbox((0, 0), overlay_text, font=font)
+            text_w = bbox[2] - bbox[0]
+            text_h = bbox[3] - bbox[1]
+            x = (im.width - text_w) // 2
+            y = im.height - text_h - 40
+            draw.rectangle([(x - 20, y - 10), (x + text_w + 20, y + text_h + 10)], fill=(0, 0, 0, 160))
+            draw.text((x, y), overlay_text, font=font, fill=(255, 255, 255, 240))
+            combined = Image.alpha_composite(im, txt_overlay).convert("RGB")
+            combined.save(img_path, "JPEG")
+    except Exception:
+        pass
+
 # ==========================================
-# DATABASE LAYER
+# DATABASE LAYER (PostgreSQL & SQLite WAL)
 # ==========================================
 def get_db_connection():
+    pg_url = os.environ.get("DATABASE_URL")
+    if pg_url:
+        try:
+            import psycopg2
+            return psycopg2.connect(pg_url)
+        except Exception:
+            pass
     conn = sqlite3.connect("sglowina_saas_v21.db", check_same_thread=False, timeout=30.0)
     conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+    except Exception:
+        pass
     return conn
 
 def init_db_v21():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("""
+    is_sqlite = not hasattr(conn, "closed")
+    serial_primary = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sqlite else "SERIAL PRIMARY KEY"
+    
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {serial_primary},
             username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
@@ -77,216 +153,320 @@ def init_db_v21():
             created_at TEXT
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS projects (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER,
+            project_name TEXT,
+            type TEXT,
+            file_path TEXT,
+            prompt TEXT,
+            created_at TEXT,
+            is_favorite INTEGER DEFAULT 0
+        )
+    """)
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS credits_history (
+            id {serial_primary},
+            user_id INTEGER,
+            action TEXT,
+            credits_used INTEGER,
+            balance_after INTEGER,
+            date TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS local_payments (
+            id TEXT PRIMARY KEY,
+            username TEXT,
+            method TEXT,
+            trx_id TEXT UNIQUE,
+            amount REAL,
+            status TEXT DEFAULT 'Pending',
+            created_at TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS characters (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER,
+            character_name TEXT,
+            description TEXT,
+            reference_data TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS scenes (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER,
+            scene_name TEXT,
+            environment TEXT,
+            lighting TEXT,
+            camera_style TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS coupons (
+            code TEXT PRIMARY KEY,
+            credits INTEGER,
+            uses_left INTEGER
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS system_config (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
+    
+    cursor.execute("SELECT COUNT(*) FROM coupons WHERE code = 'ESSASABA'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO coupons (code, credits, uses_left) VALUES ('ESSASABA', 100, 1000)")
+    
+    h_admin = hash_password("786")
+    for u, e in [("essasaba", "essasaba@sglowina.ai"), ("essa_awan", "essa@sglowina.ai")]:
+        cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (u,))
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                           (u, e, h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+                           
+    h_saba = hash_password("1234")
+    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", 5000, "Admin", "2026-07-21"))
+                       
     conn.commit()
     conn.close()
 
 init_db_v21()
 
-# TTS Audio Generator
-def save_audio_safe(text, voice, rate, pitch, filename):
+# Auth Helpers
+def register_saas_user(username, email, password):
+    username = username.strip().lower()
+    email = email.strip().lower()
+    conn = get_db_connection()
+    cursor = conn.cursor()
     try:
-        async def amain():
-            communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
-            await communicate.save(filename)
-        asyncio.run(amain())
-        return True
+        h = hash_password(password)
+        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       (username, email, h, 'Free', 50, 'User', time.strftime("%Y-%m-%d")))
+        conn.commit()
+        return True, "User registered successfully!"
     except Exception:
-        return False
+        return False, "Username or Email already exists."
+    finally:
+        conn.close()
 
-# Multimodal AI Vision
-def analyze_image_with_ai(image_bytes, question=""):
+def authenticate_user(username, password):
+    username = username.strip().lower()
+    password = password.strip()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT password_hash FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return verify_password(password, row['password_hash'])
+    return False
+
+def get_user_data(username):
+    username = username.strip().lower()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
+def deduct_user_credits(username, amount):
+    username = username.strip().lower()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE LOWER(username) = LOWER(?)", (amount, username))
+    conn.commit()
+    conn.close()
+
+def log_credit_usage(user_id, action, used, balance):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO credits_history (user_id, action, credits_used, balance_after, date) VALUES (?, ?, ?, ?, ?)",
+                   (user_id, action, used, balance, time.strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+
+# AI Director Analyzer
+def analyze_scene_for_director(scene_text):
+    text = scene_text.lower()
+    motion = "Zoom Out (v40 Default)"
+    lighting = "Volumetric Light"
+    color_grading = "Hollywood Cinematic"
+    composition = "Medium Shot, Rule of Thirds"
+    
+    if any(k in text for k in ["saba", "she", "her", "woman", "female", "girl"]):
+        composition = "Tight close-up portrait shot, extreme details of female face, emotional expression"
+        motion = "Push In"
+    elif any(k in text for k in ["essa", "he", "him", "man", "male", "boy", "warrior", "king"]):
+        composition = "Cinematic masculine close-up portrait, focus on eyes and facial details"
+        motion = "Zoom In"
+    elif any(k in text for k in ["together", "couple", "they", "them", "sitting with", "walking with"]):
+        composition = "Cinematic medium shot of a couple, side-by-side interacting"
+        motion = "Orbit Camera"
+    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "mud", "field"]):
+        composition = "Cinematic wide-angle establishing landscape shot, highly atmospheric environment"
+        motion = "Drone Shot"
+
+    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag", "tractor", "drive", "car"]):
+        motion = "Tracking Shot"
+    elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
+        motion = "Dolly In"
+        lighting = "Dark Cinematic, Horror Shadows"
+        color_grading = "Horror Green"
+    elif any(k in text for k in ["fight", "battle", "sword", "war"]):
+        motion = "Handheld Camera"
+    elif any(k in text for k in ["walk", "stroll"]):
+        motion = "Follow Shot"
+    elif any(k in text for k in ["think", "silent", "quiet", "meditate"]):
+        motion = "Ken Burns Effect"
+        
+    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine"]):
+        lighting = "Golden Hour"
+        color_grading = "Warm"
+    elif any(k in text for k in ["night", "midnight", "moon"]):
+        lighting = "Moonlight"
+        color_grading = "Cold Blue"
+        
+    return {
+        "motion": motion,
+        "lighting": lighting,
+        "color_grading": color_grading,
+        "composition": composition
+    }
+
+def translate_ur_to_en_enhanced(text):
     try:
-        b64_image = base64.b64encode(image_bytes).decode('utf-8')
-        prompt_instruction = (
-            "You are a friendly, super cute AI companion like a talking teddy mascot. "
-            "Look at this image and explain what you see in very friendly, cute, fluent Urdu (اردو). "
-            "Describe the objects, vehicles, people, colors, or surroundings in 2 simple, sweet sentences."
+        instruction = (
+            "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into highly descriptive English visual instructions. \n"
+            "CRITICAL RULES: \n"
+            "1. Explicitly identify the main subjects.\n"
+            "2. Do NOT blend genders.\n"
+            "3. Ensure anatomical perfection.\n"
+            "4. Output ONLY the English translation and visual descriptions."
         )
-        if question.strip():
-            prompt_instruction += f" Also answer this user's question: '{question}'"
-
-        url = "https://text.pollinations.ai/openai"
-        payload = {
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt_instruction},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}}
-                    ]
-                }
-            ],
-            "model": "openai"
-        }
-        res = session.post(url, json=payload, timeout=25)
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
+        res = session.get(url, timeout=15)
         if res.status_code == 200:
             return res.text.strip()
     except Exception:
         pass
-    return "میں نے منظر دیکھ لیا ہے! یہ بہت زبردست اور دلچسپ ہے!"
+    return text
 
-# ==========================================
-# 🧸 CUTE 3D ANIMATED MASCOT COMPONENT
-# ==========================================
-def render_cute_3d_mascot(is_speaking=False):
-    speaking_anim = "speaking" if is_speaking else ""
-    mascot_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <style>
-            .mascot-card {{
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                background: linear-gradient(180deg, #fdfbf7 0%, #fae8d4 100%);
-                border-radius: 25px;
-                padding: 15px;
-                box-shadow: 0 10px 30px rgba(245, 158, 11, 0.25);
-                border: 3px solid #fbbf24;
-                margin-bottom: 10px;
-            }}
-            
-            /* Fluffy 3D Character Body */
-            .fluffy-body {{
-                width: 140px;
-                height: 160px;
-                background: radial-gradient(circle at 35% 30%, #fef3c7, #fde68a 60%, #f59e0b 100%);
-                border-radius: 70px 70px 60px 60px;
-                position: relative;
-                box-shadow: 0 15px 25px rgba(217, 119, 6, 0.35), inset 0 -8px 15px rgba(180, 83, 9, 0.2);
-                animation: gentleFloat 3s infinite ease-in-out alternate;
-            }}
-            
-            /* Fluffy Ears */
-            .ear {{
-                width: 32px;
-                height: 40px;
-                background: #f59e0b;
-                border-radius: 50%;
-                position: absolute;
-                top: -8px;
-            }}
-            .ear-left {{ left: 10px; transform: rotate(-20deg); }}
-            .ear-right {{ right: 10px; transform: rotate(20deg); }}
-            
-            /* Sleeping Mask on Head */
-            .sleep-mask {{
-                width: 95px;
-                height: 28px;
-                background: #fed7aa;
-                border-radius: 15px;
-                position: absolute;
-                top: 15px;
-                left: 22px;
-                border: 2px solid #f97316;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            }}
-            .mask-strap {{
-                width: 130px;
-                height: 6px;
-                background: #f97316;
-                position: absolute;
-                top: 26px;
-                left: 5px;
-                z-index: -1;
-            }}
+def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
+    combined_text = (scene_text_en + " " + scene_text_ur).lower()
+    spiritual_keywords = [
+        "prophet", "sahaba", "saint", "angel", "god", "allah", "messenger", "nooh", "musa", "isa", "ibrahim", "yousuf", "muhammad", 
+        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر",
+        "grave", "shroud", "hell", "heaven", "paradise", "pious", "aulia", "angels", "holy dome", "mosque"
+    ]
+    if any(k in combined_text for k in spiritual_keywords):
+        safe_prompt = (
+            "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light emanating from the heavens, "
+            "sacred light beam, peaceful glowing ancient background, majestic natural mountains and glowing golden sand, "
+            "awe-inspiring holy atmosphere, highly detailed cosmic sky. "
+            "STRICTLY NO human faces, NO visible bodies, NO portraits, NO human figures. "
+            "Pure sacred light, beautiful symbolic representation."
+        )
+        return True, safe_prompt
+    return False, scene_text_en
 
-            /* Face Elements */
-            .face {{
-                width: 110px;
-                height: 90px;
-                background: #fffbeb;
-                border-radius: 50%;
-                position: absolute;
-                top: 45px;
-                left: 15px;
-            }}
-            .eyes-row {{
-                display: flex;
-                justify-content: space-around;
-                width: 65px;
-                position: absolute;
-                top: 28px;
-                left: 22px;
-            }}
-            .eye {{
-                width: 12px;
-                height: 8px;
-                background: #451a03;
-                border-radius: 0 0 12px 12px;
-                animation: cuteBlink 4s infinite;
-            }}
-            .blush {{
-                width: 16px;
-                height: 8px;
-                background: #fca5a5;
-                border-radius: 50%;
-                position: absolute;
-                top: 36px;
-            }}
-            .blush-l {{ left: 10px; }}
-            .blush-r {{ right: 10px; }}
-            
-            .mouth {{
-                width: 16px;
-                height: 8px;
-                background: #e11d48;
-                border-radius: 0 0 10px 10px;
-                position: absolute;
-                bottom: 22px;
-                left: 47px;
-                transition: all 0.2s ease;
-            }}
-            
-            /* Talking Animation */
-            .speaking .mouth {{
-                animation: talkAnim 0.25s infinite alternate;
-            }}
-            .speaking .fluffy-body {{
-                animation: bounceTalk 0.3s infinite alternate;
-            }}
+def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
+    try:
+        scene_lower = urdu_scene.lower()
+        gender_booster = ""
+        
+        if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
+            if any(k in scene_lower for k in ["صبا", "saba", "woman", "female", "girl"]):
+                gender_booster = (
+                    "beautiful elegant Eastern Pakistani Punjabi Pathan woman, realistic South Asian sharp facial features, "
+                    "wearing traditional modest cotton Shalwar Kameez with a clean modest Dupatta elegantly draped over her head as a hijab, "
+                    "extremely realistic, 8k resolution, highly detailed, strictly no western look, modest posture"
+                )
+            elif any(k in scene_lower for k in ["عیسی", "essa", "man", "male", "boy"]):
+                gender_booster = (
+                    "handsome majestic Eastern Pakistani Punjabi Pathan man, highly realistic South Asian facial structure, "
+                    "wearing a traditional modest cotton Shalwar Kameez with high collar, neat short Islamic beard, "
+                    "strictly no western look, photorealistic, 8k resolution"
+                )
+            else:
+                gender_booster = (
+                    "traditional modest Eastern Islamic attire, Shalwar Kameez, modest clothing, "
+                    "Pakistani/Arabian traditional South Asian features, strictly no western exposure"
+                )
+        elif character_heritage == "Ancient Arabian":
+            gender_booster = "wearing ancient traditional Arabian flowing historical robes, classic desert turban, Middle Eastern facial features"
+        elif character_heritage == "Western / Modern":
+            gender_booster = "modern stylish contemporary Western clothing, jeans and jacket"
+        elif character_heritage == "Far Eastern":
+            gender_booster = "traditional East Asian oriental attire"
 
-            @keyframes gentleFloat {{
-                0% {{ transform: translateY(0px); }}
-                100% {{ transform: translateY(-8px); }}
-            }}
-            @keyframes cuteBlink {{
-                0%, 90%, 100% {{ transform: scaleY(1); }}
-                95% {{ transform: scaleY(0.1); }}
-            }}
-            @keyframes talkAnim {{
-                0% {{ height: 6px; border-radius: 0 0 6px 6px; }}
-                100% {{ height: 20px; border-radius: 12px; transform: scaleX(1.3); }}
-            }}
-            @keyframes bounceTalk {{
-                0% {{ transform: scale(1); }}
-                100% {{ transform: scale(1.04); }}
-            }}
-        </style>
-    </head>
-    <body style="margin:0; background:transparent;">
-        <div class="mascot-card {speaking_anim}">
-            <div class="fluffy-body">
-                <div class="ear ear-left"></div>
-                <div class="ear ear-right"></div>
-                <div class="mask-strap"></div>
-                <div class="sleep-mask"></div>
-                <div class="face">
-                    <div class="blush blush-l"></div>
-                    <div class="blush blush-r"></div>
-                    <div class="eyes-row">
-                        <div class="eye"></div>
-                        <div class="eye"></div>
-                    </div>
-                    <div class="mouth"></div>
-                </div>
-            </div>
-            <div style="font-weight:900; color:#b45309; margin-top:8px; font-size:16px;">🧸 SGLOWINA CUTE COMPANION</div>
-        </div>
-    </body>
+        instruction = (
+            "You are an expert Hollywood visual artist and prompt engineer. Analyze the Urdu scene and write a descriptive English prompt for Flux.\n"
+            "STRICT RULES: Gender separation, no female beards, modest attire, no human depictions for sacred Islamic topics. Output ONLY final prompt."
+        )
+        
+        prompt_input = f"Urdu Scene: {urdu_scene}\n"
+        if char_memory: prompt_input += f"Character Memory: {char_memory}\n"
+        if gender_booster: prompt_input += f"Attire tags: {gender_booster}\n"
+        if scene_memory: prompt_input += f"Scene Memory: {scene_memory}\n"
+        if raw_male_url: prompt_input += f"Male reference image URL: {raw_male_url}\n"
+        if raw_female_url: prompt_input += f"Female reference image URL: {raw_female_url}\n"
+
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' ' + prompt_input)}?model=openai"
+        res = session.get(url, timeout=20)
+        if res.status_code == 200:
+            refined_p = res.text.strip()
+            return re.sub(r'^(prompt:|visual prompt:|cinematic prompt:)\s*', '', refined_p, flags=re.IGNORECASE)
+    except Exception:
+        pass
+    return f"Cinematic film scene: {urdu_scene}, highly detailed, 8k"
+
+def apply_color_lut_harmony(img_path, style_preset):
+    try:
+        if not os.path.exists(img_path): return
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            if style_preset in ["Realistic HD", "Cinematic Film"]:
+                r, g, b = im.split()
+                r = r.point(lambda i: int(i * 1.05))
+                b = b.point(lambda i: int(i * 0.95))
+                im = Image.merge("RGB", (r, g, b))
+            elif style_preset == "Dark Gothic / Mystery":
+                im = ImageEnhance.Color(im).enhance(0.7)
+                r, g, b = im.split()
+                b = b.point(lambda i: int(i * 1.10))
+                im = Image.merge("RGB", (r, g, b))
+            elif style_preset == "Historical Epic":
+                r, g, b = im.split()
+                r = r.point(lambda i: int(i * 1.08))
+                g = g.point(lambda i: int(i * 1.02))
+                b = b.point(lambda i: int(i * 0.90))
+                im = Image.merge("RGB", (r, g, b))
+            im = ImageEnhance.Contrast(im).enhance(1.08)
+            im.save(img_path, "JPEG")
+    except Exception:
+        pass
+
+def download_scene_sfx(scene_text, u_id, idx):
+    text = scene_text.lower()
+    sfx_url = None
+    if any(k in text for k in ["rain", "storm", "thunder", "clouds", "بارش", "طوفان"]):
+        sfx_url = "https://www.soundjay.com/nature/sounds/rain-07.mp3"
+    elif any(k in text for k in ["sword", "fight", "battle", "clash", "تلوار", "جنگ"]):
+        sfx_url = "https://www.soundjay.com/mechanical/sounds/cutlery-clink-1.mp3"
+    elif any(k in text for k in ["forest", "jungle", "birds", "nature", "درخت", "جنگل"]):
+        sfx_url = "https://www.soundjay.com/nature/sounds/forest-wind-1.mp3"
+    elif any(k in text for k in ["fire", "burn", "flame", "آگ"]):
+        sfx_url = "https://www.soundjay.com/nature/s>
     </html>
     """
     st.components.v1.html(mascot_html, height=240)
