@@ -37,12 +37,12 @@ session = requests.Session()
 session.headers.update(headers_browser)
 
 SGLOWINA_BIO = (
-    "Sglowina AI is an advanced generative AI cinematic video, live vision & image production platform, "
+    "Sglowina AI is an advanced generative AI cinematic video, vision & image production platform, "
     "proudly developed by Muhammad Essa Awan & Saba Wahid."
 )
 
 # ==========================================
-# 3. STREAMLIT CONFIGURATION & STATES
+# 3. STREAMLIT INITIALIZATION & GLOBAL STATES
 # ==========================================
 st.set_page_config(page_title="ES Ultimate AI Studio & Anti-Copyright Suite", layout="wide", page_icon="⚡")
 
@@ -62,7 +62,7 @@ if "last_processed_file" not in st.session_state:
     st.session_state.last_processed_file = None
 
 st.sidebar.subheader("🎬 Global Multi-Language Settings")
-target_lang = st.sidebar.selectbox("🌐 Choose System Language:", [
+target_lang = st.sidebar.selectbox("🌐 Choose Global Language (زبان منتخب کریں):", [
     "Urdu (اردو)",
     "English (English)",
     "Hindi (हिंदी)",
@@ -86,10 +86,7 @@ render_semaphore = threading.Semaphore(value=2)
 active_renderers = 0
 render_lock = threading.Lock()
 
-input_video = "input_master_video.mp4"
-output_video = "output_bypass_video.mp4"
-
-# Multi-Language Edge-TTS Voice Mapping
+# Multi-Language Voice Map for Edge-TTS
 VOICE_MAP = {
     "Urdu (اردو)": {"male": "ur-PK-AsadNeural", "female": "ur-PK-UzmaNeural", "code": "Urdu"},
     "English (English)": {"male": "en-US-GuyNeural", "female": "en-US-JennyNeural", "code": "English"},
@@ -104,6 +101,7 @@ VOICE_MAP = {
     "Turkish (Türkçe)": {"male": "tr-TR-AhmetNeural", "female": "tr-TR-EmelNeural", "code": "Turkish"}
 }
 
+# Safe FFmpeg Locator
 def get_ffmpeg():
     try:
         import imageio_ffmpeg
@@ -270,17 +268,25 @@ def init_db_v21():
         cursor.execute("INSERT INTO coupons (code, credits, uses_left) VALUES ('ESSASABA', 100, 1000)")
     
     h_admin = hash_password("786")
-    for u, e in [("essasaba", "essasaba@sglowina.ai"), ("essa_awan", "essa@sglowina.ai")]:
+    admin_users = [
+        ("essasaba", "essasaba@sglowina.ai"),
+        ("essa_awan", "essa@sglowina.ai")
+    ]
+    for u, e in admin_users:
         cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (u,))
         if cursor.fetchone()[0] == 0:
             cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                            (u, e, h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+        else:
+            cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = ?", (h_admin, u))
                            
     h_saba = hash_password("1234")
     cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                        ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", 5000, "Admin", "2026-07-21"))
+    else:
+        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'saba_wahid'", (h_saba,))
                        
     conn.commit()
     conn.close()
@@ -485,14 +491,7 @@ def analyze_scene_for_director(scene_text):
     elif any(k in text for k in ["fight", "battle", "sword", "war"]):
         motion = "Handheld Camera"
     elif any(k in text for k in ["walk", "stroll"]):
-        motion = "Follow Shot"
-    elif any(k in text for k in ["think", "silent", "quiet", "meditate"]):
-        motion = "Ken Burns Effect"
-        
-    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine"]):
-        lighting = "Golden Hour"
-        color_grading = "Warm"
-    elif any(k in text for k in ["night", "midnightdits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        motion = "Follow Shodits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                            (u, e, h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
                            
     h_saba = hash_password("1234")
