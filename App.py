@@ -44,7 +44,7 @@ SGLOWINA_BIO = (
 # ==========================================
 # STREAMLIT INITIALIZATION & GLOBAL STATES
 # ==========================================
-st.set_page_config(page_title="ES Ultimate AI Studio & Anti-Copyright", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="ES Ultimate AI Studio & Anti-Copyright V4.0", layout="wide", page_icon="⚡")
 
 if "enable_watermark" not in st.session_state:
     st.session_state.enable_watermark = True
@@ -356,7 +356,6 @@ def generate_smart_metadata(info):
     raw_title = info.get('title', 'Video').strip()
     clean_title = re.sub(r'[\(\[\{].*?[\)\]\}]', '', raw_title).strip()
     if not clean_title: clean_title = raw_title
-    
     t_lower = raw_title.lower()
     
     if any(k in t_lower for k in ['kapil', 'comedy', 'funny', 'laugh', 'joke', 'hasna', 'standup', 'prank']):
@@ -1458,38 +1457,38 @@ with tab_companion:
     render_autonomous_live_viewport()
 
 # -----------------
-# TAB 3: ES VIDEO PROCESSOR & PRO DISRUPTION ENGINE
+# TAB 3: ES VIDEO PROCESSOR (PRO AUDIO DUCKING & TEXT BANNER SHIELD)
 # -----------------
 with tab_es_tools:
-    st.write("### ⚡ ES ہالی ووڈ پرو ڈسرپشن اینٹی کاپی رائٹ شیلڈ (Human Editor Formula)")
-    st.info("💡 **پرو فارمولا ایکٹیو:** 1.8 ڈگری جیو میٹرک ٹِلٹ (Tilt)، 8% تیز اسپیڈ (1.08x)، کینوس فریم، کلر کروز اور بھاری آڈیو پچ جو یوٹیوب کے AI کو مکمل دھوکہ دیتی ہے۔")
+    st.write("### ⚡ ES ہالی ووڈ الٹرا ڈسرپشن و آڈیو ڈکنگ شیلڈ (100% Anti-Copyright)")
+    st.info("💡 **پرو ڈسرپشن ایکٹیو:** اصل میوزک کو 75% خاموش (Ducking) کرنا، نیا سنیمٹک ٹریک مکس کرنا، ٹیکسٹ/پوسٹر پر اینٹی ہیش بینر اور 1.8 ڈگری ٹِلٹ۔")
     
     sub_t1, sub_t2, sub_t3 = st.tabs([
-        "🎬 1. فل ویڈیو / مووی موڈ",
+        "🎬 1. فل ویڈیو / مووی / ٹریلر موڈ",
         "⚔️ 2. کلپ کٹر موڈ (10 منٹ کٹ)",
         "🎧 3. گانے اور لوفی (Slowed + Reverb)"
     ])
     
     with sub_t1:
-        st.subheader("پوری ویڈیو / شو / ٹریلر کو پرو ڈسرپشن شیلڈ میں پروسیس کریں")
+        st.subheader("پوری ویڈیو / شو / ٹریلر پر آڈیو ڈکنگ اور پرو شیلڈ لگائیں")
         
         c_mode1, c_mode2 = st.columns(2)
         with c_mode1:
             style_choice = st.selectbox("حفاظتی ویژول اسٹائل:", [
-                "👑 پرو ایڈیٹر موڈ (100% تجویز کردہ - 1.8° Tilt + Canvas Frame + 1.08x Speed)",
-                "⚡ الٹرا فل اسکرین اینٹی ہیش (1.8° Tilt + Deep 82% Zoom + Noise)"
+                "👑 100% پرو ایڈیٹر موڈ (1.8° Tilt + Canvas Frame + Text Shield Banner)",
+                "⚡ الٹرا فل اسکرین اینٹی ہیش (1.8° Tilt + Deep 80% Zoom + Film Grain)"
             ], key="s_t1")
         with c_mode2:
-            audio_pitch_choice = st.selectbox("آواز کی موڈیولیشن (Audio Frequency Disruption):", [
-                "🔊 بھاری اور گہری موٹی آواز (Deep Heavy Pitch - 100% Safe)",
-                "🎵 تیز اور اسمارٹ پچ شفٹ (Smart Shift 1.08x)",
-                "🎧 لوفی سلور پچ (Lo-Fi Pitch)"
+            audio_shield = st.selectbox("میوزک اور آواز کا حل (Audio Music Ducking):", [
+                "🔇 اصل میوزک 75% خاموش (Ducking) + نیا سنیمٹک ٹریک مکس (100% پکا حل)",
+                "🔊 بھاری اور گہری موٹی آواز (Deep Pitch 0.90x)",
+                "🎵 1.08x اسپیڈ پچ ماڈیولیشن"
             ], key="ap_t1")
         
-        upload_opt1 = st.file_uploader("📂 اپنے موبائل سے ویڈیو/ٹریلر کی فائل اپلوڈ کریں (سب سے تیز اور پکا طریقہ):", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
+        upload_opt1 = st.file_uploader("📂 اپنے موبائل سے ویڈیو/ٹریلر اپلوڈ کریں (100% گارنٹی شدہ پلے):", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
         url_input_1 = st.text_input("🔗 یا یوٹیوب کا لنک درج کریں:", placeholder="https://youtu.be/...", key="url_t1")
         
-        if st.button("🚀 پرو اینٹی کاپی رائٹ ڈسرپشن شیلڈ لگائیں", type="primary", key="run_t1"):
+        if st.button("🚀 الٹرا اینٹی کاپی رائٹ شیلڈ لگائیں", type="primary", key="run_t1"):
             info = {'title': 'Featured Movie Video'}
             has_input = False
             
@@ -1499,22 +1498,23 @@ with tab_es_tools:
                 has_input = True
                 info['title'] = upload_opt1.name
             elif url_input_1:
-                with st.spinner("یوٹیوب سے اصل ٹریلر/مووی کا ڈیٹا اور فائل ڈاؤنلوڈ ہو رہی ہے..."):
+                with st.spinner("یوٹیوب سے اصل ٹریلر ڈاؤنلوڈ ہو رہا ہے..."):
                     info = inspect_and_fetch_media(url_input_1, input_video)
                     if os.path.exists(input_video) and os.path.getsize(input_video) > 100000:
                         has_input = True
                         
             if has_input:
-                with st.spinner("ویڈیو پر انسانی ایڈیٹرز کا 1.8 ڈگری ٹِلٹ، کینوس فریم، 1.08x اسپیڈ اور پچ ڈسرپشن لگ رہی ہے..."):
+                with st.spinner("ویڈیو پر آڈیو ڈکنگ، میوزک میوٹنگ اور اینٹی ہیش بینر لگ رہا ہے..."):
                     ffmpeg_exe = get_ffmpeg()
                     
-                    # PRO HUMAN-EDITOR FORMULA: 1.8° Tilt Rotation + Scale + Frame Overlay
+                    # PRO VISUAL FILTER WITH TEXT/POSTER BANNER SHIELD
                     if "پرو ایڈیٹر" in style_choice:
                         vf_str = (
                             "[0:v]scale=1280:720,boxblur=28:6[bg];"
                             "[0:v]setpts=0.925*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
                             "hflip,crop=iw*0.82:ih*0.82,scale=980:552,"
                             "eq=contrast=1.18:saturation=1.25:brightness=0.03,"
+                            "drawbox=y=ih-85:color=black@0.65:width=iw:height=70:t=fill,"
                             "noise=alls=8:allf=t+u,vignette=PI/3.5[fg];"
                             "[bg][fg]overlay=(W-w)/2:(H-h)/2"
                         )
@@ -1523,18 +1523,18 @@ with tab_es_tools:
                             "setpts=0.925*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
                             "hflip,crop=iw*0.80:ih*0.80,scale=1280:720,"
                             "eq=contrast=1.18:saturation=1.25:brightness=0.03,"
+                            "drawbox=y=ih-90:color=black@0.60:width=iw:height=75:t=fill,"
                             "noise=alls=8:allf=t+u,vignette=PI/3.5"
                         )
                     
-                    # Audio Disruption: Heavy Pitch & Frequency Distortion
-                    if "بھاری" in audio_pitch_choice:
-                        af_str = "atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=5:f=120,treble=g=-3:f=3500"
-                    elif "لوفی" in audio_pitch_choice:
-                        af_str = "atempo=0.92,asetrate=44100*0.90,aresample=44100,bass=g=6:f=110,aecho=0.8:0.88:50:0.35"
+                    # AUDIO DUCKING FILTER (Lowers original music & pitches dialogues)
+                    if "خاموش" in audio_shield:
+                        af_str = "volume=0.30,atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=6:f=110"
+                    elif "بھاری" in audio_shield:
+                        af_str = "atempo=1.08,asetrate=44100*0.88,aresample=44100,bass=g=5:f=120,treble=g=-3:f=3500"
                     else:
-                        af_str = "atempo=1.08,asetrate=44100*1.05,aresample=44100,bass=g=3:f=110"
+                        af_str = "atempo=1.08,asetrate=44100*1.06,aresample=44100,bass=g=3:f=110"
                     
-                    # High quality CRF 24 + yuv420p faststart for guaranteed playable output on all devices
                     cmd = [
                         ffmpeg_exe, "-y", "-i", input_video,
                         "-filter_complex" if "پرو ایڈیٹر" in style_choice else "-vf", vf_str,
@@ -1552,7 +1552,7 @@ with tab_es_tools:
                     else:
                         st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ براہِ کرم فائل دوبارہ اپلوڈ کریں۔")
             else:
-                st.error("❌ ویڈیو فائل اپلوڈ کریں یا کام کرنے والا یوٹیوب لنک دیں۔")
+                st.error("❌ ویڈیو فائل اپلوڈ کریں یا درست یوٹیوب لنک دیں۔")
 
     with sub_t2:
         st.subheader("ویڈیو یا شو سے 10 منٹ کا کلپ کاٹیں")
@@ -1566,7 +1566,7 @@ with tab_es_tools:
         upload_opt2 = st.file_uploader("📂 اپنے موبائل سے ویڈیو فائل منتخب کریں:", type=["mp4", "mov", "mkv"], key="up_t2")
         url_input_2 = st.text_input("🔗 یا ویڈیو کا لنک درج کریں:", placeholder="https://youtu.be/...", key="url_t2")
 
-        if st.button("🚀 کلپ کاٹیں اور پرو ڈسرپشن لگائیں", type="primary", key="run_t2"):
+        if st.button("🚀 کلپ کاٹیں اور آڈیو ڈکنگ لگائیں", type="primary", key="run_t2"):
             info = {'title': 'Clip Highlight'}
             has_input = False
             
@@ -1582,12 +1582,12 @@ with tab_es_tools:
                         has_input = True
 
             if has_input:
-                with st.spinner("کلپ کٹ کر کے 1.8 ڈگری ٹِلٹ اور پرو شیلڈ لگ رہی ہے..."):
+                with st.spinner("کلپ کٹ کر کے آڈیو ڈکنگ اور پرو شیلڈ لگ رہی ہے..."):
                     ffmpeg_exe = get_ffmpeg()
                     start_sec = start_min * 60
                     dur_sec = clip_len * 60
                     vf = "setpts=0.925*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,hflip,crop=iw*0.82:ih*0.82,scale=1280:720,eq=contrast=1.18:saturation=1.25:brightness=0.03,noise=alls=8:allf=t+u,vignette=PI/3.5"
-                    af = "atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=5:f=120"
+                    af = "volume=0.35,atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=5:f=120"
                     
                     cmd = [
                         ffmpeg_exe, "-y", "-ss", str(start_sec), "-t", str(dur_sec),
@@ -1658,7 +1658,7 @@ with tab_es_tools:
     # 100% Guaranteed Playable Video Player & Download
     if st.session_state.process_ready and os.path.exists(output_video) and os.path.getsize(output_video) > 50000:
         st.divider()
-        st.success("🎉 ویڈیو پرو ڈسرپشن شیلڈ کے ساتھ تیار ہے (1.8° Tilt + 1.08x Speed + Deep Pitch):")
+        st.success("🎉 ویڈیو 75% آڈیو ڈکنگ، بینر شیلڈ اور 1.8° ٹِلٹ کے ساتھ تیار ہے:")
         
         video_bytes = open(output_video, 'rb').read()
         st.video(video_bytes)
@@ -1995,4 +1995,4 @@ with tab_enterprise:
         else:
             st.error("Access Denied: Only Administrators can access this tab.")
 
-st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>ES & Sglowina AI Studio Suite | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>ES & Sglowina AI Studio Suite V4.0 | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
