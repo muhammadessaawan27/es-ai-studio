@@ -66,74 +66,6 @@ enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=s
 st.session_state.enable_watermark = enable_watermark
 st.session_state.enable_bg_music = enable_bg_music
 
-render_semaphore = import streamlit as st
-import asyncio
-import edge_tts
-import requests
-import urllib.parse
-import os
-import time
-import re
-import uuid
-import random
-import subprocess
-from PIL import Image, ImageDraw, ImageFont, ImageStat, ImageFilter, ImageEnhance
-import io
-import base64
-import numpy as np
-import threading
-import gc
-import sqlite3
-import hashlib
-import concurrent.futures
-
-# ==========================================
-# MOVIEPY CINEMATIC IMPORTS
-# ==========================================
-try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
-except ImportError:
-    from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
-
-# ==========================================
-# BROWSER SESSION STABILITY HEADERS
-# ==========================================
-headers_browser = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
-session = requests.Session()
-session.headers.update(headers_browser)
-
-SGLOWINA_BIO = (
-    "Sglowina AI is an advanced generative AI cinematic video, vision & image production platform, "
-    "proudly developed by Muhammad Essa Awan & Saba Wahid."
-)
-
-# ==========================================
-# STREAMLIT INITIALIZATION & GLOBAL STATES
-# ==========================================
-st.set_page_config(page_title="ES Ultimate AI Studio & SaaS", layout="wide", page_icon="⚡")
-
-if "enable_watermark" not in st.session_state:
-    st.session_state.enable_watermark = True
-if "enable_bg_music" not in st.session_state:
-    st.session_state.enable_bg_music = True
-if "logged_in_user" not in st.session_state:
-    st.session_state.logged_in_user = "demo_user"
-if "msgs" not in st.session_state:
-    st.session_state.msgs = []
-if "process_ready" not in st.session_state:
-    st.session_state.process_ready = False
-if "detected_info" not in st.session_state:
-    st.session_state.detected_info = {}
-
-st.sidebar.subheader("🎬 Video Settings")
-enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=st.session_state.enable_watermark)
-enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=st.session_state.enable_bg_music)
-
-st.session_state.enable_watermark = enable_watermark
-st.session_state.enable_bg_music = enable_bg_music
-
 render_semaphore = threading.Semaphore(value=2)
 active_renderers = 0
 render_lock = threading.Lock()
@@ -223,6 +155,7 @@ def get_db_connection():
 def init_db_v21():
     conn = get_db_connection()
     cursor = conn.cursor()
+    
     is_sqlite = not hasattr(conn, "closed")
     serial_primary = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sqlite else "SERIAL PRIMARY KEY"
     
@@ -239,6 +172,7 @@ def init_db_v21():
             created_at TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS projects (
             id TEXT PRIMARY KEY,
@@ -251,6 +185,7 @@ def init_db_v21():
             is_favorite INTEGER DEFAULT 0
         )
     """)
+    
     cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS credits_history (
             id {serial_primary},
@@ -261,6 +196,7 @@ def init_db_v21():
             date TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS local_payments (
             id TEXT PRIMARY KEY,
@@ -272,6 +208,7 @@ def init_db_v21():
             created_at TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS characters (
             id TEXT PRIMARY KEY,
@@ -281,6 +218,7 @@ def init_db_v21():
             reference_data TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS scenes (
             id TEXT PRIMARY KEY,
@@ -291,6 +229,7 @@ def init_db_v21():
             camera_style TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS coupons (
             code TEXT PRIMARY KEY,
@@ -298,6 +237,7 @@ def init_db_v21():
             uses_left INTEGER
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS system_config (
             key TEXT PRIMARY KEY,
@@ -310,17 +250,28 @@ def init_db_v21():
         cursor.execute("INSERT INTO coupons (code, credits, uses_left) VALUES ('ESSASABA', 100, 1000)")
     
     h_admin = hash_password("786")
-    for u, e in [("essasaba", "essasaba@sglowina.ai"), ("essa_awan", "essa@sglowina.ai")]:
-        cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (u,))
-        if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                           (u, e, h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
-                           
+    
+    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'essasaba'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       ("essasaba", "essasaba@sglowina.ai", h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+    else:
+        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'essasaba'", (h_admin,))
+
+    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'essa_awan'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       ("essa_awan", "essa@sglowina.ai", h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+    else:
+        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'essa_awan'", (h_admin,))
+                       
     h_saba = hash_password("1234")
     cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                        ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", 5000, "Admin", "2026-07-21"))
+    else:
+        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'saba_wahid'", (h_saba,))
                        
     conn.commit()
     conn.close()
@@ -1542,7 +1493,6 @@ with tab_es_tools:
         st.subheader("پوری ویڈیو / شو کو 7 لیئر فلٹرز میں پروسیس کریں")
         style_choice = st.selectbox("حفاظتی اسٹائل:", ["🛡️ 7 لیئر کینوس بلر فریم (سب سے زیادہ محفوظ)", "⚡ 7 لیئر فل اسکرین الٹرا اینٹی ہیش"], key="s_t1")
         
-        # Dual input: Direct File Upload OR Safe URL
         upload_opt1 = st.file_uploader("📂 اپنے موبائل/کمپیوٹر سے ویڈیو اپلوڈ کریں (100% گارنٹی شدہ پلے):", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
         url_input_1 = st.text_input("🔗 یا ویڈیو/مووی کا یوٹیوب لنک درج کریں:", placeholder="https://youtu.be/...", key="url_t1")
         
@@ -1565,7 +1515,6 @@ with tab_es_tools:
                 with st.spinner("ویڈیو پر 7 لیئرز لگ رہی ہیں اور موبائل فارمیٹ میں کمپریس ہو رہی ہے..."):
                     ffmpeg_exe = get_ffmpeg()
                     
-                    # 7-Layer Video & Audio Filter Logic
                     if "کینوس" in style_choice:
                         vf_str = "[0:v]scale=1280:720,boxblur=25:5[bg];[0:v]hflip,crop=iw*0.92:ih*0.92,scale=1080:608,eq=contrast=1.06:saturation=1.12:brightness=0.01,noise=alls=2:allf=t+u,vignette=PI/5[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2"
                     else:
@@ -1573,8 +1522,6 @@ with tab_es_tools:
                         
                     af_str = "atempo=1.03,asetrate=44100*1.025,aresample=44100,bass=g=2:f=110"
                     
-                    # -pix_fmt yuv420p & -movflags +faststart fixes video playback on all mobile devices
-                    # -crf 24 reduces size from 250MB to ~15-25MB while keeping HD quality
                     cmd = [
                         ffmpeg_exe, "-y", "-i", input_video,
                         "-filter_complex" if "کینوس" in style_choice else "-vf", vf_str,
@@ -1693,12 +1640,11 @@ with tab_es_tools:
             else:
                 st.error("❌ آڈیو فائل اپلوڈ کریں یا درست لنک دیں۔")
 
-    # 100% Guaranteed Playable Video Player & Download
+    # 100% Playable Video Output Section
     if st.session_state.process_ready and os.path.exists(output_video) and os.path.getsize(output_video) > 50000:
         st.divider()
         st.success("🎉 ویڈیو 100% پروسیس ہو گئی ہے اور اب موبائل پر بھی چلے گی:")
         
-        # Streamlit Video Player with correct byte read
         video_bytes = open(output_video, 'rb').read()
         st.video(video_bytes)
         
