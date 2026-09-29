@@ -1458,11 +1458,11 @@ with tab_companion:
     render_autonomous_live_viewport()
 
 # -----------------
-# TAB 3: ES VIDEO PROCESSOR & 9-LAYER HEAVY ANTI-COPYRIGHT ENGINE
+# TAB 3: ES VIDEO PROCESSOR & PRO DISRUPTION ENGINE
 # -----------------
 with tab_es_tools:
-    st.write("### ⚡ ES الٹرا اسمارٹ اینٹی کاپی رائٹ شیلڈ (Heavy Bypass Engine)")
-    st.info("💡 **نوٹ:** یہ انجن یوٹیوب کے Content ID کے ویژول اور آڈیو ہیش کو توڑنے کے لیے ڈیپ کراپ، نوائز، پچ شفٹ اور کینوس فریم لگاتا ہے۔")
+    st.write("### ⚡ ES ہالی ووڈ پرو ڈسرپشن اینٹی کاپی رائٹ شیلڈ (Human Editor Formula)")
+    st.info("💡 **پرو فارمولا ایکٹیو:** 1.8 ڈگری جیو میٹرک ٹِلٹ (Tilt)، 8% تیز اسپیڈ (1.08x)، کینوس فریم، کلر کروز اور بھاری آڈیو پچ جو یوٹیوب کے AI کو مکمل دھوکہ دیتی ہے۔")
     
     sub_t1, sub_t2, sub_t3 = st.tabs([
         "🎬 1. فل ویڈیو / مووی موڈ",
@@ -1471,25 +1471,25 @@ with tab_es_tools:
     ])
     
     with sub_t1:
-        st.subheader("پوری ویڈیو / شو / ٹریلر کو 9 لیئر شیلڈ میں پروسیس کریں")
+        st.subheader("پوری ویڈیو / شو / ٹریلر کو پرو ڈسرپشن شیلڈ میں پروسیس کریں")
         
         c_mode1, c_mode2 = st.columns(2)
         with c_mode1:
             style_choice = st.selectbox("حفاظتی ویژول اسٹائل:", [
-                "🛡️ 9 لیئر کینوس بلر فریم (100% تجویز کردہ - Maximum Bypass)",
-                "⚡ 9 لیئر الٹرا کراپ اینٹی ہیش (Full Screen Zoom)"
+                "👑 پرو ایڈیٹر موڈ (100% تجویز کردہ - 1.8° Tilt + Canvas Frame + 1.08x Speed)",
+                "⚡ الٹرا فل اسکرین اینٹی ہیش (1.8° Tilt + Deep 82% Zoom + Noise)"
             ], key="s_t1")
         with c_mode2:
-            audio_pitch_choice = st.selectbox("آواز کی موڈیولیشن (Audio Pitch Shield):", [
-                "🔊 بھاری اور گہری آواز (Deep Heavy Pitch - 100% Safe)",
-                "🎵 اسمارٹ پچ شفٹ (Smart Shift 1.04x)",
+            audio_pitch_choice = st.selectbox("آواز کی موڈیولیشن (Audio Frequency Disruption):", [
+                "🔊 بھاری اور گہری موٹی آواز (Deep Heavy Pitch - 100% Safe)",
+                "🎵 تیز اور اسمارٹ پچ شفٹ (Smart Shift 1.08x)",
                 "🎧 لوفی سلور پچ (Lo-Fi Pitch)"
             ], key="ap_t1")
         
-        upload_opt1 = st.file_uploader("📂 اپنے موبائل سے ویڈیو/ٹریلر کی فائل اپلوڈ کریں (بہترین رزلٹ):", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
+        upload_opt1 = st.file_uploader("📂 اپنے موبائل سے ویڈیو/ٹریلر کی فائل اپلوڈ کریں (سب سے تیز اور پکا طریقہ):", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
         url_input_1 = st.text_input("🔗 یا یوٹیوب کا لنک درج کریں:", placeholder="https://youtu.be/...", key="url_t1")
         
-        if st.button("🚀 9 لیئر اینٹی کاپی رائٹ شیلڈ لگائیں", type="primary", key="run_t1"):
+        if st.button("🚀 پرو اینٹی کاپی رائٹ ڈسرپشن شیلڈ لگائیں", type="primary", key="run_t1"):
             info = {'title': 'Featured Movie Video'}
             has_input = False
             
@@ -1499,44 +1499,47 @@ with tab_es_tools:
                 has_input = True
                 info['title'] = upload_opt1.name
             elif url_input_1:
-                with st.spinner("یوٹیوب سے اصل ٹریلر/مووی کا ڈیٹا اور ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
+                with st.spinner("یوٹیوب سے اصل ٹریلر/مووی کا ڈیٹا اور فائل ڈاؤنلوڈ ہو رہی ہے..."):
                     info = inspect_and_fetch_media(url_input_1, input_video)
                     if os.path.exists(input_video) and os.path.getsize(input_video) > 100000:
                         has_input = True
                         
             if has_input:
-                with st.spinner("ویڈیو پر 9 لیئر ویژول و آڈیو ہیش بریکر لگ رہا ہے اور موبائل کے لیے 15-25 MB میں کمپریس ہو رہا ہے..."):
+                with st.spinner("ویڈیو پر انسانی ایڈیٹرز کا 1.8 ڈگری ٹِلٹ، کینوس فریم، 1.08x اسپیڈ اور پچ ڈسرپشن لگ رہی ہے..."):
                     ffmpeg_exe = get_ffmpeg()
                     
-                    # 9-Layer Visual Filter String (Breaks Visual Hash)
-                    if "کینوس" in style_choice:
+                    # PRO HUMAN-EDITOR FORMULA: 1.8° Tilt Rotation + Scale + Frame Overlay
+                    if "پرو ایڈیٹر" in style_choice:
                         vf_str = (
-                            "[0:v]scale=1280:720,boxblur=25:5[bg];"
-                            "[0:v]hflip,crop=iw*0.88:ih*0.88,scale=1080:608,"
-                            "eq=contrast=1.12:saturation=1.20:brightness=0.02,"
-                            "noise=alls=5:allf=t+u,vignette=PI/4[fg];"
+                            "[0:v]scale=1280:720,boxblur=28:6[bg];"
+                            "[0:v]setpts=0.925*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
+                            "hflip,crop=iw*0.82:ih*0.82,scale=980:552,"
+                            "eq=contrast=1.18:saturation=1.25:brightness=0.03,"
+                            "noise=alls=8:allf=t+u,vignette=PI/3.5[fg];"
                             "[bg][fg]overlay=(W-w)/2:(H-h)/2"
                         )
                     else:
                         vf_str = (
-                            "hflip,crop=iw*0.88:ih*0.88,scale=1280:720,"
-                            "eq=contrast=1.12:saturation=1.20:brightness=0.02,"
-                            "noise=alls=5:allf=t+u,vignette=PI/4"
+                            "setpts=0.925*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
+                            "hflip,crop=iw*0.80:ih*0.80,scale=1280:720,"
+                            "eq=contrast=1.18:saturation=1.25:brightness=0.03,"
+                            "noise=alls=8:allf=t+u,vignette=PI/3.5"
                         )
                     
-                    # Audio Pitch Shift Selection (Breaks Audio Hash)
+                    # Audio Disruption: Heavy Pitch & Frequency Distortion
                     if "بھاری" in audio_pitch_choice:
-                        af_str = "atempo=1.04,asetrate=44100*0.95,aresample=44100,bass=g=4:f=100,treble=g=-2:f=3000"
+                        af_str = "atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=5:f=120,treble=g=-3:f=3500"
                     elif "لوفی" in audio_pitch_choice:
-                        af_str = "atempo=0.92,asetrate=44100*0.92,aresample=44100,bass=g=5:f=110,aecho=0.8:0.88:40:0.3"
+                        af_str = "atempo=0.92,asetrate=44100*0.90,aresample=44100,bass=g=6:f=110,aecho=0.8:0.88:50:0.35"
                     else:
-                        af_str = "atempo=1.035,asetrate=44100*1.03,aresample=44100,bass=g=2:f=110"
+                        af_str = "atempo=1.08,asetrate=44100*1.05,aresample=44100,bass=g=3:f=110"
                     
-                    # High quality CRF 24 + yuv420p faststart for guaranteed playable output
+                    # High quality CRF 24 + yuv420p faststart for guaranteed playable output on all devices
                     cmd = [
                         ffmpeg_exe, "-y", "-i", input_video,
-                        "-filter_complex" if "کینوس" in style_choice else "-vf", vf_str,
+                        "-filter_complex" if "پرو ایڈیٹر" in style_choice else "-vf", vf_str,
                         "-af", af_str,
+                        "-r", "25",
                         "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
                         "-pix_fmt", "yuv420p", "-movflags", "+faststart",
                         "-c:a", "aac", "-b:a", "128k", output_video
@@ -1549,7 +1552,7 @@ with tab_es_tools:
                     else:
                         st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ براہِ کرم فائل دوبارہ اپلوڈ کریں۔")
             else:
-                st.error("❌ براہِ کرم ویڈیو فائل اپلوڈ کریں یا کام کرنے والا یوٹیوب لنک دیں۔")
+                st.error("❌ ویڈیو فائل اپلوڈ کریں یا کام کرنے والا یوٹیوب لنک دیں۔")
 
     with sub_t2:
         st.subheader("ویڈیو یا شو سے 10 منٹ کا کلپ کاٹیں")
@@ -1563,7 +1566,7 @@ with tab_es_tools:
         upload_opt2 = st.file_uploader("📂 اپنے موبائل سے ویڈیو فائل منتخب کریں:", type=["mp4", "mov", "mkv"], key="up_t2")
         url_input_2 = st.text_input("🔗 یا ویڈیو کا لنک درج کریں:", placeholder="https://youtu.be/...", key="url_t2")
 
-        if st.button("🚀 کلپ کاٹیں اور اینٹی کاپی رائٹ لگائیں", type="primary", key="run_t2"):
+        if st.button("🚀 کلپ کاٹیں اور پرو ڈسرپشن لگائیں", type="primary", key="run_t2"):
             info = {'title': 'Clip Highlight'}
             has_input = False
             
@@ -1579,16 +1582,17 @@ with tab_es_tools:
                         has_input = True
 
             if has_input:
-                with st.spinner("کلپ کٹ کر کے 9 لیئرز لگ رہی ہیں..."):
+                with st.spinner("کلپ کٹ کر کے 1.8 ڈگری ٹِلٹ اور پرو شیلڈ لگ رہی ہے..."):
                     ffmpeg_exe = get_ffmpeg()
                     start_sec = start_min * 60
                     dur_sec = clip_len * 60
-                    vf = "hflip,crop=iw*0.88:ih*0.88,scale=1280:720,eq=contrast=1.12:saturation=1.20:brightness=0.02,noise=alls=5:allf=t+u,vignette=PI/4"
-                    af = "atempo=1.04,asetrate=44100*0.95,aresample=44100,bass=g=3:f=110"
+                    vf = "setpts=0.925*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,hflip,crop=iw*0.82:ih*0.82,scale=1280:720,eq=contrast=1.18:saturation=1.25:brightness=0.03,noise=alls=8:allf=t+u,vignette=PI/3.5"
+                    af = "atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=5:f=120"
                     
                     cmd = [
                         ffmpeg_exe, "-y", "-ss", str(start_sec), "-t", str(dur_sec),
                         "-i", input_video, "-vf", vf, "-af", af,
+                        "-r", "25",
                         "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
                         "-pix_fmt", "yuv420p", "-movflags", "+faststart",
                         "-c:a", "aac", "-b:a", "128k", output_video
@@ -1651,10 +1655,10 @@ with tab_es_tools:
             else:
                 st.error("❌ آڈیو فائل اپلوڈ کریں یا درست لنک دیں۔")
 
-    # 100% Playable Video Output Section
+    # 100% Guaranteed Playable Video Player & Download
     if st.session_state.process_ready and os.path.exists(output_video) and os.path.getsize(output_video) > 50000:
         st.divider()
-        st.success("🎉 ویڈیو 100% پروسیس ہو گئی ہے اور اب موبائل پر بھی چلے گی:")
+        st.success("🎉 ویڈیو پرو ڈسرپشن شیلڈ کے ساتھ تیار ہے (1.8° Tilt + 1.08x Speed + Deep Pitch):")
         
         video_bytes = open(output_video, 'rb').read()
         st.video(video_bytes)
