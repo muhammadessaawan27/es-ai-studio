@@ -481,6 +481,206 @@ def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
         return True, safe_prompt
     return False, scene_text_en
 
+def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, character_heritage, enableLOWER(?)", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return verify_password(password, row['password_hash'])
+    return False
+
+def get_user_data(username):
+    username = username.strip().lower()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
+def deduct_user_credits(username, amount):
+    username = username.strip().lower()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE LOWER(username) = LOWER(?)", (amount, username))
+    conn.commit()
+    conn.close()
+
+def log_credit_usage(user_id, action, used, balance):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO credits_history (user_id, action, credits_used, balance_after, date) VALUES (?, ?, ?, ?, ?)",
+                   (user_id, action, used, balance, time.strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+
+# ==========================================
+# 3. ENHANCED VIDEO PROCESSOR & AUTHENTIC METADATA
+# ==========================================
+def inspect_and_fetch_media(url, target_path=input_video):
+    if os.path.exists(target_path):
+        os.remove(target_path)
+    
+    info_dict = {'title': 'Featured Movie Video', 'uploader': 'Official Creator', 'categories': ['Entertainment'], 'tags': []}
+    try:
+        import yt_dlp
+        ydl_opts = {
+            'format': 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
+            'outtmpl': target_path,
+            'quiet': True,
+            'no_warnings': True,
+            'nocheckcertificate': True,
+            'extractor_args': {
+                'youtube': {'player_client': ['android', 'ios', 'mweb', 'web']}
+            }
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            meta = ydl.extract_info(url, download=True)
+            info_dict['title'] = meta.get('title', 'Featured Movie Video')
+            info_dict['uploader'] = meta.get('uploader', 'Official Creator')
+            info_dict['categories'] = meta.get('categories', ['Entertainment'])
+            info_dict['tags'] = meta.get('tags', [])
+    except Exception:
+        info_dict['title'] = "Custom Action Highlight"
+        try:
+            with requests.get(url, headers=headers_browser, stream=True, timeout=40) as r:
+                if r.status_code == 200:
+                    with open(target_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=16384):
+                            f.write(chunk)
+        except Exception:
+            pass
+
+    return info_dict
+
+def generate_smart_metadata(info):
+    raw_title = info.get('title', 'Video').strip()
+    clean_title = re.sub(r'[\(\[\{].*?[\)\]\}]', '', raw_title).strip()
+    if not clean_title: clean_title = raw_title
+    t_lower = raw_title.lower()
+    
+    if any(k in t_lower for k in ['kapil', 'comedy', 'funny', 'laugh', 'joke', 'hasna', 'standup', 'prank']):
+        genre = "Comedy / Talk Show"
+        safe_titles = [
+            f"😂 {clean_title} | Best Uncut Funny Moments",
+            f"🤣 Kapil Sharma Comedy Special | {clean_title[:45]} (Full Laugh Attack)",
+            f"🔥 Non-Stop Comedy Scene | {clean_title[:50]}"
+        ]
+        hashtags = f"#Comedy #FunnyVideo #StandupComedy #HindiComedy #ViralShow #LaughOutLoud"
+        thumb_prompt = f"Ultra realistic 8K YouTube thumbnail for comedy show scene '{clean_title[:35]}', comedian laughing happily on stage, bright cinematic studio lights, 16:9."
+    elif any(k in t_lower for k in ['song', 'music', 'lofi', 'slowed', 'reverb', 'audio', 'gaana', 'singer']):
+        genre = "Music / Lo-Fi Audio"
+        safe_titles = [
+            f"🎧 {clean_title} (Slowed + Reverb Lo-Fi Remix) | Midnight Chill",
+            f"🌙 {clean_title} | Deep Relaxing Vibe (Lofi Master HD)",
+            f"✨ Pure Nostalgia Vibes | {clean_title[:45]} (Slowed Version)"
+        ]
+        hashtags = f"#SlowedAndReverb #LofiRemix #ChillMusic #AestheticAudio #MidnightVibes"
+        thumb_prompt = f"Anime aesthetic 4K Lo-Fi wallpaper thumbnail for song '{clean_title[:35]}', neon cozy bedroom, rain outside window, 16:9."
+    elif any(k in t_lower for k in ['trailer', 'teaser', 'promo', 'first look', 'udta', 'teer', 'official']):
+        genre = "Official Trailer / Teaser Breakdown"
+        safe_titles = [
+            f"🔥 {clean_title} - Full Story & Climax Explained in Urdu/Hindi",
+            f"⚡ {clean_title} - Hidden Details & Teaser Breakdown You Missed!",
+            f"😱 {clean_title} - Big Twist & Action Breakdown Reaction"
+        ]
+        hashtags = f"#TrailerBreakdown #MovieTrailer #Blockbuster #CinemaLovers #MovieRecap #ActionTrailer"
+        thumb_prompt = f"Hyper-realistic 8K cinematic movie poster thumbnail for '{clean_title[:35]}', action hero in intense dramatic lighting, cinematic sparks and explosion, 16:9."
+    else:
+        genre = "Blockbuster Movie Scene"
+        safe_titles = [
+            f"🔥 {clean_title} - Ultimate Climax Scene (Hindi/Urdu)",
+            f"⚡ {clean_title} - Unstoppable Action & Best Moments",
+            f"😱 The Most Dramatic Scene of {clean_title[:40]} | Full HD Recap"
+        ]
+        hashtags = f"#MovieRecap #ActionMovie #CinemaLovers #Blockbuster #ViralClip"
+        thumb_prompt = f"Cinematic 8K action movie thumbnail for '{clean_title[:35]}', hero dramatic intense face, cinematic color grading, 16:9."
+        
+    return genre, safe_titles, hashtags, thumb_prompt
+
+# AI Director Analyzer
+def analyze_scene_for_director(scene_text):
+    text = scene_text.lower()
+    motion = "Zoom Out (v40 Default)"
+    lighting = "Volumetric Light"
+    color_grading = "Hollywood Cinematic"
+    composition = "Medium Shot, Rule of Thirds"
+    
+    if any(k in text for k in ["saba", "she", "her", "woman", "female", "girl"]):
+        composition = "Tight close-up portrait shot, extreme details of female face, emotional expression"
+        motion = "Push In"
+    elif any(k in text for k in ["essa", "he", "him", "man", "male", "boy", "warrior", "king"]):
+        composition = "Cinematic masculine close-up portrait, focus on eyes and facial details"
+        motion = "Zoom In"
+    elif any(k in text for k in ["together", "couple", "they", "them", "sitting with", "walking with"]):
+        composition = "Cinematic medium shot of a couple, side-by-side interacting"
+        motion = "Orbit Camera"
+    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "mud", "field"]):
+        composition = "Cinematic wide-angle establishing landscape shot, highly atmospheric environment"
+        motion = "Drone Shot"
+
+    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag", "tractor", "drive", "car"]):
+        motion = "Tracking Shot"
+    elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
+        motion = "Dolly In"
+        lighting = "Dark Cinematic, Horror Shadows"
+        color_grading = "Horror Green"
+    elif any(k in text for k in ["fight", "battle", "sword", "war"]):
+        motion = "Handheld Camera"
+    elif any(k in text for k in ["walk", "stroll"]):
+        motion = "Follow Shot"
+    elif any(k in text for k in ["think", "silent", "quiet", "meditate"]):
+        motion = "Ken Burns Effect"
+        
+    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine"]):
+        lighting = "Golden Hour"
+        color_grading = "Warm"
+    elif any(k in text for k in ["night", "midnight", "moon"]):
+        lighting = "Moonlight"
+        color_grading = "Cold Blue"
+        
+    return {
+        "motion": motion,
+        "lighting": lighting,
+        "color_grading": color_grading,
+        "composition": composition
+    }
+
+def translate_ur_to_en_enhanced(text):
+    try:
+        instruction = (
+            "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into highly descriptive English visual instructions. \n"
+            "CRITICAL RULES: \n"
+            "1. Explicitly identify the main subjects.\n"
+            "2. Do NOT blend genders.\n"
+            "3. Ensure anatomical perfection.\n"
+            "4. Output ONLY the English translation and visual descriptions."
+        )
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
+        res = session.get(url, timeout=15)
+        if res.status_code == 200:
+            return res.text.strip()
+    except Exception:
+        pass
+    return text
+
+def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
+    combined_text = (scene_text_en + " " + scene_text_ur).lower()
+    spiritual_keywords = [
+        "prophet", "sahaba", "saint", "angel", "god", "allah", "messenger", "nooh", "musa", "isa", "ibrahim", "yousuf", "muhammad", 
+        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر",
+        "grave", "shroud", "hell", "heaven", "paradise", "pious", "aulia", "angels", "holy dome", "mosque"
+    ]
+    if any(k in combined_text for k in spiritual_keywords):
+        safe_prompt = (
+            "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light emanating from the heavens, "
+            "sacred light beam, peaceful glowing ancient background, majestic natural mountains and glowing golden sand, "
+            "awe-inspiring holy atmosphere, highly detailed cosmic sky. "
+            "STRICTLY NO human faces, NO visible bodies, NO portraits, NO human figures. "
+            "Pure sacred light, beautiful symbolic representation."
+        )
+        return True, safe_prompt
+    return False, scene_text_en
+
 def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
     try:
         scene_lower = urdu_scene.lower()
