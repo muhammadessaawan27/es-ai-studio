@@ -44,7 +44,7 @@ SGLOWINA_BIO = (
 # ==========================================
 # STREAMLIT INITIALIZATION & GLOBAL STATES
 # ==========================================
-st.set_page_config(page_title="ES Ultimate AI Studio & Anti-Copyright V4.0", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="ES Ultimate AI Studio & Anti-Copyright V5.0", layout="wide", page_icon="⚡")
 
 if "enable_watermark" not in st.session_state:
     st.session_state.enable_watermark = True
@@ -58,6 +58,8 @@ if "process_ready" not in st.session_state:
     st.session_state.process_ready = False
 if "detected_info" not in st.session_state:
     st.session_state.detected_info = {}
+if "last_processed_file" not in st.session_state:
+    st.session_state.last_processed_file = None
 
 st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=st.session_state.enable_watermark)
@@ -69,9 +71,6 @@ st.session_state.enable_bg_music = enable_bg_music
 render_semaphore = threading.Semaphore(value=2)
 active_renderers = 0
 render_lock = threading.Lock()
-
-input_video = "input_master_video.mp4"
-output_video = "output_bypass_video.mp4"
 
 # Safe FFmpeg Locator
 def get_ffmpeg():
@@ -282,6 +281,221 @@ def authenticate_user(username, password):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT password_hash FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return verify_password(password, row['password_hash'])
+    return False
+
+def get_user_data(username):
+    username = username.strip().lower()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
+def deduct_user_credits(username, amount):
+    username = username.strip().lower()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE LOWER(username) = LOWER(?)", (amount, username))
+    conn.commit()
+    conn.close()
+
+def log_credit_usage(user_id, action, used, balance):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO credits_history (user_id, action, credits_used, balance_after, date) VALUES (?, ?, ?, ?, ?)",
+                   (user_id, action, used, balance, time.strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+
+# ==========================================
+# 3. UNIVERSAL MULTI-PLATFORM MEDIA FETCHER (TikTok, FB, Insta, Pinterest, YouTube)
+# ==========================================
+def inspect_and_fetch_media_universal(url, target_path):
+    if os.path.exists(target_path):
+        try: os.remove(target_path)
+        except Exception: pass
+    
+    info_dict = {
+        'title': 'Viral Video',
+        'uploader': 'Original Creator',
+        'platform': 'Social Media',
+        'tags': []
+    }
+    
+    # Identify platform
+    u_low = url.lower()
+    if 'tiktok' in u_low: info_dict['platform'] = 'TikTok'
+    elif 'instagram' in u_low: info_dict['platform'] = 'Instagram'
+    elif 'facebook' in u_low or 'fb.watch' in u_low: info_dict['platform'] = 'Facebook'
+    elif 'pinterest' in u_low or 'pin.it' in u_low: info_dict['platform'] = 'Pinterest'
+    elif 'youtu' in u_low: info_dict['platform'] = 'YouTube'
+    
+    try:
+        import yt_dlp
+        ydl_opts = {
+            'format': 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
+            'outtmpl': target_path,
+            'quiet': True,
+            'no_warnings': True,
+            'nocheckcertificate': True,
+            'http_headers': headers_browser,
+            'extractor_args': {
+                'youtube': {'player_client': ['android', 'ios', 'mweb', 'web']},
+                'tiktok': {'app_version': '20.2.1'}
+            }
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            meta = ydl.extract_info(url, download=True)
+            info_dict['title'] = meta.get('title', meta.get('description', 'Viral Video'))
+            info_dict['uploader'] = meta.get('uploader', meta.get('channel', 'Creator'))
+            info_dict['tags'] = meta.get('tags', [])
+    except Exception:
+        try:
+            with requests.get(url, headers=headers_browser, stream=True, timeout=40) as r:
+                if r.status_code == 200:
+                    with open(target_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=16384):
+                            f.write(chunk)
+                    info_dict['title'] = "Social Media Video"
+        except Exception:
+            pass
+
+    return info_dict
+
+# Pure Dynamic Smart Metadata Generator
+def generate_smart_metadata_dynamic(info):
+    raw_title = info.get('title', 'Video').strip()
+    platform = info.get('platform', 'Social Media')
+    
+    # Clean hashtags and brackets from original title
+    clean_title = re.sub(r'#\w+', '', raw_title)
+    clean_title = re.sub(r'[\(\[\{].*?[\)\]\}]', '', clean_title).strip()
+    if len(clean_title) < 5: clean_title = f"{platform} Viral Video"
+    
+    genre = "Trending Viral Clip"
+    t_lower = raw_title.lower()
+    
+    if any(k in t_lower for k in ['comedy', 'funny', 'laugh', 'joke', 'hasna', 'prank']):
+        genre = "Comedy / Entertainment"
+        safe_titles = [
+            f"😂 {clean_title[:50]} | Non-Stop Funny Moments",
+            f"🤣 Uncut Comedy Special | {clean_title[:45]}",
+            f"🔥 When Fun Reaches Peak! | {clean_title[:50]}"
+        ]
+        hashtags = "#Comedy #FunnyVideo #LaughOutLoud #ViralClip #TrendingReels"
+        thumb_prompt = f"8K YouTube comedy thumbnail for '{clean_title[:35]}', funny expression, bright stage lighting, 16:9."
+    elif any(k in t_lower for k in ['song', 'music', 'lofi', 'slowed', 'reverb', 'audio', 'gaana', 'remix']):
+        genre = "Music / Audio Vibe"
+        safe_titles = [
+            f"🎧 {clean_title[:50]} (Slowed + Reverb Lo-Fi Remix)",
+            f"🌙 {clean_title[:50]} | Midnight Relaxing Vibe",
+            f"✨ Deep Aesthetic Audio | {clean_title[:45]}"
+        ]
+        hashtags = "#SlowedAndReverb #LofiMusic #ChillVibes #AestheticAudio"
+        thumb_prompt = f"Cozy Lo-Fi anime aesthetic 4K wallpaper thumbnail for '{clean_title[:35]}', neon room, rain, 16:9."
+    elif any(k in t_lower for k in ['trailer', 'teaser', 'movie', 'film', 'cinema', 'scene', 'action']):
+        genre = "Movie / Action Scene"
+        safe_titles = [
+            f"🔥 {clean_title[:50]} - Full Scene Explained (Urdu/Hindi)",
+            f"⚡ {clean_title[:50]} - Ultimate Climax & Action Breakdown",
+            f"😱 Unbelievable Twist in {clean_title[:45]} | Full Review"
+        ]
+        hashtags = "#MovieRecap #ActionScene #CinemaLovers #Blockbuster"
+        thumb_prompt = f"8K cinematic action movie thumbnail for '{clean_title[:35]}', dramatic lighting, explosion sparks, 16:9."
+    else:
+        safe_titles = [
+            f"🔥 {clean_title[:50]} | Viral Trending Video",
+            f"⚡ You Won't Believe What Happened in {clean_title[:45]}",
+            f"😱 Best Moments of {clean_title[:50]} | Must Watch!"
+        ]
+        hashtags = f"#ViralVideo #{platform}Reels #Trending #MustWatch #BestMoments"
+        thumb_prompt = f"High contrast 8K viral thumbnail for '{clean_title[:35]}', vivid colors, dynamic composition, 16:9."
+        
+    return genre, safe_titles, hashtags, thumb_prompt
+
+# AI Director Analyzer
+def analyze_scene_for_director(scene_text):
+    text = scene_text.lower()
+    motion = "Zoom Out (v40 Default)"
+    lighting = "Volumetric Light"
+    color_grading = "Hollywood Cinematic"
+    composition = "Medium Shot, Rule of Thirds"
+    
+    if any(k in text for k in ["saba", "she", "her", "woman", "female", "girl"]):
+        composition = "Tight close-up portrait shot, extreme details of female face, emotional expression"
+        motion = "Push In"
+    elif any(k in text for k in ["essa", "he", "him", "man", "male", "boy", "warrior", "king"]):
+        composition = "Cinematic masculine close-up portrait, focus on eyes and facial details"
+        motion = "Zoom In"
+    elif any(k in text for k in ["together", "couple", "they", "them", "sitting with", "walking with"]):
+        composition = "Cinematic medium shot of a couple, side-by-side interacting"
+        motion = "Orbit Camera"
+    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "mud", "field"]):
+        composition = "Cinematic wide-angle establishing landscape shot, highly atmospheric environment"
+        motion = "Drone Shot"
+
+    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag", "tractor", "drive", "car"]):
+        motion = "Tracking Shot"
+    elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
+        motion = "Dolly In"
+        lighting = "Dark Cinematic, Horror Shadows"
+        color_grading = "Horror Green"
+    elif any(k in text for k in ["fight", "battle", "sword", "war"]):
+        motion = "Handheld Camera"
+    elif any(k in text for k in ["walk", "stroll"]):
+        motion = "Follow Shot"
+    elif any(k in text for k in ["think", "silent", "quiet", "meditate"]):
+        motion = "Ken Burns Effect"
+        
+    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine"]):
+        lighting = "Golden Hour"
+        color_grading = "Warm"
+    elif any(k in text for k in ["night", "midnight", "moon"]):
+        lighting = "Moonlight"
+        color_grading = "Cold Blue"
+        
+    return {
+        "motion": motion,
+        "lighting": lighting,
+        "color_grading": color_grading,
+        "composition": composition
+    }
+
+def translate_ur_to_en_enhanced(text):
+    try:
+        instruction = (
+            "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into descriptive visual instructions. "
+            "Identify main subjects, ensure gender separation and output ONLY visual descriptions."
+        )
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu: ' + text)}?model=openai"
+        res = session.get(url, timeout=15)
+        if res.status_code == 200:
+            return res.text.strip()
+    except Exception:
+        pass
+    return text
+
+def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
+    combined_text = (scene_text_en + " " + scene_text_ur).lower()
+    spiritual_keywords = [
+        "prophet", "sahaba", "saint", "angel", "god", "allah", "messenger", "nooh", "musa", "isa", "ibrahim", "yousuf", "muhammad", 
+        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر"
+    ]
+    if any(k in combined_text for k in spiritual_keywords):
+        safe_prompt = (
+            "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light emanating from the heavens, "
+            "sacred light beam, peaceful glowing ancient background, majestic natural mountains. "
+            "STRICTLY NO human faces, NO visible bodies. Pure sacred light."
+        )
+        return True, safe_prompt
+    return False, scene_text_en
+
+def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, character_heritage, enable_LOWER(?)", (username,))
     row = cursor.fetchone()
     conn.close()
     if row:
