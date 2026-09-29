@@ -37,7 +37,7 @@ session = requests.Session()
 session.headers.update(headers_browser)
 
 SGLOWINA_BIO = (
-    "Sglowina AI is an advanced generative AI cinematic video, live vision & image production platform, "
+    "Sglowina AI is an advanced generative AI cinematic video, vision & image production platform, "
     "proudly developed by Muhammad Essa Awan & Saba Wahid."
 )
 
@@ -172,6 +172,7 @@ def init_db_v21():
             created_at TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS projects (
             id TEXT PRIMARY KEY,
@@ -184,6 +185,7 @@ def init_db_v21():
             is_favorite INTEGER DEFAULT 0
         )
     """)
+    
     cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS credits_history (
             id {serial_primary},
@@ -194,6 +196,7 @@ def init_db_v21():
             date TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS local_payments (
             id TEXT PRIMARY KEY,
@@ -205,6 +208,7 @@ def init_db_v21():
             created_at TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS characters (
             id TEXT PRIMARY KEY,
@@ -214,6 +218,7 @@ def init_db_v21():
             reference_data TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS scenes (
             id TEXT PRIMARY KEY,
@@ -224,6 +229,7 @@ def init_db_v21():
             camera_style TEXT
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS coupons (
             code TEXT PRIMARY KEY,
@@ -231,6 +237,7 @@ def init_db_v21():
             uses_left INTEGER
         )
     """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS system_config (
             key TEXT PRIMARY KEY,
@@ -326,7 +333,7 @@ def log_credit_usage(user_id, action, used, balance):
     conn.close()
 
 # ==========================================
-# 3. VIDEO PROCESSING & METADATA HELPERS
+# 3. ENHANCED VIDEO PROCESSOR (SAFE FETCH & VERIFY)
 # ==========================================
 def inspect_and_fetch_media(url, target_path=input_video):
     if os.path.exists(target_path):
@@ -340,8 +347,9 @@ def inspect_and_fetch_media(url, target_path=input_video):
             'outtmpl': target_path,
             'quiet': True,
             'no_warnings': True,
+            'nocheckcertificate': True,
             'extractor_args': {
-                'youtube': {'player_client': ['tv_embedded', 'android', 'ios', 'mweb']}
+                'youtube': {'player_client': ['android', 'ios', 'mweb', 'web']}
             }
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -351,11 +359,11 @@ def inspect_and_fetch_media(url, target_path=input_video):
     except Exception:
         info_dict['title'] = "Custom Video Highlight"
         try:
-            with requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, stream=True, timeout=30) as r:
-                r.raise_for_status()
-                with open(target_path, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
+            with requests.get(url, headers=headers_browser, stream=True, timeout=40) as r:
+                if r.status_code == 200:
+                    with open(target_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=16384):
+                            f.write(chunk)
         except Exception:
             pass
 
@@ -1397,7 +1405,7 @@ def render_autonomous_live_viewport():
     st.components.v1.html(viewport_html, height=540)
 
 # ==========================================
-# 7. NAVIGATION TABS (ALL IN ONE INTEGRATED SUITE)
+# 7. NAVIGATION TABS (ALL 7 TABS)
 # ==========================================
 tab_auth, tab_companion, tab_es_tools, tab_movie, tab_image, tab_chat, tab_enterprise = st.tabs([
     "🔑 Sign In & Auth",
@@ -1470,23 +1478,41 @@ with tab_es_tools:
     with sub_t1:
         st.subheader("پوری ویڈیو / شو کو اینٹی کاپی رائٹ فلٹرز میں پروسیس کریں")
         style_choice = st.selectbox("حفاظتی اسٹائل:", ["🛡️ کینوس بلر فریم (سب سے زیادہ محفوظ)", "⚡ فل اسکرین الٹرا اینٹی ہیش"], key="s_t1")
-        url_input_1 = st.text_input("🔗 ویڈیو کا لنک درج کریں (جیسے کپل شرما شو یا مووی):", placeholder="https://youtu.be/...", key="url_t1")
+        
+        # Dual input: URL or Direct Upload
+        upload_opt1 = st.file_uploader("📂 یا اپنے موبائل/کمپیوٹر سے ویڈیو اپلوڈ کریں (100% گارنٹی شدہ):", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
+        url_input_1 = st.text_input("🔗 یا ویڈیو کا لنک درج کریں (جیسے کپل شرما شو یا مووی):", placeholder="https://youtu.be/...", key="url_t1")
         
         if st.button("🚀 پروسیسنگ شروع کریں", type="primary", key="run_t1"):
-            if url_input_1:
-                with st.spinner("ویڈیو اسکین، کٹ اور فلٹرز لگ رہے ہیں..."):
+            info = {'title': 'Custom Movie Highlight'}
+            has_input = False
+            
+            if upload_opt1 is not None:
+                with open(input_video, "wb") as f:
+                    f.write(upload_opt1.getvalue())
+                has_input = True
+                info['title'] = upload_opt1.name
+            elif url_input_1:
+                with st.spinner("ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
                     info = inspect_and_fetch_media(url_input_1, input_video)
-                    if os.path.exists(input_video) and os.path.getsize(input_video) > 50000:
-                        ffmpeg_exe = get_ffmpeg()
-                        vf_str = "[0:v]scale=1920:1080,boxblur=20:5[bg];[0:v]hflip,scale=1600:900,eq=contrast=1.07:saturation=1.14:brightness=0.01,noise=alls=2:allf=t+u,vignette=PI/4[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2" if "کینوس" in style_choice else "hflip,crop=iw*0.94:ih*0.94,eq=contrast=1.08:saturation=1.15,noise=alls=2:allf=t+u,vignette=PI/4"
-                        af_str = "atempo=1.04,asetrate=44100*1.02,bass=g=2:f=100"
+                    if os.path.exists(input_video) and os.path.getsize(input_video) > 100000:
+                        has_input = True
                         
-                        cmd = [ffmpeg_exe, "-y", "-i", input_video, "-filter_complex" if "کینوس" in style_choice else "-vf", vf_str, "-af", af_str, "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-b:a", "192k", output_video]
-                        subprocess.run(cmd)
+            if has_input:
+                with st.spinner("ویڈیو پر فلٹرز لگ رہے ہیں..."):
+                    ffmpeg_exe = get_ffmpeg()
+                    vf_str = "[0:v]scale=1920:1080,boxblur=20:5[bg];[0:v]hflip,scale=1600:900,eq=contrast=1.07:saturation=1.14:brightness=0.01,noise=alls=2:allf=t+u,vignette=PI/4[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2" if "کینوس" in style_choice else "hflip,crop=iw*0.94:ih*0.94,eq=contrast=1.08:saturation=1.15,noise=alls=2:allf=t+u,vignette=PI/4"
+                    af_str = "atempo=1.04,asetrate=44100*1.02,bass=g=2:f=100"
+                    
+                    cmd = [ffmpeg_exe, "-y", "-i", input_video, "-filter_complex" if "کینوس" in style_choice else "-vf", vf_str, "-af", af_str, "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-b:a", "192k", output_video]
+                    res = subprocess.run(cmd)
+                    if os.path.exists(output_video) and os.path.getsize(output_video) > 50000:
                         st.session_state.detected_info = info
                         st.session_state.process_ready = True
                     else:
-                        st.error("❌ ویڈیو ڈاؤنلوڈ نہیں ہو سکی۔")
+                        st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ فائل فارمیٹ چیک کریں۔")
+            else:
+                st.error("❌ براہِ کرم ویڈیو اپلوڈ کریں یا کام کرنے والا لنک دیں۔")
 
     with sub_t2:
         st.subheader("ویڈیو یا شو سے 10 منٹ کا کلپ کاٹیں")
@@ -1497,25 +1523,41 @@ with tab_es_tools:
             clip_len = st.slider("دورانیہ (منٹ):", 1, 20, 10, key="len_t2")
             
         start_min = 30 if "30" in scene_type else 45 if "45" in scene_type else 15 if "15" in scene_type else st.number_input("اسٹارٹ منٹ:", 0, 300, 10)
-        url_input_2 = st.text_input("🔗 ویڈیو کا لنک درج کریں:", placeholder="https://youtu.be/...", key="url_t2")
+        upload_opt2 = st.file_uploader("📂 یا اپنے موبائل سے ویڈیو فائل منتخب کریں:", type=["mp4", "mov", "mkv"], key="up_t2")
+        url_input_2 = st.text_input("🔗 یا ویڈیو کا لنک درج کریں:", placeholder="https://youtu.be/...", key="url_t2")
 
         if st.button("🚀 کلپ کاٹیں اور اینٹی کاپی رائٹ لگائیں", type="primary", key="run_t2"):
-            if url_input_2:
+            info = {'title': 'Clip Highlight'}
+            has_input = False
+            
+            if upload_opt2 is not None:
+                with open(input_video, "wb") as f:
+                    f.write(upload_opt2.getvalue())
+                has_input = True
+                info['title'] = upload_opt2.name
+            elif url_input_2:
                 with st.spinner("ویڈیو اسکین اور کلپ کٹ ہو رہا ہے..."):
                     info = inspect_and_fetch_media(url_input_2, input_video)
-                    if os.path.exists(input_video) and os.path.getsize(input_video) > 50000:
-                        ffmpeg_exe = get_ffmpeg()
-                        start_sec = start_min * 60
-                        dur_sec = clip_len * 60
-                        vf = "hflip,crop=iw*0.94:ih*0.94,eq=contrast=1.08:saturation=1.15,noise=alls=2:allf=t+u,vignette=PI/4"
-                        af = "atempo=1.04,asetrate=44100*1.02"
-                        
-                        cmd = [ffmpeg_exe, "-y", "-ss", str(start_sec), "-t", str(dur_sec), "-i", input_video, "-vf", vf, "-af", af, "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", output_video]
-                        subprocess.run(cmd)
+                    if os.path.exists(input_video) and os.path.getsize(input_video) > 100000:
+                        has_input = True
+
+            if has_input:
+                with st.spinner("کلپ کاٹ کر محفوظ بنایا جا رہا ہے..."):
+                    ffmpeg_exe = get_ffmpeg()
+                    start_sec = start_min * 60
+                    dur_sec = clip_len * 60
+                    vf = "hflip,crop=iw*0.94:ih*0.94,eq=contrast=1.08:saturation=1.15,noise=alls=2:allf=t+u,vignette=PI/4"
+                    af = "atempo=1.04,asetrate=44100*1.02"
+                    
+                    cmd = [ffmpeg_exe, "-y", "-ss", str(start_sec), "-t", str(dur_sec), "-i", input_video, "-vf", vf, "-af", af, "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", output_video]
+                    subprocess.run(cmd)
+                    if os.path.exists(output_video) and os.path.getsize(output_video) > 50000:
                         st.session_state.detected_info = info
                         st.session_state.process_ready = True
                     else:
-                        st.error("❌ لنک سے کلپ لوڈ نہیں ہو سکا۔")
+                        st.error("❌ ویڈیو ٹائم سیٹنگز چیک کریں۔")
+            else:
+                st.error("❌ براہِ کرم ویڈیو اپلوڈ کریں یا درست لنک دیں۔")
 
     with sub_t3:
         st.subheader("گانے کا لنک ڈالیں اور وائرل Slowed + Reverb بنائیں")
@@ -1527,26 +1569,42 @@ with tab_es_tools:
         with col_s3:
             bass_val = st.slider("بیس بوسٹ:", 0, 12, 6, key="bass_t3")
             
-        song_url = st.text_input("🔗 گانے کا لنک یہاں پیسٹ کریں:", placeholder="https://youtu.be/...", key="url_t3")
+        upload_opt3 = st.file_uploader("📂 یا آڈیو/ویڈیو فائل منتخب کریں:", type=["mp3", "wav", "mp4", "m4a"], key="up_t3")
+        song_url = st.text_input("🔗 یا گانے کا لنک یہاں پیسٹ کریں:", placeholder="https://youtu.be/...", key="url_t3")
         
         if st.button("🚀 گانے کو Slowed + Reverb بنائیں", type="primary", key="run_t3"):
-            if song_url:
-                with st.spinner("گانا ماسٹر ہو رہا ہے..."):
-                    temp_audio_in = "temp_song.mp4"
+            temp_audio_in = "temp_song.mp4"
+            info = {'title': 'Lo-Fi Chill Track'}
+            has_input = False
+            
+            if upload_opt3 is not None:
+                with open(temp_audio_in, "wb") as f:
+                    f.write(upload_opt3.getvalue())
+                has_input = True
+                info['title'] = upload_opt3.name
+            elif song_url:
+                with st.spinner("گانا ڈاؤنلوڈ ہو رہا ہے..."):
                     info = inspect_and_fetch_media(song_url, temp_audio_in)
                     if os.path.exists(temp_audio_in) and os.path.getsize(temp_audio_in) > 50000:
-                        ffmpeg_exe = get_ffmpeg()
-                        sample_rate = int(44100 * slow_val)
-                        af_filter = f"asetrate={sample_rate},aresample=44100,aecho=0.8:0.88:{reverb_val}:0.4,bass=g={bass_val}:f=110"
-                        cmd_song = [ffmpeg_exe, "-y", "-i", temp_audio_in, "-af", af_filter, "-c:v", "copy", "-c:a", "aac", output_video]
-                        subprocess.run(cmd_song)
+                        has_input = True
+                        
+            if has_input:
+                with st.spinner("گانا ماسٹر ہو رہا ہے..."):
+                    ffmpeg_exe = get_ffmpeg()
+                    sample_rate = int(44100 * slow_val)
+                    af_filter = f"asetrate={sample_rate},aresample=44100,aecho=0.8:0.88:{reverb_val}:0.4,bass=g={bass_val}:f=110"
+                    cmd_song = [ffmpeg_exe, "-y", "-i", temp_audio_in, "-af", af_filter, "-c:v", "copy", "-c:a", "aac", output_video]
+                    subprocess.run(cmd_song)
+                    if os.path.exists(output_video) and os.path.getsize(output_video) > 50000:
                         st.session_state.detected_info = info
                         st.session_state.process_ready = True
                     else:
-                        st.error("❌ گانے کا لنک لوڈ نہیں ہو سکا۔")
+                        st.error("❌ آڈیو پروسیسنگ فیل ہو گئی۔")
+            else:
+                st.error("❌ براہِ کرم آڈیو فائل اپلوڈ کریں یا درست لنک دیں۔")
 
-    # ES Tools Output Section
-    if st.session_state.process_ready and os.path.exists(output_video):
+    # Output Player
+    if st.session_state.process_ready and os.path.exists(output_video) and os.path.getsize(output_video) > 50000:
         st.divider()
         st.success("🎉 ویڈیو مکمل تیار ہے! نیچے سے ڈاؤنلوڈ کریں:")
         
