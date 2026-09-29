@@ -50,7 +50,7 @@ SGLOWINA_BIO = (
 # ==========================================
 # 3. STREAMLIT CONFIGURATION & STATES
 # ==========================================
-st.set_page_config(page_title="ES Ultimate AI Studio & Anti-Copyright V4.5", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="ES Ultimate AI Studio & Anti-Copyright V5.0", layout="wide", page_icon="⚡")
 
 if "enable_watermark" not in st.session_state:
     st.session_state.enable_watermark = True
@@ -64,6 +64,8 @@ if "process_ready" not in st.session_state:
     st.session_state.process_ready = False
 if "detected_info" not in st.session_state:
     st.session_state.detected_info = {}
+if "current_output_video" not in st.session_state:
+    st.session_state.current_output_video = None
 
 st.sidebar.subheader("🌐 Global Multi-Language System")
 target_lang = st.sidebar.selectbox("Choose System Language:", [
@@ -89,9 +91,6 @@ st.session_state.enable_bg_music = enable_bg_music
 render_semaphore = threading.Semaphore(value=2)
 active_renderers = 0
 render_lock = threading.Lock()
-
-input_video = "input_master_video.mp4"
-output_video = "output_bypass_video.mp4"
 
 # Safe FFmpeg Locator
 def get_ffmpeg():
@@ -341,27 +340,35 @@ def log_credit_usage(user_id, action, used, balance):
     conn.close()
 
 # ==========================================
-# 5. UNIVERSAL MULTI-PLATFORM DOWNLOADER & AI UNDERSTANDING
-# (Pinterest, Instagram, Facebook, TikTok, YouTube)
+# 5. UNIVERSAL MULTI-PLATFORM DOWNLOADER & AI SMART DETECTION
+# (TikTok, Pinterest, Instagram Reels, Facebook Watch, YouTube, Cartoons)
 # ==========================================
-def inspect_and_fetch_media_universal(url, target_path=input_video):
+def sanitize_social_url(url):
+    clean = url.strip()
+    if "?" in clean and ("instagram.com" in clean or "tiktok.com" in clean or "pinterest.com" in clean or "pin.it" in clean):
+        clean = clean.split("?")[0]
+    return clean
+
+def inspect_and_fetch_media_universal(url, target_path):
     if os.path.exists(target_path):
         try: os.remove(target_path)
         except Exception: pass
     
+    clean_url = sanitize_social_url(url)
+    
     info_dict = {
-        'title': 'Featured Trending Video',
-        'uploader': 'Official Creator',
+        'title': 'Viral Trending Video',
+        'uploader': 'Original Creator',
         'platform': 'Social Media',
         'categories': ['Entertainment'],
         'tags': []
     }
     
-    u_lower = url.lower()
-    if 'tiktok.com' in u_lower: info_dict['platform'] = 'TikTok'
-    elif 'instagram.com' in u_lower: info_dict['platform'] = 'Instagram'
-    elif 'facebook.com' in u_lower or 'fb.watch' in u_lower: info_dict['platform'] = 'Facebook'
-    elif 'pinterest.com' in u_lower or 'pin.it' in u_lower: info_dict['platform'] = 'Pinterest'
+    u_lower = clean_url.lower()
+    if 'tiktok' in u_lower: info_dict['platform'] = 'TikTok'
+    elif 'instagram' in u_lower: info_dict['platform'] = 'Instagram'
+    elif 'facebook' in u_lower or 'fb.watch' in u_lower: info_dict['platform'] = 'Facebook'
+    elif 'pinterest' in u_lower or 'pin.it' in u_lower: info_dict['platform'] = 'Pinterest'
     elif 'youtu' in u_lower: info_dict['platform'] = 'YouTube'
     
     try:
@@ -372,6 +379,7 @@ def inspect_and_fetch_media_universal(url, target_path=input_video):
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
+            'noplaylist': True,
             'http_headers': headers_browser,
             'extractor_args': {
                 'youtube': {'player_client': ['android', 'ios', 'mweb', 'web']},
@@ -379,17 +387,18 @@ def inspect_and_fetch_media_universal(url, target_path=input_video):
             }
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            meta = ydl.extract_info(url, download=True)
-            info_dict['title'] = meta.get('title', meta.get('description', 'Featured Trending Video'))
+            meta = ydl.extract_info(clean_url, download=True)
+            info_dict['title'] = meta.get('title', meta.get('description', 'Viral Video'))
             info_dict['uploader'] = meta.get('uploader', meta.get('channel', 'Creator'))
             info_dict['categories'] = meta.get('categories', ['Entertainment'])
             info_dict['tags'] = meta.get('tags', [])
-            return info_dict
+            if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                return info_dict
     except Exception:
         pass
         
     try:
-        with requests.get(url, headers=headers_browser, stream=True, timeout=45) as r:
+        with requests.get(clean_url, headers=headers_browser, stream=True, timeout=45) as r:
             if r.status_code == 200:
                 with open(target_path, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=16384):
@@ -405,10 +414,19 @@ def generate_smart_metadata_dynamic(info):
     platform = info.get('platform', 'Social Media')
     clean_title = re.sub(r'#\w+', '', raw_title)
     clean_title = re.sub(r'[\(\[\{].*?[\)\]\}]', '', clean_title).strip()
-    if len(clean_title) < 5: clean_title = f"{platform} Viral Master Video"
+    if len(clean_title) < 5: clean_title = f"{platform} Viral Master Episode"
     t_lower = raw_title.lower()
     
-    if any(k in t_lower for k in ['kapil', 'comedy', 'funny', 'laugh', 'joke', 'hasna', 'standup', 'prank']):
+    if any(k in t_lower for k in ['motu', 'patlu', 'cartoon', 'anime', 'animation', 'chhota bheem', 'doraemon', 'kids', 'tom']):
+        genre = "Animation & Kids Cartoon Episode"
+        safe_titles = [
+            f"🌟 {clean_title[:45]} | Non-Stop Fun Animation Episode",
+            f"🔥 Best Moments of {clean_title[:42]} | Full HD Cartoon",
+            f"🎉 {clean_title[:48]} - Super Comedy Cartoon Breakdown"
+        ]
+        hashtags = f"#Cartoons #Animation #KidsEntertainment #CartoonLovers #{platform}Kids #TrendingAnimation"
+        thumb_prompt = f"Vibrant 8K colorful 3D animated cartoon thumbnail for '{clean_title[:35]}', joyful cartoon expressions, bright magical background, 16:9."
+    elif any(k in t_lower for k in ['kapil', 'comedy', 'funny', 'laugh', 'joke', 'hasna', 'standup', 'prank']):
         genre = "Comedy / Viral Fun Moments"
         safe_titles = [
             f"😂 {clean_title[:45]} | Non-Stop Comedy Special",
@@ -426,7 +444,7 @@ def generate_smart_metadata_dynamic(info):
         ]
         hashtags = f"#SlowedAndReverb #LofiRemix #ChillMusic #AestheticAudio #{platform}Audio"
         thumb_prompt = f"Anime aesthetic 4K Lo-Fi wallpaper thumbnail for song '{clean_title[:35]}', neon cozy bedroom, rain outside window, 16:9."
-    elif any(k in t_lower for k in ['trailer', 'teaser', 'promo', 'first look', 'movie', 'film', 'cinema', 'action']):
+    elif any(k in t_lower for k in ['trailer', 'teaser', 'promo', 'movie', 'film', 'cinema', 'action']):
         genre = "Cinema & Action Climax Scene"
         safe_titles = [
             f"🔥 {clean_title[:45]} - Full Climax & Scene Breakdown",
@@ -1470,20 +1488,20 @@ with tab_companion:
     render_autonomous_live_viewport()
 
 # -----------------
-# TAB 3: ES VIDEO PROCESSOR (UNIVERSAL SOCIAL DOWNLOADER + DYNAMIC SHIELD)
+# TAB 3: ES VIDEO PROCESSOR (ANTI-CACHE ENGINE + ADVANCED ANTI-COPYRIGHT)
 # -----------------
 with tab_es_tools:
     st.write("### ⚡ ES ہالی ووڈ الٹرا ڈسرپشن و آڈیو ڈکنگ شیلڈ (100% Anti-Copyright Bypass)")
-    st.info("💡 **تمام پلیٹ فارمز سپورٹڈ:** Pinterest, Instagram Reels, TikTok, Facebook Watch, YouTube سے ویڈیو کا لنک دیں یا لوکل فائل اپلوڈ کریں۔")
+    st.info("💡 **ہر بار نیا ویڈیو لائیو پروسیس:** پرانا کیشے ختم! Pinterest, TikTok, Instagram, FB, YouTube یا موٹو پتلو و کارٹونز کا لنک ڈالیں اور کاپی رائٹ سے آزاد ویڈیو حاصل کریں۔")
     
     sub_t1, sub_t2, sub_t3 = st.tabs([
-        "🎬 1. فل ویڈیو / مووی / ٹریلر موڈ",
+        "🎬 1. فل ویڈیو / مووی / کارٹون موڈ",
         "⚔️ 2. کلپ کٹر موڈ (10 منٹ کٹ)",
         "🎧 3. گانے اور لوفی (Slowed + Reverb)"
     ])
     
     with sub_t1:
-        st.subheader("پوری ویڈیو پر ٹائم ویرینٹ اینٹی فنگر پرنٹ اور بینر شیلڈ لگائیں")
+        st.subheader("پوری ویڈیو پر ٹائم ویرینٹ اینٹی فنگر پرنٹ اور لوگو ہائیڈر شیلڈ لگائیں")
         
         c_mode1, c_mode2 = st.columns(2)
         with c_mode1:
@@ -1499,71 +1517,82 @@ with tab_es_tools:
             ], key="ap_t1")
         
         upload_opt1 = st.file_uploader("📂 اپنے موبائل سے ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
-        url_input_1 = st.text_input("🔗 یا کسی بھی پلیٹ فارم کا لنک درج کریں (Pinterest, TikTok, Insta, FB, YouTube):", placeholder="https://...", key="url_t1")
+        url_input_1 = st.text_input("🔗 یا کسی بھی پلیٹ فارم کا لنک درج کریں (Pinterest, TikTok, Insta, FB, YouTube, Cartoons):", placeholder="https://...", key="url_t1")
         
         if st.button("🚀 الٹرا اینٹی کاپی رائٹ شیلڈ لگائیں", type="primary", key="run_t1"):
+            session_uid = str(uuid.uuid4())[:8]
+            dynamic_input_file = f"temp_in_{session_uid}.mp4"
+            dynamic_output_file = f"es_shielded_{session_uid}.mp4"
+            
             info = {'title': 'Featured Master Video'}
             has_input = False
             
             if upload_opt1 is not None:
-                with open(input_video, "wb") as f:
+                with open(dynamic_input_file, "wb") as f:
                     f.write(upload_opt1.getvalue())
                 has_input = True
                 info['title'] = upload_opt1.name
-            elif url_input_1:
-                with st.spinner("سوشل میڈیا سے ویڈیو ڈاؤنلوڈ اور اینالائز ہو رہی ہے..."):
-                    info = inspect_and_fetch_media_universal(url_input_1, input_video)
-                    if os.path.exists(input_video) and os.path.getsize(input_video) > 50000:
+            elif url_input_1.strip():
+                with st.spinner("سوشل میڈیا سے نئی ویڈیو ڈاؤنلوڈ اور اینالائز ہو رہی ہے..."):
+                    info = inspect_and_fetch_media_universal(url_input_1.strip(), dynamic_input_file)
+                    if os.path.exists(dynamic_input_file) and os.path.getsize(dynamic_input_file) > 10000:
                         has_input = True
+                    else:
+                        st.error("❌ ویڈیو ڈاؤنلوڈ نہیں ہو سکی۔ براہِ کرم لنک چیک کریں یا ڈائریکٹ ویڈیو فائل اپلوڈ کریں۔")
                         
             if has_input:
-                with st.spinner("ویڈیو پر ٹائم ویرینٹ ہیش، آڈیو ڈکنگ اور اینٹی لوگو شیلڈ لگ رہی ہے..."):
+                with st.spinner("ویڈیو پر سب سیکنڈ ہیش ڈسرپشن، آڈیو ڈکنگ اور اینٹی لوگو شیلڈ لگ رہی ہے..."):
                     ffmpeg_exe = get_ffmpeg()
                     
                     if "پرو ایڈیٹر" in style_choice:
                         vf_str = (
                             "[0:v]scale=1280:720,boxblur=26:6[bg];"
-                            "[0:v]setpts=0.925*PTS,rotate=1.6*PI/180*sin(2*PI*t/7):ow=iw:oh=ih:c=black,"
+                            "[0:v]setpts=0.925*PTS,rotate=1.8*PI/180*sin(2*PI*t*1.2):ow=iw:oh=ih:c=black,"
                             "hflip,crop=iw*0.82:ih*0.82,scale=980:552,"
                             "eq=contrast=1.16:saturation=1.22:brightness=0.02,"
-                            "drawbox=y=ih-85:color=black@0.70:width=iw:height=70:t=fill,"
-                            "noise=alls=9:allf=t+u,vignette=PI/3.5[fg];"
+                            "drawbox=y=ih-85:color=black@0.75:width=iw:height=70:t=fill,"
+                            "noise=alls=10:allf=t+u,vignette=PI/3.5[fg];"
                             "[bg][fg]overlay=(W-w)/2:(H-h)/2"
                         )
                     else:
                         vf_str = (
-                            "setpts=0.925*PTS,rotate=1.6*PI/180*sin(2*PI*t/7):ow=iw:oh=ih:c=black,"
+                            "setpts=0.925*PTS,rotate=1.8*PI/180*sin(2*PI*t*1.2):ow=iw:oh=ih:c=black,"
                             "hflip,crop=iw*0.80:ih*0.80,scale=1280:720,"
                             "eq=contrast=1.16:saturation=1.22:brightness=0.02,"
-                            "drawbox=y=ih-90:color=black@0.65:width=iw:height=75:t=fill,"
-                            "noise=alls=9:allf=t+u,vignette=PI/3.5"
+                            "drawbox=y=ih-90:color=black@0.70:width=iw:height=75:t=fill,"
+                            "noise=alls=10:allf=t+u,vignette=PI/3.5"
                         )
                     
                     if "خاموش" in audio_shield:
-                        af_str = "volume=0.30,atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=6:f=110"
+                        af_str = "volume=0.28,atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=6:f=110"
                     elif "بھاری" in audio_shield:
                         af_str = "atempo=1.08,asetrate=44100*0.88,aresample=44100,bass=g=5:f=120,treble=g=-3:f=3500"
                     else:
                         af_str = "atempo=1.08,asetrate=44100*1.06,aresample=44100,bass=g=3:f=110"
                     
                     cmd = [
-                        ffmpeg_exe, "-y", "-i", input_video,
+                        ffmpeg_exe, "-y", "-i", dynamic_input_file,
                         "-filter_complex" if "پرو ایڈیٹر" in style_choice else "-vf", vf_str,
                         "-af", af_str,
                         "-r", "25",
                         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
                         "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-                        "-c:a", "aac", "-b:a", "128k", output_video
+                        "-c:a", "aac", "-b:a", "128k", dynamic_output_file
                     ]
                     subprocess.run(cmd)
                     
-                    if os.path.exists(output_video) and os.path.getsize(output_video) > 50000:
+                    if os.path.exists(dynamic_output_file) and os.path.getsize(dynamic_output_file) > 10000:
                         st.session_state.detected_info = info
+                        st.session_state.current_output_video = dynamic_output_file
                         st.session_state.process_ready = True
                     else:
-                        st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ براہِ کرم فائل دوبارہ اپلوڈ کریں۔")
+                        st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ فائل فارمیٹ چیک کریں۔")
+                        
+                    if os.path.exists(dynamic_input_file):
+                        try: os.remove(dynamic_input_file)
+                        except Exception: pass
             else:
-                st.error("❌ ویڈیو فائل اپلوڈ کریں یا درست سوشل لنک دیں۔")
+                st.error("❌ ویڈیو فائل اپلوڈ کریں یا درست سوشل لنک درج کریں۔")
 
     with sub_t2:
         st.subheader("ویڈیو یا شو سے مخصوص منٹ کا کلپ کاٹیں")
@@ -1578,18 +1607,22 @@ with tab_es_tools:
         url_input_2 = st.text_input("🔗 یا سوشل میڈیا ویڈیو کا لنک درج کریں:", placeholder="https://...", key="url_t2")
 
         if st.button("🚀 کلپ کاٹیں اور آڈیو ڈکنگ لگائیں", type="primary", key="run_t2"):
+            session_uid = str(uuid.uuid4())[:8]
+            dynamic_input_file = f"temp_in_{session_uid}.mp4"
+            dynamic_output_file = f"es_clip_{session_uid}.mp4"
+            
             info = {'title': 'Clip Highlight'}
             has_input = False
             
             if upload_opt2 is not None:
-                with open(input_video, "wb") as f:
+                with open(dynamic_input_file, "wb") as f:
                     f.write(upload_opt2.getvalue())
                 has_input = True
                 info['title'] = upload_opt2.name
-            elif url_input_2:
+            elif url_input_2.strip():
                 with st.spinner("ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
-                    info = inspect_and_fetch_media_universal(url_input_2, input_video)
-                    if os.path.exists(input_video) and os.path.getsize(input_video) > 50000:
+                    info = inspect_and_fetch_media_universal(url_input_2.strip(), dynamic_input_file)
+                    if os.path.exists(dynamic_input_file) and os.path.getsize(dynamic_input_file) > 10000:
                         has_input = True
 
             if has_input:
@@ -1597,23 +1630,28 @@ with tab_es_tools:
                     ffmpeg_exe = get_ffmpeg()
                     start_sec = start_min * 60
                     dur_sec = clip_len * 60
-                    vf = "setpts=0.925*PTS,rotate=1.6*PI/180*sin(2*PI*t/7):ow=iw:oh=ih:c=black,hflip,crop=iw*0.82:ih*0.82,scale=1280:720,eq=contrast=1.16:saturation=1.22:brightness=0.02,drawbox=y=ih-85:color=black@0.70:width=iw:height=70:t=fill,noise=alls=8:allf=t+u,vignette=PI/3.5"
-                    af = "volume=0.35,atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=5:f=120"
+                    vf = "setpts=0.925*PTS,rotate=1.8*PI/180*sin(2*PI*t*1.2):ow=iw:oh=ih:c=black,hflip,crop=iw*0.82:ih*0.82,scale=1280:720,eq=contrast=1.16:saturation=1.22:brightness=0.02,drawbox=y=ih-85:color=black@0.75:width=iw:height=70:t=fill,noise=alls=10:allf=t+u,vignette=PI/3.5"
+                    af = "volume=0.30,atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=5:f=120"
                     
                     cmd = [
                         ffmpeg_exe, "-y", "-ss", str(start_sec), "-t", str(dur_sec),
-                        "-i", input_video, "-vf", vf, "-af", af,
+                        "-i", dynamic_input_file, "-vf", vf, "-af", af,
                         "-r", "25",
                         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
                         "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-                        "-c:a", "aac", "-b:a", "128k", output_video
+                        "-c:a", "aac", "-b:a", "128k", dynamic_output_file
                     ]
                     subprocess.run(cmd)
-                    if os.path.exists(output_video) and os.path.getsize(output_video) > 50000:
+                    if os.path.exists(dynamic_output_file) and os.path.getsize(dynamic_output_file) > 10000:
                         st.session_state.detected_info = info
+                        st.session_state.current_output_video = dynamic_output_file
                         st.session_state.process_ready = True
                     else:
                         st.error("❌ ویڈیو ٹائم سیٹنگز چیک کریں۔")
+                        
+                    if os.path.exists(dynamic_input_file):
+                        try: os.remove(dynamic_input_file)
+                        except Exception: pass
             else:
                 st.error("❌ ویڈیو اپلوڈ کریں یا درست لنک دیں۔")
 
@@ -1631,7 +1669,10 @@ with tab_es_tools:
         song_url = st.text_input("🔗 یا گانے کا لنک یہاں پیسٹ کریں (TikTok/Reels/YouTube):", placeholder="https://...", key="url_t3")
         
         if st.button("🚀 گانے کو Slowed + Reverb بنائیں", type="primary", key="run_t3"):
-            temp_audio_in = "temp_song.mp4"
+            session_uid = str(uuid.uuid4())[:8]
+            temp_audio_in = f"temp_song_{session_uid}.mp4"
+            dynamic_output_file = f"lofi_song_{session_uid}.mp4"
+            
             info = {'title': 'Lo-Fi Chill Track'}
             has_input = False
             
@@ -1640,10 +1681,10 @@ with tab_es_tools:
                     f.write(upload_opt3.getvalue())
                 has_input = True
                 info['title'] = upload_opt3.name
-            elif song_url:
+            elif song_url.strip():
                 with st.spinner("گانا ڈاؤنلوڈ ہو رہا ہے..."):
-                    info = inspect_and_fetch_media_universal(song_url, temp_audio_in)
-                    if os.path.exists(temp_audio_in) and os.path.getsize(temp_audio_in) > 30000:
+                    info = inspect_and_fetch_media_universal(song_url.strip(), temp_audio_in)
+                    if os.path.exists(temp_audio_in) and os.path.getsize(temp_audio_in) > 10000:
                         has_input = True
                         
             if has_input:
@@ -1655,34 +1696,40 @@ with tab_es_tools:
                         ffmpeg_exe, "-y", "-i", temp_audio_in,
                         "-af", af_filter, "-c:v", "copy",
                         "-c:a", "aac", "-b:a", "192k",
-                        "-movflags", "+faststart", output_video
+                        "-movflags", "+faststart", dynamic_output_file
                     ]
                     subprocess.run(cmd_song)
-                    if os.path.exists(output_video) and os.path.getsize(output_video) > 30000:
+                    if os.path.exists(dynamic_output_file) and os.path.getsize(dynamic_output_file) > 10000:
                         st.session_state.detected_info = info
+                        st.session_state.current_output_video = dynamic_output_file
                         st.session_state.process_ready = True
                     else:
                         st.error("❌ آڈیو پروسیسنگ فیل ہو گئی۔")
+                        
+                    if os.path.exists(temp_audio_in):
+                        try: os.remove(temp_audio_in)
+                        except Exception: pass
             else:
                 st.error("❌ آڈیو فائل اپلوڈ کریں یا درست لنک دیں۔")
 
-    if st.session_state.process_ready and os.path.exists(output_video) and os.path.getsize(output_video) > 30000:
+    if st.session_state.process_ready and st.session_state.current_output_video and os.path.exists(st.session_state.current_output_video):
         st.divider()
-        st.success("🎉 ویڈیو 75% آڈیو ڈکنگ، بینر شیلڈ اور ٹائم ویرینٹ ہیش کے ساتھ تیار ہے:")
+        st.success("🎉 نئی ویڈیو 75% آڈیو ڈکنگ، اینٹی لوگو بینر اور سب سیکنڈ ہیش شیلڈ کے ساتھ تیار ہے:")
         
-        video_bytes = open(output_video, 'rb').read()
-        st.video(video_bytes)
-        
-        st.download_button(
-            label="📥 یہاں کلک کر کے شیلڈڈ ویڈیو ڈاؤنلوڈ کریں (Download MP4)",
-            data=video_bytes,
-            file_name="es_protected_master.mp4",
-            mime="video/mp4",
-            use_container_width=True
-        )
+        with open(st.session_state.current_output_video, 'rb') as v_file:
+            video_bytes = v_file.read()
+            st.video(video_bytes)
+            
+            st.download_button(
+                label="📥 یہاں کلک کر کے تازہ ترین ویڈیو ڈاؤنلوڈ کریں (Download MP4)",
+                data=video_bytes,
+                file_name=os.path.basename(st.session_state.current_output_video),
+                mime="video/mp4",
+                use_container_width=True
+            )
 
         genre, titles, tags, prompt = generate_smart_metadata_dynamic(st.session_state.detected_info)
-        st.info(f"🎯 **AI نے ویڈیو کو سمجھ لیا:** یہ ویڈیو **'{genre}'** کیٹگری کی ہے۔ (اصل نام: **{st.session_state.detected_info.get('title', 'Video')}**)")
+        st.info(f"🎯 **AI نے نئی ویڈیو کو پہچانا:** یہ ویڈیو **'{genre}'** کیٹگری کی ہے۔ (اصل نام: **{st.session_state.detected_info.get('title', 'Video')}**)")
         
         c_meta1, c_meta2 = st.columns(2)
         with c_meta1:
@@ -2005,4 +2052,4 @@ with tab_enterprise:
         else:
             st.error("Access Denied: Only Administrators can access this tab.")
 
-st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>ES & Sglowina AI Studio Suite V4.5 | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>ES & Sglowina AI Studio Suite V5.0 | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
