@@ -44,7 +44,7 @@ SGLOWINA_BIO = (
 # ==========================================
 # STREAMLIT INITIALIZATION & GLOBAL STATES
 # ==========================================
-st.set_page_config(page_title="ES Ultimate AI Studio & SaaS", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="ES Ultimate AI Studio & Anti-Copyright", layout="wide", page_icon="⚡")
 
 if "enable_watermark" not in st.session_state:
     st.session_state.enable_watermark = True
@@ -155,7 +155,6 @@ def get_db_connection():
 def init_db_v21():
     conn = get_db_connection()
     cursor = conn.cursor()
-    
     is_sqlite = not hasattr(conn, "closed")
     serial_primary = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sqlite else "SERIAL PRIMARY KEY"
     
@@ -172,7 +171,6 @@ def init_db_v21():
             created_at TEXT
         )
     """)
-    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS projects (
             id TEXT PRIMARY KEY,
@@ -185,7 +183,6 @@ def init_db_v21():
             is_favorite INTEGER DEFAULT 0
         )
     """)
-    
     cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS credits_history (
             id {serial_primary},
@@ -196,7 +193,6 @@ def init_db_v21():
             date TEXT
         )
     """)
-    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS local_payments (
             id TEXT PRIMARY KEY,
@@ -208,7 +204,6 @@ def init_db_v21():
             created_at TEXT
         )
     """)
-    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS characters (
             id TEXT PRIMARY KEY,
@@ -218,7 +213,6 @@ def init_db_v21():
             reference_data TEXT
         )
     """)
-    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS scenes (
             id TEXT PRIMARY KEY,
@@ -229,7 +223,6 @@ def init_db_v21():
             camera_style TEXT
         )
     """)
-    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS coupons (
             code TEXT PRIMARY KEY,
@@ -237,7 +230,6 @@ def init_db_v21():
             uses_left INTEGER
         )
     """)
-    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS system_config (
             key TEXT PRIMARY KEY,
@@ -250,28 +242,17 @@ def init_db_v21():
         cursor.execute("INSERT INTO coupons (code, credits, uses_left) VALUES ('ESSASABA', 100, 1000)")
     
     h_admin = hash_password("786")
-    
-    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'essasaba'")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                       ("essasaba", "essasaba@sglowina.ai", h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
-    else:
-        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'essasaba'", (h_admin,))
-
-    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'essa_awan'")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                       ("essa_awan", "essa@sglowina.ai", h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
-    else:
-        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'essa_awan'", (h_admin,))
-                       
+    for u, e in [("essasaba", "essasaba@sglowina.ai"), ("essa_awan", "essa@sglowina.ai")]:
+        cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (u,))
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                           (u, e, h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
+                           
     h_saba = hash_password("1234")
     cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                        ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", 5000, "Admin", "2026-07-21"))
-    else:
-        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'saba_wahid'", (h_saba,))
                        
     conn.commit()
     conn.close()
@@ -396,14 +377,14 @@ def generate_smart_metadata(info):
         ]
         hashtags = f"#SlowedAndReverb #LofiRemix #ChillMusic #AestheticAudio #MidnightVibes"
         thumb_prompt = f"Anime aesthetic 4K Lo-Fi wallpaper thumbnail for song '{clean_title[:35]}', neon cozy bedroom, rain outside window, 16:9."
-    elif any(k in t_lower for k in ['trailer', 'teaser', 'promo', 'first look']):
+    elif any(k in t_lower for k in ['trailer', 'teaser', 'promo', 'first look', 'udta', 'teer', 'official']):
         genre = "Official Trailer / Teaser Breakdown"
         safe_titles = [
-            f"🔥 {clean_title} - Full Climax & Story Explained in Urdu/Hindi",
-            f"⚡ {clean_title} - Hidden Details & Breakdown You Missed!",
-            f"😱 {clean_title} - Big Twist Revealed! Blockbuster Reaction"
+            f"🔥 {clean_title} - Full Story & Climax Explained in Urdu/Hindi",
+            f"⚡ {clean_title} - Hidden Details & Teaser Breakdown You Missed!",
+            f"😱 {clean_title} - Big Twist & Action Breakdown Reaction"
         ]
-        hashtags = f"#TrailerBreakdown #MovieTrailer #Blockbuster #CinemaLovers #MovieRecap"
+        hashtags = f"#TrailerBreakdown #MovieTrailer #Blockbuster #CinemaLovers #MovieRecap #ActionTrailer"
         thumb_prompt = f"Hyper-realistic 8K cinematic movie poster thumbnail for '{clean_title[:35]}', action hero in intense dramatic lighting, cinematic sparks and explosion, 16:9."
     else:
         genre = "Blockbuster Movie Scene"
@@ -1477,11 +1458,11 @@ with tab_companion:
     render_autonomous_live_viewport()
 
 # -----------------
-# TAB 3: ES VIDEO PROCESSOR & 7-LAYER ANTI-COPYRIGHT ENGINE
+# TAB 3: ES VIDEO PROCESSOR & 9-LAYER HEAVY ANTI-COPYRIGHT ENGINE
 # -----------------
 with tab_es_tools:
-    st.write("### ⚡ ES الٹرا اسمارٹ اینٹی کاپی رائٹ اسٹوڈیو")
-    st.write("7 لیئر اینٹی کاپی رائٹ فلٹرز، موبائل پلے ایبل انکوڈنگ اور اصل نام کے ساتھ وائرل میٹا ڈیٹا۔")
+    st.write("### ⚡ ES الٹرا اسمارٹ اینٹی کاپی رائٹ شیلڈ (Heavy Bypass Engine)")
+    st.info("💡 **نوٹ:** یہ انجن یوٹیوب کے Content ID کے ویژول اور آڈیو ہیش کو توڑنے کے لیے ڈیپ کراپ، نوائز، پچ شفٹ اور کینوس فریم لگاتا ہے۔")
     
     sub_t1, sub_t2, sub_t3 = st.tabs([
         "🎬 1. فل ویڈیو / مووی موڈ",
@@ -1490,13 +1471,25 @@ with tab_es_tools:
     ])
     
     with sub_t1:
-        st.subheader("پوری ویڈیو / شو کو 7 لیئر فلٹرز میں پروسیس کریں")
-        style_choice = st.selectbox("حفاظتی اسٹائل:", ["🛡️ 7 لیئر کینوس بلر فریم (سب سے زیادہ محفوظ)", "⚡ 7 لیئر فل اسکرین الٹرا اینٹی ہیش"], key="s_t1")
+        st.subheader("پوری ویڈیو / شو / ٹریلر کو 9 لیئر شیلڈ میں پروسیس کریں")
         
-        upload_opt1 = st.file_uploader("📂 اپنے موبائل/کمپیوٹر سے ویڈیو اپلوڈ کریں (100% گارنٹی شدہ پلے):", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
-        url_input_1 = st.text_input("🔗 یا ویڈیو/مووی کا یوٹیوب لنک درج کریں:", placeholder="https://youtu.be/...", key="url_t1")
+        c_mode1, c_mode2 = st.columns(2)
+        with c_mode1:
+            style_choice = st.selectbox("حفاظتی ویژول اسٹائل:", [
+                "🛡️ 9 لیئر کینوس بلر فریم (100% تجویز کردہ - Maximum Bypass)",
+                "⚡ 9 لیئر الٹرا کراپ اینٹی ہیش (Full Screen Zoom)"
+            ], key="s_t1")
+        with c_mode2:
+            audio_pitch_choice = st.selectbox("آواز کی موڈیولیشن (Audio Pitch Shield):", [
+                "🔊 بھاری اور گہری آواز (Deep Heavy Pitch - 100% Safe)",
+                "🎵 اسمارٹ پچ شفٹ (Smart Shift 1.04x)",
+                "🎧 لوفی سلور پچ (Lo-Fi Pitch)"
+            ], key="ap_t1")
         
-        if st.button("🚀 7 لیئر اینٹی کاپی رائٹ پروسیسنگ شروع کریں", type="primary", key="run_t1"):
+        upload_opt1 = st.file_uploader("📂 اپنے موبائل سے ویڈیو/ٹریلر کی فائل اپلوڈ کریں (بہترین رزلٹ):", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
+        url_input_1 = st.text_input("🔗 یا یوٹیوب کا لنک درج کریں:", placeholder="https://youtu.be/...", key="url_t1")
+        
+        if st.button("🚀 9 لیئر اینٹی کاپی رائٹ شیلڈ لگائیں", type="primary", key="run_t1"):
             info = {'title': 'Featured Movie Video'}
             has_input = False
             
@@ -1506,22 +1499,40 @@ with tab_es_tools:
                 has_input = True
                 info['title'] = upload_opt1.name
             elif url_input_1:
-                with st.spinner("ویڈیو کا اصل ڈیٹا اور فائل ڈاؤنلوڈ ہو رہی ہے..."):
+                with st.spinner("یوٹیوب سے اصل ٹریلر/مووی کا ڈیٹا اور ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
                     info = inspect_and_fetch_media(url_input_1, input_video)
                     if os.path.exists(input_video) and os.path.getsize(input_video) > 100000:
                         has_input = True
                         
             if has_input:
-                with st.spinner("ویڈیو پر 7 لیئرز لگ رہی ہیں اور موبائل فارمیٹ میں کمپریس ہو رہی ہے..."):
+                with st.spinner("ویڈیو پر 9 لیئر ویژول و آڈیو ہیش بریکر لگ رہا ہے اور موبائل کے لیے 15-25 MB میں کمپریس ہو رہا ہے..."):
                     ffmpeg_exe = get_ffmpeg()
                     
+                    # 9-Layer Visual Filter String (Breaks Visual Hash)
                     if "کینوس" in style_choice:
-                        vf_str = "[0:v]scale=1280:720,boxblur=25:5[bg];[0:v]hflip,crop=iw*0.92:ih*0.92,scale=1080:608,eq=contrast=1.06:saturation=1.12:brightness=0.01,noise=alls=2:allf=t+u,vignette=PI/5[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2"
+                        vf_str = (
+                            "[0:v]scale=1280:720,boxblur=25:5[bg];"
+                            "[0:v]hflip,crop=iw*0.88:ih*0.88,scale=1080:608,"
+                            "eq=contrast=1.12:saturation=1.20:brightness=0.02,"
+                            "noise=alls=5:allf=t+u,vignette=PI/4[fg];"
+                            "[bg][fg]overlay=(W-w)/2:(H-h)/2"
+                        )
                     else:
-                        vf_str = "hflip,crop=iw*0.92:ih*0.92,scale=1280:720,eq=contrast=1.06:saturation=1.12:brightness=0.01,noise=alls=2:allf=t+u,vignette=PI/5"
-                        
-                    af_str = "atempo=1.03,asetrate=44100*1.025,aresample=44100,bass=g=2:f=110"
+                        vf_str = (
+                            "hflip,crop=iw*0.88:ih*0.88,scale=1280:720,"
+                            "eq=contrast=1.12:saturation=1.20:brightness=0.02,"
+                            "noise=alls=5:allf=t+u,vignette=PI/4"
+                        )
                     
+                    # Audio Pitch Shift Selection (Breaks Audio Hash)
+                    if "بھاری" in audio_pitch_choice:
+                        af_str = "atempo=1.04,asetrate=44100*0.95,aresample=44100,bass=g=4:f=100,treble=g=-2:f=3000"
+                    elif "لوفی" in audio_pitch_choice:
+                        af_str = "atempo=0.92,asetrate=44100*0.92,aresample=44100,bass=g=5:f=110,aecho=0.8:0.88:40:0.3"
+                    else:
+                        af_str = "atempo=1.035,asetrate=44100*1.03,aresample=44100,bass=g=2:f=110"
+                    
+                    # High quality CRF 24 + yuv420p faststart for guaranteed playable output
                     cmd = [
                         ffmpeg_exe, "-y", "-i", input_video,
                         "-filter_complex" if "کینوس" in style_choice else "-vf", vf_str,
@@ -1536,9 +1547,9 @@ with tab_es_tools:
                         st.session_state.detected_info = info
                         st.session_state.process_ready = True
                     else:
-                        st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ براہِ کرم ویڈیو دوبارہ اپلوڈ کریں۔")
+                        st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ براہِ کرم فائل دوبارہ اپلوڈ کریں۔")
             else:
-                st.error("❌ ویڈیو فائل اپلوڈ کریں یا کام کرنے والا یوٹیوب لنک دیں۔")
+                st.error("❌ براہِ کرم ویڈیو فائل اپلوڈ کریں یا کام کرنے والا یوٹیوب لنک دیں۔")
 
     with sub_t2:
         st.subheader("ویڈیو یا شو سے 10 منٹ کا کلپ کاٹیں")
@@ -1568,12 +1579,12 @@ with tab_es_tools:
                         has_input = True
 
             if has_input:
-                with st.spinner("کلپ کٹ کر کے 7 لیئرز لگ رہی ہیں..."):
+                with st.spinner("کلپ کٹ کر کے 9 لیئرز لگ رہی ہیں..."):
                     ffmpeg_exe = get_ffmpeg()
                     start_sec = start_min * 60
                     dur_sec = clip_len * 60
-                    vf = "hflip,crop=iw*0.92:ih*0.92,scale=1280:720,eq=contrast=1.06:saturation=1.12:brightness=0.01,noise=alls=2:allf=t+u,vignette=PI/5"
-                    af = "atempo=1.03,asetrate=44100*1.025,aresample=44100"
+                    vf = "hflip,crop=iw*0.88:ih*0.88,scale=1280:720,eq=contrast=1.12:saturation=1.20:brightness=0.02,noise=alls=5:allf=t+u,vignette=PI/4"
+                    af = "atempo=1.04,asetrate=44100*0.95,aresample=44100,bass=g=3:f=110"
                     
                     cmd = [
                         ffmpeg_exe, "-y", "-ss", str(start_sec), "-t", str(dur_sec),
