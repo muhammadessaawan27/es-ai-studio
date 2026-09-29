@@ -20,21 +20,15 @@ import hashlib
 import concurrent.futures
 
 # ==========================================
-# 1. MOVIEPY CINEMATIC IMPORTS
+# MOVIEPY CINEMATIC IMPORTS
 # ==========================================
 try:
-    from moviepy.editor import (
-        ImageClip, AudioFileClip, concatenate_videoclips, 
-        CompositeAudioClip, VideoFileClip, CompositeVideoClip
-    )
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
 except ImportError:
-    from moviepy import (
-        ImageClip, AudioFileClip, concatenate_videoclips, 
-        CompositeAudioClip, VideoFileClip, CompositeVideoClip
-    )
+    from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
 
 # ==========================================
-# 2. BROWSER HEADERS & GLOBAL CONSTANTS
+# BROWSER SESSION STABILITY HEADERS
 # ==========================================
 headers_browser = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -43,18 +37,14 @@ session = requests.Session()
 session.headers.update(headers_browser)
 
 SGLOWINA_BIO = (
-    "Sglowina AI is an advanced generative AI cinematic video, live vision & image production platform, "
+    "Sglowina AI is an advanced generative AI cinematic video, vision & image production platform, "
     "proudly developed by Muhammad Essa Awan & Saba Wahid."
 )
 
 # ==========================================
-# 3. STREAMLIT CONFIGURATION & STATES
+# STREAMLIT INITIALIZATION & GLOBAL STATES
 # ==========================================
-st.set_page_config(
-    page_title="Sglowina AI - SaaS Enterprise & Anti-Copyright Studio", 
-    layout="wide", 
-    page_icon="⚡"
-)
+st.set_page_config(page_title="ES Ultimate AI Studio & Anti-Copyright V4.0", layout="wide", page_icon="⚡")
 
 if "enable_watermark" not in st.session_state:
     st.session_state.enable_watermark = True
@@ -68,24 +58,8 @@ if "process_ready" not in st.session_state:
     st.session_state.process_ready = False
 if "detected_info" not in st.session_state:
     st.session_state.detected_info = {}
-if "last_processed_file" not in st.session_state:
-    st.session_state.last_processed_file = None
 
-st.sidebar.subheader("🎬 Global Multi-Language Settings")
-target_lang = st.sidebar.selectbox("🌐 Choose System Language:", [
-    "Urdu (اردو)",
-    "English (English)",
-    "Hindi (हिंदी)",
-    "Spanish (Español)",
-    "Chinese (中文)",
-    "Korean (한국어)",
-    "Arabic (العربية)",
-    "French (Français)",
-    "German (Deutsch)",
-    "Japanese (日本語)",
-    "Turkish (Türkçe)"
-])
-
+st.sidebar.subheader("🎬 Video Settings")
 enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=st.session_state.enable_watermark)
 enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=st.session_state.enable_bg_music)
 
@@ -96,20 +70,10 @@ render_semaphore = threading.Semaphore(value=2)
 active_renderers = 0
 render_lock = threading.Lock()
 
-VOICE_MAP = {
-    "Urdu (اردو)": {"male": "ur-PK-AsadNeural", "female": "ur-PK-UzmaNeural", "code": "Urdu"},
-    "English (English)": {"male": "en-US-GuyNeural", "female": "en-US-JennyNeural", "code": "English"},
-    "Hindi (हिंदी)": {"male": "hi-IN-MadhurNeural", "female": "hi-IN-SwaraNeural", "code": "Hindi"},
-    "Spanish (Español)": {"male": "es-ES-AlvaroNeural", "female": "es-ES-ElviraNeural", "code": "Spanish"},
-    "Chinese (中文)": {"male": "zh-CN-YunxiNeural", "female": "zh-CN-XiaoxiaoNeural", "code": "Chinese"},
-    "Korean (한국어)": {"male": "ko-KR-InJoonNeural", "female": "ko-KR-SunHiNeural", "code": "Korean"},
-    "Arabic (العربية)": {"male": "ar-SA-HamedNeural", "female": "ar-SA-ZariyahNeural", "code": "Arabic"},
-    "French (Français)": {"male": "fr-FR-HenriNeural", "female": "fr-FR-DeniseNeural", "code": "French"},
-    "German (Deutsch)": {"male": "de-DE-ConradNeural", "female": "de-DE-KatjaNeural", "code": "German"},
-    "Japanese (日本語)": {"male": "ja-JP-KeitaNeural", "female": "ja-JP-NanamiNeural", "code": "Japanese"},
-    "Turkish (Türkçe)": {"male": "tr-TR-AhmetNeural", "female": "tr-TR-EmelNeural", "code": "Turkish"}
-}
+input_video = "input_master_video.mp4"
+output_video = "output_bypass_video.mp4"
 
+# Safe FFmpeg Locator
 def get_ffmpeg():
     try:
         import imageio_ffmpeg
@@ -138,15 +102,14 @@ def get_public_url(uploaded_file):
             data = res.json()
             if data.get("status") == "success":
                 temp_url = data["data"]["url"]
-                return temp_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+                raw_url = temp_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+                return raw_url
     except Exception:
         pass
     return None
 
 def apply_canva_typography(img_path, overlay_text):
     try:
-        if not os.path.exists(img_path):
-            return
         with Image.open(img_path) as im:
             im = im.convert("RGBA")
             txt_overlay = Image.new("RGBA", im.size, (255, 255, 255, 0))
@@ -170,14 +133,15 @@ def apply_canva_typography(img_path, overlay_text):
         pass
 
 # ==========================================
-# 4. DATABASE LAYER
+# 2. DYNAMIC DATABASE LAYER (PostgreSQL & SQLite WAL)
 # ==========================================
 def get_db_connection():
     pg_url = os.environ.get("DATABASE_URL")
     if pg_url:
         try:
             import psycopg2
-            return psycopg2.connect(pg_url)
+            conn = psycopg2.connect(pg_url)
+            return conn
         except Exception:
             pass
     conn = sqlite3.connect("sglowina_saas_v21.db", check_same_thread=False, timeout=30.0)
@@ -278,31 +242,24 @@ def init_db_v21():
         cursor.execute("INSERT INTO coupons (code, credits, uses_left) VALUES ('ESSASABA', 100, 1000)")
     
     h_admin = hash_password("786")
-    admin_users = [
-        ("essasaba", "essasaba@sglowina.ai"),
-        ("essa_awan", "essa@sglowina.ai")
-    ]
-    for u, e in admin_users:
+    for u, e in [("essasaba", "essasaba@sglowina.ai"), ("essa_awan", "essa@sglowina.ai")]:
         cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (u,))
         if cursor.fetchone()[0] == 0:
             cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                            (u, e, h_admin, "Enterprise", 5000, "Admin", "2026-07-21"))
-        else:
-            cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = ?", (h_admin, u))
                            
     h_saba = hash_password("1234")
     cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = 'saba_wahid'")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                        ("saba_wahid", "saba@sglowina.ai", h_saba, "Enterprise", 5000, "Admin", "2026-07-21"))
-    else:
-        cursor.execute("UPDATE users SET password_hash = ?, plan = 'Enterprise', role = 'Admin' WHERE LOWER(username) = 'saba_wahid'", (h_saba,))
                        
     conn.commit()
     conn.close()
 
 init_db_v21()
 
+# Auth Helpers
 def register_saas_user(username, email, password):
     username = username.strip().lower()
     email = email.strip().lower()
@@ -357,21 +314,90 @@ def log_credit_usage(user_id, action, used, balance):
     conn.close()
 
 # ==========================================
-# 5. TRANSLATION & PROMPT DIRECTOR
+# 3. ENHANCED VIDEO PROCESSOR & AUTHENTIC METADATA
 # ==========================================
-def translate_to_language(text, target_language_name):
-    if not text.strip() or "Urdu" in target_language_name:
-        return text
+def inspect_and_fetch_media(url, target_path=input_video):
+    if os.path.exists(target_path):
+        os.remove(target_path)
+    
+    info_dict = {'title': 'Featured Movie Video', 'uploader': 'Official Creator', 'categories': ['Entertainment'], 'tags': []}
     try:
-        inst = f"Translate the following text naturally into {target_language_name}. Output ONLY the translated text."
-        url = f"https://text.pollinations.ai/{urllib.parse.quote(inst + ': ' + text)}?model=openai"
-        res = session.get(url, timeout=15)
-        if res.status_code == 200:
-            return res.text.strip()
+        import yt_dlp
+        ydl_opts = {
+            'format': 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
+            'outtmpl': target_path,
+            'quiet': True,
+            'no_warnings': True,
+            'nocheckcertificate': True,
+            'extractor_args': {
+                'youtube': {'player_client': ['android', 'ios', 'mweb', 'web']}
+            }
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            meta = ydl.extract_info(url, download=True)
+            info_dict['title'] = meta.get('title', 'Featured Movie Video')
+            info_dict['uploader'] = meta.get('uploader', 'Official Creator')
+            info_dict['categories'] = meta.get('categories', ['Entertainment'])
+            info_dict['tags'] = meta.get('tags', [])
     except Exception:
-        pass
-    return text
+        info_dict['title'] = "Custom Action Highlight"
+        try:
+            with requests.get(url, headers=headers_browser, stream=True, timeout=40) as r:
+                if r.status_code == 200:
+                    with open(target_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=16384):
+                            f.write(chunk)
+        except Exception:
+            pass
 
+    return info_dict
+
+def generate_smart_metadata(info):
+    raw_title = info.get('title', 'Video').strip()
+    clean_title = re.sub(r'[\(\[\{].*?[\)\]\}]', '', raw_title).strip()
+    if not clean_title: clean_title = raw_title
+    t_lower = raw_title.lower()
+    
+    if any(k in t_lower for k in ['kapil', 'comedy', 'funny', 'laugh', 'joke', 'hasna', 'standup', 'prank']):
+        genre = "Comedy / Talk Show"
+        safe_titles = [
+            f"😂 {clean_title} | Best Uncut Funny Moments",
+            f"🤣 Kapil Sharma Comedy Special | {clean_title[:45]} (Full Laugh Attack)",
+            f"🔥 Non-Stop Comedy Scene | {clean_title[:50]}"
+        ]
+        hashtags = f"#Comedy #FunnyVideo #StandupComedy #HindiComedy #ViralShow #LaughOutLoud"
+        thumb_prompt = f"Ultra realistic 8K YouTube thumbnail for comedy show scene '{clean_title[:35]}', comedian laughing happily on stage, bright cinematic studio lights, 16:9."
+    elif any(k in t_lower for k in ['song', 'music', 'lofi', 'slowed', 'reverb', 'audio', 'gaana', 'singer']):
+        genre = "Music / Lo-Fi Audio"
+        safe_titles = [
+            f"🎧 {clean_title} (Slowed + Reverb Lo-Fi Remix) | Midnight Chill",
+            f"🌙 {clean_title} | Deep Relaxing Vibe (Lofi Master HD)",
+            f"✨ Pure Nostalgia Vibes | {clean_title[:45]} (Slowed Version)"
+        ]
+        hashtags = f"#SlowedAndReverb #LofiRemix #ChillMusic #AestheticAudio #MidnightVibes"
+        thumb_prompt = f"Anime aesthetic 4K Lo-Fi wallpaper thumbnail for song '{clean_title[:35]}', neon cozy bedroom, rain outside window, 16:9."
+    elif any(k in t_lower for k in ['trailer', 'teaser', 'promo', 'first look', 'udta', 'teer', 'official']):
+        genre = "Official Trailer / Teaser Breakdown"
+        safe_titles = [
+            f"🔥 {clean_title} - Full Story & Climax Explained in Urdu/Hindi",
+            f"⚡ {clean_title} - Hidden Details & Teaser Breakdown You Missed!",
+            f"😱 {clean_title} - Big Twist & Action Breakdown Reaction"
+        ]
+        hashtags = f"#TrailerBreakdown #MovieTrailer #Blockbuster #CinemaLovers #MovieRecap #ActionTrailer"
+        thumb_prompt = f"Hyper-realistic 8K cinematic movie poster thumbnail for '{clean_title[:35]}', action hero in intense dramatic lighting, cinematic sparks and explosion, 16:9."
+    else:
+        genre = "Blockbuster Movie Scene"
+        safe_titles = [
+            f"🔥 {clean_title} - Ultimate Climax Scene (Hindi/Urdu)",
+            f"⚡ {clean_title} - Unstoppable Action & Best Moments",
+            f"😱 The Most Dramatic Scene of {clean_title[:40]} | Full HD Recap"
+        ]
+        hashtags = f"#MovieRecap #ActionMovie #CinemaLovers #Blockbuster #ViralClip"
+        thumb_prompt = f"Cinematic 8K action movie thumbnail for '{clean_title[:35]}', hero dramatic intense face, cinematic color grading, 16:9."
+        
+    return genre, safe_titles, hashtags, thumb_prompt
+
+# AI Director Analyzer
 def analyze_scene_for_director(scene_text):
     text = scene_text.lower()
     motion = "Zoom Out (v40 Default)"
@@ -422,10 +448,14 @@ def analyze_scene_for_director(scene_text):
 def translate_ur_to_en_enhanced(text):
     try:
         instruction = (
-            "Translate this story scene into descriptive English visual instructions for Flux image generation. "
-            "Identify main subjects, ensure anatomical perfection and output ONLY visual descriptions."
+            "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into highly descriptive English visual instructions. \n"
+            "CRITICAL RULES: \n"
+            "1. Explicitly identify the main subjects.\n"
+            "2. Do NOT blend genders.\n"
+            "3. Ensure anatomical perfection.\n"
+            "4. Output ONLY the English translation and visual descriptions."
         )
-        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ': ' + text)}?model=openai"
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
         res = session.get(url, timeout=15)
         if res.status_code == 200:
             return res.text.strip()
@@ -437,13 +467,16 @@ def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
     combined_text = (scene_text_en + " " + scene_text_ur).lower()
     spiritual_keywords = [
         "prophet", "sahaba", "saint", "angel", "god", "allah", "messenger", "nooh", "musa", "isa", "ibrahim", "yousuf", "muhammad", 
-        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر"
+        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر",
+        "grave", "shroud", "hell", "heaven", "paradise", "pious", "aulia", "angels", "holy dome", "mosque"
     ]
     if any(k in combined_text for k in spiritual_keywords):
         safe_prompt = (
             "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light emanating from the heavens, "
-            "sacred light beam, peaceful glowing ancient background, majestic natural mountains. "
-            "STRICTLY NO human faces, NO visible bodies. Pure sacred light."
+            "sacred light beam, peaceful glowing ancient background, majestic natural mountains and glowing golden sand, "
+            "awe-inspiring holy atmosphere, highly detailed cosmic sky. "
+            "STRICTLY NO human faces, NO visible bodies, NO portraits, NO human figures. "
+            "Pure sacred light, beautiful symbolic representation."
         )
         return True, safe_prompt
     return False, scene_text_en
@@ -475,16 +508,26 @@ def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, ch
             gender_booster = "wearing ancient traditional Arabian flowing historical robes, classic desert turban, Middle Eastern facial features"
         elif character_heritage == "Western / Modern":
             gender_booster = "modern stylish contemporary Western clothing, jeans and jacket"
+        elif character_heritage == "Far Eastern":
+            gender_booster = "traditional East Asian oriental attire"
 
-        prompt_input = f"Scene: {urdu_scene}\n"
-        if char_memory: prompt_input += f"Character Details: {char_memory}\n"
-        if gender_booster: prompt_input += f"Attire Details: {gender_booster}\n"
-        if scene_memory: prompt_input += f"Environment: {scene_memory}\n"
+        instruction = (
+            "You are an expert Hollywood visual artist and prompt engineer. Analyze the Urdu scene and write a descriptive English prompt for Flux.\n"
+            "STRICT RULES: Gender separation, no female beards, modest attire, no human depictions for sacred Islamic topics. Output ONLY final prompt."
+        )
+        
+        prompt_input = f"Urdu Scene: {urdu_scene}\n"
+        if char_memory: prompt_input += f"Character Memory: {char_memory}\n"
+        if gender_booster: prompt_input += f"Attire tags: {gender_booster}\n"
+        if scene_memory: prompt_input += f"Scene Memory: {scene_memory}\n"
+        if raw_male_url: prompt_input += f"Male reference image URL: {raw_male_url}\n"
+        if raw_female_url: prompt_input += f"Female reference image URL: {raw_female_url}\n"
 
-        url = f"https://text.pollinations.ai/{urllib.parse.quote('Write Flux 8k cinematic prompt: ' + prompt_input)}?model=openai"
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' ' + prompt_input)}?model=openai"
         res = session.get(url, timeout=20)
         if res.status_code == 200:
-            return re.sub(r'^(prompt:|visual prompt:|cinematic prompt:)\s*', '', res.text.strip(), flags=re.IGNORECASE)
+            refined_p = res.text.strip()
+            return re.sub(r'^(prompt:|visual prompt:|cinematic prompt:)\s*', '', refined_p, flags=re.IGNORECASE)
     except Exception:
         pass
     return f"Cinematic film scene: {urdu_scene}, highly detailed, 8k"
@@ -503,6 +546,12 @@ def apply_color_lut_harmony(img_path, style_preset):
                 im = ImageEnhance.Color(im).enhance(0.7)
                 r, g, b = im.split()
                 b = b.point(lambda i: int(i * 1.10))
+                im = Image.merge("RGB", (r, g, b))
+            elif style_preset == "Historical Epic":
+                r, g, b = im.split()
+                r = r.point(lambda i: int(i * 1.08))
+                g = g.point(lambda i: int(i * 1.02))
+                b = b.point(lambda i: int(i * 0.90))
                 im = Image.merge("RGB", (r, g, b))
             im = ImageEnhance.Contrast(im).enhance(1.08)
             im.save(img_path, "JPEG")
@@ -561,20 +610,29 @@ def parallel_download_flux_images(urls, paths):
     def download_single(url, path):
         try:
             res = session.get(url, timeout=40)
-            if res.status_code == 200:
+            if res.status_code == 200 and len(res.content) > 5000:
                 with open(path, "wb") as f:
                     f.write(res.content)
                 return True
         except Exception:
             pass
-        return False
+        try:
+            im = Image.new("RGB", (1280, 720), color=(20, 24, 33))
+            im.save(path, "JPEG")
+            return True
+        except Exception:
+            return False
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         futures = [executor.submit(download_single, urls[i], paths[i]) for i in range(len(urls))]
         concurrent.futures.wait(futures)
 
+# ALL 25+ HOLLYWOOD CAMERA MOTIONS
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     try:
+        if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
+            Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_path, "JPEG")
+            
         scale_factor = 1.30
         base_clip = ImageClip(img_path).set_duration(duration).set_fps(24)
         cw, ch = int(w * scale_factor), int(h * scale_factor)
@@ -598,26 +656,42 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
             animated_clip = clip.resize(lambda t: 1.25 - 0.25 * (t / duration)).set_position('center')
         elif motion in ["Orbit Camera", "Arc Shot"]:
             animated_clip = clip.rotate(lambda t: -3 + 6 * (t / duration)).resize(lambda t: 1.1 + 0.1 * (t / duration)).set_position('center')
+        elif motion == "Crane Shot":
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -2 * (t / duration))
         elif motion == "Drone Shot":
             animated_clip = clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center')
+        elif motion in ["Tracking Shot", "Follow Shot"]:
+            animated_clip = clip.set_position(lambda t: (
+                int((w - cw) * (t / duration)),
+                int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5)))
+            ))
+        elif motion in ["Handheld Camera", "Shoulder Camera"]:
+            animated_clip = clip.set_position(lambda t: (
+                int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))),
+                int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7)))
+            )).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0))
+        elif motion == "Cinematic Reveal":
+            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
+        elif motion == "Whip Pan":
+            animated_clip = clip.set_position(lambda t: (int((w - cw) * ((t / duration) ** 3)), 'center'))
+        elif motion in ["Parallax Motion", "Ken Burns Effect"]:
+            animated_clip = clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
         else:
-            animated_clip = clip.resize(lambda t: 1.05 + 0.10 * (t / duration)).set_position('center')
+            animated_clip = clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center')
 
         return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
     except Exception:
-        pass
-    try:
         return ImageClip(img_path).set_duration(duration).resize((w, h))
-    except Exception:
-        pass
-    return None
 
 def apply_clip_transition(clip, transition, duration):
     try:
-        if transition == "Cross Dissolve (Fade)":
-            return clip.fadein(0.4).fadeout(0.4)
-        elif transition == "Flash Transition (White Glow)":
-            return clip.fadein(0.2).fadeout(0.2)
+        if clip is not None:
+            if transition == "Cross Dissolve (Fade)":
+                return clip.fadein(0.4).fadeout(0.4)
+            elif transition == "Flash Transition (White Glow)":
+                return clip.fadein(0.2).fadeout(0.2)
+            elif transition == "Film Dissolve (Muted)":
+                return clip.fadein(0.3).fadeout(0.3)
     except Exception:
         pass
     return clip
@@ -639,14 +713,13 @@ def save_audio_safe(text, voice, rate, pitch, filename):
             await communicate.save(filename)
         asyncio.run(amain())
         return True
-    except Exception as e:
-        st.error(f"Voice synthesis error: {e}")
+    except Exception:
         return False
 
 # ==========================================
-# 6. MASTER VIDEO GENERATOR CORE
+# 4. MASTER V40 RENDER SYSTEM CORE
 # ==========================================
-def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free & Unlimited)", pollinations_key="", video_model="wan-fast"):
+def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free & Unlimited)", pollinations_key="", video_model="wan-fast", advanced_params=None):
     u_id = str(uuid.uuid4())[:8]
     
     global active_renderers
@@ -699,7 +772,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             progress_bar.progress(0.05)
             status.info("🎙️ Processing Dialogue Voiceovers...")
             
-            sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 5]
+            sentences = [s.strip() for s in re.split(r'[۔.!]', story) if len(s.strip()) > 4]
             if not sentences: sentences = [story]
             
             clips = []
@@ -713,14 +786,13 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     v_code_scene = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
                     
                 sub_audio_path = f"a_{u_id}_{idx}.mp3"
-                if not save_audio_safe(scene, v_code_scene, rate, pitch, sub_audio_path):
-                    raise Exception("Voice generation failed.")
+                save_audio_safe(scene, v_code_scene, rate, pitch, sub_audio_path)
                 temporary_audio_tracks.append(sub_audio_path)
                 
             progress_bar.progress(0.15)
             
             if enable_bg_music:
-                status.info("🎵 Downloading Background Track...")
+                status.info("🎵 Downloading Atmospheric Background Track...")
                 story_lower = story.lower()
                 is_horror = any(k in story_lower for k in ["قبر", "عذاب", "موت", "خوفناک", "خوف", "جن", "grave", "horror", "ghost", "dark"])
                 is_epic = any(k in story_lower for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "king", "warrior", "palace", "empire"])
@@ -762,13 +834,9 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     dir_settings["motion"] = camera_motion
                 
                 refined_p = generate_enhanced_cinematic_prompt(
-                    urdu_scene=scene,
-                    char_memory=char_desc,
-                    scene_memory=scene_desc,
-                    character_heritage=character_heritage,
-                    enable_islamic_filter=enable_islamic_filter,
-                    raw_male_url=raw_male_url,
-                    raw_female_url=raw_female_url
+                    urdu_scene=scene, char_memory=char_desc, scene_memory=scene_desc,
+                    character_heritage=character_heritage, enable_islamic_filter=enable_islamic_filter,
+                    raw_male_url=raw_male_url, raw_female_url=raw_female_url
                 )
                 
                 if not is_spiritual:
@@ -776,19 +844,19 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}"
                 generated_prompts.append(refined_p)
                 
+                # Real AI Video Mode
                 if "Real AI Video" in gen_mode and active_api_key:
                     status.info(f"🎥 Rendering 3D Video Frame {i+1} via {video_model}...")
                     aspect_param = "16:9" if "16:9" in ratio else "9:16"
-                    motion_prompt = f"high motion, natural realistic animation, {refined_p[:350]}"
+                    motion_prompt = f"high motion, dynamic realistic animation, {refined_p[:350]}"
                     vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt)}?model={video_model}&aspectRatio={aspect_param}&key={active_api_key}&duration=4"
-                    
                     ref_url = raw_female_url if "saba" in scene.lower() else raw_male_url
                     if ref_url: vid_url += f"&image={urllib.parse.quote(ref_url)}"
                     
                     vid_path = f"v_{u_id}_{i}.mp4"
                     try:
                         res_vid = session.get(vid_url, timeout=90)
-                        if res_vid.status_code == 200:
+                        if res_vid.status_code == 200 and len(res_vid.content) > 50000:
                             with open(vid_path, "wb") as f_vid:
                                 f_vid.write(res_vid.content)
                             dur_per = 4.0
@@ -809,11 +877,11 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 generated_images.append(img_path)
                 
             progress_bar.progress(0.35)
-            status.info("🎨 Downloading Visual Frames in Parallel...")
+            status.info("🎨 Rendering High-Definition Visual Frames...")
             parallel_download_flux_images(flux_prompt_urls, img_paths)
             
             progress_bar.progress(0.55)
-            status.info("🎞️ Assembling Audio Syncing and Camera Motions...")
+            status.info("🎞️ Assembling Synchronized Audio and Motions...")
             
             for i, scene in enumerate(sentences):
                 if len(clips) > i:
@@ -860,7 +928,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                     pass
                     
             out_name = f"Sglowina_{u_id}.mp4"
-            final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p"], logger=None)
+            final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p", "-movflags", "+faststart"], logger=None)
             final_video.close()
             
             for sub_voice in temporary_audio_tracks:
@@ -897,56 +965,7 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             gc.collect()
 
 # ==========================================
-# 7. ANTI-COPYRIGHT BYPASS ENGINE
-# ==========================================
-def process_anti_copyright_video(in_path, out_path, flip_h, spd, color_mod, add_grain, smart_zoom, shift_audio, border_mode, crop_margin):
-    try:
-        ffmpeg_cmd = get_ffmpeg()
-        vf_filters = []
-        
-        if flip_h:
-            vf_filters.append("hflip")
-        if smart_zoom:
-            vf_filters.append("scale=iw*1.04:ih*1.04,crop=iw/1.04:ih/1.04")
-        if crop_margin > 0:
-            vf_filters.append(f"crop=iw-{crop_margin*2}:ih-{crop_margin*2}:{crop_margin}:{crop_margin}")
-        if color_mod:
-            vf_filters.append("eq=contrast=1.05:brightness=0.02:saturation=1.08")
-        if add_grain:
-            vf_filters.append("noise=alls=12:allf=t+u")
-        if border_mode:
-            vf_filters.append("pad=iw+16:ih+16:8:8:color=black")
-            
-        vf_str = ",".join(vf_filters) if vf_filters else "null"
-        
-        af_filters = []
-        if shift_audio:
-            af_filters.append("asetrate=44100*1.03,aresample=44100")
-        if spd != 1.0:
-            vf_str += f",setpts={1/spd}*PTS"
-            af_filters.append(f"atempo={spd}")
-            
-        af_str = ",".join(af_filters) if af_filters else "anull"
-        
-        cmd = [
-            ffmpeg_cmd, "-y", "-i", in_path,
-            "-vf", vf_str,
-            "-af", af_str,
-            "-c:v", "libx264",
-            "-preset", "fast",
-            "-crf", "22",
-            "-c:a", "aac",
-            "-pix_fmt", "yuv420p",
-            out_path
-        ]
-        
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return os.path.exists(out_path) and os.path.getsize(out_path) > 1000
-    except Exception:
-        return False
-
-# ==========================================
-# 8. UI STYLING & NAVIGATION
+# 5. UI & PREMIUM BRANDING STYLING
 # ==========================================
 st.markdown("""
     <style>
@@ -966,20 +985,21 @@ st.markdown("""
         background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin-top: 15px;
+        text-shadow: 0 0 15px rgba(255, 0, 122, 0.2);
+        margin-top: 10px;
         margin-bottom: 5px;
         letter-spacing: 2px;
     }
 
-    .logo-container { display: flex; justify-content: center; align-items: center; padding: 15px 0; }
+    .logo-container { display: flex; justify-content: center; align-items: center; padding: 10px 0; }
     
     .circular-s {
-        width: 120px; height: 120px; 
+        width: 100px; height: 100px; 
         background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff) !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        font-family: 'Orbitron', sans-serif; font-size: 50px; color: #ffffff !important;
-        border: 5px solid #ffffff !important;
-        box-shadow: 0 0 50px #ff007a, inset 0 0 20px #ffffff;
+        font-family: 'Orbitron', sans-serif; font-size: 42px; color: #ffffff !important;
+        border: 4px solid #ffffff !important;
+        box-shadow: 0 0 40px #ff007a, inset 0 0 15px #ffffff;
     }
 
     .stButton>button { 
@@ -992,24 +1012,407 @@ st.markdown("""
         font-weight: bold; 
         border: none; 
     }
+    
+    [data-testid="stSidebar"] { 
+        background-color: #ffffff !important; 
+        border-right: 1px solid #e2e8f0; 
+    }
+    [data-testid="stSidebar"] * { 
+        color: #000000 !important; 
+        font-weight: bold !important; 
+    }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="glow-title">SGLOWINA AI ENTERPRISE STUDIO</div>', unsafe_allow_html=True)
-st.markdown('<div class="logo-container"><div class="circular-s">S</div></div>', unsafe_allow_html=True)
+st.markdown('<div class="glow-title">SGLOWINA & ES AI STUDIO</div>', unsafe_allow_html=True)
+st.markdown('<div class="logo-container"><div class="circular-s">ES</div></div>', unsafe_allow_html=True)
 
-tab_auth, tab_chat, tab_movie, tab_image, tab_bypass, tab_chars, tab_enterprise = st.tabs([
-    "🔑 Sign In & Registrations",
-    "💬 Electric AI Chat", 
+# ==========================================
+# 6. SEAMLESS AR LIVE VIEWPORT HTML5 ENGINE
+# ==========================================
+def render_autonomous_live_viewport():
+    viewport_html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+            body { background: transparent; display: flex; justify-content: center; }
+            
+            .viewport-container {
+                width: 100%;
+                max-width: 480px;
+                height: 520px;
+                background: #000;
+                border-radius: 28px;
+                position: relative;
+                overflow: hidden;
+                box-shadow: 0 12px 35px rgba(0,0,0,0.5), 0 0 20px rgba(245, 158, 11, 0.3);
+                border: 3px solid #f59e0b;
+            }
+
+            #liveVideo {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transform: scaleX(-1);
+            }
+
+            .hud-header {
+                position: absolute;
+                top: 14px;
+                left: 14px;
+                right: 14px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                z-index: 10;
+            }
+            .hud-badge {
+                background: rgba(0, 0, 0, 0.75);
+                backdrop-filter: blur(8px);
+                border: 1px solid #10b981;
+                color: #10b981;
+                padding: 6px 14px;
+                border-radius: 20px;
+                font-size: 13px;
+                font-weight: 800;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .pulse-dot {
+                width: 8px;
+                height: 8px;
+                background: #10b981;
+                border-radius: 50%;
+                animation: livePulse 1.5s infinite;
+            }
+
+            .mascot-overlay {
+                position: absolute;
+                bottom: 85px;
+                right: 14px;
+                width: 110px;
+                height: 130px;
+                z-index: 15;
+                pointer-events: none;
+            }
+            .fluffy-body {
+                width: 100px;
+                height: 115px;
+                background: radial-gradient(circle at 35% 30%, #fef3c7, #fde68a 60%, #f59e0b 100%);
+                border-radius: 50px 50px 45px 45px;
+                position: relative;
+                box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+                animation: mascotBounce 2.5s infinite ease-in-out alternate;
+            }
+            .ear {
+                width: 24px;
+                height: 30px;
+                background: #f59e0b;
+                border-radius: 50%;
+                position: absolute;
+                top: -6px;
+            }
+            .ear-l { left: 8px; transform: rotate(-20deg); }
+            .ear-r { right: 8px; transform: rotate(20deg); }
+            .sleep-mask {
+                width: 70px;
+                height: 22px;
+                background: #fed7aa;
+                border-radius: 12px;
+                position: absolute;
+                top: 10px;
+                left: 15px;
+                border: 1.5px solid #f97316;
+            }
+            .face-box {
+                width: 80px;
+                height: 65px;
+                background: #fffbeb;
+                border-radius: 50%;
+                position: absolute;
+                top: 32px;
+                left: 10px;
+            }
+            .eye-row {
+                display: flex;
+                justify-content: space-around;
+                width: 46px;
+                position: absolute;
+                top: 20px;
+                left: 17px;
+            }
+            .eye-dot {
+                width: 8px;
+                height: 6px;
+                background: #451a03;
+                border-radius: 0 0 8px 8px;
+                animation: eyeBlink 3.5s infinite;
+            }
+            .blush-dot {
+                width: 12px;
+                height: 6px;
+                background: #fca5a5;
+                border-radius: 50%;
+                position: absolute;
+                top: 26px;
+            }
+            .blush-l { left: 6px; }
+            .blush-r { right: 6px; }
+            .mascot-mouth {
+                width: 14px;
+                height: 6px;
+                background: #e11d48;
+                border-radius: 0 0 8px 8px;
+                position: absolute;
+                bottom: 16px;
+                left: 33px;
+                transition: all 0.15s ease;
+            }
+            .speaking .mascot-mouth {
+                animation: mouthMove 0.25s infinite alternate;
+            }
+            .speaking .fluffy-body {
+                animation: speakingBounce 0.3s infinite alternate;
+            }
+
+            .subtitle-bar {
+                position: absolute;
+                bottom: 14px;
+                left: 14px;
+                right: 14px;
+                background: rgba(15, 23, 42, 0.85);
+                backdrop-filter: blur(12px);
+                border: 1px solid rgba(255,255,255,0.15);
+                border-radius: 16px;
+                padding: 10px 16px;
+                color: #ffffff;
+                font-size: 14px;
+                font-weight: 600;
+                text-align: right;
+                direction: rtl;
+                z-index: 10;
+                min-height: 48px;
+                display: flex;
+                align-items: center;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            }
+
+            .start-overlay {
+                position: absolute;
+                inset: 0;
+                background: rgba(0,0,0,0.88);
+                backdrop-filter: blur(10px);
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                z-index: 30;
+                padding: 20px;
+                text-align: center;
+            }
+            .start-btn {
+                background: linear-gradient(45deg, #f59e0b, #ec4899);
+                color: #000000;
+                border: none;
+                padding: 16px 32px;
+                border-radius: 50px;
+                font-size: 18px;
+                font-weight: 900;
+                cursor: pointer;
+                box-shadow: 0 0 25px rgba(245, 158, 11, 0.6);
+                transition: 0.3s;
+                margin-top: 15px;
+            }
+            .start-btn:hover { transform: scale(1.05); }
+
+            @keyframes livePulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.2); } }
+            @keyframes mascotBounce { 0% { transform: translateY(0); } 100% { transform: translateY(-8px); } }
+            @keyframes speakingBounce { 0% { transform: scale(1); } 100% { transform: scale(1.05) translateY(-4px); } }
+            @keyframes eyeBlink { 0%, 90%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+            @keyframes mouthMove { 0% { height: 4px; border-radius: 0 0 4px 4px; } 100% { height: 18px; border-radius: 8px; transform: scaleX(1.3); } }
+        </style>
+    </head>
+    <body>
+        <div class="viewport-container">
+            <video id="liveVideo" autoplay playsinline></video>
+
+            <div class="hud-header">
+                <div class="hud-badge"><div class="pulse-dot"></div> <span id="statusLabel">STANDBY</span></div>
+                <div style="background:rgba(0,0,0,0.6); padding:5px 12px; border-radius:20px; font-size:12px; color:#f59e0b; font-weight:800;">🧸 MUSE AI</div>
+            </div>
+
+            <div class="mascot-overlay" id="mascotBox">
+                <div class="fluffy-body">
+                    <div class="ear ear-l"></div>
+                    <div class="ear ear-r"></div>
+                    <div class="sleep-mask"></div>
+                    <div class="face-box">
+                        <div class="blush-dot blush-l"></div>
+                        <div class="blush-dot blush-r"></div>
+                        <div class="eye-row">
+                            <div class="eye-dot"></div>
+                            <div class="eye-dot"></div>
+                        </div>
+                        <div class="mascot-mouth"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="subtitle-bar" id="subtitles">
+                السلام علیکم! نیچے "Start Live Companion" دبائیں، میں کیمرے سے دیکھ کر لائیو بولوں گا!
+            </div>
+
+            <div class="start-overlay" id="startScreen">
+                <div style="font-size:45px; margin-bottom:10px;">🧸</div>
+                <h3 style="color:#ffffff; font-weight:900; margin-bottom:5px;">MUSE Live Vision Companion</h3>
+                <p style="color:#94a3b8; font-size:13px; max-width:280px;">موبائل کیمرہ لائیو رہے گا اور AI بغیر بٹن دبائے خودکار اردو بولے گا!</p>
+                <button class="start-btn" onclick="startAutonomousMUSE()">🚀 Start Live Companion</button>
+            </div>
+        </div>
+
+        <canvas id="frameCanvas" style="display:none;"></canvas>
+
+        <script>
+            let video = document.getElementById('liveVideo');
+            let startScreen = document.getElementById('startScreen');
+            let mascotBox = document.getElementById('mascotBox');
+            let subtitles = document.getElementById('subtitles');
+            let statusLabel = document.getElementById('statusLabel');
+            let recognition = null;
+            let isScanning = false;
+            let autoScanTimer = null;
+
+            async function startAutonomousMUSE() {
+                try {
+                    startScreen.style.display = 'none';
+                    statusLabel.innerText = "CONNECTING...";
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: "environment", width: 640, height: 480 },
+                        audio: false
+                    });
+                    video.srcObject = stream;
+                    statusLabel.innerText = "AUTONOMOUS LIVE";
+                    
+                    speakUrdu("السلام علیکم! میں آپ کا پیارا AI دوست ہوں۔ کیمرہ لائیو ہے، آپ جو پوچھیں میں دیکھ کر بتاؤں گا!");
+                    startSpeechListener();
+                    
+                    autoScanTimer = setInterval(() => {
+                        if (!isScanning) {
+                            captureAndAnalyze("Describe what is in front of the camera in friendly Urdu.");
+                        }
+                    }, 8000);
+                } catch (e) {
+                    alert("کیمرہ پرمیشن الاؤ کریں: " + e.message);
+                }
+            }
+
+            function startSpeechListener() {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) return;
+
+                recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = false;
+                recognition.lang = 'ur-PK';
+
+                recognition.onresult = async function(event) {
+                    let lastIdx = event.results.length - 1;
+                    let spoken = event.results[lastIdx][0].transcript;
+                    subtitles.innerText = "👂 آپ: " + spoken;
+                    await captureAndAnalyze(spoken);
+                };
+
+                recognition.onerror = function() { try { recognition.start(); } catch(e){} };
+                recognition.onend = function() { try { recognition.start(); } catch(e){} };
+                recognition.start();
+            }
+
+            async function captureAndAnalyze(promptText) {
+                if (isScanning) return;
+                isScanning = true;
+
+                let canvas = document.getElementById('frameCanvas');
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                let ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                let base64Img = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
+
+                try {
+                    let res = await fetch("https://text.pollinations.ai/openai", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            model: "openai",
+                            messages: [
+                                {
+                                    role: "user",
+                                    content: [
+                                        { 
+                                            type: "text", 
+                                            text: "You are a super cute, friendly AI mascot in a real-time live vision session. Look at this camera frame and explain directly in fluent, sweet, natural Urdu (اردو). Explain vehicles, tractors, objects, people or surroundings in 2 sweet concise sentences: " + promptText 
+                                        },
+                                        { 
+                                            type: "image_url", 
+                                            image_url: { url: "data:image/jpeg;base64," + base64Img } 
+                                        }
+                                    ]
+                                }
+                            ]
+                        })
+                    });
+
+                    let reply = await res.text();
+                    subtitles.innerText = "🧸: " + reply;
+                    speakUrdu(reply);
+                } catch (err) {
+                } finally {
+                    isScanning = false;
+                }
+            }
+
+            function speakUrdu(text) {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    let utter = new SpeechSynthesisUtterance(text);
+                    utter.lang = 'ur-PK';
+                    utter.rate = 1.0;
+                    utter.pitch = 1.15;
+
+                    utter.onstart = function() { mascotBox.classList.add('speaking'); };
+                    utter.onend = function() { mascotBox.classList.remove('speaking'); };
+                    utter.onerror = function() { mascotBox.classList.remove('speaking'); };
+
+                    window.speechSynthesis.speak(utter);
+                }
+            }
+        </script>
+    </body>
+    </html>
+    """
+    st.components.v1.html(viewport_html, height=540)
+
+# ==========================================
+# 7. NAVIGATION TABS (ALL 7 TABS)
+# ==========================================
+tab_auth, tab_companion, tab_es_tools, tab_movie, tab_image, tab_chat, tab_enterprise = st.tabs([
+    "🔑 Sign In & Auth",
+    "🧸 Live AR Companion (لائیو ویژن)",
+    "⚡ ES Video Processor (اینٹی کاپی رائٹ اسٹوڈیو)",
     "🎬 Pro Master Studio", 
     "🎨 Pro Image Studio",
-    "🛡️ Anti-Copyright Video Suite",
-    "🎭 Character & Scene Library",
-    "👤 Enterprise & Billing Center"
+    "💬 Electric AI Chat", 
+    "👤 Enterprise Center"
 ])
 
 # -----------------
-# TAB 1: AUTH
+# TAB 1: AUTHENTICATION
 # -----------------
 with tab_auth:
     st.write("### 🔑 Sglowina Secure Authentication Portal")
@@ -1023,11 +1426,14 @@ with tab_auth:
             if btn_login:
                 if authenticate_user(u_name, p_word):
                     st.session_state.logged_in_user = u_name.strip().lower()
-                    st.success(f"Welcome back, {u_name}! 🟢")
+                    if st.session_state.logged_in_user in ["essasaba", "essa_awan", "saba_wahid"]:
+                        st.success("Welcome back to SGLOWINA & ES AI, Muhammad Essa Awan & Saba Wahid! (Admin Authorized) 🟢")
+                    else:
+                        st.success(f"Welcome to SGLOWINA AI, {u_name}! (Authorized User) 🟢")
                     time.sleep(1)
                     st.rerun()
                 else:
-                    st.error("Invalid username or password.")
+                    st.error("Invalid credentials.")
     else:
         with st.form("reg_form"):
             new_u = st.text_input("Choose Username")
@@ -1038,69 +1444,293 @@ with tab_auth:
                 if new_u and new_e and new_p:
                     success, msg = register_saas_user(new_u, new_e, new_p)
                     if success:
-                        st.success(f"Account '{new_u}' created! Please sign in. 🟢")
+                        st.success(f"Welcome to SGLOWINA AI! Account for '{new_u}' registered successfully. Please sign in. 🟢")
                     else:
                         st.error(msg)
+                else:
+                    st.warning("Please fill out all fields.")
 
 # -----------------
-# TAB 2: CHAT
+# TAB 2: LIVE AR COMPANION (NO TAKE PHOTO BUTTONS)
 # -----------------
-with tab_chat:
-    st.write("### 💬 Sglowina Intelligence Creative Assistant")
-    for m in st.session_state.msgs:
-        with st.chat_message(m["role"]): st.write(m["content"])
-    if p := st.chat_input("Ask for a story idea, prompt, or video script..."):
-        st.session_state.msgs.append({"role": "user", "content": p})
-        with st.chat_message("user"): st.write(p)
-        if any(k in p.lower() for k in ["kisne", "who made", "owner", "essa", "saba"]):
-            translated_response = SGLOWINA_BIO
-        else:
-            try:
-                res = requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true", timeout=15).text
-                translated_response = res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
-            except Exception:
-                translated_response = "I am ready to assist your creative productions."
-        with st.chat_message("assistant"):
-            st.write(translated_response)
-            st.session_state.msgs.append({"role": "assistant", "content": translated_response})
+with tab_companion:
+    render_autonomous_live_viewport()
 
 # -----------------
-# TAB 3: PRO MOVIE STUDIO
+# TAB 3: ES VIDEO PROCESSOR (PRO AUDIO DUCKING & TEXT BANNER SHIELD)
+# -----------------
+with tab_es_tools:
+    st.write("### ⚡ ES ہالی ووڈ الٹرا ڈسرپشن و آڈیو ڈکنگ شیلڈ (100% Anti-Copyright)")
+    st.info("💡 **پرو ڈسرپشن ایکٹیو:** اصل میوزک کو 75% خاموش (Ducking) کرنا، نیا سنیمٹک ٹریک مکس کرنا، ٹیکسٹ/پوسٹر پر اینٹی ہیش بینر اور 1.8 ڈگری ٹِلٹ۔")
+    
+    sub_t1, sub_t2, sub_t3 = st.tabs([
+        "🎬 1. فل ویڈیو / مووی / ٹریلر موڈ",
+        "⚔️ 2. کلپ کٹر موڈ (10 منٹ کٹ)",
+        "🎧 3. گانے اور لوفی (Slowed + Reverb)"
+    ])
+    
+    with sub_t1:
+        st.subheader("پوری ویڈیو / شو / ٹریلر پر آڈیو ڈکنگ اور پرو شیلڈ لگائیں")
+        
+        c_mode1, c_mode2 = st.columns(2)
+        with c_mode1:
+            style_choice = st.selectbox("حفاظتی ویژول اسٹائل:", [
+                "👑 100% پرو ایڈیٹر موڈ (1.8° Tilt + Canvas Frame + Text Shield Banner)",
+                "⚡ الٹرا فل اسکرین اینٹی ہیش (1.8° Tilt + Deep 80% Zoom + Film Grain)"
+            ], key="s_t1")
+        with c_mode2:
+            audio_shield = st.selectbox("میوزک اور آواز کا حل (Audio Music Ducking):", [
+                "🔇 اصل میوزک 75% خاموش (Ducking) + نیا سنیمٹک ٹریک مکس (100% پکا حل)",
+                "🔊 بھاری اور گہری موٹی آواز (Deep Pitch 0.90x)",
+                "🎵 1.08x اسپیڈ پچ ماڈیولیشن"
+            ], key="ap_t1")
+        
+        upload_opt1 = st.file_uploader("📂 اپنے موبائل سے ویڈیو/ٹریلر اپلوڈ کریں (100% گارنٹی شدہ پلے):", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
+        url_input_1 = st.text_input("🔗 یا یوٹیوب کا لنک درج کریں:", placeholder="https://youtu.be/...", key="url_t1")
+        
+        if st.button("🚀 الٹرا اینٹی کاپی رائٹ شیلڈ لگائیں", type="primary", key="run_t1"):
+            info = {'title': 'Featured Movie Video'}
+            has_input = False
+            
+            if upload_opt1 is not None:
+                with open(input_video, "wb") as f:
+                    f.write(upload_opt1.getvalue())
+                has_input = True
+                info['title'] = upload_opt1.name
+            elif url_input_1:
+                with st.spinner("یوٹیوب سے اصل ٹریلر ڈاؤنلوڈ ہو رہا ہے..."):
+                    info = inspect_and_fetch_media(url_input_1, input_video)
+                    if os.path.exists(input_video) and os.path.getsize(input_video) > 100000:
+                        has_input = True
+                        
+            if has_input:
+                with st.spinner("ویڈیو پر آڈیو ڈکنگ، میوزک میوٹنگ اور اینٹی ہیش بینر لگ رہا ہے..."):
+                    ffmpeg_exe = get_ffmpeg()
+                    
+                    # PRO VISUAL FILTER WITH TEXT/POSTER BANNER SHIELD
+                    if "پرو ایڈیٹر" in style_choice:
+                        vf_str = (
+                            "[0:v]scale=1280:720,boxblur=28:6[bg];"
+                            "[0:v]setpts=0.925*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
+                            "hflip,crop=iw*0.82:ih*0.82,scale=980:552,"
+                            "eq=contrast=1.18:saturation=1.25:brightness=0.03,"
+                            "drawbox=y=ih-85:color=black@0.65:width=iw:height=70:t=fill,"
+                            "noise=alls=8:allf=t+u,vignette=PI/3.5[fg];"
+                            "[bg][fg]overlay=(W-w)/2:(H-h)/2"
+                        )
+                    else:
+                        vf_str = (
+                            "setpts=0.925*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
+                            "hflip,crop=iw*0.80:ih*0.80,scale=1280:720,"
+                            "eq=contrast=1.18:saturation=1.25:brightness=0.03,"
+                            "drawbox=y=ih-90:color=black@0.60:width=iw:height=75:t=fill,"
+                            "noise=alls=8:allf=t+u,vignette=PI/3.5"
+                        )
+                    
+                    # AUDIO DUCKING FILTER (Lowers original music & pitches dialogues)
+                    if "خاموش" in audio_shield:
+                        af_str = "volume=0.30,atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=6:f=110"
+                    elif "بھاری" in audio_shield:
+                        af_str = "atempo=1.08,asetrate=44100*0.88,aresample=44100,bass=g=5:f=120,treble=g=-3:f=3500"
+                    else:
+                        af_str = "atempo=1.08,asetrate=44100*1.06,aresample=44100,bass=g=3:f=110"
+                    
+                    cmd = [
+                        ffmpeg_exe, "-y", "-i", input_video,
+                        "-filter_complex" if "پرو ایڈیٹر" in style_choice else "-vf", vf_str,
+                        "-af", af_str,
+                        "-r", "25",
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
+                        "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                        "-c:a", "aac", "-b:a", "128k", output_video
+                    ]
+                    subprocess.run(cmd)
+                    
+                    if os.path.exists(output_video) and os.path.getsize(output_video) > 50000:
+                        st.session_state.detected_info = info
+                        st.session_state.process_ready = True
+                    else:
+                        st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ براہِ کرم فائل دوبارہ اپلوڈ کریں۔")
+            else:
+                st.error("❌ ویڈیو فائل اپلوڈ کریں یا درست یوٹیوب لنک دیں۔")
+
+    with sub_t2:
+        st.subheader("ویڈیو یا شو سے 10 منٹ کا کلپ کاٹیں")
+        c1, c2 = st.columns(2)
+        with c1:
+            scene_type = st.selectbox("سین کا آغاز:", ["⚔️ اہم سین / کلائمیکس (منٹ 30)", "👻 سسپنس موڑ (منٹ 45)", "🏔️ آغاز (منٹ 15)", "⏱️ کسٹم منٹ"], key="s_t2")
+        with c2:
+            clip_len = st.slider("دورانیہ (منٹ):", 1, 20, 10, key="len_t2")
+            
+        start_min = 30 if "30" in scene_type else 45 if "45" in scene_type else 15 if "15" in scene_type else st.number_input("اسٹارٹ منٹ:", 0, 300, 10)
+        upload_opt2 = st.file_uploader("📂 اپنے موبائل سے ویڈیو فائل منتخب کریں:", type=["mp4", "mov", "mkv"], key="up_t2")
+        url_input_2 = st.text_input("🔗 یا ویڈیو کا لنک درج کریں:", placeholder="https://youtu.be/...", key="url_t2")
+
+        if st.button("🚀 کلپ کاٹیں اور آڈیو ڈکنگ لگائیں", type="primary", key="run_t2"):
+            info = {'title': 'Clip Highlight'}
+            has_input = False
+            
+            if upload_opt2 is not None:
+                with open(input_video, "wb") as f:
+                    f.write(upload_opt2.getvalue())
+                has_input = True
+                info['title'] = upload_opt2.name
+            elif url_input_2:
+                with st.spinner("ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
+                    info = inspect_and_fetch_media(url_input_2, input_video)
+                    if os.path.exists(input_video) and os.path.getsize(input_video) > 100000:
+                        has_input = True
+
+            if has_input:
+                with st.spinner("کلپ کٹ کر کے آڈیو ڈکنگ اور پرو شیلڈ لگ رہی ہے..."):
+                    ffmpeg_exe = get_ffmpeg()
+                    start_sec = start_min * 60
+                    dur_sec = clip_len * 60
+                    vf = "setpts=0.925*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,hflip,crop=iw*0.82:ih*0.82,scale=1280:720,eq=contrast=1.18:saturation=1.25:brightness=0.03,noise=alls=8:allf=t+u,vignette=PI/3.5"
+                    af = "volume=0.35,atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=5:f=120"
+                    
+                    cmd = [
+                        ffmpeg_exe, "-y", "-ss", str(start_sec), "-t", str(dur_sec),
+                        "-i", input_video, "-vf", vf, "-af", af,
+                        "-r", "25",
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
+                        "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                        "-c:a", "aac", "-b:a", "128k", output_video
+                    ]
+                    subprocess.run(cmd)
+                    if os.path.exists(output_video) and os.path.getsize(output_video) > 50000:
+                        st.session_state.detected_info = info
+                        st.session_state.process_ready = True
+                    else:
+                        st.error("❌ ویڈیو ٹائم سیٹنگز چیک کریں۔")
+            else:
+                st.error("❌ ویڈیو اپلوڈ کریں یا درست لنک دیں۔")
+
+    with sub_t3:
+        st.subheader("گانے کا لنک ڈالیں اور وائرل Slowed + Reverb بنائیں")
+        col_s1, col_s2, col_s3 = st.columns(3)
+        with col_s1:
+            slow_val = st.slider("سلو اسپیڈ:", 0.80, 0.96, 0.88, 0.01, key="sl_t3")
+        with col_s2:
+            reverb_val = st.slider("گونج / Reverb:", 20, 80, 50, 5, key="rev_t3")
+        with col_s3:
+            bass_val = st.slider("بیس بوسٹ:", 0, 12, 6, key="bass_t3")
+            
+        upload_opt3 = st.file_uploader("📂 آڈیو یا ویڈیو فائل منتخب کریں:", type=["mp3", "wav", "mp4", "m4a"], key="up_t3")
+        song_url = st.text_input("🔗 یا گانے کا لنک یہاں پیسٹ کریں:", placeholder="https://youtu.be/...", key="url_t3")
+        
+        if st.button("🚀 گانے کو Slowed + Reverb بنائیں", type="primary", key="run_t3"):
+            temp_audio_in = "temp_song.mp4"
+            info = {'title': 'Lo-Fi Chill Track'}
+            has_input = False
+            
+            if upload_opt3 is not None:
+                with open(temp_audio_in, "wb") as f:
+                    f.write(upload_opt3.getvalue())
+                has_input = True
+                info['title'] = upload_opt3.name
+            elif song_url:
+                with st.spinner("گانا ڈاؤنلوڈ ہو رہا ہے..."):
+                    info = inspect_and_fetch_media(song_url, temp_audio_in)
+                    if os.path.exists(temp_audio_in) and os.path.getsize(temp_audio_in) > 50000:
+                        has_input = True
+                        
+            if has_input:
+                with st.spinner("لوفی گانا ماسٹر ہو رہا ہے..."):
+                    ffmpeg_exe = get_ffmpeg()
+                    sample_rate = int(44100 * slow_val)
+                    af_filter = f"asetrate={sample_rate},aresample=44100,aecho=0.8:0.88:{reverb_val}:0.4,bass=g={bass_val}:f=110"
+                    cmd_song = [
+                        ffmpeg_exe, "-y", "-i", temp_audio_in,
+                        "-af", af_filter, "-c:v", "copy",
+                        "-c:a", "aac", "-b:a", "192k",
+                        "-movflags", "+faststart", output_video
+                    ]
+                    subprocess.run(cmd_song)
+                    if os.path.exists(output_video) and os.path.getsize(output_video) > 50000:
+                        st.session_state.detected_info = info
+                        st.session_state.process_ready = True
+                    else:
+                        st.error("❌ آڈیو پروسیسنگ فیل ہو گئی۔")
+            else:
+                st.error("❌ آڈیو فائل اپلوڈ کریں یا درست لنک دیں۔")
+
+    # 100% Guaranteed Playable Video Player & Download
+    if st.session_state.process_ready and os.path.exists(output_video) and os.path.getsize(output_video) > 50000:
+        st.divider()
+        st.success("🎉 ویڈیو 75% آڈیو ڈکنگ، بینر شیلڈ اور 1.8° ٹِلٹ کے ساتھ تیار ہے:")
+        
+        video_bytes = open(output_video, 'rb').read()
+        st.video(video_bytes)
+        
+        st.download_button(
+            label="📥 یہاں کلک کر کے مکمل ویڈیو ڈاؤنلوڈ کریں (Download MP4)",
+            data=video_bytes,
+            file_name="es_protected_master.mp4",
+            mime="video/mp4",
+            use_container_width=True
+        )
+
+        genre, titles, tags, prompt = generate_smart_metadata(st.session_state.detected_info)
+        st.info(f"🎯 **AI نے پہچانا:** یہ ویڈیو **'{genre}'** کیٹگری کی ہے۔ (اصل نام: **{st.session_state.detected_info.get('title', 'Video')}**)")
+        
+        c_meta1, c_meta2 = st.columns(2)
+        with c_meta1:
+            st.markdown(f"### 🔥 وائرل ٹائٹلز ({genre}):")
+            for i, t in enumerate(titles, 1):
+                st.code(t, language="text")
+            st.markdown("### 🏷️ وائرل ہیش ٹیگز:")
+            st.code(tags, language="text")
+
+        with c_meta2:
+            st.markdown("### 🎨 AI تھمب نیل پرامپٹ (Thumbnail Prompt):")
+            st.info("💡 اسے Midjourney یا Bing Creator میں ڈال کر نیا تھمب نیل بنائیں۔")
+            st.code(prompt, language="text")
+
+# -----------------
+# TAB 4: PRO MOVIE STUDIO (ALL FEATURES)
 # -----------------
 with tab_movie:
-    st.write("### 🎥 Industrial Cinematic Production (v40 Hollywood Power)")
-    gen_mode = st.selectbox("Select Generator Engine:", [
-        "Cinematic Photo Zoom & Pan (100% Free & Unlimited)", 
-        "Real AI Video Motion (Beta - Pollinations Video API)"
-    ])
+    st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
+    
+    st.subheader("⚙️ AI Generation Mode")
+    gen_mode = st.selectbox("Select Generator Engine:", ["Cinematic Photo Zoom & Pan (100% Free & Unlimited)", "Real AI Video Motion (Beta - Pollinations Video API)"])
     pollinations_key = ""
     if "Real AI Video" in gen_mode:
-        pollinations_key = st.text_input("Enter Pollinations API Key (Optional if master key is set in Admin Panel):", type="password")
-        
-    m_script = st.text_area("Enter Movie Script (Urdu/English):", height=140, placeholder="مثال: ایک لڑکا گھنے جنگل میں تیزی سے دوڑ رہا ہے...")
+        pollinations_key = st.text_input("Enter Pollinations API Key (sk_* or pk_*):", type="password")
+
+    m_script = st.text_area("Enter Movie Script (Urdu/English):", height=150, placeholder="مثال: ایک کسان ٹریکٹر چلا رہا ہے اور کھیت میں کام کر رہا ہے...")
     enable_islamic_filter = st.checkbox("Enable Islamic & Spiritual Safety Filter (حرمتِ انبیاء و اولیاء فلٹر) 🛡️", value=True)
+    
     char_desc = st.text_input("Character Memory (کردار کا حلیہ):", placeholder="e.g. Saba is wearing a modest dark blue hijab")
     
+    st.write("##### 👤 Consistent Character Identity References (کرداروں کے چہروں کی تصاویر)")
     col_up1, col_up2 = st.columns(2)
     with col_up1:
-        uploaded_male_img = st.file_uploader("Upload Male Reference Image:", type=["jpg", "png", "jpeg"])
+        uploaded_male_img = st.file_uploader("Upload Male Character Reference Image:", type=["jpg", "png", "jpeg"])
+        if uploaded_male_img is not None:
+            st.image(uploaded_male_img, caption="Male Identity Loaded ✅", width=120)
     with col_up2:
-        uploaded_female_img = st.file_uploader("Upload Female Reference Image:", type=["jpg", "png", "jpeg"])
+        uploaded_female_img = st.file_uploader("Upload Female Character Reference Image:", type=["jpg", "png", "jpeg"])
+        if uploaded_female_img is not None:
+            st.image(uploaded_female_img, caption="Female Identity Loaded ✅", width=120)
         
     scene_desc = st.text_input("Scene Memory (ماحول):", placeholder="e.g. Deep green ancient forest, dark stormy night")
 
-    mc1, mc2, mc3, mc4, mc5 = st.columns(5)
+    mc1, mc2, mc3, mc4, mc5, mc6, mc7, mc8, mc9, mc10 = st.columns(10)
     with mc1: mv = st.selectbox("Voice:", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
-    with mc2: mv_rate = st.selectbox("Voice Speed:", ["+0% (Normal)", "+10% (Fast)", "-10% (Slow)"])
+    with mc2: mv_rate = st.selectbox("Speed:", ["+0% (Normal)", "+10% (Fast)", "-10% (Slow)"])
     with mc3: mv_pitch = st.selectbox("Pitch:", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
-    with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Dark Gothic / Mystery"])
-    
-    mc6, mc7, mc8, mc9, mc10 = st.columns(5)
-    with mc6: camera_motion = st.selectbox("Camera Motion:", ["AI Hollywood Director (Auto)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Dolly In", "Orbit Camera", "Drone Shot"])
-    with mc7: transition_style = st.selectbox("Transition:", ["Cross Dissolve (Fade)", "Flash Transition (White Glow)", "Instant Cut"])
-    with mc8: character_heritage = st.selectbox("Attire Heritage:", ["Automatic", "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)", "Ancient Arabian", "Western / Modern"])
-    with mc9: video_model = st.selectbox("Video Model:", ["wan-fast", "seedance", "veo"])
+    with mc4: mr = st.selectbox("Format:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)", "CinemaScope (21:9)", "Standard Box (4:3)"])
+    with mc5: ms = st.selectbox("Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Dark Gothic / Mystery"])
+    with mc6: camera_motion = st.selectbox("Motion:", [
+        "AI Hollywood Director (Auto)", "Zoom Out (v40 Default)", "Zoom In", "Pan Left", "Pan Right", "Pan Up", "Pan Down",
+        "Dolly In", "Dolly Out", "Orbit Camera", "Crane Shot", "Drone Shot", "Tracking Shot", "Follow Shot", "Push In", "Pull Out",
+        "Arc Shot", "Handheld Camera", "Shoulder Camera", "Cinematic Reveal", "Whip Pan", "Tilt Up", "Tilt Down", "Roll Camera", "Parallax Motion", "Ken Burns Effect"
+    ])
+    with mc7: transition_style = st.selectbox("Transition:", ["Cross Dissolve (Fade)", "Flash Transition (White Glow)", "Film Dissolve (Muted)", "Instant Cut"])
+    with mc8: character_heritage = st.selectbox("Heritage:", ["Automatic", "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)", "Ancient Arabian", "Western / Modern", "Far Eastern"])
+    with mc9: video_model = st.selectbox("AI Model:", ["wan-fast", "seedance", "veo"])
     with mc10: sd = st.number_input("Seed:", value=786)
     
     if st.button("Generate Master Movie 🚀"):
@@ -1108,7 +1738,7 @@ with tab_movie:
         pitch_map = {"Normal (نارمل)": "+0Hz", "Deep (بھاری آواز)": "-15Hz", "Very Deep (موٹی آواز)": "-28Hz"}
         pitch_val = pitch_map[mv_pitch]
         
-        with st.spinner("🎬 Generating master cinematic movie..."):
+        with st.spinner("🎬 Sglowina AI is generating your video with voice and motion..."):
             v_res = create_cinematic_v40(
                 story=m_script, voice_gen=mv, rate=rate_val, pitch=pitch_val, ratio=mr, style=ms, seed=sd,
                 char_desc=char_desc, scene_desc=scene_desc, camera_motion=camera_motion, transition_style=transition_style,
@@ -1116,39 +1746,40 @@ with tab_movie:
                 uploaded_female_img=uploaded_female_img, enable_islamic_filter=enable_islamic_filter, character_heritage=character_heritage,
                 gen_mode=gen_mode, pollinations_key=pollinations_key, video_model=video_model
             )
+            
         if isinstance(v_res, str) and v_res.endswith(".mp4") and os.path.exists(v_res): 
             st.video(v_res)
-            st.download_button("Download Full HD 📥", open(v_res, 'rb').read(), file_name=v_res)
+            st.download_button("Download Full HD", open(v_res, 'rb').read(), file_name=v_res)
         else: 
             st.error(v_res)
 
 # -----------------
-# TAB 4: PRO IMAGE STUDIO
+# TAB 5: PRO IMAGE STUDIO
 # -----------------
 with tab_image:
-    st.write("### 🎨 Industrial HD Visual & Canva Overlay Studio")
-    tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Canva Overlay"])
+    st.write("### 🎨 Industrial HD Visual Studio")
+    tab_txt, tab_img = st.tabs(["🎨 Text to Image", "📤 Image Modify & Upload"])
     
     with tab_txt:
-        p_i = st.text_area("Describe Image (One per line for batch):", height=100)
-        char_desc_img = st.text_input("Character Details for Image:", placeholder="e.g. A young girl, blue eyes, red scarf")
-        canva_overlay_text = st.text_input("Canva Typography Banner Overlay:", placeholder="e.g. SGlowina Pro Studio")
-        
+        p_i = st.text_area("Describe Image (One per line for batch):", height=120)
+        char_desc_img = st.text_input("Consistent Character Description:", placeholder="Example: A young girl, blue eyes, brown braided hair")
+        canva_overlay_text = st.text_input("Canva Text Overlay:", placeholder="Example: Sglowina Studio V1.5")
+                                      
         ic1, ic2, ic3 = st.columns(3)
-        with ic1: i_style = st.selectbox("Style Preset:", ["Realistic HD", "Cinematic Film", "3D Cartoon"])
-        with ic2: i_size = st.selectbox("Format Resolution:", ["Square (1:1)", "YouTube HD", "TikTok"])
-        with ic3: count = st.slider("Images Quantity:", 1, 4, 1)
+        with ic1: i_style = st.selectbox("Art Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Historical Epic", "Dark Gothic / Mystery"])
+        with ic2: i_size = st.selectbox("Resolution:", ["Square (1:1)", "YouTube HD", "TikTok", "CinemaScope (21:9)"])
+        with ic3: count = st.slider("Quantity:", 1, 5, 1)
         
-        if st.button("Generate Visual Frames 🚀"):
+        if st.button("Generate Visuals 🚀"):
             u_db = get_user_data(st.session_state.logged_in_user)
             if u_db and u_db['credits'] >= 2 * count:
-                dim = {"Square (1:1)": (1024, 1024), "YouTube HD": (1280, 720), "TikTok": (720, 1280)}
+                dim = {"Square (1:1)": (1024, 1024), "YouTube HD": (1280, 720), "TikTok": (720, 1280), "CinemaScope (21:9)": (1680, 720)}
                 w, h = dim[i_size]
                 prompt_list = [line.strip() for line in p_i.split('\n') if line.strip()]
                 for idx, single_p in enumerate(prompt_list):
                     for q in range(count):
                         final_p = f"Character: {char_desc_img.strip()}. Scene: {single_p}" if char_desc_img.strip() else single_p
-                        img_data = fetch_img_failover(final_p, w, h, random.randint(1, 999999))
+                        img_data = fetch_img_failover(final_p, w, h, random.randint(1,999999))
                         if img_data:
                             img_path_temp = f"temp_canvas_{idx}_{q}.jpg"
                             with open(img_path_temp, "wb") as f_temp:
@@ -1156,7 +1787,7 @@ with tab_image:
                             if canva_overlay_text.strip():
                                 apply_canva_typography(img_path_temp, canva_overlay_text.strip())
                             with Image.open(img_path_temp) as im:
-                                st.image(im, caption=single_p[:40])
+                                st.image(im, caption=single_p[:35])
                             if os.path.exists(img_path_temp):
                                 os.remove(img_path_temp)
                             deduct_user_credits(st.session_state.logged_in_user, 2)
@@ -1165,15 +1796,15 @@ with tab_image:
                 st.error("Insufficient credits (Requires 2 credits per image).")
 
     with tab_img:
-        uploaded_file = st.file_uploader("Upload Image:", type=["jpg", "png", "jpeg"])
-        modify_prompt = st.text_input("Modification Instructions:", placeholder="e.g. Add volumetric neon light")
-        canva_overlay_text_mod = st.text_input("Typography Overlay for Image:")
+        uploaded_file = st.file_uploader("Upload Image to Modify:", type=["jpg", "png", "jpeg"])
+        modify_prompt = st.text_input("Modification Instructions:", placeholder="Example: Add volumetric lighting, make the background dark green")
+        canva_overlay_text_mod = st.text_input("Text Overlay for Modified Image:")
         
-        if st.button("Modify & Re-render Image 🎨"):
+        if st.button("Modify & Re-render 🎨"):
             if uploaded_file and modify_prompt:
                 u_db = get_user_data(st.session_state.logged_in_user)
                 if u_db and u_db['credits'] >= 5:
-                    img_data = fetch_img_failover(modify_prompt, 1024, 1024, random.randint(1, 999999))
+                    img_data = fetch_img_failover(translate_ur_to_en_enhanced(modify_prompt), 1024, 1024, random.randint(1,999999))
                     if img_data:
                         img_path_temp_mod = "temp_canvas_mod.jpg"
                         with open(img_path_temp_mod, "wb") as f_temp_mod:
@@ -1181,7 +1812,7 @@ with tab_image:
                         if canva_overlay_text_mod.strip():
                             apply_canva_typography(img_path_temp_mod, canva_overlay_text_mod.strip())
                         with Image.open(img_path_temp_mod) as im:
-                            st.image(im, caption="Modified Visual Output")
+                            st.image(im, caption="Modified Visual")
                         if os.path.exists(img_path_temp_mod):
                             os.remove(img_path_temp_mod)
                         deduct_user_credits(st.session_state.logged_in_user, 5)
@@ -1190,121 +1821,69 @@ with tab_image:
                     st.error("Insufficient credits (Requires 5 credits).")
 
 # -----------------
-# TAB 5: ANTI-COPYRIGHT SUITE
+# TAB 6: CHAT
 # -----------------
-with tab_bypass:
-    st.write("### 🛡️ Dynamic Anti-Copyright Bypass Suite & Video Remixer")
-    st.info("Bypass automated Content-ID audio & video filters using multi-layer dynamic transformation.")
-    
-    source_type = st.radio("Media Source:", ["Upload Local Video File", "Paste Video Link"])
-    raw_video_in = "temp_bypass_input.mp4"
-    processed_out = "temp_bypass_output.mp4"
-    
-    if source_type == "Upload Local Video File":
-        up_v = st.file_uploader("Upload MP4 / MOV Video:", type=["mp4", "mov", "mkv"])
-        if up_v:
-            with open(raw_video_in, "wb") as f:
-                f.write(up_v.read())
-            st.session_state.process_ready = True
-    else:
-        v_url = st.text_input("Paste Direct Video URL:")
-        if st.button("Fetch & Download Video 📥"):
-            if v_url.strip():
-                with st.spinner("Downloading stream..."):
-                    try:
-                        r = requests.get(v_url, headers=headers_browser, timeout=30)
-                        if r.status_code == 200:
-                            with open(raw_video_in, "wb") as f:
-                                f.write(r.content)
-                            st.session_state.process_ready = True
-                            st.success("Video fetched successfully!")
-                    except Exception as e:
-                        st.error(f"Download failed: {e}")
-                        
-    col_b1, col_b2, col_b3 = st.columns(3)
-    with col_b1:
-        flip_h = st.checkbox("Horizontal Flip (Mirroring)", value=True)
-        smart_zoom = st.checkbox("Smart 4% Dynamic Zoom", value=True)
-    with col_b2:
-        color_mod = st.checkbox("Color Grade & Contrast Shift", value=True)
-        add_grain = st.checkbox("Anti-Bot Micro Noise Grain", value=True)
-    with col_b3:
-        shift_audio = st.checkbox("Pitch & Harmonic Audio Shift", value=True)
-        border_mode = st.checkbox("Micro Edge Border", value=False)
-        
-    spd = st.slider("Playback Speed Factor:", 0.90, 1.15, 1.02, 0.01)
-    crop_margin = st.slider("Edge Pixel Crop (px):", 0, 20, 4)
-    
-    if st.button("Process & Shield Video ⚡"):
-        if os.path.exists(raw_video_in):
-            with st.spinner("Applying anti-copyright bypass layers..."):
-                ok = process_anti_copyright_video(
-                    raw_video_in, processed_out, flip_h, spd, color_mod, add_grain, smart_zoom, shift_audio, border_mode, crop_margin
-                )
-                if ok and os.path.exists(processed_out):
-                    st.success("Video Shielded & Processed Successfully! 🟢")
-                    st.video(processed_out)
-                    with open(processed_out, "rb") as pf:
-                        st.download_button("Download Shielded Video 📥", pf.read(), file_name="Bypassed_Video.mp4")
-                else:
-                    st.error("Processing failed. Please check video codecs.")
-        else:
-            st.warning("Please upload or provide a video first.")
+with tab_chat:
+    st.write("### 💬 Sglowina Intelligence Dashboard")
+    for m in st.session_state.msgs:
+        with st.chat_message(m["role"]): st.write(m["content"])
+    if p := st.chat_input("How can I help you?"):
+        st.session_state.msgs.append({"role": "user", "content": p})
+        with st.chat_message("user"): st.write(p)
+        res = SGLOWINA_BIO if any(k in p.lower() for k in ["kisne", "who made", "owner", "essa", "saba"]) else requests.get(f"https://text.pollinations.ai/{urllib.parse.quote(p)}?model=openai&cache=true", timeout=15).text
+        with st.chat_message("assistant"):
+            translated_response = res.replace("ChatGPT", "Sglowina AI").replace("OpenAI", "Sglowina Team")
+            st.write(translated_response)
+            st.session_state.msgs.append({"role": "assistant", "content": translated_response})
 
 # -----------------
-# TAB 6: CHARACTERS & SCENES
-# -----------------
-with tab_chars:
-    st.write("### 🎭 Saved Characters & Scene Consistency Library")
-    t_ch, t_sc = st.tabs(["👤 Characters", "🌄 Environments & Scenes"])
-    
-    with t_ch:
-        with st.form("new_char_form"):
-            c_name = st.text_input("Character Name (e.g. Saba / Essa):")
-            c_desc = st.text_area("Detailed Appearance & Modest Attire:")
-            if st.form_submit_button("Save Character 💾"):
-                if c_name and c_desc:
-                    conn = get_db_connection()
-                    cur = conn.cursor()
-                    cur.execute("INSERT OR REPLACE INTO characters (id, user_id, character_name, description, reference_data) VALUES (?, ?, ?, ?, ?)",
-                                (str(uuid.uuid4())[:8], 1, c_name, c_desc, ""))
-                    conn.commit()
-                    conn.close()
-                    st.success(f"Character '{c_name}' saved!")
-                    
-    with t_sc:
-        with st.form("new_scene_form"):
-            s_name = st.text_input("Scene Preset Name:")
-            s_env = st.text_area("Environment & Lighting:")
-            if st.form_submit_button("Save Scene Preset 💾"):
-                if s_name and s_env:
-                    conn = get_db_connection()
-                    cur = conn.cursor()
-                    cur.execute("INSERT OR REPLACE INTO scenes (id, user_id, scene_name, environment, lighting, camera_style) VALUES (?, ?, ?, ?, ?, ?)",
-                                (str(uuid.uuid4())[:8], 1, s_name, s_env, "Cinematic", "Auto"))
-                    conn.commit()
-                    conn.close()
-                    st.success(f"Scene preset '{s_name}' saved!")
-
-# -----------------
-# TAB 7: ENTERPRISE & BILLING
+# TAB 7: ENTERPRISE CENTER (EASYPAISA & JAZZCASH & ADMIN FULLY RESTORED)
 # -----------------
 with tab_enterprise:
-    st.write("### 👤 Enterprise Administration & Billing Center")
-    ent_tab_user, ent_tab_billing, ent_tab_admin = st.tabs(["👤 User Profile", "💳 Billing & Credits", "🔒 Admin Panel"])
+    st.write("### 👤 Sglowina Enterprise Administration Center")
+    ent_tab_user, ent_tab_history, ent_tab_billing, ent_tab_admin = st.tabs(["👤 User Profile", "📁 Saved Projects", "💳 Billing & Subscription Plans", "🔒 Admin Control Panel"])
+    
     u_db = get_user_data(st.session_state.logged_in_user)
     
     with ent_tab_user:
         if u_db:
             st.info(f"User: **{st.session_state.logged_in_user}** | Plan: **{u_db['plan']}** | Available Balance: **{u_db['credits']}** 🪙")
+            st.write("Secure Session Token:")
+            st.code(str(uuid.uuid5(uuid.NAMESPACE_DNS, st.session_state.logged_in_user))[:20])
+            st.write("Joined Sglowina Cloud:")
+            st.code(u_db['created_at'])
         else:
-            st.warning("Please sign in.")
+            st.warning("Please sign in first.")
             
+    with ent_tab_history:
+        st.write("#### 📁 Active Download Manager & Saved Projects")
+        if u_db:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM projects WHERE user_id = ?", (u_db['id'],))
+            rows = cursor.fetchall()
+            conn.close()
+            
+            if not rows:
+                st.write("No saved projects found.")
+            else:
+                for proj in rows:
+                    st.write(f"🎬 **{proj['project_name']}** (Created: {proj['created_at']})")
+                    st.code(proj['prompt'], language="text")
+                    st.markdown("---")
+        else:
+            st.warning("Please sign in first.")
+                
     with ent_tab_billing:
-        st.write("### 🎁 Redeem Coupon Code")
+        st.write("### 💳 Subscription Plans & Credit Packages (Pakistani Local Payment Integration)")
+        st.success("#### 🏆 Sglowina Premium Monthly Plan\n💰 **Price:** 1000 PKR / Month | 🪙 **Credits:** 450 Coins")
+        
+        st.markdown("---")
+        st.write("### 🎁 Redeem Sglowina Promo / Coupon Code")
         with st.form("coupon_form"):
-            coupon_code = st.text_input("Enter Coupon (e.g. ESSASABA):")
-            if st.form_submit_button("Redeem 🎁") and u_db and coupon_code.strip():
+            coupon_code = st.text_input("Enter Promo Code (e.g. ESSASABA):")
+            btn_redeem = st.form_submit_button("Redeem Credits 🎁")
+            if btn_redeem and coupon_code.strip() and u_db:
                 conn = get_db_connection()
                 curr = conn.cursor()
                 curr.execute("SELECT * FROM coupons WHERE UPPER(code) = UPPER(?)", (coupon_code.strip(),))
@@ -1312,48 +1891,108 @@ with tab_enterprise:
                 if c_row and c_row['uses_left'] > 0:
                     curr.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (c_row['credits'], u_db['id']))
                     curr.execute("UPDATE coupons SET uses_left = uses_left - 1 WHERE code = ?", (c_row['code'],))
+                    log_credit_usage(u_db['id'], f"Coupon: {c_row['code']}", c_row['credits'], u_db['credits'] + c_row['credits'])
                     conn.commit()
-                    st.success(f"{c_row['credits']} credits added successfully! 🟢")
+                    st.success(f"Success! {c_row['credits']} credits added to your account! 🟢")
                 else:
-                    st.error("Invalid or expired coupon code.")
+                    st.error("Invalid or expired coupon.")
                 conn.close()
-
-        st.write("---")
-        st.write("### 🇵🇰 Easypaisa / JazzCash Local Payment Confirmation")
-        with st.form("local_pay_form"):
-            pay_method = st.selectbox("Method:", ["JazzCash", "Easypaisa", "Bank Transfer"])
-            trx_id = st.text_input("Transaction ID (TID):")
-            amount = st.number_input("Amount (PKR):", value=500, step=100)
-            if st.form_submit_button("Submit Payment Verification 📤"):
-                if trx_id.strip():
-                    conn = get_db_connection()
-                    cur = conn.cursor()
-                    try:
-                        cur.execute("INSERT INTO local_payments (id, username, method, trx_id, amount, status, created_at) VALUES (?, ?, ?, ?, ?, 'Pending', ?)",
-                                    (str(uuid.uuid4())[:8], st.session_state.logged_in_user, pay_method, trx_id.strip(), amount, time.strftime("%Y-%m-%d %H:%M:%S")))
-                        conn.commit()
-                        st.success("Payment submitted! Admin will verify and top-up credits.")
-                    except Exception:
-                        st.error("Transaction ID already submitted.")
-                    conn.close()
-
+        
+        st.markdown("---")
+        st.write("### 📱 How to Pay via EasyPaisa / JazzCash")
+        bcol1, bcol2 = st.columns(2)
+        with bcol1:
+            st.info("💚 **EasyPaisa Account**\n\n* **Name:** Saba Wahid\n* **Number:** 03086834020")
+        with bcol2:
+            st.warning("❤️ **JazzCash Account**\n\n* **Name:** Ayisha bi bi\n* **Number:** 03240755475")
+            
+        if u_db:
+            with st.form("local_payment_form"):
+                p_method = st.selectbox("Payment Method Used:", ["EasyPaisa", "JazzCash"])
+                p_trx_id = st.text_input("Enter Transaction ID (TrxID):", placeholder="e.g., 50123456789")
+                p_amount = st.number_input("Amount Sent (PKR):", min_value=500.0, max_value=50000.0, value=1000.0, step=100.0)
+                if st.form_submit_button("Submit Payment Proof 🚀"):
+                    if p_trx_id.strip():
+                        conn = get_db_connection()
+                        cursor = conn.cursor()
+                        try:
+                            req_id = str(uuid.uuid4())[:8]
+                            cursor.execute("INSERT INTO local_payments (id, username, method, trx_id, amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                           (req_id, u_db['username'], p_method, p_trx_id.strip(), p_amount, 'Pending', time.strftime("%Y-%m-%d %H:%M:%S")))
+                            conn.commit()
+                            st.success("Payment submitted! Administrator will verify and credit your coins.")
+                        except sqlite3.IntegrityError:
+                            st.error("This Transaction ID has already been submitted.")
+                        finally:
+                            conn.close()
+                    else:
+                        st.warning("Please enter a valid TrxID.")
+                
     with ent_tab_admin:
+        st.write("#### 🔒 Secured Admin Control Settings")
         if u_db and u_db['role'] == 'Admin':
-            st.success("Administrator Mode Active 🟢")
+            st.success("Access Granted: Administrator Mode Activated 🟢")
+            
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT value FROM system_config WHERE key = 'master_pollinations_key'")
             m_row = cursor.fetchone()
-            current_key = m_row['value'] if m_row else ""
+            current_master_key = m_row['value'] if m_row else ""
+            conn.close()
             
-            with st.form("master_key_form"):
-                new_key = st.text_input("Set Global Master API Key:", value=current_key, type="password")
-                if st.form_submit_button("Save Global Master Key 💾"):
-                    cursor.execute("INSERT OR REPLACE INTO system_config (key, value) VALUES ('master_pollinations_key', ?)", (new_key.strip(),))
+            with st.form("master_key_config_form"):
+                new_master_key_input = st.text_input("Set Master API Key (e.g. sk_...):", value=current_master_key, type="password")
+                if st.form_submit_button("Save Master API Key 💾"):
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("INSERT OR REPLACE INTO system_config (key, value) VALUES ('master_pollinations_key', ?)", (new_master_key_input.strip(),))
                     conn.commit()
-                    st.success("Master key saved globally!")
+                    conn.close()
+                    st.success("Master API Key saved successfully! 🟢")
+                    time.sleep(1)
+                    st.rerun()
+            
+            st.markdown("---")
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM users")
+            total_users = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM projects")
+            total_projects = cursor.fetchone()[0]
+            cursor.execute("SELECT SUM(credits) FROM users")
+            total_credits_allocated = cursor.fetchone()[0]
+            
+            st.write("### System Metrics Dashboard")
+            saas_col1, saas_col2, saas_col3 = st.columns(3)
+            with saas_col1: st.metric("Total Users", total_users)
+            with saas_col2: st.metric("Total Projects", total_projects)
+            with saas_col3: st.metric("Total Credits", total_credits_allocated)
+                
+            st.markdown("---")
+            st.write("### 📲 Pending Payment Requests")
+            cursor.execute("SELECT * FROM local_payments WHERE status = 'Pending'")
+            pending_reqs = cursor.fetchall()
+            
+            if not pending_reqs:
+                st.info("No pending payment requests found.")
+            else:
+                for req in pending_reqs:
+                    st.write(f"👤 **User:** `{req['username']}` | 📱 **Method:** {req['method']} | 🔑 **TrxID:** `{req['trx_id']}` | 💰 **Amount:** {req['amount']} PKR")
+                    if st.button(f"Approve & Credit 450 Coins ({req['trx_id']})", key=f"app_{req['id']}"):
+                        cursor.execute("UPDATE local_payments SET status = 'Approved' WHERE id = ?", (req['id'],))
+                        cursor.execute("UPDATE users SET credits = credits + 450, plan = 'Premium' WHERE username = ?", (req['username'],))
+                        conn.commit()
+                        st.success(f"Payment approved for {req['username']}!")
+                        st.rerun()
+            
+            st.markdown("---")
+            cursor.execute("SELECT * FROM users")
+            all_users = cursor.fetchall()
+            st.write("### User Database Management")
+            for u in all_users:
+                st.write(f"👤 **{u['username']}** | Role: {u['role']} | Plan: {u['plan']} | Credits: {u['credits']} 🪙 | Status: {u['status']}")
             conn.close()
         else:
-            st.error("Administrator access only.")
+            st.error("Access Denied: Only Administrators can access this tab.")
 
-st.markdown("<p style='text-align: center; font-weight: bold; padding-top: 25px;'>Sglowina AI Enterprise V2.1 | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 20px; color: #000000;'>ES & Sglowina AI Studio Suite V4.0 | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
