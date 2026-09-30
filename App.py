@@ -14,7 +14,7 @@ import io
 # ==========================================
 # STREAMLIT COMPACT CONFIGURATION
 # ==========================================
-st.set_page_config(page_title="ES Fast Anti-Copyright Studio", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="ES Ultra Anti-Copyright Shield", layout="wide", page_icon="⚡")
 
 if "process_ready" not in st.session_state:
     st.session_state.process_ready = False
@@ -30,67 +30,112 @@ def get_ffmpeg():
     except Exception:
         return "ffmpeg"
 
-def sanitize_url(raw_url):
+def extract_yt_id(raw_url):
     raw_url = raw_url.strip()
-    if "shorts/" in raw_url:
-        vid_id = raw_url.split("shorts/")[1].split("?")[0].split("&")[0]
-        return f"https://www.youtube.com/watch?v={vid_id}"
-    elif "youtu.be" in raw_url:
-        vid_id = raw_url.split("youtu.be/")[1].split("?")[0].split("&")[0]
-        return f"https://www.youtube.com/watch?v={vid_id}"
-    elif "youtube.com/watch" in raw_url:
-        parsed = urllib.parse.urlparse(raw_url)
-        params = urllib.parse.parse_qs(parsed.query)
-        if 'v' in params:
-            return f"https://www.youtube.com/watch?v={params['v'][0]}"
-    return raw_url
+    m = re.search(r'(?:v=|\/|shorts\/)([0-9A-Za-z_-]{11})', raw_url)
+    return m.group(1) if m else None
 
-# ==========================================
-# SMART METADATA & FAST DOWNLOADER
-# ==========================================
 def fetch_oembed_title(clean_url):
     try:
         req_url = f"https://noembed.com/embed?url={urllib.parse.quote(clean_url)}"
-        res = requests.get(req_url, timeout=5)
+        res = requests.get(req_url, timeout=4)
         if res.status_code == 200:
             return res.json().get("title", "")
     except Exception:
         pass
     return ""
 
-def inspect_and_fetch_media_fast(raw_url, base_prefix):
-    clean_url = sanitize_url(raw_url)
-    fallback_title = fetch_oembed_title(clean_url)
-    info_dict = {'title': fallback_title if fallback_title else 'Action Video Scene'}
-    outtmpl = f"{base_prefix}.%(ext)s"
-    found_file = None
+# ==========================================
+# UNBLOCKABLE MULTI-ENGINE VIDEO FETCHER
+# ==========================================
+def download_unblockable_media(raw_url, target_path):
+    vid_id = extract_yt_id(raw_url)
+    clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url.strip()
+    title = fetch_oembed_title(clean_url) or "Action Movie Video"
     
+    # --- ENGINE 1: Invidious Proxy Stream Nodes ---
+    if vid_id:
+        invidious_nodes = [
+            "https://inv.tux.pizza",
+            "https://invidious.nerdvpn.de",
+            "https://invidious.privacydev.net",
+            "https://invidious.drgns.space",
+            "https://invidious.projectsegfau.lt"
+        ]
+        for node in invidious_nodes:
+            try:
+                api_url = f"{node}/api/v1/videos/{vid_id}"
+                res = requests.get(api_url, timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    title = data.get("title", title)
+                    streams = data.get("formatStreams", [])
+                    mp4s = [s for s in streams if "mp4" in s.get("container", "").lower() or "video/mp4" in s.get("type", "").lower()] or streams
+                    if mp4s:
+                        dl_url = mp4s[-1]["url"]
+                        if dl_url.startswith("/"):
+                            dl_url = node + dl_url
+                        r_file = requests.get(dl_url, stream=True, timeout=12)
+                        if r_file.status_code == 200:
+                            with open(target_path, "wb") as f:
+                                for chunk in r_file.iter_content(chunk_size=1024*1024):
+                                    if chunk: f.write(chunk)
+                            if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                                return True, title
+            except Exception:
+                continue
+
+    # --- ENGINE 2: Piped Stream Router ---
+    if vid_id:
+        piped_nodes = [
+            "https://pipedapi.kavin.rocks",
+            "https://api.piped.privacydev.net",
+            "https://piped-api.lunar.icu"
+        ]
+        for node in piped_nodes:
+            try:
+                api_url = f"{node}/streams/{vid_id}"
+                res = requests.get(api_url, timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    title = data.get("title", title)
+                    video_streams = data.get("videoStreams", [])
+                    combined = [s for s in video_streams if not s.get("videoOnly") and "mp4" in s.get("format", "").lower()] or [s for s in video_streams if not s.get("videoOnly")]
+                    if combined:
+                        dl_url = combined[0]["url"]
+                        r_file = requests.get(dl_url, stream=True, timeout=12)
+                        if r_file.status_code == 200:
+                            with open(target_path, "wb") as f:
+                                for chunk in r_file.iter_content(chunk_size=1024*1024):
+                                    if chunk: f.write(chunk)
+                            if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                                return True, title
+            except Exception:
+                continue
+
+    # --- ENGINE 3: yt-dlp Native Fallback with iOS/TV Signature ---
     try:
         import yt_dlp
         ydl_opts = {
             'format': '18/best[height<=720][ext=mp4]/best[ext=mp4]/best',
-            'outtmpl': outtmpl,
+            'outtmpl': target_path,
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'geo_bypass': True,
             'socket_timeout': 10,
-            'extractor_args': {'youtube': {'player_client': ['ios', 'android', 'tvhtml5']}}
+            'extractor_args': {'youtube': {'player_client': ['ios', 'android_creator', 'tvhtml5']}}
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             meta = ydl.extract_info(clean_url, download=True)
             if meta:
-                info_dict['title'] = meta.get('title', info_dict['title'])
+                title = meta.get('title', title)
+        if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+            return True, title
     except Exception:
         pass
-        
-    matching = glob.glob(f"{base_prefix}.*")
-    for f in matching:
-        if os.path.exists(f) and os.path.getsize(f) > 5000:
-            found_file = f
-            break
-            
-    return info_dict, found_file
+
+    return False, title
 
 # ==========================================
 # AI VIDEO UNDERSTANDING & THUMBNAIL ENGINE
@@ -114,7 +159,7 @@ def analyze_video_with_ai(title):
         
     clean_t = re.sub(r'[\(\[\{].*?[\)\]\}]', '', title).strip() or title
     return (
-        f"**🎯 کیٹگری:** ایکشن و ڈراماٹک مووی سین\n\n"
+        f"**🎯 کیٹگری:** ایکشن مووی بلاک بسٹر سین\n\n"
         f"**🔥 وائرل ٹائٹلز:**\n"
         f"1. 😱 {clean_t[:45]} | سب سے خطرناک اور ان کٹ سین!\n"
         f"2. ⚡ فل ایچ ڈی ایکشن کلائمیکس | {clean_t[:40]}\n"
@@ -131,79 +176,26 @@ def analyze_video_with_ai(title):
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif !important;
-        font-size: 13px !important;
-    }
-    
-    .stApp { 
-        background-color: #f8fafc !important; 
-        color: #0f172a !important; 
-    }
-    
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; font-size: 13px !important; }
+    .stApp { background-color: #f8fafc !important; color: #0f172a !important; }
     .compact-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background: #ffffff;
-        padding: 8px 16px;
-        border-radius: 8px;
-        border: 1px solid #e2e8f0;
-        margin-bottom: 12px;
+        display: flex; align-items: center; justify-content: space-between;
+        background: #ffffff; padding: 8px 16px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 12px;
     }
-    
-    .compact-title {
-        font-size: 1.15rem !important;
-        font-weight: 800 !important;
-        color: #0284c7 !important;
-        margin: 0 !important;
-        letter-spacing: 0.5px;
-    }
-    
-    .badge {
-        background: #0f172a;
-        color: #ffffff;
-        padding: 3px 8px;
-        border-radius: 4px;
-        font-size: 11px;
-        font-weight: 600;
-    }
-
+    .compact-title { font-size: 1.15rem !important; font-weight: 800 !important; color: #0284c7 !important; margin: 0 !important; }
+    .badge { background: #0f172a; color: #ffffff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
     .stButton>button { 
-        background: #0284c7 !important; 
-        color: white !important; 
-        border-radius: 6px !important; 
-        height: 38px !important; 
-        font-size: 13px !important; 
-        font-weight: 600 !important; 
-        border: none !important;
-        padding: 0 16px !important;
+        background: #0284c7 !important; color: white !important; border-radius: 6px !important; 
+        height: 38px !important; font-size: 13px !important; font-weight: 600 !important; border: none !important;
     }
-    .stButton>button:hover {
-        background: #0369a1 !important;
-    }
-    
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 34px !important;
-        font-size: 12px !important;
-        font-weight: 600 !important;
-        padding: 0 12px !important;
-    }
-
-    div[data-testid="stFileUploader"] {
-        padding: 4px 0 !important;
-    }
+    .stTabs [data-baseweb="tab"] { height: 34px !important; font-size: 12px !important; font-weight: 600 !important; }
     </style>
     """, unsafe_allow_html=True)
 
 st.markdown("""
 <div class="compact-header">
     <div class="compact-title">⚡ ES ULTRA ANTI-COPYRIGHT TURBO STUDIO</div>
-    <div class="badge">TURBO v50 (0.75s Sub-Cut + Deep Voice)</div>
+    <div class="badge">TURBO v60 (Multi-Proxy Bypass + Sub-Cut)</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -211,7 +203,7 @@ st.markdown("""
 # TABS
 # ==========================================
 tab_shield, tab_clip, tab_lofi = st.tabs([
-    "🛡️ 1. فاسٹ اینٹی کاپی رائٹ موڈ (سیکنڈوں میں تیار)",
+    "🛡️ 1. فاسٹ اینٹی کاپی رائٹ شیلڈ (لنک و فائل سپورٹ)",
     "⚔️ 2. کلپ کٹر (10 تا 20 منٹ)",
     "🎧 3. لوفی گانے (Slowed + Reverb)"
 ])
@@ -232,20 +224,26 @@ with tab_shield:
             "🎵 میڈیم پچ شفٹ (Medium Thick)"
         ])
         
-    up_file = st.file_uploader("📂 ویڈیو فائل منتخب کریں (سپر فاسٹ پروسیسنگ):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_main")
-    url_input = st.text_input("🔗 یا ویڈیو کا لنک یہاں پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=...", key="url_main")
+    url_input = st.text_input("🔗 یوٹیوب یا کسی بھی ویڈیو کا لنک یہاں پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=...", key="url_main")
+    up_file = st.file_uploader("📂 یا اپنے موبائل / کمپیوٹر سے فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_main")
     
     if st.button("🚀 فاسٹ اینٹی کاپی رائٹ شیلڈ لگائیں (10 تا 20 سیکنڈ)", type="primary", key="btn_main"):
         uid = str(uuid.uuid4())[:8]
-        base_prefix = f"in_vid_{uid}"
+        target_in = f"in_vid_{uid}.mp4"
         target_out = f"es_turbo_{uid}.mp4"
         info = {'title': 'Action Scene Video'}
-        input_file = None
+        has_input = False
         
-        if up_file is not None:
+        if url_input.strip():
+            with st.spinner("🔗 لنک بائی پاس ہو رہا ہے اور ایچ ڈی ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
+                success, title_fetched = download_unblockable_media(url_input.strip(), target_in)
+                if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
+                    has_input = True
+                    info['title'] = title_fetched
+                else:
+                    st.error("❌ لنک ڈاؤنلوڈ نہیں ہو سکا۔ براہ کرم ڈائریکٹ فائل اپلوڈر استعمال کریں۔")
+        elif up_file is not None:
             with st.spinner("📂 ویڈیو محفوظ ہو رہی ہے..."):
-                ext = up_file.name.split('.')[-1] if '.' in up_file.name else "mp4"
-                target_in = f"{base_prefix}.{ext}"
                 with open(target_in, "wb") as f:
                     up_file.seek(0)
                     while True:
@@ -253,24 +251,15 @@ with tab_shield:
                         if not chunk: break
                         f.write(chunk)
                 if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
-                    input_file = target_in
+                    has_input = True
                     info['title'] = up_file.name
-        elif url_input.strip():
-            with st.spinner("🔗 لنک چیک اور ڈاؤنلوڈ ہو رہا ہے..."):
-                info, d_file = inspect_and_fetch_media_fast(url_input.strip(), base_prefix)
-                if d_file and os.path.exists(d_file) and os.path.getsize(d_file) > 1000:
-                    input_file = d_file
-                else:
-                    st.warning(f"⚠️ یوٹیوب سیکیورٹی نے ڈائریکٹ ڈاؤنلوڈ بلاک کیا۔ AI نے ٹائٹل پہچان لیا ہے: **'{info['title']}'**۔ برائے مہربانی ویڈیو ڈائریکٹ اپلوڈ کریں۔")
-                    st.markdown("---")
-                    st.markdown(analyze_video_with_ai(info['title']))
 
-        if input_file and os.path.exists(input_file):
+        if has_input and os.path.exists(target_in):
             t_start = time.time()
             with st.spinner("⚡ ٹربو اینٹی کاپی رائٹ شیلڈ لگ رہی ہے (صرف چند سیکنڈز)..."):
                 ffmpeg_exe = get_ffmpeg()
                 
-                # BLAZING FAST SUB-SECOND CUTS + LIGHTWEIGHT FAST BLUR CANVAS + 1.8 DEG TILT + COLOR SHIFT
+                # 0.75s CUTS + ULTRA FAST BLUR CANVAS + 1.8 DEG TILT + COLOR SHIFT
                 if "فاسٹ کینوس" in shield_mode:
                     vf_str = (
                         "[0:v]scale=160:90,scale=1280:720[bg];"
@@ -290,7 +279,7 @@ with tab_shield:
                         "drawbox=y=ih-44:h=44:color=black@0.85:t=fill"
                     )
                 
-                # FAST HEAVY THICK VOICE & HARMONIC SHIFT
+                # FAST DEEP THICK AUDIO
                 if "موٹی بھاری آواز" in audio_mode:
                     af_str = (
                         "volume=0.35,asetrate=44100*0.88,aresample=44100:async=1,atempo=1.13636,"
@@ -299,9 +288,8 @@ with tab_shield:
                 else:
                     af_str = "volume=0.75,asetrate=44100*0.94,aresample=44100:async=1,atempo=1.0638,bass=g=4:f=110"
                 
-                # ULTRA-FAST PRESET WITH THREADS AUTO FOR 20-30 SEC ENCODING
                 cmd = [
-                    ffmpeg_exe, "-y", "-i", input_file,
+                    ffmpeg_exe, "-y", "-i", target_in,
                     "-map_metadata", "-1",
                     "-filter_complex" if "فاسٹ کینوس" in shield_mode else "-vf", vf_str,
                     "-af", af_str,
@@ -321,12 +309,12 @@ with tab_shield:
                     st.session_state.current_output_video = target_out
                     st.session_state.process_ready = True
                     st.success(f"⚡ ویڈیو صرف **{dur} سیکنڈ** میں تیار ہو گئی!")
-                    try: os.remove(input_file)
+                    try: os.remove(target_in)
                     except Exception: pass
                 else:
-                    st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ فائل دوبارہ اپلوڈ کریں۔")
-        elif not input_file and not url_input.strip() and up_file is None:
-            st.error("❌ برائے مہربانی ویڈیو فائل منتخب کریں یا لنک دیں۔")
+                    st.error("❌ ویڈیو پروسیسنگ مکمل نہ ہو سکی۔")
+        elif not has_input and not url_input.strip() and up_file is None:
+            st.error("❌ برائے مہربانی یوٹیوب لنک ڈالیں یا فائل اپلوڈ کریں۔")
 
 # -----------------
 # TAB 2: CLIP CUTTER
@@ -337,16 +325,29 @@ with tab_clip:
     with c2: clip_len = st.slider("دورانیہ (منٹ):", 1, 20, 10, key="len_t2")
         
     start_min = 30 if "30" in scene_type else 45 if "45" in scene_type else 15 if "15" in scene_type else st.number_input("اسٹارٹ منٹ:", 0, 300, 10)
-    upload_opt2 = st.file_uploader("📂 کلپ کے لیے ویڈیو منتخب کریں:", type=["mp4", "mov", "mkv", "webm"], key="up_t2")
+    clip_url = st.text_input("🔗 یوٹیوب کا لنک:", placeholder="https://...", key="clip_url")
+    upload_opt2 = st.file_uploader("📂 یا فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "webm"], key="up_t2")
 
     if st.button("🚀 کلپ کاٹیں اور فاسٹ شیلڈ لگائیں", type="primary", key="run_t2"):
-        if upload_opt2 is not None:
-            uid = str(uuid.uuid4())[:8]
-            target_in = f"clip_in_{uid}.mp4"
-            target_out = f"clip_out_{uid}.mp4"
+        uid = str(uuid.uuid4())[:8]
+        target_in = f"clip_in_{uid}.mp4"
+        target_out = f"clip_out_{uid}.mp4"
+        info = {'title': 'Clip Highlight'}
+        has_input = False
+        
+        if clip_url.strip():
+            with st.spinner("ویڈیو لنک سے ڈاؤنلوڈ ہو رہی ہے..."):
+                success, title_fetched = download_unblockable_media(clip_url.strip(), target_in)
+                if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
+                    has_input = True
+                    info['title'] = title_fetched
+        elif upload_opt2 is not None:
             with open(target_in, "wb") as f:
                 f.write(upload_opt2.read())
-                
+            has_input = True
+            info['title'] = upload_opt2.name
+            
+        if has_input and os.path.exists(target_in):
             with st.spinner("کلپ کٹ کر کے فاسٹ شیلڈ لگائی جا رہی ہے..."):
                 ffmpeg_exe = get_ffmpeg()
                 start_sec = start_min * 60
@@ -363,13 +364,13 @@ with tab_clip:
                 ]
                 subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
-                    st.session_state.detected_info = {'title': upload_opt2.name}
+                    st.session_state.detected_info = info
                     st.session_state.current_output_video = target_out
                     st.session_state.process_ready = True
                     try: os.remove(target_in)
                     except Exception: pass
         else:
-            st.error("❌ براہ کرم کلپ کاٹنے کے لیے ویڈیو فائل اپلوڈ کریں۔")
+            st.error("❌ برائے مہربانی درست لنک دیں یا ویڈیو فائل اپلوڈ کریں۔")
 
 # -----------------
 # TAB 3: LO-FI & SONGS
@@ -379,16 +380,29 @@ with tab_lofi:
     with col_s1: slow_val = st.slider("سلو اسپیڈ:", 0.80, 0.96, 0.88, 0.01, key="sl_t3")
     with col_s2: reverb_val = st.slider("گونج / Reverb:", 20, 80, 50, 5, key="rev_t3")
         
-    upload_opt3 = st.file_uploader("📂 گانے کی آڈیو یا ویڈیو فائل منتخب کریں:", type=["mp3", "wav", "mp4", "m4a"], key="up_t3")
+    song_url = st.text_input("🔗 گانے کا لنک پیسٹ کریں:", placeholder="https://...", key="song_url")
+    upload_opt3 = st.file_uploader("📂 یا آڈیو فائل منتخب کریں:", type=["mp3", "wav", "mp4", "m4a"], key="up_t3")
     
     if st.button("🚀 فاسٹ لوفی بنائیں", type="primary", key="run_t3"):
-        if upload_opt3 is not None:
-            uid = str(uuid.uuid4())[:8]
-            target_in = f"song_in_{uid}.mp4"
-            target_out = f"song_out_{uid}.mp4"
+        uid = str(uuid.uuid4())[:8]
+        target_in = f"song_in_{uid}.mp4"
+        target_out = f"song_out_{uid}.mp4"
+        has_input = False
+        info = {'title': 'Lo-Fi Chill Track'}
+        
+        if song_url.strip():
+            with st.spinner("گانا ڈاؤنلوڈ ہو رہا ہے..."):
+                success, title_fetched = download_unblockable_media(song_url.strip(), target_in)
+                if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
+                    has_input = True
+                    info['title'] = title_fetched
+        elif upload_opt3 is not None:
             with open(target_in, "wb") as f:
                 f.write(upload_opt3.read())
-                
+            has_input = True
+            info['title'] = upload_opt3.name
+            
+        if has_input and os.path.exists(target_in):
             with st.spinner("لوفی گانا تیار ہو رہا ہے..."):
                 ffmpeg_exe = get_ffmpeg()
                 sample_rate = int(44100 * slow_val)
@@ -402,13 +416,13 @@ with tab_lofi:
                 ]
                 subprocess.run(cmd_song, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
-                    st.session_state.detected_info = {'title': upload_opt3.name}
+                    st.session_state.detected_info = info
                     st.session_state.current_output_video = target_out
                     st.session_state.process_ready = True
                     try: os.remove(target_in)
                     except Exception: pass
         else:
-            st.error("❌ براہ کرم آڈیو یا ویڈیو فائل اپلوڈ کریں۔")
+            st.error("❌ گانے کا درست لنک دیں یا فائل اپلوڈ کریں۔")
 
 # ==========================================
 # OUTPUT & AI METADATA / THUMBNAIL DASHBOARD
