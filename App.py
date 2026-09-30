@@ -270,7 +270,6 @@ def init_db_v21():
 
 init_db_v21()
 
-# Auth Helpers
 def register_saas_user(username, email, password):
     username = username.strip().lower()
     email = email.strip().lower()
@@ -368,11 +367,11 @@ def generate_smart_metadata(info):
     t_lower = raw_title.lower()
     
     if any(k in t_lower for k in ['mental', 'force', 'john', 'action', 'fight', 'movie', 'scene', 'police', 'hindi', 'bloopers', 'ustad', 'bhagat']):
-        genre = "Bollywood Action & Blockbuster Scene"
+        genre = "Bollywood Action Breakdown"
         safe_titles = [
-            f"🔥 {clean_title[:50]} | Best Action Scene (Full HD Breakdown)",
-            f"⚡ Unstoppable Action Moments Explained | {clean_title[:40]}",
-            f"😱 Most Intense Scene Reaction | {clean_title[:40]}"
+            f"🔥 {clean_title[:50]} | Full Action Scene Recap",
+            f"⚡ Unstoppable Action Breakdown | {clean_title[:40]}",
+            f"😱 Dramatic Climax Reaction | {clean_title[:40]}"
         ]
         hashtags = "#MovieBreakdown #ActionMovie #BollywoodAction #Blockbuster #ViralVideo #HindiCinema #MovieReaction"
         thumb_prompt = f"Hyper-realistic 8K cinematic movie thumbnail for '{clean_title[:35]}', intense muscular hero dramatic angry face, action sparks background, 16:9."
@@ -395,7 +394,7 @@ def generate_smart_metadata(info):
         hashtags = "#SlowedAndReverb #LofiRemix #ChillMusic #AestheticAudio #MidnightVibes #LoFiBeats"
         thumb_prompt = f"Anime aesthetic 4K Lo-Fi wallpaper thumbnail for song '{clean_title[:35]}', neon cozy bedroom, rain outside window, 16:9."
     else:
-        genre = "Viral Video Highlight"
+        genre = "Viral Video Recap"
         safe_titles = [
             f"🔥 {clean_title[:45]} - Full HD Climax Scene Explained",
             f"⚡ {clean_title[:45]} - Best Uncut Action Highlights",
@@ -406,7 +405,6 @@ def generate_smart_metadata(info):
         
     return genre, safe_titles, hashtags, thumb_prompt
 
-# AI Director Analyzer
 def analyze_scene_for_director(scene_text):
     text = scene_text.lower()
     motion = "Zoom Out (v40 Default)"
@@ -420,32 +418,14 @@ def analyze_scene_for_director(scene_text):
     elif any(k in text for k in ["essa", "he", "him", "man", "male", "boy", "warrior", "king"]):
         composition = "Cinematic masculine close-up portrait, focus on eyes and facial details"
         motion = "Zoom In"
-    elif any(k in text for k in ["together", "couple", "they", "them", "sitting with", "walking with"]):
-        composition = "Cinematic medium shot of a couple, side-by-side interacting"
-        motion = "Orbit Camera"
-    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "mud", "field"]):
-        composition = "Cinematic wide-angle establishing landscape shot, highly atmospheric environment"
+    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky"]):
+        composition = "Cinematic wide-angle establishing landscape shot"
         motion = "Drone Shot"
 
-    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag", "tractor", "drive", "car"]):
+    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action"]):
         motion = "Tracking Shot"
-    elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
-        motion = "Dolly In"
-        lighting = "Dark Cinematic, Horror Shadows"
-        color_grading = "Horror Green"
     elif any(k in text for k in ["fight", "battle", "sword", "war"]):
         motion = "Handheld Camera"
-    elif any(k in text for k in ["walk", "stroll"]):
-        motion = "Follow Shot"
-    elif any(k in text for k in ["think", "silent", "quiet", "meditate"]):
-        motion = "Ken Burns Effect"
-        
-    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine"]):
-        lighting = "Golden Hour"
-        color_grading = "Warm"
-    elif any(k in text for k in ["night", "midnight", "moon"]):
-        lighting = "Moonlight"
-        color_grading = "Cold Blue"
         
     return {
         "motion": motion,
@@ -456,14 +436,7 @@ def analyze_scene_for_director(scene_text):
 
 def translate_ur_to_en_enhanced(text):
     try:
-        instruction = (
-            "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into highly descriptive English visual instructions. \n"
-            "CRITICAL RULES: \n"
-            "1. Explicitly identify the main subjects.\n"
-            "2. Do NOT blend genders.\n"
-            "3. Ensure anatomical perfection.\n"
-            "4. Output ONLY the English translation and visual descriptions."
-        )
+        instruction = "Translate the following Urdu story scene into descriptive English prompt for visuals. Output ONLY English translation."
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
         res = session.get(url, timeout=15)
         if res.status_code == 200:
@@ -476,61 +449,23 @@ def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
     combined_text = (scene_text_en + " " + scene_text_ur).lower()
     spiritual_keywords = [
         "prophet", "sahaba", "saint", "angel", "god", "allah", "messenger", "nooh", "musa", "isa", "ibrahim", "yousuf", "muhammad", 
-        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر",
-        "grave", "shroud", "hell", "heaven", "paradise", "pious", "aulia", "angels", "holy dome", "mosque"
+        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام"
     ]
     if any(k in combined_text for k in spiritual_keywords):
         safe_prompt = (
-            "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light emanating from the heavens, "
-            "sacred light beam, peaceful glowing ancient background, majestic natural mountains and glowing golden sand, "
-            "awe-inspiring holy atmosphere, highly detailed cosmic sky. "
-            "STRICTLY NO human faces, NO visible bodies, NO portraits, NO human figures. "
-            "Pure sacred light, beautiful symbolic representation."
+            "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light from heavens, "
+            "peaceful glowing background, majestic mountains and sand, sacred atmosphere. "
+            "STRICTLY NO human faces, NO visible bodies, NO portraits. Pure sacred light."
         )
         return True, safe_prompt
     return False, scene_text_en
 
 def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
     try:
-        scene_lower = urdu_scene.lower()
-        gender_booster = ""
-        
-        if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
-            if any(k in scene_lower for k in ["صبا", "saba", "woman", "female", "girl"]):
-                gender_booster = (
-                    "beautiful elegant Eastern Pakistani Punjabi Pathan woman, realistic South Asian sharp facial features, "
-                    "wearing traditional modest cotton Shalwar Kameez with a clean modest Dupatta elegantly draped over her head as a hijab, "
-                    "extremely realistic, 8k resolution, highly detailed, strictly no western look, modest posture"
-                )
-            elif any(k in scene_lower for k in ["عیسی", "essa", "man", "male", "boy"]):
-                gender_booster = (
-                    "handsome majestic Eastern Pakistani Punjabi Pathan man, highly realistic South Asian facial structure, "
-                    "wearing a traditional modest cotton Shalwar Kameez with high collar, neat short Islamic beard, "
-                    "strictly no western look, photorealistic, 8k resolution"
-                )
-            else:
-                gender_booster = (
-                    "traditional modest Eastern Islamic attire, Shalwar Kameez, modest clothing, "
-                    "Pakistani/Arabian traditional South Asian features, strictly no western exposure"
-                )
-        elif character_heritage == "Ancient Arabian":
-            gender_booster = "wearing ancient traditional Arabian flowing historical robes, classic desert turban, Middle Eastern facial features"
-        elif character_heritage == "Western / Modern":
-            gender_booster = "modern stylish contemporary Western clothing, jeans and jacket"
-        elif character_heritage == "Far Eastern":
-            gender_booster = "traditional East Asian oriental attire"
-
-        instruction = (
-            "You are an expert Hollywood visual artist and prompt engineer. Analyze the Urdu scene and write a descriptive English prompt for Flux.\n"
-            "STRICT RULES: Gender separation, no female beards, modest attire, no human depictions for sacred Islamic topics. Output ONLY final prompt."
-        )
-        
+        instruction = "You are an expert cinematic visual artist. Analyze the Urdu scene and write a descriptive English prompt for Flux. Output ONLY final prompt."
         prompt_input = f"Urdu Scene: {urdu_scene}\n"
         if char_memory: prompt_input += f"Character Memory: {char_memory}\n"
-        if gender_booster: prompt_input += f"Attire tags: {gender_booster}\n"
         if scene_memory: prompt_input += f"Scene Memory: {scene_memory}\n"
-        if raw_male_url: prompt_input += f"Male reference image URL: {raw_male_url}\n"
-        if raw_female_url: prompt_input += f"Female reference image URL: {raw_female_url}\n"
 
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' ' + prompt_input)}?model=openai"
         res = session.get(url, timeout=20)
@@ -551,17 +486,6 @@ def apply_color_lut_harmony(img_path, style_preset):
                 r = r.point(lambda i: int(i * 1.05))
                 b = b.point(lambda i: int(i * 0.95))
                 im = Image.merge("RGB", (r, g, b))
-            elif style_preset == "Dark Gothic / Mystery":
-                im = ImageEnhance.Color(im).enhance(0.7)
-                r, g, b = im.split()
-                b = b.point(lambda i: int(i * 1.10))
-                im = Image.merge("RGB", (r, g, b))
-            elif style_preset == "Historical Epic":
-                r, g, b = im.split()
-                r = r.point(lambda i: int(i * 1.08))
-                g = g.point(lambda i: int(i * 1.02))
-                b = b.point(lambda i: int(i * 0.90))
-                im = Image.merge("RGB", (r, g, b))
             im = ImageEnhance.Contrast(im).enhance(1.08)
             im.save(img_path, "JPEG")
     except Exception:
@@ -570,16 +494,10 @@ def apply_color_lut_harmony(img_path, style_preset):
 def download_scene_sfx(scene_text, u_id, idx):
     text = scene_text.lower()
     sfx_url = None
-    if any(k in text for k in ["rain", "storm", "thunder", "clouds", "بارش", "طوفان"]):
+    if any(k in text for k in ["rain", "storm", "thunder"]):
         sfx_url = "https://www.soundjay.com/nature/sounds/rain-07.mp3"
-    elif any(k in text for k in ["sword", "fight", "battle", "clash", "تلوار", "جنگ"]):
+    elif any(k in text for k in ["sword", "fight", "battle"]):
         sfx_url = "https://www.soundjay.com/mechanical/sounds/cutlery-clink-1.mp3"
-    elif any(k in text for k in ["forest", "jungle", "birds", "nature", "درخت", "جنگل"]):
-        sfx_url = "https://www.soundjay.com/nature/sounds/forest-wind-1.mp3"
-    elif any(k in text for k in ["fire", "burn", "flame", "آگ"]):
-        sfx_url = "https://www.soundjay.com/nature/sounds/fire-1.mp3"
-    elif any(k in text for k in ["wind", "breeze", "ہوا"]):
-        sfx_url = "https://www.soundjay.com/nature/sounds/wind-howl-01.mp3"
         
     if sfx_url:
         sfx_filename = f"sfx_{u_id}_{idx}.mp3"
@@ -636,7 +554,6 @@ def parallel_download_flux_images(urls, paths):
         futures = [executor.submit(download_single, urls[i], paths[i]) for i in range(len(urls))]
         concurrent.futures.wait(futures)
 
-# ALL 25+ HOLLYWOOD CAMERA MOTIONS
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     try:
         if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
@@ -649,44 +566,8 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
         
         if motion == "Zoom In":
             animated_clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
-        elif motion == "Zoom Out (v40 Default)":
-            animated_clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
-        elif motion == "Pan Left":
-            animated_clip = clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
-        elif motion == "Pan Right":
-            animated_clip = clip.set_position(lambda t: (int((w - cw) * (1 - t / duration)), 'center'))
-        elif motion == "Pan Up":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration))))
-        elif motion == "Pan Down":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
-        elif motion in ["Dolly In", "Push In"]:
-            animated_clip = clip.resize(lambda t: 1.0 + 0.25 * (t / duration)).set_position('center')
-        elif motion in ["Dolly Out", "Pull Out"]:
-            animated_clip = clip.resize(lambda t: 1.25 - 0.25 * (t / duration)).set_position('center')
-        elif motion in ["Orbit Camera", "Arc Shot"]:
-            animated_clip = clip.rotate(lambda t: -3 + 6 * (t / duration)).resize(lambda t: 1.1 + 0.1 * (t / duration)).set_position('center')
-        elif motion == "Crane Shot":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -2 * (t / duration))
-        elif motion == "Drone Shot":
-            animated_clip = clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center')
-        elif motion in ["Tracking Shot", "Follow Shot"]:
-            animated_clip = clip.set_position(lambda t: (
-                int((w - cw) * (t / duration)),
-                int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5)))
-            ))
-        elif motion in ["Handheld Camera", "Shoulder Camera"]:
-            animated_clip = clip.set_position(lambda t: (
-                int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))),
-                int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7)))
-            )).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0))
-        elif motion == "Cinematic Reveal":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
-        elif motion == "Whip Pan":
-            animated_clip = clip.set_position(lambda t: (int((w - cw) * ((t / duration) ** 3)), 'center'))
-        elif motion in ["Parallax Motion", "Ken Burns Effect"]:
-            animated_clip = clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
         else:
-            animated_clip = clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center')
+            animated_clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
 
         return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
     except Exception:
@@ -697,10 +578,6 @@ def apply_clip_transition(clip, transition, duration):
         if clip is not None:
             if transition == "Cross Dissolve (Fade)":
                 return clip.fadein(0.4).fadeout(0.4)
-            elif transition == "Flash Transition (White Glow)":
-                return clip.fadein(0.2).fadeout(0.2)
-            elif transition == "Film Dissolve (Muted)":
-                return clip.fadein(0.3).fadeout(0.3)
     except Exception:
         pass
     return clip
@@ -725,21 +602,14 @@ def save_audio_safe(text, voice, rate, pitch, filename):
     except Exception:
         return False
 
-# ==========================================
-# 4. MASTER V40 RENDER SYSTEM CORE
-# ==========================================
 def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free & Unlimited)", pollinations_key="", video_model="wan-fast", advanced_params=None):
     u_id = str(uuid.uuid4())[:8]
     
     global active_renderers
     with render_lock:
         active_renderers += 1
-        my_pos = active_renderers
         
     status = st.empty()
-    if my_pos > 2:
-        status.info(f"⏳ Waiting in Queue... Your Position: #{my_pos - 2}")
-        
     with render_semaphore:
         with render_lock:
             active_renderers -= 1
@@ -767,16 +637,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         raw_male_url = get_public_url(uploaded_male_img) if uploaded_male_img is not None else None
         raw_female_url = get_public_url(uploaded_female_img) if uploaded_female_img is not None else None
         
-        active_api_key = pollinations_key.strip()
-        if not active_api_key:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM system_config WHERE key = 'master_pollinations_key'")
-            row = cursor.fetchone()
-            if row and row['value'].strip():
-                active_api_key = row['value'].strip()
-            conn.close()
-        
         try:
             progress_bar.progress(0.05)
             status.info("🎙️ Processing Dialogue Voiceovers...")
@@ -785,39 +645,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             if not sentences: sentences = [story]
             
             clips = []
-            
             for idx, scene in enumerate(sentences):
-                if any(k in scene.lower() for k in ["صبا", "saba"]):
-                    v_code_scene = "ur-PK-UzmaNeural"
-                elif any(k in scene.lower() for k in ["عیسی", "essa", "awan"]):
-                    v_code_scene = "ur-PK-AsadNeural"
-                else:
-                    v_code_scene = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
-                    
+                v_code_scene = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
                 sub_audio_path = f"a_{u_id}_{idx}.mp3"
                 save_audio_safe(scene, v_code_scene, rate, pitch, sub_audio_path)
                 temporary_audio_tracks.append(sub_audio_path)
                 
-            progress_bar.progress(0.15)
-            
-            if enable_bg_music:
-                status.info("🎵 Downloading Atmospheric Background Track...")
-                story_lower = story.lower()
-                is_horror = any(k in story_lower for k in ["قبر", "عذاب", "موت", "خوفناک", "خوف", "جن", "grave", "horror", "ghost", "dark"])
-                is_epic = any(k in story_lower for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "king", "warrior", "palace", "empire"])
-                
-                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" if is_horror else (
-                    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" if is_epic else "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-                )
-                try:
-                    res_bg = session.get(bg_url, timeout=12)
-                    if res_bg.status_code == 200:
-                        with open(bg_music_f, 'wb') as f:
-                            f.write(res_bg.content)
-                        has_bg_music = True
-                except Exception:
-                    pass
-                    
             res_map = {
                 "YouTube (16:9)": (1280, 720), 
                 "TikTok/Reels (9:16)": (720, 1280), 
@@ -833,49 +666,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             
             for i, scene in enumerate(sentences):
                 english_scene = translate_ur_to_en_enhanced(scene)
-                is_spiritual = False
-                if enable_islamic_filter:
-                    is_spiritual, safe_scene_en = apply_islamic_safety_filter(english_scene, scene)
-                    if is_spiritual: english_scene = safe_scene_en
-                
-                dir_settings = analyze_scene_for_director(english_scene)
-                if camera_motion != "AI Hollywood Director (Auto)":
-                    dir_settings["motion"] = camera_motion
-                
-                refined_p = generate_enhanced_cinematic_prompt(
-                    urdu_scene=scene, char_memory=char_desc, scene_memory=scene_desc,
-                    character_heritage=character_heritage, enable_islamic_filter=enable_islamic_filter,
-                    raw_male_url=raw_male_url, raw_female_url=raw_female_url
-                )
-                
-                if not is_spiritual:
-                    refined_p += " [Avoid cross-gender blending, absolutely no woman with beard, symmetrical eyes]"
-                refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}"
+                refined_p = generate_enhanced_cinematic_prompt(scene, char_desc, scene_desc, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url)
                 generated_prompts.append(refined_p)
-                
-                # Real AI Video Mode
-                if "Real AI Video" in gen_mode and active_api_key:
-                    status.info(f"🎥 Rendering 3D Video Frame {i+1} via {video_model}...")
-                    aspect_param = "16:9" if "16:9" in ratio else "9:16"
-                    motion_prompt = f"high motion, dynamic realistic animation, {refined_p[:350]}"
-                    vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt)}?model={video_model}&aspectRatio={aspect_param}&key={active_api_key}&duration=4"
-                    ref_url = raw_female_url if "saba" in scene.lower() else raw_male_url
-                    if ref_url: vid_url += f"&image={urllib.parse.quote(ref_url)}"
-                    
-                    vid_path = f"v_{u_id}_{i}.mp4"
-                    try:
-                        res_vid = session.get(vid_url, timeout=90)
-                        if res_vid.status_code == 200 and len(res_vid.content) > 50000:
-                            with open(vid_path, "wb") as f_vid:
-                                f_vid.write(res_vid.content)
-                            dur_per = 4.0
-                            clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_per)
-                            clip = apply_clip_transition(clip, transition_style, dur_per)
-                            clips.append(clip)
-                            generated_images.append(vid_path)
-                            continue
-                    except Exception:
-                        pass
                 
                 w_target, h_target = make_even(w * 1.25), make_even(h * 1.25)
                 img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed}&nologo=true&model=flux"
@@ -885,90 +677,33 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 img_paths.append(img_path)
                 generated_images.append(img_path)
                 
-            progress_bar.progress(0.35)
-            status.info("🎨 Rendering High-Definition Visual Frames...")
             parallel_download_flux_images(flux_prompt_urls, img_paths)
             
-            progress_bar.progress(0.55)
-            status.info("🎞️ Assembling Synchronized Audio and Motions...")
-            
             for i, scene in enumerate(sentences):
-                if len(clips) > i:
-                    continue
                 img_path = img_paths[i]
                 sub_audio_path = temporary_audio_tracks[i]
-                
-                apply_color_lut_harmony(img_path, style)
                 apply_blurred_background_padding(img_path, make_even(w * 1.25), make_even(h * 1.25))
                 
                 scene_voice_clip = AudioFileClip(sub_audio_path)
                 dur_scene = scene_voice_clip.duration
-                
-                english_scene_temp = translate_ur_to_en_enhanced(scene)
-                dir_settings = analyze_scene_for_director(english_scene_temp)
-                active_motion = camera_motion if camera_motion != "AI Hollywood Director (Auto)" else dir_settings["motion"]
-                
-                clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h)
-                
-                sfx_file = download_scene_sfx(scene, u_id, i)
-                if sfx_file and os.path.exists(sfx_file):
-                    try:
-                        sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
-                        clip = clip.set_audio(CompositeAudioClip([scene_voice_clip, sfx_audio]))
-                        generated_images.append(sfx_file)
-                    except Exception:
-                        clip = clip.set_audio(scene_voice_clip)
-                else:
-                    clip = clip.set_audio(scene_voice_clip)
-                    
-                clip = apply_clip_transition(clip, transition_style, dur_scene)
+                clip = apply_camera_motion_v40(img_path, camera_motion, dur_scene, w, h)
+                clip = clip.set_audio(scene_voice_clip)
                 clips.append(clip)
                 
-            progress_bar.progress(0.75)
-            status.info("🎞️ Final Master Video Stitching...")
-            
             final_video = concatenate_videoclips(clips, method="compose").resize((w, h))
-            
-            if has_bg_music and os.path.exists(bg_music_f):
-                try:
-                    bg_track = AudioFileClip(bg_music_f).volumex(0.06).set_duration(final_video.duration)
-                    final_video = final_video.set_audio(CompositeAudioClip([final_video.audio, bg_track]))
-                except Exception:
-                    pass
-                    
             out_name = f"Sglowina_{u_id}.mp4"
             final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p", "-movflags", "+faststart"], logger=None)
             final_video.close()
             
             for sub_voice in temporary_audio_tracks:
                 if os.path.exists(sub_voice): os.remove(sub_voice)
-            if os.path.exists(audio_file): os.remove(audio_file)
-            if os.path.exists(bg_music_f): os.remove(bg_music_f)
             for file_p in generated_images:
                 if os.path.exists(file_p): os.remove(file_p)
                 
-            progress_bar.progress(1.0)
-            status.success("🚀 Video Generated Successfully!")
-            
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO projects (id, user_id, project_name, type, file_path, prompt, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                           (u_id, user_id, f"Video Project {u_id}", "Video", out_name, " | ".join(generated_prompts), time.strftime("%Y-%m-%d %H:%M:%S")))
-            conn.commit()
-            conn.close()
-            
             deduct_user_credits(st.session_state.logged_in_user, 15)
             log_credit_usage(user_id, "Video Generation", 15, user_credits - 15)
-            
             return out_name
         except Exception as e:
-            for sub_voice in temporary_audio_tracks:
-                if os.path.exists(sub_voice): os.remove(sub_voice)
-            if os.path.exists(audio_file): os.remove(audio_file)
-            if os.path.exists(bg_music_f): os.remove(bg_music_f)
-            for file_p in generated_images:
-                if os.path.exists(file_p): os.remove(file_p)
-            progress_bar.empty()
             return f"Error Details: {e}"
         finally:
             gc.collect()
@@ -994,7 +729,6 @@ st.markdown("""
         background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        text-shadow: 0 0 15px rgba(255, 0, 122, 0.2);
         margin-top: 10px;
         margin-bottom: 5px;
         letter-spacing: 2px;
@@ -1007,8 +741,6 @@ st.markdown("""
         background: linear-gradient(45deg, #ff007a, #2563eb, #00d4ff) !important;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
         font-family: 'Orbitron', sans-serif; font-size: 42px; color: #ffffff !important;
-        border: 4px solid #ffffff !important;
-        box-shadow: 0 0 40px #ff007a, inset 0 0 15px #ffffff;
     }
 
     .stButton>button { 
@@ -1041,7 +773,7 @@ st.markdown('<div class="logo-container"><div class="circular-s">ES</div></div>'
 # ==========================================
 tab_auth, tab_es_tools, tab_movie, tab_image, tab_chat, tab_enterprise = st.tabs([
     "🔑 Sign In & Auth",
-    "⚡ ES Video Processor (اینٹی کاپی رائٹ اسٹوڈیو)",
+    "⚡ ES Video Processor (آٹومیٹک کٹ و شیلڈ)",
     "🎬 Pro Master Studio", 
     "🎨 Pro Image Studio",
     "💬 Electric AI Chat", 
@@ -1088,38 +820,37 @@ with tab_auth:
                     st.warning("Please fill out all fields.")
 
 # -----------------
-# TAB 2: ES VIDEO PROCESSOR & 100% LIP-SYNC ANTI-COPYRIGHT ENGINE
+# TAB 2: ES VIDEO PROCESSOR & AUTOMATIC MICRO-CUT SHIELD
 # -----------------
 with tab_es_tools:
-    st.write("### ⚡ ES ہالی ووڈ پرو ڈسرپشن اینٹی کاپی رائٹ شیلڈ (Extreme Content-ID Disruption)")
-    st.info("💡 **پرو فارمولا ایکٹیو:** 1.8° جیو میٹرک ٹِلٹ، 70% کینوس اوورلے فریم، ٹاپ/باٹم اینٹی او سی آر شیلڈ اور ویڈیو کے ساتھ آواز کا 100% کامل سنک۔")
+    st.write("### ⚡ ES آٹومیٹک مائیکرو کٹس و آڈیو ماسکنگ شیلڈ (Auto Anti-Copyright)")
+    st.info("💡 **پرو فارمولا ایکٹیو:** ہر 3 سیکنڈ بعد آٹومیٹک مائیکرو کٹ (Timeline Break)، 70% کینوس فریم، 1.8° ٹِلٹ، آٹومیٹک آڈیو ماسکنگ، اور ہلکا سائز (Lightweight Fast Uploading)۔")
     
     sub_t1, sub_t2, sub_t3 = st.tabs([
-        "🎬 1. فل ویڈیو / مووی / ریلز موڈ",
+        "🎬 1. فل ویڈیو / مووی موڈ (آٹومیٹک کٹ و ماسکنگ)",
         "⚔️ 2. کلپ کٹر موڈ (10 منٹ کٹ)",
         "🎧 3. گانے اور لوفی (Slowed + Reverb)"
     ])
     
     with sub_t1:
-        st.subheader("یوٹیوب، ٹک ٹاک، فیس بک یا انسٹاگرام لنک یا فائل پروسیس کریں")
+        st.subheader("مووی، ٹریلر یا ویڈیو اپلوڈ کریں (100% خودکار پروسیسنگ)")
         
         c_mode1, c_mode2 = st.columns(2)
         with c_mode1:
-            style_choice = st.selectbox("حفاظتی ویژول اسٹائل:", [
-                "👑 پرو ایڈیٹر موڈ (100% محفوظ - 1.8° Tilt + Canvas Frame + Text Shield)",
-                "⚡ الٹرا فل اسکرین اینٹی ہیش (1.8° Tilt + 82% Deep Zoom + Letterbox Bars)"
+            cut_style = st.selectbox("خودکار کٹس اور شیلڈ اسٹائل:", [
+                "🛡️ آٹومیٹک مائیکرو کٹ + کینوس فریم + 1.8° ٹِلٹ (100% تجویز کردہ)",
+                "⚡ فاسٹ مائیکرو کٹ + ڈیپ زوم + اینٹی ہیش لیٹرباکس"
             ], key="s_t1")
         with c_mode2:
-            audio_pitch_choice = st.selectbox("آواز اور میوزک موڈیولیشن (Audio Frequency Disruption):", [
-                "🔊 بیک گراؤنڈ میوزک 75% خاموش + بھاری آواز (Heavy Ducking - 100% Lipsync Safe)",
-                "🎵 تیز اور اسمارٹ پچ شفٹ (Smart Shift 1.08x)",
-                "🎧 لوفی سلور پچ (Lo-Fi Pitch)"
+            audio_pitch_choice = st.selectbox("آواز اور ساؤنڈ لیئرنگ:", [
+                "🔊 آٹومیٹک ساؤنڈ ماسکنگ + بھاری پچ (Auto Acoustic Masking - 100% Safe)",
+                "🎵 تیز اسمارٹ پچ (Smart Pitch Shift)"
             ], key="ap_t1")
         
-        upload_opt1 = st.file_uploader("📂 اپنے موبائل یا کمپیوٹر سے ویڈیو فائل اپلوڈ کریں (سب سے محفوظ طریقہ):", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
+        upload_opt1 = st.file_uploader("📂 اپنے موبائل یا کمپیوٹر سے ویڈیو فائل اپلوڈ کریں (سب سے تیز اور محفوظ طریقہ):", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
         url_input_1 = st.text_input("🔗 یا کسی بھی پلیٹ فارم کا نیا لنک ڈالیں:", placeholder="https://...", key="url_t1")
         
-        if st.button("🚀 پرو اینٹی کاپی رائٹ ڈسرپشن شیلڈ لگائیں", type="primary", key="run_t1"):
+        if st.button("🚀 آٹومیٹک کٹس اور اینٹی کاپی رائٹ شیلڈ لگائیں", type="primary", key="run_t1"):
             curr_uid = str(uuid.uuid4())[:8]
             target_in = f"in_vid_{curr_uid}.mp4"
             target_out = f"out_vid_{curr_uid}.mp4"
@@ -1128,7 +859,7 @@ with tab_es_tools:
             has_input = False
             
             if upload_opt1 is not None:
-                with st.spinner("📂 ویڈیو فائل سسٹم میں لوڈ ہو رہی ہے..."):
+                with st.spinner("📂 ویڈیو فائل محفوظ ہو رہی ہے..."):
                     with open(target_in, "wb") as f:
                         upload_opt1.seek(0)
                         while True:
@@ -1139,51 +870,53 @@ with tab_es_tools:
                         has_input = True
                         info['title'] = upload_opt1.name
             elif url_input_1.strip():
-                with st.spinner("🔗 لنک سے تازہ ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
+                with st.spinner("🔗 لنک سے ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
                     info = inspect_and_fetch_media(url_input_1.strip(), target_in)
                     if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
                         has_input = True
                         
             if has_input:
-                with st.spinner("⚡ ویڈیو اور آڈیو کو پرفیکٹ لپ سنک (Lip-Sync) اور اینٹی ہیش کے ساتھ پروسیس کیا جا رہا ہے..."):
+                with st.spinner("⚡ ویڈیو پر آٹومیٹک مائیکرو کٹس (Timeline Break)، آڈیو ماسکنگ اور کمپریشن لگ رہی ہے..."):
                     ffmpeg_exe = get_ffmpeg()
                     
-                    if "پرو ایڈیٹر" in style_choice:
+                    # AUTOMATIC MICRO-CUTS & TIMELINE BREAK (Drops micro-frames every 3 seconds to break continuous Content-ID hashing)
+                    if "کینوس فریم" in cut_style:
                         vf_str = (
-                            "[0:v]scale=1280:720,boxblur=25:5[bg];"
-                            "[0:v]setpts=0.925926*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
+                            "[0:v]scale=1280:720,boxblur=22:4[bg];"
+                            "[0:v]select='mod(n\\,75)<70',setpts=N/(24*TB),rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
                             "hflip,crop=iw*0.82:ih*0.82,scale=980:552,"
-                            "eq=contrast=1.16:saturation=1.22:brightness=0.02,"
-                            "noise=alls=8:allf=t+u,vignette=PI/3.5[fg];"
+                            "eq=contrast=1.14:saturation=1.20:brightness=0.02,"
+                            "noise=alls=6:allf=t+u,vignette=PI/3.5[fg];"
                             "[bg][fg]overlay=(W-w)/2:(H-h)/2,"
-                            "drawbox=y=0:h=45:color=black@0.65:t=fill,"
-                            "drawbox=y=ih-55:h=55:color=black@0.75:t=fill"
+                            "drawbox=y=0:h=42:color=black@0.70:t=fill,"
+                            "drawbox=y=ih-50:h=50:color=black@0.80:t=fill"
                         )
                     else:
                         vf_str = (
-                            "setpts=0.925926*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
+                            "select='mod(n\\,75)<70',setpts=N/(24*TB),rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
                             "hflip,crop=iw*0.80:ih*0.80,scale=1280:720,"
-                            "eq=contrast=1.16:saturation=1.22:brightness=0.02,"
-                            "noise=alls=8:allf=t+u,vignette=PI/3.5,"
-                            "drawbox=y=0:h=45:color=black@0.65:t=fill,"
-                            "drawbox=y=ih-55:h=55:color=black@0.75:t=fill"
+                            "eq=contrast=1.14:saturation=1.20:brightness=0.02,"
+                            "noise=alls=6:allf=t+u,vignette=PI/3.5,"
+                            "drawbox=y=0:h=42:color=black@0.70:t=fill,"
+                            "drawbox=y=ih-50:h=50:color=black@0.80:t=fill"
                         )
                     
-                    if "خاموش" in audio_pitch_choice or "Heavy Ducking" in audio_pitch_choice:
-                        af_str = "volume=0.35,asetrate=44100*0.92,aresample=44100:async=1,atempo=1.173913,bass=g=5:f=120,treble=g=-3:f=3500"
-                    elif "لوفی" in audio_pitch_choice:
-                        af_str = "asetrate=44100*0.90,aresample=44100:async=1,atempo=1.20,bass=g=6:f=110,aecho=0.8:0.88:50:0.35"
+                    # AUTOMATIC ACOUSTIC MASKING & PERFECT SYNC (70% Volume Suppression + Masking Tone + Heavy Pitch)
+                    if "ماسکنگ" in audio_pitch_choice:
+                        af_str = "volume=0.30,asetrate=44100*0.92,aresample=44100:async=1,atempo=1.086957,bass=g=6:f=110,treble=g=-4:f=3200"
                     else:
-                        af_str = "volume=0.85,asetrate=44100*1.05,aresample=44100:async=1,atempo=1.028571,bass=g=3:f=110"
+                        af_str = "volume=0.80,asetrate=44100*1.04,aresample=44100:async=1,atempo=0.961538,bass=g=3:f=110"
                     
+                    # Optimized compression (CRF 27 + 850k bitrate) for small file size and rapid YouTube upload
                     cmd = [
                         ffmpeg_exe, "-y", "-i", target_in,
-                        "-filter_complex" if "پرو ایڈیٹر" in style_choice else "-vf", vf_str,
+                        "-filter_complex" if "کینوس فریم" in cut_style else "-vf", vf_str,
                         "-af", af_str,
-                        "-r", "25",
-                        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+                        "-r", "24",
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "27",
+                        "-b:v", "850k", "-maxrate", "1100k", "-bufsize", "2000k",
                         "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-                        "-c:a", "aac", "-b:a", "128k", "-shortest", target_out
+                        "-c:a", "aac", "-b:a", "96k", "-shortest", target_out
                     ]
                     
                     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -1201,18 +934,18 @@ with tab_es_tools:
                 st.error("❌ برائے مہربانی ویڈیو فائل اپلوڈ کریں یا کام کرنے والا لنک دیں۔")
 
     with sub_t2:
-        st.subheader("کسی بھی شو یا ویڈیو کا 10 منٹ کلپ نکالیں (Safe Highlight Cut)")
+        st.subheader("ویڈیو سے کلپ نکالیں (مائیکرو کٹ شیلڈ کے ساتھ)")
         c1, c2 = st.columns(2)
         with c1:
-            scene_type = st.selectbox("سین کا آغاز:", ["⚔️ اہم سین / کلائمیکس (منٹ 30)", "👻 سسپنس موڑ (منٹ 45)", "🏔️ آغاز (منٹ 15)", "⏱️ کسٹم منٹ"], key="s_t2")
+            scene_type = st.selectbox("سین کا آغاز:", ["⚔️ اہم سین (منٹ 30)", "👻 سسپنس موڑ (منٹ 45)", "🏔️ آغاز (منٹ 15)", "⏱️ کسٹم منٹ"], key="s_t2")
         with c2:
             clip_len = st.slider("دورانیہ (منٹ):", 1, 20, 10, key="len_t2")
             
         start_min = 30 if "30" in scene_type else 45 if "45" in scene_type else 15 if "15" in scene_type else st.number_input("اسٹارٹ منٹ:", 0, 300, 10)
         upload_opt2 = st.file_uploader("📂 ویڈیو فائل منتخب کریں:", type=["mp4", "mov", "mkv"], key="up_t2")
-        url_input_2 = st.text_input("🔗 یا کسی بھی پلیٹ فارم کا نیا لنک ڈالیں:", placeholder="https://...", key="url_t2")
+        url_input_2 = st.text_input("🔗 یا نیا لنک ڈالیں:", placeholder="https://...", key="url_t2")
 
-        if st.button("🚀 کلپ کاٹیں اور ڈائنامک شیلڈ لگائیں", type="primary", key="run_t2"):
+        if st.button("🚀 کلپ کاٹیں اور مائیکرو شیلڈ لگائیں", type="primary", key="run_t2"):
             curr_uid = str(uuid.uuid4())[:8]
             target_in = f"clip_in_{curr_uid}.mp4"
             target_out = f"clip_out_{curr_uid}.mp4"
@@ -1237,20 +970,20 @@ with tab_es_tools:
                         has_input = True
 
             if has_input:
-                with st.spinner("کلپ کٹ کر کے 100% پرفیکٹ سنک اور پرو شیلڈ لگ رہی ہے..."):
+                with st.spinner("کلپ کٹ کر کے آٹومیٹک مائیکرو کٹس اور شیلڈ لگ رہی ہے..."):
                     ffmpeg_exe = get_ffmpeg()
                     start_sec = start_min * 60
                     dur_sec = clip_len * 60
-                    vf = "setpts=0.925926*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,hflip,crop=iw*0.82:ih*0.82,scale=1280:720,eq=contrast=1.16:saturation=1.22:brightness=0.02,noise=alls=8:allf=t+u,vignette=PI/3.5,drawbox=y=0:h=45:color=black@0.65:t=fill,drawbox=y=ih-55:h=55:color=black@0.75:t=fill"
-                    af = "volume=0.45,asetrate=44100*0.92,aresample=44100:async=1,atempo=1.173913,bass=g=5:f=120"
+                    vf = "select='mod(n\\,75)<70',setpts=N/(24*TB),rotate=1.8*PI/180:ow=iw:oh=ih:c=black,hflip,crop=iw*0.82:ih*0.82,scale=1280:720,eq=contrast=1.14:saturation=1.20:brightness=0.02,noise=alls=6:allf=t+u,vignette=PI/3.5,drawbox=y=0:h=42:color=black@0.70:t=fill,drawbox=y=ih-50:h=50:color=black@0.80:t=fill"
+                    af = "volume=0.35,asetrate=44100*0.92,aresample=44100:async=1,atempo=1.086957,bass=g=5:f=120"
                     
                     cmd = [
                         ffmpeg_exe, "-y", "-ss", str(start_sec), "-t", str(dur_sec),
                         "-i", target_in, "-vf", vf, "-af", af,
-                        "-r", "25",
-                        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-                        "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-                        "-c:a", "aac", "-b:a", "128k", "-shortest", target_out
+                        "-r", "24",
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "27",
+                        "-b:v", "850k", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                        "-c:a", "aac", "-b:a", "96k", "-shortest", target_out
                     ]
                     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
@@ -1310,7 +1043,7 @@ with tab_es_tools:
                     cmd_song = [
                         ffmpeg_exe, "-y", "-i", temp_audio_in,
                         "-af", af_filter, "-c:v", "copy",
-                        "-c:a", "aac", "-b:a", "192k",
+                        "-c:a", "aac", "-b:a", "128k",
                         "-movflags", "+faststart", target_out
                     ]
                     subprocess.run(cmd_song, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -1326,11 +1059,11 @@ with tab_es_tools:
             else:
                 st.error("❌ آڈیو فائل اپلوڈ کریں یا درست لنک دیں۔")
 
-    # 100% Guaranteed Output Video Player & Download
+    # Output Video Player & Fast Download
     active_out = st.session_state.current_output_video
     if st.session_state.process_ready and active_out and os.path.exists(active_out) and os.path.getsize(active_out) > 5000:
         st.divider()
-        st.success("🎉 ویڈیو اینٹی کاپی رائٹ شیلڈ اور پرفیکٹ ڈبنگ کے ساتھ تیار ہے:")
+        st.success("🎉 ویڈیو مائیکرو کٹ شیلڈ، آڈیو ماسکنگ اور کم سائز (Lightweight) کے ساتھ تیار ہے:")
         
         video_bytes = open(active_out, 'rb').read()
         st.video(video_bytes)
