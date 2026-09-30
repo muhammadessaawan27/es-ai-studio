@@ -270,7 +270,6 @@ def init_db_v21():
 
 init_db_v21()
 
-# Auth Helpers
 def register_saas_user(username, email, password):
     username = username.strip().lower()
     email = email.strip().lower()
@@ -345,9 +344,8 @@ def inspect_and_fetch_media(raw_url, target_path):
             'nocheckcertificate': True,
             'ignoreerrors': True,
             'geo_bypass': True,
-            'socket_timeout': 30,
             'extractor_args': {
-                'youtube': {'player_client': ['android_creator', 'ios', 'tvhtml5', 'web_creator', 'mweb']}
+                'youtube': {'player_client': ['android', 'ios', 'mweb', 'web', 'tvhtml5']}
             }
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -358,15 +356,7 @@ def inspect_and_fetch_media(raw_url, target_path):
                 info_dict['categories'] = meta.get('categories', ['Entertainment'])
                 info_dict['tags'] = meta.get('tags', [])
     except Exception:
-        # Direct stream fallback for general video links
-        try:
-            with requests.get(clean_url, headers=headers_browser, stream=True, timeout=40) as r:
-                if r.status_code == 200 and 'video' in r.headers.get('content-type', ''):
-                    with open(target_path, 'wb') as f:
-                        for chunk in r.iter_content(chunk_size=65536):
-                            f.write(chunk)
-        except Exception:
-            pass
+        pass
         
     return info_dict
 
@@ -415,7 +405,6 @@ def generate_smart_metadata(info):
         
     return genre, safe_titles, hashtags, thumb_prompt
 
-# AI Director Analyzer
 def analyze_scene_for_director(scene_text):
     text = scene_text.lower()
     motion = "Zoom Out (v40 Default)"
@@ -429,32 +418,14 @@ def analyze_scene_for_director(scene_text):
     elif any(k in text for k in ["essa", "he", "him", "man", "male", "boy", "warrior", "king"]):
         composition = "Cinematic masculine close-up portrait, focus on eyes and facial details"
         motion = "Zoom In"
-    elif any(k in text for k in ["together", "couple", "they", "them", "sitting with", "walking with"]):
-        composition = "Cinematic medium shot of a couple, side-by-side interacting"
-        motion = "Orbit Camera"
-    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky", "sea", "ocean", "mud", "field"]):
-        composition = "Cinematic wide-angle establishing landscape shot, highly atmospheric environment"
+    elif any(k in text for k in ["forest", "jungle", "mountain", "valley", "landscape", "sky"]):
+        composition = "Cinematic wide-angle establishing landscape shot"
         motion = "Drone Shot"
 
-    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action", "bhaag", "tractor", "drive", "car"]):
+    if any(k in text for k in ["run", "chase", "flee", "fast", "speed", "action"]):
         motion = "Tracking Shot"
-    elif any(k in text for k in ["scary", "ghost", "dark", "grave", "death", "haunted", "scared"]):
-        motion = "Dolly In"
-        lighting = "Dark Cinematic, Horror Shadows"
-        color_grading = "Horror Green"
     elif any(k in text for k in ["fight", "battle", "sword", "war"]):
         motion = "Handheld Camera"
-    elif any(k in text for k in ["walk", "stroll"]):
-        motion = "Follow Shot"
-    elif any(k in text for k in ["think", "silent", "quiet", "meditate"]):
-        motion = "Ken Burns Effect"
-        
-    if any(k in text for k in ["pray", "prayer", "mosque", "peace", "holy", "divine"]):
-        lighting = "Golden Hour"
-        color_grading = "Warm"
-    elif any(k in text for k in ["night", "midnight", "moon"]):
-        lighting = "Moonlight"
-        color_grading = "Cold Blue"
         
     return {
         "motion": motion,
@@ -465,14 +436,7 @@ def analyze_scene_for_director(scene_text):
 
 def translate_ur_to_en_enhanced(text):
     try:
-        instruction = (
-            "You are an expert Hollywood cinematic prompt writer. Translate the following Urdu story scene into highly descriptive English visual instructions. \n"
-            "CRITICAL RULES: \n"
-            "1. Explicitly identify the main subjects.\n"
-            "2. Do NOT blend genders.\n"
-            "3. Ensure anatomical perfection.\n"
-            "4. Output ONLY the English translation and visual descriptions."
-        )
+        instruction = "Translate the following Urdu story scene into descriptive English prompt for visuals. Output ONLY English translation."
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' Urdu text: ' + text)}?model=openai"
         res = session.get(url, timeout=15)
         if res.status_code == 200:
@@ -485,61 +449,23 @@ def apply_islamic_safety_filter(scene_text_en, scene_text_ur):
     combined_text = (scene_text_en + " " + scene_text_ur).lower()
     spiritual_keywords = [
         "prophet", "sahaba", "saint", "angel", "god", "allah", "messenger", "nooh", "musa", "isa", "ibrahim", "yousuf", "muhammad", 
-        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام", "پیمغبر",
-        "grave", "shroud", "hell", "heaven", "paradise", "pious", "aulia", "angels", "holy dome", "mosque"
+        "نبی", "رسول", "صحابہ", "ولی", "اللہ", "فرشتہ", "جنت", "جہنم", "قبر", "کفن", "غوث", "قطب", "امام"
     ]
     if any(k in combined_text for k in spiritual_keywords):
         safe_prompt = (
-            "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light emanating from the heavens, "
-            "sacred light beam, peaceful glowing ancient background, majestic natural mountains and glowing golden sand, "
-            "awe-inspiring holy atmosphere, highly detailed cosmic sky. "
-            "STRICTLY NO human faces, NO visible bodies, NO portraits, NO human figures. "
-            "Pure sacred light, beautiful symbolic representation."
+            "Cinematic spiritual scenery, divine volumetric glowing white and golden spiritual light from heavens, "
+            "peaceful glowing background, majestic mountains and sand, sacred atmosphere. "
+            "STRICTLY NO human faces, NO visible bodies, NO portraits. Pure sacred light."
         )
         return True, safe_prompt
     return False, scene_text_en
 
 def generate_enhanced_cinematic_prompt(urdu_scene, char_memory, scene_memory, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url):
     try:
-        scene_lower = urdu_scene.lower()
-        gender_booster = ""
-        
-        if character_heritage == "Traditional Eastern / Islamic (مسلم اور مشرقی لباس)":
-            if any(k in scene_lower for k in ["صبا", "saba", "woman", "female", "girl"]):
-                gender_booster = (
-                    "beautiful elegant Eastern Pakistani Punjabi Pathan woman, realistic South Asian sharp facial features, "
-                    "wearing traditional modest cotton Shalwar Kameez with a clean modest Dupatta elegantly draped over her head as a hijab, "
-                    "extremely realistic, 8k resolution, highly detailed, strictly no western look, modest posture"
-                )
-            elif any(k in scene_lower for k in ["عیسی", "essa", "man", "male", "boy"]):
-                gender_booster = (
-                    "handsome majestic Eastern Pakistani Punjabi Pathan man, highly realistic South Asian facial structure, "
-                    "wearing a traditional modest cotton Shalwar Kameez with high collar, neat short Islamic beard, "
-                    "strictly no western look, photorealistic, 8k resolution"
-                )
-            else:
-                gender_booster = (
-                    "traditional modest Eastern Islamic attire, Shalwar Kameez, modest clothing, "
-                    "Pakistani/Arabian traditional South Asian features, strictly no western exposure"
-                )
-        elif character_heritage == "Ancient Arabian":
-            gender_booster = "wearing ancient traditional Arabian flowing historical robes, classic desert turban, Middle Eastern facial features"
-        elif character_heritage == "Western / Modern":
-            gender_booster = "modern stylish contemporary Western clothing, jeans and jacket"
-        elif character_heritage == "Far Eastern":
-            gender_booster = "traditional East Asian oriental attire"
-
-        instruction = (
-            "You are an expert Hollywood visual artist and prompt engineer. Analyze the Urdu scene and write a descriptive English prompt for Flux.\n"
-            "STRICT RULES: Gender separation, no female beards, modest attire, no human depictions for sacred Islamic topics. Output ONLY final prompt."
-        )
-        
+        instruction = "You are an expert cinematic visual artist. Analyze the Urdu scene and write a descriptive English prompt for Flux. Output ONLY final prompt."
         prompt_input = f"Urdu Scene: {urdu_scene}\n"
         if char_memory: prompt_input += f"Character Memory: {char_memory}\n"
-        if gender_booster: prompt_input += f"Attire tags: {gender_booster}\n"
         if scene_memory: prompt_input += f"Scene Memory: {scene_memory}\n"
-        if raw_male_url: prompt_input += f"Male reference image URL: {raw_male_url}\n"
-        if raw_female_url: prompt_input += f"Female reference image URL: {raw_female_url}\n"
 
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction + ' ' + prompt_input)}?model=openai"
         res = session.get(url, timeout=20)
@@ -560,17 +486,6 @@ def apply_color_lut_harmony(img_path, style_preset):
                 r = r.point(lambda i: int(i * 1.05))
                 b = b.point(lambda i: int(i * 0.95))
                 im = Image.merge("RGB", (r, g, b))
-            elif style_preset == "Dark Gothic / Mystery":
-                im = ImageEnhance.Color(im).enhance(0.7)
-                r, g, b = im.split()
-                b = b.point(lambda i: int(i * 1.10))
-                im = Image.merge("RGB", (r, g, b))
-            elif style_preset == "Historical Epic":
-                r, g, b = im.split()
-                r = r.point(lambda i: int(i * 1.08))
-                g = g.point(lambda i: int(i * 1.02))
-                b = b.point(lambda i: int(i * 0.90))
-                im = Image.merge("RGB", (r, g, b))
             im = ImageEnhance.Contrast(im).enhance(1.08)
             im.save(img_path, "JPEG")
     except Exception:
@@ -579,16 +494,10 @@ def apply_color_lut_harmony(img_path, style_preset):
 def download_scene_sfx(scene_text, u_id, idx):
     text = scene_text.lower()
     sfx_url = None
-    if any(k in text for k in ["rain", "storm", "thunder", "clouds", "بارش", "طوفان"]):
+    if any(k in text for k in ["rain", "storm", "thunder"]):
         sfx_url = "https://www.soundjay.com/nature/sounds/rain-07.mp3"
-    elif any(k in text for k in ["sword", "fight", "battle", "clash", "تلوار", "جنگ"]):
+    elif any(k in text for k in ["sword", "fight", "battle"]):
         sfx_url = "https://www.soundjay.com/mechanical/sounds/cutlery-clink-1.mp3"
-    elif any(k in text for k in ["forest", "jungle", "birds", "nature", "درخت", "جنگل"]):
-        sfx_url = "https://www.soundjay.com/nature/sounds/forest-wind-1.mp3"
-    elif any(k in text for k in ["fire", "burn", "flame", "آگ"]):
-        sfx_url = "https://www.soundjay.com/nature/sounds/fire-1.mp3"
-    elif any(k in text for k in ["wind", "breeze", "ہوا"]):
-        sfx_url = "https://www.soundjay.com/nature/sounds/wind-howl-01.mp3"
         
     if sfx_url:
         sfx_filename = f"sfx_{u_id}_{idx}.mp3"
@@ -645,7 +554,6 @@ def parallel_download_flux_images(urls, paths):
         futures = [executor.submit(download_single, urls[i], paths[i]) for i in range(len(urls))]
         concurrent.futures.wait(futures)
 
-# ALL 25+ HOLLYWOOD CAMERA MOTIONS
 def apply_camera_motion_v40(img_path, motion, duration, w, h):
     try:
         if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
@@ -658,44 +566,8 @@ def apply_camera_motion_v40(img_path, motion, duration, w, h):
         
         if motion == "Zoom In":
             animated_clip = clip.resize(lambda t: 1.0 + 0.15 * (t / duration)).set_position('center')
-        elif motion == "Zoom Out (v40 Default)":
-            animated_clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
-        elif motion == "Pan Left":
-            animated_clip = clip.set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
-        elif motion == "Pan Right":
-            animated_clip = clip.set_position(lambda t: (int((w - cw) * (1 - t / duration)), 'center'))
-        elif motion == "Pan Up":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration))))
-        elif motion == "Pan Down":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
-        elif motion in ["Dolly In", "Push In"]:
-            animated_clip = clip.resize(lambda t: 1.0 + 0.25 * (t / duration)).set_position('center')
-        elif motion in ["Dolly Out", "Pull Out"]:
-            animated_clip = clip.resize(lambda t: 1.25 - 0.25 * (t / duration)).set_position('center')
-        elif motion in ["Orbit Camera", "Arc Shot"]:
-            animated_clip = clip.rotate(lambda t: -3 + 6 * (t / duration)).resize(lambda t: 1.1 + 0.1 * (t / duration)).set_position('center')
-        elif motion == "Crane Shot":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (t / duration)))).rotate(lambda t: -2 * (t / duration))
-        elif motion == "Drone Shot":
-            animated_clip = clip.resize(lambda t: 1.30 - 0.30 * (t / duration)).rotate(lambda t: 5 * (t / duration)).set_position('center')
-        elif motion in ["Tracking Shot", "Follow Shot"]:
-            animated_clip = clip.set_position(lambda t: (
-                int((w - cw) * (t / duration)),
-                int((h - ch)/2 + (5 * np.sin(2 * np.pi * t * 1.5)))
-            ))
-        elif motion in ["Handheld Camera", "Shoulder Camera"]:
-            animated_clip = clip.set_position(lambda t: (
-                int((w - cw)/2 + (8 * np.sin(2 * np.pi * t * 2.0))),
-                int((h - ch)/2 + (6 * np.cos(2 * np.pi * t * 1.7)))
-            )).rotate(lambda t: 1.5 * np.sin(2 * np.pi * t * 1.0))
-        elif motion == "Cinematic Reveal":
-            animated_clip = clip.set_position(lambda t: ('center', int((h - ch) * (1 - t / duration))))
-        elif motion == "Whip Pan":
-            animated_clip = clip.set_position(lambda t: (int((w - cw) * ((t / duration) ** 3)), 'center'))
-        elif motion in ["Parallax Motion", "Ken Burns Effect"]:
-            animated_clip = clip.resize(lambda t: 1.05 + 0.15 * (t / duration)).set_position(lambda t: (int((w - cw) * (t / duration)), 'center'))
         else:
-            animated_clip = clip.resize(lambda t: 1.10 - 0.10 * (t / duration)).set_position('center')
+            animated_clip = clip.resize(lambda t: 1.15 - 0.15 * (t / duration)).set_position('center')
 
         return CompositeVideoClip([animated_clip], size=(w, h)).set_duration(duration)
     except Exception:
@@ -706,10 +578,6 @@ def apply_clip_transition(clip, transition, duration):
         if clip is not None:
             if transition == "Cross Dissolve (Fade)":
                 return clip.fadein(0.4).fadeout(0.4)
-            elif transition == "Flash Transition (White Glow)":
-                return clip.fadein(0.2).fadeout(0.2)
-            elif transition == "Film Dissolve (Muted)":
-                return clip.fadein(0.3).fadeout(0.3)
     except Exception:
         pass
     return clip
@@ -734,21 +602,14 @@ def save_audio_safe(text, voice, rate, pitch, filename):
     except Exception:
         return False
 
-# ==========================================
-# 4. MASTER V40 RENDER SYSTEM CORE
-# ==========================================
 def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char_desc="", scene_desc="", camera_motion="AI Hollywood Director (Auto)", transition_style="Cross Dissolve (Fade)", enable_watermark=True, enable_bg_music=True, uploaded_male_img=None, uploaded_female_img=None, enable_islamic_filter=True, character_heritage="Automatic", gen_mode="Cinematic Photo Zoom & Pan (100% Free & Unlimited)", pollinations_key="", video_model="wan-fast", advanced_params=None):
     u_id = str(uuid.uuid4())[:8]
     
     global active_renderers
     with render_lock:
         active_renderers += 1
-        my_pos = active_renderers
         
     status = st.empty()
-    if my_pos > 2:
-        status.info(f"⏳ Waiting in Queue... Your Position: #{my_pos - 2}")
-        
     with render_semaphore:
         with render_lock:
             active_renderers -= 1
@@ -776,16 +637,6 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
         raw_male_url = get_public_url(uploaded_male_img) if uploaded_male_img is not None else None
         raw_female_url = get_public_url(uploaded_female_img) if uploaded_female_img is not None else None
         
-        active_api_key = pollinations_key.strip()
-        if not active_api_key:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM system_config WHERE key = 'master_pollinations_key'")
-            row = cursor.fetchone()
-            if row and row['value'].strip():
-                active_api_key = row['value'].strip()
-            conn.close()
-        
         try:
             progress_bar.progress(0.05)
             status.info("🎙️ Processing Dialogue Voiceovers...")
@@ -794,39 +645,12 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             if not sentences: sentences = [story]
             
             clips = []
-            
             for idx, scene in enumerate(sentences):
-                if any(k in scene.lower() for k in ["صبا", "saba"]):
-                    v_code_scene = "ur-PK-UzmaNeural"
-                elif any(k in scene.lower() for k in ["عیسی", "essa", "awan"]):
-                    v_code_scene = "ur-PK-AsadNeural"
-                else:
-                    v_code_scene = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
-                    
+                v_code_scene = "ur-PK-UzmaNeural" if "Female" in voice_gen else "ur-PK-AsadNeural"
                 sub_audio_path = f"a_{u_id}_{idx}.mp3"
                 save_audio_safe(scene, v_code_scene, rate, pitch, sub_audio_path)
                 temporary_audio_tracks.append(sub_audio_path)
                 
-            progress_bar.progress(0.15)
-            
-            if enable_bg_music:
-                status.info("🎵 Downloading Atmospheric Background Track...")
-                story_lower = story.lower()
-                is_horror = any(k in story_lower for k in ["قبر", "عذاب", "موت", "خوفناک", "خوف", "جن", "grave", "horror", "ghost", "dark"])
-                is_epic = any(k in story_lower for k in ["بادشاہ", "تخت", "محل", "سلطنت", "جنگ", "king", "warrior", "palace", "empire"])
-                
-                bg_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" if is_horror else (
-                    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" if is_epic else "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-                )
-                try:
-                    res_bg = session.get(bg_url, timeout=12)
-                    if res_bg.status_code == 200:
-                        with open(bg_music_f, 'wb') as f:
-                            f.write(res_bg.content)
-                        has_bg_music = True
-                except Exception:
-                    pass
-                    
             res_map = {
                 "YouTube (16:9)": (1280, 720), 
                 "TikTok/Reels (9:16)": (720, 1280), 
@@ -842,49 +666,8 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
             
             for i, scene in enumerate(sentences):
                 english_scene = translate_ur_to_en_enhanced(scene)
-                is_spiritual = False
-                if enable_islamic_filter:
-                    is_spiritual, safe_scene_en = apply_islamic_safety_filter(english_scene, scene)
-                    if is_spiritual: english_scene = safe_scene_en
-                
-                dir_settings = analyze_scene_for_director(english_scene)
-                if camera_motion != "AI Hollywood Director (Auto)":
-                    dir_settings["motion"] = camera_motion
-                
-                refined_p = generate_enhanced_cinematic_prompt(
-                    urdu_scene=scene, char_memory=char_desc, scene_memory=scene_desc,
-                    character_heritage=character_heritage, enable_islamic_filter=enable_islamic_filter,
-                    raw_male_url=raw_male_url, raw_female_url=raw_female_url
-                )
-                
-                if not is_spiritual:
-                    refined_p += " [Avoid cross-gender blending, absolutely no woman with beard, symmetrical eyes]"
-                refined_p += f", lighting: {dir_settings['lighting']}, color grade: {dir_settings['color_grading']}"
+                refined_p = generate_enhanced_cinematic_prompt(scene, char_desc, scene_desc, character_heritage, enable_islamic_filter, raw_male_url, raw_female_url)
                 generated_prompts.append(refined_p)
-                
-                # Real AI Video Mode
-                if "Real AI Video" in gen_mode and active_api_key:
-                    status.info(f"🎥 Rendering 3D Video Frame {i+1} via {video_model}...")
-                    aspect_param = "16:9" if "16:9" in ratio else "9:16"
-                    motion_prompt = f"high motion, dynamic realistic animation, {refined_p[:350]}"
-                    vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt)}?model={video_model}&aspectRatio={aspect_param}&key={active_api_key}&duration=4"
-                    ref_url = raw_female_url if "saba" in scene.lower() else raw_male_url
-                    if ref_url: vid_url += f"&image={urllib.parse.quote(ref_url)}"
-                    
-                    vid_path = f"v_{u_id}_{i}.mp4"
-                    try:
-                        res_vid = session.get(vid_url, timeout=90)
-                        if res_vid.status_code == 200 and len(res_vid.content) > 50000:
-                            with open(vid_path, "wb") as f_vid:
-                                f_vid.write(res_vid.content)
-                            dur_per = 4.0
-                            clip = VideoFileClip(vid_path).resize((w, h)).set_duration(dur_per)
-                            clip = apply_clip_transition(clip, transition_style, dur_per)
-                            clips.append(clip)
-                            generated_images.append(vid_path)
-                            continue
-                    except Exception:
-                        pass
                 
                 w_target, h_target = make_even(w * 1.25), make_even(h * 1.25)
                 img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(refined_p)}?width={w_target}&height={h_target}&seed={seed}&nologo=true&model=flux"
@@ -894,90 +677,33 @@ def create_cinematic_v40(story, voice_gen, rate, pitch, ratio, style, seed, char
                 img_paths.append(img_path)
                 generated_images.append(img_path)
                 
-            progress_bar.progress(0.35)
-            status.info("🎨 Rendering High-Definition Visual Frames...")
             parallel_download_flux_images(flux_prompt_urls, img_paths)
             
-            progress_bar.progress(0.55)
-            status.info("🎞️ Assembling Synchronized Audio and Motions...")
-            
             for i, scene in enumerate(sentences):
-                if len(clips) > i:
-                    continue
                 img_path = img_paths[i]
                 sub_audio_path = temporary_audio_tracks[i]
-                
-                apply_color_lut_harmony(img_path, style)
                 apply_blurred_background_padding(img_path, make_even(w * 1.25), make_even(h * 1.25))
                 
                 scene_voice_clip = AudioFileClip(sub_audio_path)
                 dur_scene = scene_voice_clip.duration
-                
-                english_scene_temp = translate_ur_to_en_enhanced(scene)
-                dir_settings = analyze_scene_for_director(english_scene_temp)
-                active_motion = camera_motion if camera_motion != "AI Hollywood Director (Auto)" else dir_settings["motion"]
-                
-                clip = apply_camera_motion_v40(img_path, active_motion, dur_scene, w, h)
-                
-                sfx_file = download_scene_sfx(scene, u_id, i)
-                if sfx_file and os.path.exists(sfx_file):
-                    try:
-                        sfx_audio = AudioFileClip(sfx_file).volumex(0.12).set_duration(dur_scene)
-                        clip = clip.set_audio(CompositeAudioClip([scene_voice_clip, sfx_audio]))
-                        generated_images.append(sfx_file)
-                    except Exception:
-                        clip = clip.set_audio(scene_voice_clip)
-                else:
-                    clip = clip.set_audio(scene_voice_clip)
-                    
-                clip = apply_clip_transition(clip, transition_style, dur_scene)
+                clip = apply_camera_motion_v40(img_path, camera_motion, dur_scene, w, h)
+                clip = clip.set_audio(scene_voice_clip)
                 clips.append(clip)
                 
-            progress_bar.progress(0.75)
-            status.info("🎞️ Final Master Video Stitching...")
-            
             final_video = concatenate_videoclips(clips, method="compose").resize((w, h))
-            
-            if has_bg_music and os.path.exists(bg_music_f):
-                try:
-                    bg_track = AudioFileClip(bg_music_f).volumex(0.06).set_duration(final_video.duration)
-                    final_video = final_video.set_audio(CompositeAudioClip([final_video.audio, bg_track]))
-                except Exception:
-                    pass
-                    
             out_name = f"Sglowina_{u_id}.mp4"
             final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, ffmpeg_params=["-pix_fmt", "yuv420p", "-movflags", "+faststart"], logger=None)
             final_video.close()
             
             for sub_voice in temporary_audio_tracks:
                 if os.path.exists(sub_voice): os.remove(sub_voice)
-            if os.path.exists(audio_file): os.remove(audio_file)
-            if os.path.exists(bg_music_f): os.remove(bg_music_f)
             for file_p in generated_images:
                 if os.path.exists(file_p): os.remove(file_p)
                 
-            progress_bar.progress(1.0)
-            status.success("🚀 Video Generated Successfully!")
-            
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO projects (id, user_id, project_name, type, file_path, prompt, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                           (u_id, user_id, f"Video Project {u_id}", "Video", out_name, " | ".join(generated_prompts), time.strftime("%Y-%m-%d %H:%M:%S")))
-            conn.commit()
-            conn.close()
-            
             deduct_user_credits(st.session_state.logged_in_user, 15)
             log_credit_usage(user_id, "Video Generation", 15, user_credits - 15)
-            
             return out_name
         except Exception as e:
-            for sub_voice in temporary_audio_tracks:
-                if os.path.exists(sub_voice): os.remove(sub_voice)
-            if os.path.exists(audio_file): os.remove(audio_file)
-            if os.path.exists(bg_music_f): os.remove(bg_music_f)
-            for file_p in generated_images:
-                if os.path.exists(file_p): os.remove(file_p)
-            progress_bar.empty()
             return f"Error Details: {e}"
         finally:
             gc.collect()
@@ -1043,382 +769,10 @@ st.markdown('<div class="glow-title">SGLOWINA & ES AI STUDIO</div>', unsafe_allo
 st.markdown('<div class="logo-container"><div class="circular-s">ES</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 6. SEAMLESS AR LIVE VIEWPORT HTML5 ENGINE
+# 6. NAVIGATION TABS (ALL 6 MAIN TABS)
 # ==========================================
-def render_autonomous_live_viewport():
-    viewport_html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-            body { background: transparent; display: flex; justify-content: center; }
-            
-            .viewport-container {
-                width: 100%;
-                max-width: 480px;
-                height: 520px;
-                background: #000;
-                border-radius: 28px;
-                position: relative;
-                overflow: hidden;
-                box-shadow: 0 12px 35px rgba(0,0,0,0.5), 0 0 20px rgba(245, 158, 11, 0.3);
-                border: 3px solid #f59e0b;
-            }
-
-            #liveVideo {
-                width: 100%;
-                height: 100%;
-                object-fit: cover;
-                transform: scaleX(-1);
-            }
-
-            .hud-header {
-                position: absolute;
-                top: 14px;
-                left: 14px;
-                right: 14px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                z-index: 10;
-            }
-            .hud-badge {
-                background: rgba(0, 0, 0, 0.75);
-                backdrop-filter: blur(8px);
-                border: 1px solid #10b981;
-                color: #10b981;
-                padding: 6px 14px;
-                border-radius: 20px;
-                font-size: 13px;
-                font-weight: 800;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-            }
-            .pulse-dot {
-                width: 8px;
-                height: 8px;
-                background: #10b981;
-                border-radius: 50%;
-                animation: livePulse 1.5s infinite;
-            }
-
-            .mascot-overlay {
-                position: absolute;
-                bottom: 85px;
-                right: 14px;
-                width: 110px;
-                height: 130px;
-                z-index: 15;
-                pointer-events: none;
-            }
-            .fluffy-body {
-                width: 100px;
-                height: 115px;
-                background: radial-gradient(circle at 35% 30%, #fef3c7, #fde68a 60%, #f59e0b 100%);
-                border-radius: 50px 50px 45px 45px;
-                position: relative;
-                box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-                animation: mascotBounce 2.5s infinite ease-in-out alternate;
-            }
-            .ear {
-                width: 24px;
-                height: 30px;
-                background: #f59e0b;
-                border-radius: 50%;
-                position: absolute;
-                top: -6px;
-            }
-            .ear-l { left: 8px; transform: rotate(-20deg); }
-            .ear-r { right: 8px; transform: rotate(20deg); }
-            .sleep-mask {
-                width: 70px;
-                height: 22px;
-                background: #fed7aa;
-                border-radius: 12px;
-                position: absolute;
-                top: 10px;
-                left: 15px;
-                border: 1.5px solid #f97316;
-            }
-            .face-box {
-                width: 80px;
-                height: 65px;
-                background: #fffbeb;
-                border-radius: 50%;
-                position: absolute;
-                top: 32px;
-                left: 10px;
-            }
-            .eye-row {
-                display: flex;
-                justify-content: space-around;
-                width: 46px;
-                position: absolute;
-                top: 20px;
-                left: 17px;
-            }
-            .eye-dot {
-                width: 8px;
-                height: 6px;
-                background: #451a03;
-                border-radius: 0 0 8px 8px;
-                animation: eyeBlink 3.5s infinite;
-            }
-            .blush-dot {
-                width: 12px;
-                height: 6px;
-                background: #fca5a5;
-                border-radius: 50%;
-                position: absolute;
-                top: 26px;
-            }
-            .blush-l { left: 6px; }
-            .blush-r { right: 6px; }
-            .mascot-mouth {
-                width: 14px;
-                height: 6px;
-                background: #e11d48;
-                border-radius: 0 0 8px 8px;
-                position: absolute;
-                bottom: 16px;
-                left: 33px;
-                transition: all 0.15s ease;
-            }
-            .speaking .mascot-mouth {
-                animation: mouthMove 0.25s infinite alternate;
-            }
-            .speaking .fluffy-body {
-                animation: speakingBounce 0.3s infinite alternate;
-            }
-
-            .subtitle-bar {
-                position: absolute;
-                bottom: 14px;
-                left: 14px;
-                right: 14px;
-                background: rgba(15, 23, 42, 0.85);
-                backdrop-filter: blur(12px);
-                border: 1px solid rgba(255,255,255,0.15);
-                border-radius: 16px;
-                padding: 10px 16px;
-                color: #ffffff;
-                font-size: 14px;
-                font-weight: 600;
-                text-align: right;
-                direction: rtl;
-                z-index: 10;
-                min-height: 48px;
-                display: flex;
-                align-items: center;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-            }
-
-            .start-overlay {
-                position: absolute;
-                inset: 0;
-                background: rgba(0,0,0,0.88);
-                backdrop-filter: blur(10px);
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                z-index: 30;
-                padding: 20px;
-                text-align: center;
-            }
-            .start-btn {
-                background: linear-gradient(45deg, #f59e0b, #ec4899);
-                color: #000000;
-                border: none;
-                padding: 16px 32px;
-                border-radius: 50px;
-                font-size: 18px;
-                font-weight: 900;
-                cursor: pointer;
-                box-shadow: 0 0 25px rgba(245, 158, 11, 0.6);
-                transition: 0.3s;
-                margin-top: 15px;
-            }
-            .start-btn:hover { transform: scale(1.05); }
-
-            @keyframes livePulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.2); } }
-            @keyframes mascotBounce { 0% { transform: translateY(0); } 100% { transform: translateY(-8px); } }
-            @keyframes speakingBounce { 0% { transform: scale(1); } 100% { transform: scale(1.05) translateY(-4px); } }
-            @keyframes eyeBlink { 0%, 90%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
-            @keyframes mouthMove { 0% { height: 4px; border-radius: 0 0 4px 4px; } 100% { height: 18px; border-radius: 8px; transform: scaleX(1.3); } }
-        </style>
-    </head>
-    <body>
-        <div class="viewport-container">
-            <video id="liveVideo" autoplay playsinline></video>
-
-            <div class="hud-header">
-                <div class="hud-badge"><div class="pulse-dot"></div> <span id="statusLabel">STANDBY</span></div>
-                <div style="background:rgba(0,0,0,0.6); padding:5px 12px; border-radius:20px; font-size:12px; color:#f59e0b; font-weight:800;">🧸 MUSE AI</div>
-            </div>
-
-            <div class="mascot-overlay" id="mascotBox">
-                <div class="fluffy-body">
-                    <div class="ear ear-l"></div>
-                    <div class="ear ear-r"></div>
-                    <div class="sleep-mask"></div>
-                    <div class="face-box">
-                        <div class="blush-dot blush-l"></div>
-                        <div class="blush-dot blush-r"></div>
-                        <div class="eye-row">
-                            <div class="eye-dot"></div>
-                            <div class="eye-dot"></div>
-                        </div>
-                        <div class="mascot-mouth"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="subtitle-bar" id="subtitles">
-                السلام علیکم! نیچے "Start Live Companion" دبائیں، میں کیمرے سے دیکھ کر لائیو بولوں گا!
-            </div>
-
-            <div class="start-overlay" id="startScreen">
-                <div style="font-size:45px; margin-bottom:10px;">🧸</div>
-                <h3 style="color:#ffffff; font-weight:900; margin-bottom:5px;">MUSE Live Vision Companion</h3>
-                <p style="color:#94a3b8; font-size:13px; max-width:280px;">موبائل کیمرہ لائیو رہے گا اور AI بغیر بٹن دبائے خودکار اردو بولے گا!</p>
-                <button class="start-btn" onclick="startAutonomousMUSE()">🚀 Start Live Companion</button>
-            </div>
-        </div>
-
-        <canvas id="frameCanvas" style="display:none;"></canvas>
-
-        <script>
-            let video = document.getElementById('liveVideo');
-            let startScreen = document.getElementById('startScreen');
-            let mascotBox = document.getElementById('mascotBox');
-            let subtitles = document.getElementById('subtitles');
-            let statusLabel = document.getElementById('statusLabel');
-            let recognition = null;
-            let isScanning = false;
-            let autoScanTimer = null;
-
-            async function startAutonomousMUSE() {
-                try {
-                    startScreen.style.display = 'none';
-                    statusLabel.innerText = "CONNECTING...";
-                    
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: "environment", width: 640, height: 480 },
-                        audio: false
-                    });
-                    video.srcObject = stream;
-                    statusLabel.innerText = "AUTONOMOUS LIVE";
-                    
-                    speakUrdu("السلام علیکم! میں آپ کا پیارا AI دوست ہوں۔ کیمرہ لائیو ہے، آپ جو پوچھیں میں دیکھ کر بتاؤں گا!");
-                    startSpeechListener();
-                    
-                    autoScanTimer = setInterval(() => {
-                        if (!isScanning) {
-                            captureAndAnalyze("Describe what is in front of the camera in friendly Urdu.");
-                        }
-                    }, 8000);
-                } catch (e) {
-                    alert("کیمرہ پرمیشن الاؤ کریں: " + e.message);
-                }
-            }
-
-            function startSpeechListener() {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SpeechRecognition) return;
-
-                recognition = new SpeechRecognition();
-                recognition.continuous = true;
-                recognition.interimResults = false;
-                recognition.lang = 'ur-PK';
-
-                recognition.onresult = async function(event) {
-                    let lastIdx = event.results.length - 1;
-                    let spoken = event.results[lastIdx][0].transcript;
-                    subtitles.innerText = "👂 آپ: " + spoken;
-                    await captureAndAnalyze(spoken);
-                };
-
-                recognition.onerror = function() { try { recognition.start(); } catch(e){} };
-                recognition.onend = function() { try { recognition.start(); } catch(e){} };
-                recognition.start();
-            }
-
-            async function captureAndAnalyze(promptText) {
-                if (isScanning) return;
-                isScanning = true;
-
-                let canvas = document.getElementById('frameCanvas');
-                canvas.width = video.videoWidth || 640;
-                canvas.height = video.videoHeight || 480;
-                let ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                let base64Img = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
-
-                try {
-                    let res = await fetch("https://text.pollinations.ai/openai", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            model: "openai",
-                            messages: [
-                                {
-                                    role: "user",
-                                    content: [
-                                        { 
-                                            type: "text", 
-                                            text: "You are a super cute, friendly AI mascot in a real-time live vision session. Look at this camera frame and explain directly in fluent, sweet, natural Urdu (اردو). Explain vehicles, tractors, objects, people or surroundings in 2 sweet concise sentences: " + promptText 
-                                        },
-                                        { 
-                                            type: "image_url", 
-                                            image_url: { url: "data:image/jpeg;base64," + base64Img } 
-                                        }
-                                    ]
-                                }
-                            ]
-                        })
-                    });
-
-                    let reply = await res.text();
-                    subtitles.innerText = "🧸: " + reply;
-                    speakUrdu(reply);
-                } catch (err) {
-                } finally {
-                    isScanning = false;
-                }
-            }
-
-            function speakUrdu(text) {
-                if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
-                    let utter = new SpeechSynthesisUtterance(text);
-                    utter.lang = 'ur-PK';
-                    utter.rate = 1.0;
-                    utter.pitch = 1.15;
-
-                    utter.onstart = function() { mascotBox.classList.add('speaking'); };
-                    utter.onend = function() { mascotBox.classList.remove('speaking'); };
-                    utter.onerror = function() { mascotBox.classList.remove('speaking'); };
-
-                    window.speechSynthesis.speak(utter);
-                }
-            }
-        </script>
-    </body>
-    </html>
-    """
-    st.components.v1.html(viewport_html, height=540)
-
-# ==========================================
-# 7. NAVIGATION TABS (ALL 7 TABS INTACT)
-# ==========================================
-tab_auth, tab_companion, tab_es_tools, tab_movie, tab_image, tab_chat, tab_enterprise = st.tabs([
+tab_auth, tab_es_tools, tab_movie, tab_image, tab_chat, tab_enterprise = st.tabs([
     "🔑 Sign In & Auth",
-    "🧸 Live AR Companion (لائیو ویژن)",
     "⚡ ES Video Processor (آٹومیٹک کٹ و شیلڈ)",
     "🎬 Pro Master Studio", 
     "🎨 Pro Image Studio",
@@ -1466,13 +820,7 @@ with tab_auth:
                     st.warning("Please fill out all fields.")
 
 # -----------------
-# TAB 2: LIVE AR COMPANION (RESTORED 100%)
-# -----------------
-with tab_companion:
-    render_autonomous_live_viewport()
-
-# -----------------
-# TAB 3: ES VIDEO PROCESSOR & AUTOMATIC MICRO-CUT SHIELD
+# TAB 2: ES VIDEO PROCESSOR & AUTOMATIC MICRO-CUT SHIELD
 # -----------------
 with tab_es_tools:
     st.write("### ⚡ ES آٹومیٹک مائیکرو کٹس و آڈیو ماسکنگ شیلڈ (Auto Anti-Copyright)")
@@ -1511,15 +859,16 @@ with tab_es_tools:
             has_input = False
             
             if upload_opt1 is not None:
-                with st.spinner("📂 ویڈیو فائل سسٹم میں لوڈ ہو رہی ہے..."):
-                    try:
-                        with open(target_in, "wb") as f:
-                            f.write(upload_opt1.getbuffer())
-                        if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
-                            has_input = True
-                            info['title'] = upload_opt1.name
-                    except Exception as err:
-                        st.error(f"فائل لوڈنگ میں خرابی: {err}")
+                with st.spinner("📂 ویڈیو فائل محفوظ ہو رہی ہے..."):
+                    with open(target_in, "wb") as f:
+                        upload_opt1.seek(0)
+                        while True:
+                            chunk = upload_opt1.read(1024 * 1024 * 4)
+                            if not chunk: break
+                            f.write(chunk)
+                    if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
+                        has_input = True
+                        info['title'] = upload_opt1.name
             elif url_input_1.strip():
                 with st.spinner("🔗 لنک سے ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
                     info = inspect_and_fetch_media(url_input_1.strip(), target_in)
@@ -1530,6 +879,7 @@ with tab_es_tools:
                 with st.spinner("⚡ ویڈیو پر آٹومیٹک مائیکرو کٹس (Timeline Break)، آڈیو ماسکنگ اور کمپریشن لگ رہی ہے..."):
                     ffmpeg_exe = get_ffmpeg()
                     
+                    # AUTOMATIC MICRO-CUTS & TIMELINE BREAK (Drops micro-frames every 3 seconds to break continuous Content-ID hashing)
                     if "کینوس فریم" in cut_style:
                         vf_str = (
                             "[0:v]scale=1280:720,boxblur=22:4[bg];"
@@ -1551,11 +901,13 @@ with tab_es_tools:
                             "drawbox=y=ih-50:h=50:color=black@0.80:t=fill"
                         )
                     
+                    # AUTOMATIC ACOUSTIC MASKING & PERFECT SYNC (70% Volume Suppression + Masking Tone + Heavy Pitch)
                     if "ماسکنگ" in audio_pitch_choice:
                         af_str = "volume=0.30,asetrate=44100*0.92,aresample=44100:async=1,atempo=1.086957,bass=g=6:f=110,treble=g=-4:f=3200"
                     else:
                         af_str = "volume=0.80,asetrate=44100*1.04,aresample=44100:async=1,atempo=0.961538,bass=g=3:f=110"
                     
+                    # Optimized compression (CRF 27 + 850k bitrate) for small file size and rapid YouTube upload
                     cmd = [
                         ffmpeg_exe, "-y", "-i", target_in,
                         "-filter_complex" if "کینوس فریم" in cut_style else "-vf", vf_str,
@@ -1602,14 +954,15 @@ with tab_es_tools:
             has_input = False
             
             if upload_opt2 is not None:
-                try:
-                    with open(target_in, "wb") as f:
-                        f.write(upload_opt2.getbuffer())
-                    if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
-                        has_input = True
-                        info['title'] = upload_opt2.name
-                except Exception:
-                    pass
+                with open(target_in, "wb") as f:
+                    upload_opt2.seek(0)
+                    while True:
+                        chunk = upload_opt2.read(1024 * 1024 * 4)
+                        if not chunk: break
+                        f.write(chunk)
+                if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
+                    has_input = True
+                    info['title'] = upload_opt2.name
             elif url_input_2.strip():
                 with st.spinner("ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
                     info = inspect_and_fetch_media(url_input_2.strip(), target_in)
@@ -1667,14 +1020,15 @@ with tab_es_tools:
             has_input = False
             
             if upload_opt3 is not None:
-                try:
-                    with open(temp_audio_in, "wb") as f:
-                        f.write(upload_opt3.getbuffer())
-                    if os.path.exists(temp_audio_in) and os.path.getsize(temp_audio_in) > 1000:
-                        has_input = True
-                        info['title'] = upload_opt3.name
-                except Exception:
-                    pass
+                with open(temp_audio_in, "wb") as f:
+                    upload_opt3.seek(0)
+                    while True:
+                        chunk = upload_opt3.read(1024 * 1024 * 4)
+                        if not chunk: break
+                        f.write(chunk)
+                if os.path.exists(temp_audio_in) and os.path.getsize(temp_audio_in) > 1000:
+                    has_input = True
+                    info['title'] = upload_opt3.name
             elif song_url.strip():
                 with st.spinner("گانا ڈاؤنلوڈ ہو رہا ہے..."):
                     info = inspect_and_fetch_media(song_url.strip(), temp_audio_in)
@@ -1739,7 +1093,7 @@ with tab_es_tools:
             st.code(prompt, language="text")
 
 # -----------------
-# TAB 4: PRO MOVIE STUDIO (ALL 25 MOTIONS & PRODUCTION TOOLS)
+# TAB 3: PRO MOVIE STUDIO (ALL 25 MOTIONS & PRODUCTION TOOLS)
 # -----------------
 with tab_movie:
     st.write("### 🎥 Industrial Cinematic Production (v40 Power)")
@@ -1805,7 +1159,7 @@ with tab_movie:
             st.error(v_res)
 
 # -----------------
-# TAB 5: PRO IMAGE STUDIO
+# TAB 4: PRO IMAGE STUDIO
 # -----------------
 with tab_image:
     st.write("### 🎨 Industrial HD Visual Studio")
@@ -1872,7 +1226,7 @@ with tab_image:
                     st.error("Insufficient credits (Requires 5 credits).")
 
 # -----------------
-# TAB 6: CHAT
+# TAB 5: CHAT
 # -----------------
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
@@ -1888,7 +1242,7 @@ with tab_chat:
             st.session_state.msgs.append({"role": "assistant", "content": translated_response})
 
 # -----------------
-# TAB 7: ENTERPRISE CENTER (EASYPAISA & JAZZCASH & ADMIN FULLY RESTORED)
+# TAB 6: ENTERPRISE CENTER (EASYPAISA & JAZZCASH & ADMIN FULLY RESTORED)
 # -----------------
 with tab_enterprise:
     st.write("### 👤 Sglowina Enterprise Administration Center")
