@@ -367,14 +367,14 @@ def generate_smart_metadata(info):
     if not clean_title: clean_title = raw_title
     t_lower = raw_title.lower()
     
-    if any(k in t_lower for k in ['mental', 'force', 'john', 'action', 'fight', 'movie', 'scene', 'police', 'hindi', 'bloopers']):
+    if any(k in t_lower for k in ['mental', 'force', 'john', 'action', 'fight', 'movie', 'scene', 'police', 'hindi', 'bloopers', 'ustad', 'bhagat']):
         genre = "Bollywood Action & Blockbuster Scene"
         safe_titles = [
-            f"🔥 {clean_title[:50]} | Best Action Scene (Full HD)",
-            f"⚡ Unstoppable Action Moments | {clean_title[:45]}",
-            f"😱 Most Intense Fight Scene | {clean_title[:45]}"
+            f"🔥 {clean_title[:50]} | Best Action Scene (Full HD Breakdown)",
+            f"⚡ Unstoppable Action Moments Explained | {clean_title[:40]}",
+            f"😱 Most Intense Scene Reaction | {clean_title[:40]}"
         ]
-        hashtags = "#Force2 #JohnAbraham #ActionScene #BollywoodAction #Blockbuster #ViralVideo #HindiCinema"
+        hashtags = "#MovieBreakdown #ActionMovie #BollywoodAction #Blockbuster #ViralVideo #HindiCinema #MovieReaction"
         thumb_prompt = f"Hyper-realistic 8K cinematic movie thumbnail for '{clean_title[:35]}', intense muscular hero dramatic angry face, action sparks background, 16:9."
     elif any(k in t_lower for k in ['kapil', 'comedy', 'funny', 'laugh', 'joke', 'hasna', 'standup', 'prank']):
         genre = "Comedy / Entertainment Show"
@@ -397,8 +397,8 @@ def generate_smart_metadata(info):
     else:
         genre = "Viral Video Highlight"
         safe_titles = [
-            f"🔥 {clean_title[:45]} - Full HD Climax Scene",
-            f"⚡ {clean_title[:45]} - Best Uncut Action Moments",
+            f"🔥 {clean_title[:45]} - Full HD Climax Scene Explained",
+            f"⚡ {clean_title[:45]} - Best Uncut Action Highlights",
             f"😱 The Most Dramatic Scene of {clean_title[:40]}"
         ]
         hashtags = "#ViralClip #TrendingNow #CinemaRecap #ActionHighlights #BlockbusterScene"
@@ -1091,7 +1091,7 @@ with tab_auth:
 # TAB 2: ES VIDEO PROCESSOR & 100% LIP-SYNC ANTI-COPYRIGHT ENGINE
 # -----------------
 with tab_es_tools:
-    st.write("### ⚡ ES ہالی ووڈ پرو ڈسرپشن اینٹی کاپی رائٹ شیلڈ (100% Lipsync Locked)")
+    st.write("### ⚡ ES ہالی ووڈ پرو ڈسرپشن اینٹی کاپی رائٹ شیلڈ (Extreme Content-ID Disruption)")
     st.info("💡 **پرو فارمولا ایکٹیو:** 1.8° جیو میٹرک ٹِلٹ، 70% کینوس اوورلے فریم، ٹاپ/باٹم اینٹی او سی آر شیلڈ اور ویڈیو کے ساتھ آواز کا 100% کامل سنک۔")
     
     sub_t1, sub_t2, sub_t3 = st.tabs([
@@ -1116,8 +1116,8 @@ with tab_es_tools:
                 "🎧 لوفی سلور پچ (Lo-Fi Pitch)"
             ], key="ap_t1")
         
-        upload_opt1 = st.file_uploader("📂 اپنے موبائل یا کمپیوٹر سے ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
-        url_input_1 = st.text_input("🔗 یا کسی بھی پلیٹ فارم (YouTube, TikTok, Insta, Facebook) کا نیا لنک ڈالیں:", placeholder="https://...", key="url_t1")
+        upload_opt1 = st.file_uploader("📂 اپنے موبائل یا کمپیوٹر سے ویڈیو فائل اپلوڈ کریں (سب سے محفوظ طریقہ):", type=["mp4", "mov", "mkv", "avi"], key="up_t1")
+        url_input_1 = st.text_input("🔗 یا کسی بھی پلیٹ فارم کا نیا لنک ڈالیں:", placeholder="https://...", key="url_t1")
         
         if st.button("🚀 پرو اینٹی کاپی رائٹ ڈسرپشن شیلڈ لگائیں", type="primary", key="run_t1"):
             curr_uid = str(uuid.uuid4())[:8]
@@ -1139,16 +1139,15 @@ with tab_es_tools:
                         has_input = True
                         info['title'] = upload_opt1.name
             elif url_input_1.strip():
-                with st.spinner("🔗 لنک سے تازہ ویڈیو ڈاؤنلوڈ ہو رہی ہے (Universal Multi-Platform Downloader)..."):
+                with st.spinner("🔗 لنک سے تازہ ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
                     info = inspect_and_fetch_media(url_input_1.strip(), target_in)
                     if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
                         has_input = True
                         
             if has_input:
-                with st.spinner("⚡ ویڈیو اور آڈیو کو پرفیکٹ لپ سنک (Lip-Sync) کے ساتھ پروسیس کیا جا رہا ہے..."):
+                with st.spinner("⚡ ویڈیو اور آڈیو کو پرفیکٹ لپ سنک (Lip-Sync) اور اینٹی ہیش کے ساتھ پروسیس کیا جا رہا ہے..."):
                     ffmpeg_exe = get_ffmpeg()
                     
-                    # 1.08x Speed = 0.925926 PTS
                     if "پرو ایڈیٹر" in style_choice:
                         vf_str = (
                             "[0:v]scale=1280:720,boxblur=25:5[bg];"
@@ -1170,7 +1169,6 @@ with tab_es_tools:
                             "drawbox=y=ih-55:h=55:color=black@0.75:t=fill"
                         )
                     
-                    # MATHEMATICALLY PERFECT LIP-SYNC (atempo = 1.08 / 0.92 = 1.173913)
                     if "خاموش" in audio_pitch_choice or "Heavy Ducking" in audio_pitch_choice:
                         af_str = "volume=0.35,asetrate=44100*0.92,aresample=44100:async=1,atempo=1.173913,bass=g=5:f=120,treble=g=-3:f=3500"
                     elif "لوفی" in audio_pitch_choice:
@@ -1198,12 +1196,12 @@ with tab_es_tools:
                             try: os.remove(target_in)
                             except Exception: pass
                     else:
-                        st.error("❌ ویڈیو پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم دوبارہ ٹرائی کریں۔")
+                        st.error("❌ ویڈیو پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم فائل دوبارہ اپلوڈ کریں۔")
             else:
-                st.error("❌ برائے مہربانی کوئی کام کرنے والا ویڈیو لنک یا فائل فراہم کریں۔")
+                st.error("❌ برائے مہربانی ویڈیو فائل اپلوڈ کریں یا کام کرنے والا لنک دیں۔")
 
     with sub_t2:
-        st.subheader("کسی بھی شو یا ویڈیو کا 10 منٹ کلپ نکالیں")
+        st.subheader("کسی بھی شو یا ویڈیو کا 10 منٹ کلپ نکالیں (Safe Highlight Cut)")
         c1, c2 = st.columns(2)
         with c1:
             scene_type = st.selectbox("سین کا آغاز:", ["⚔️ اہم سین / کلائمیکس (منٹ 30)", "👻 سسپنس موڑ (منٹ 45)", "🏔️ آغاز (منٹ 15)", "⏱️ کسٹم منٹ"], key="s_t2")
