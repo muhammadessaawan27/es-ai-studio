@@ -1088,11 +1088,11 @@ with tab_auth:
                     st.warning("Please fill out all fields.")
 
 # -----------------
-# TAB 2: ES VIDEO PROCESSOR & PRO DISRUPTION ENGINE
+# TAB 2: ES VIDEO PROCESSOR & 100% LIP-SYNC ANTI-COPYRIGHT ENGINE
 # -----------------
 with tab_es_tools:
-    st.write("### ⚡ ES ہالی ووڈ پرو ڈسرپشن اینٹی کاپی رائٹ شیلڈ (Guaranteed Pro Shield)")
-    st.info("💡 **پرو فارمولا ایکٹیو:** 1.8° جیو میٹرک ٹِلٹ (Geometric Tilt)، 70% کینوس اوورلے فریم، ٹاپ/باٹم اینٹی او سی آر شیلڈ، مائیکرو ڈائنامک کلر ایڈجسٹمنٹ اور 75% بیک گراؤنڈ میوزک ڈکنگ۔")
+    st.write("### ⚡ ES ہالی ووڈ پرو ڈسرپشن اینٹی کاپی رائٹ شیلڈ (100% Lipsync Locked)")
+    st.info("💡 **پرو فارمولا ایکٹیو:** 1.8° جیو میٹرک ٹِلٹ، 70% کینوس اوورلے فریم، ٹاپ/باٹم اینٹی او سی آر شیلڈ اور ویڈیو کے ساتھ آواز کا 100% کامل سنک۔")
     
     sub_t1, sub_t2, sub_t3 = st.tabs([
         "🎬 1. فل ویڈیو / مووی / ریلز موڈ",
@@ -1111,7 +1111,7 @@ with tab_es_tools:
             ], key="s_t1")
         with c_mode2:
             audio_pitch_choice = st.selectbox("آواز اور میوزک موڈیولیشن (Audio Frequency Disruption):", [
-                "🔊 بیک گراؤنڈ میوزک 75% خاموش + بھاری آواز (Heavy Ducking - 100% Safe)",
+                "🔊 بیک گراؤنڈ میوزک 75% خاموش + بھاری آواز (Heavy Ducking - 100% Lipsync Safe)",
                 "🎵 تیز اور اسمارٹ پچ شفٹ (Smart Shift 1.08x)",
                 "🎧 لوفی سلور پچ (Lo-Fi Pitch)"
             ], key="ap_t1")
@@ -1132,7 +1132,7 @@ with tab_es_tools:
                     with open(target_in, "wb") as f:
                         upload_opt1.seek(0)
                         while True:
-                            chunk = upload_opt1.read(1024 * 1024 * 4) # 4MB safe chunks
+                            chunk = upload_opt1.read(1024 * 1024 * 4)
                             if not chunk: break
                             f.write(chunk)
                     if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
@@ -1145,14 +1145,14 @@ with tab_es_tools:
                         has_input = True
                         
             if has_input:
-                with st.spinner("⚡ ویڈیو پر 1.8° ٹِلٹ، کینوس فریم، 1.08x اسپیڈ اور بی جی ایم ڈکنگ لگ رہی ہے..."):
+                with st.spinner("⚡ ویڈیو اور آڈیو کو پرفیکٹ لپ سنک (Lip-Sync) کے ساتھ پروسیس کیا جا رہا ہے..."):
                     ffmpeg_exe = get_ffmpeg()
                     
-                    # ROCK SOLID FFMPEG FILTER (100% Guaranteed Non-Crashing)
+                    # 1.08x Speed = 0.925926 PTS
                     if "پرو ایڈیٹر" in style_choice:
                         vf_str = (
                             "[0:v]scale=1280:720,boxblur=25:5[bg];"
-                            "[0:v]setpts=0.925*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
+                            "[0:v]setpts=0.925926*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
                             "hflip,crop=iw*0.82:ih*0.82,scale=980:552,"
                             "eq=contrast=1.16:saturation=1.22:brightness=0.02,"
                             "noise=alls=8:allf=t+u,vignette=PI/3.5[fg];"
@@ -1162,7 +1162,7 @@ with tab_es_tools:
                         )
                     else:
                         vf_str = (
-                            "setpts=0.925*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
+                            "setpts=0.925926*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,"
                             "hflip,crop=iw*0.80:ih*0.80,scale=1280:720,"
                             "eq=contrast=1.16:saturation=1.22:brightness=0.02,"
                             "noise=alls=8:allf=t+u,vignette=PI/3.5,"
@@ -1170,12 +1170,13 @@ with tab_es_tools:
                             "drawbox=y=ih-55:h=55:color=black@0.75:t=fill"
                         )
                     
+                    # MATHEMATICALLY PERFECT LIP-SYNC (atempo = 1.08 / 0.92 = 1.173913)
                     if "خاموش" in audio_pitch_choice or "Heavy Ducking" in audio_pitch_choice:
-                        af_str = "volume=0.35,atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=5:f=120,treble=g=-3:f=3500"
+                        af_str = "volume=0.35,asetrate=44100*0.92,aresample=44100:async=1,atempo=1.173913,bass=g=5:f=120,treble=g=-3:f=3500"
                     elif "لوفی" in audio_pitch_choice:
-                        af_str = "atempo=0.92,asetrate=44100*0.90,aresample=44100,bass=g=6:f=110,aecho=0.8:0.88:50:0.35"
+                        af_str = "asetrate=44100*0.90,aresample=44100:async=1,atempo=1.20,bass=g=6:f=110,aecho=0.8:0.88:50:0.35"
                     else:
-                        af_str = "volume=0.85,atempo=1.08,asetrate=44100*1.05,aresample=44100,bass=g=3:f=110"
+                        af_str = "volume=0.85,asetrate=44100*1.05,aresample=44100:async=1,atempo=1.028571,bass=g=3:f=110"
                     
                     cmd = [
                         ffmpeg_exe, "-y", "-i", target_in,
@@ -1184,7 +1185,7 @@ with tab_es_tools:
                         "-r", "25",
                         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
                         "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-                        "-c:a", "aac", "-b:a", "128k", target_out
+                        "-c:a", "aac", "-b:a", "128k", "-shortest", target_out
                     ]
                     
                     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -1197,7 +1198,7 @@ with tab_es_tools:
                             try: os.remove(target_in)
                             except Exception: pass
                     else:
-                        st.error("❌ ویڈیو پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم ویڈیو کو کٹ موڈ میں ٹرائی کریں۔")
+                        st.error("❌ ویڈیو پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم دوبارہ ٹرائی کریں۔")
             else:
                 st.error("❌ برائے مہربانی کوئی کام کرنے والا ویڈیو لنک یا فائل فراہم کریں۔")
 
@@ -1238,12 +1239,12 @@ with tab_es_tools:
                         has_input = True
 
             if has_input:
-                with st.spinner("کلپ کٹ کر کے 1.8° ٹِلٹ اور پرو شیلڈ لگ رہی ہے..."):
+                with st.spinner("کلپ کٹ کر کے 100% پرفیکٹ سنک اور پرو شیلڈ لگ رہی ہے..."):
                     ffmpeg_exe = get_ffmpeg()
                     start_sec = start_min * 60
                     dur_sec = clip_len * 60
-                    vf = "setpts=0.925*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,hflip,crop=iw*0.82:ih*0.82,scale=1280:720,eq=contrast=1.16:saturation=1.22:brightness=0.02,noise=alls=8:allf=t+u,vignette=PI/3.5,drawbox=y=0:h=45:color=black@0.65:t=fill,drawbox=y=ih-55:h=55:color=black@0.75:t=fill"
-                    af = "volume=0.45,atempo=1.08,asetrate=44100*0.92,aresample=44100,bass=g=5:f=120"
+                    vf = "setpts=0.925926*PTS,rotate=1.8*PI/180:ow=iw:oh=ih:c=black,hflip,crop=iw*0.82:ih*0.82,scale=1280:720,eq=contrast=1.16:saturation=1.22:brightness=0.02,noise=alls=8:allf=t+u,vignette=PI/3.5,drawbox=y=0:h=45:color=black@0.65:t=fill,drawbox=y=ih-55:h=55:color=black@0.75:t=fill"
+                    af = "volume=0.45,asetrate=44100*0.92,aresample=44100:async=1,atempo=1.173913,bass=g=5:f=120"
                     
                     cmd = [
                         ffmpeg_exe, "-y", "-ss", str(start_sec), "-t", str(dur_sec),
@@ -1251,7 +1252,7 @@ with tab_es_tools:
                         "-r", "25",
                         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
                         "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-                        "-c:a", "aac", "-b:a", "128k", target_out
+                        "-c:a", "aac", "-b:a", "128k", "-shortest", target_out
                     ]
                     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
@@ -1331,7 +1332,7 @@ with tab_es_tools:
     active_out = st.session_state.current_output_video
     if st.session_state.process_ready and active_out and os.path.exists(active_out) and os.path.getsize(active_out) > 5000:
         st.divider()
-        st.success("🎉 ویڈیو اینٹی کاپی رائٹ شیلڈ کے ساتھ کامیابی سے تیار ہے:")
+        st.success("🎉 ویڈیو اینٹی کاپی رائٹ شیلڈ اور پرفیکٹ ڈبنگ کے ساتھ تیار ہے:")
         
         video_bytes = open(active_out, 'rb').read()
         st.video(video_bytes)
