@@ -28,7 +28,7 @@ except ImportError:
 # ==========================================
 # STREAMLIT COMPACT CONFIGURATION
 # ==========================================
-st.set_page_config(page_title="ES Ultra 26-Shield Pure Full-Screen Studio", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="ES Ultra 1/10th Frame Drop & Scene Shuffler Studio", layout="wide", page_icon="⚡")
 
 if "process_ready" not in st.session_state:
     st.session_state.process_ready = False
@@ -223,8 +223,8 @@ st.markdown("""
 
 st.markdown("""
 <div class="compact-header">
-    <div class="compact-title">⚡ ES ULTRA 26-SHIELD PURE FULL-SCREEN STUDIO</div>
-    <div class="badge">100% PURE 9:16 FULL-SCREEN SHORTS</div>
+    <div class="compact-title">⚡ ES ULTRA 1/10th FRAME DROP & SCENE SHUFFLER STUDIO</div>
+    <div class="badge">10% FRAME CHOP + SCENE SHUFFLER ACTIVE</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -232,34 +232,37 @@ st.markdown("""
 # NAVIGATION TABS
 # ==========================================
 tab_shield, tab_shorts, tab_clip, tab_lofi, tab_movie, tab_image = st.tabs([
-    "🛡️ 1. فل اینٹی کاپی رائٹ شیلڈ (26 ہتھیار + شفلر)",
-    "📱 2. پیور فل اسکرین 9:16 شارٹس (100% Full-Screen 9:16)",
+    "🛡️ 1. فل مووی شفلر (ہر سیکنڈ 1/10واں کٹ + شفلنگ)",
+    "📱 2. پیور فل اسکرین 9:16 شارٹس (1/10واں کٹ)",
     "⚔️ 3. کلپ کٹر موڈ (10 تا 20 منٹ کٹ)",
     "🎧 4. اینٹی کاپی رائٹ لوفی و گانے (Slowed + Reverb)",
-    "🎬 5. پرو AI مووی اسٹوڈیو (Unlimited)",
-    "🎨 6. پرو AI امیج اسٹوڈیو (Unlimited)"
+    "🎬 5. پرو AI مووی اسٹوڈیو",
+    "🎨 6. پرو AI امیج اسٹوڈیو"
 ])
 
 # -----------------
-# TAB 1: 26-LAYER FULL ANTI-COPYRIGHT SHIELD & SHUFFLER
+# TAB 1: 1/10th FRAME DROP FULL SHIELD & SCENE SHUFFLER
 # -----------------
 with tab_shield:
+    st.write("### 🛡️ فل مووی شفلر (ہر سیکنڈ کا 10واں حصہ کٹ + سین شفلنگ)")
+    st.info("💡 **پرو فارمولا فعال:** ہر سیکنڈ کے 10 فریمز میں سے 1 فریم مستقل اڑا دیا جائے گا، شروع کے لوگو کٹ جائیں گے اور سینز کی ترتیب خودکار بدل کر کرسٹل کلیئر ڈبنگ لگائی جائے گی!")
+    
     c1, c2 = st.columns(2)
     with c1:
-        shield_mode = st.selectbox("اینٹی کاپی رائٹ شیلڈ اسٹائل:", [
-            "🛡️ 26 ہتھیار: لوگو کٹ + سین شفل + 0.75s کٹ + اسپیڈ وارپ (100% محفوظ)",
-            "⚡ الٹرا فاسٹ کٹ + اسپیڈ وارپ + لیٹرباکس"
+        shield_mode = st.selectbox("شیلڈ اسٹائل:", [
+            "🛡️ فل شفلر: لوگو کٹ + سین شفل + ہر سیکنڈ 1/10واں فریم کٹ (100% تجویز کردہ)",
+            "⚡ لکیری موڈ: لوگو کٹ + ہر سیکنڈ 1/10واں فریم کٹ + اسپیڈ وارپ"
         ], key="sm_t1")
     with c2:
         voice_quality = st.selectbox("ڈبنگ اور آواز کی کوالٹی:", [
-            "🔊 کرسٹل کلیئر بیریٹون ڈبنگ + ہارمونک ایکوسٹک شیلڈ (صاف و واضح)",
-            "🎵 میڈیم پچ شفٹ (Medium Thick)"
+            "🔊 کرسٹل کلیئر بیریٹون ڈبنگ + ایکوسٹک شیلڈ (صاف و واضح آواز)",
+            "🎵 نیچرل اسمارٹ پچ (Natural Clear Voice)"
         ], key="am_t1")
 
     up_file = st.file_uploader("📂 ویڈیو فائل منتخب کریں (فوری واٹس ایپ اسپیڈ لوڈ):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_main")
     url_input = st.text_input("🔗 یا یوٹیوب کا لنک یہاں ڈالیں:", placeholder="https://www.youtube.com/watch?v=...", key="url_main")
 
-    if st.button("🚀 26 اینٹی کاپی رائٹ شیلڈز لگائیں اور ویڈیو تیار کریں", type="primary", key="btn_main"):
+    if st.button("🚀 ہر سیکنڈ 1/10واں کٹ اور سین شفل کر کے ویڈیو تیار کریں", type="primary", key="btn_main"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"in_vid_{uid}.mp4"
         target_out = f"es_turbo_{uid}.mp4"
@@ -284,13 +287,17 @@ with tab_shield:
             total_dur = get_video_duration_fast(target_in)
             ffmpeg_exe = get_ffmpeg()
 
-            with st.spinner("⚡ تمام 26 اینٹی کاپی رائٹ شیلڈز، لوگو اسٹرپنگ اور ڈبنگ لگائی جا رہی ہے..."):
+            with st.spinner("⚡ ہر سیکنڈ کے 10ویں حصے کو کاٹ کر سینز کی ترتیب بدلی جا رہی ہے..."):
+                # AUDIO DE-RUMBLE + CRISP BARITONE PITCH
                 if "کرسٹل کلیئر" in voice_quality:
                     af_clear = "highpass=f=75,lowpass=f=8200,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
                 else:
                     af_clear = "volume=0.75,asetrate=44100*0.94,aresample=44100,atempo=1.14,bass=g=4:f=110"
 
-                if "سین شفل" in shield_mode:
+                # 1/10th FRAME DROP FORMULA: select='mod(n,10)<9' drops index 9 out of every 10 frames (drops exactly 10% frames every second)
+                vf_10th_drop = "select='mod(n\\,10)<9',setpts=0.90*N/(24*TB),hflip,crop=iw*0.82:ih*0.82,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=40:color=black@0.75:t=fill,drawbox=y=ih-48:h=48:color=black@0.85:t=fill"
+
+                if "فل شفلر" in shield_mode:
                     p1_start = max(8.0, total_dur * 0.65)
                     p1_dur = min(45.0, total_dur * 0.20)
                     p2_start = max(8.0, total_dur * 0.10)
@@ -299,11 +306,10 @@ with tab_shield:
                     p3_dur = min(45.0, total_dur * 0.25)
 
                     f1, f2, f3, list_file = f"part1_{uid}.mp4", f"part2_{uid}.mp4", f"part3_{uid}.mp4", f"list_{uid}.txt"
-                    vf_clean = "select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),hflip,crop=iw*0.82:ih*0.82,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=40:color=black@0.75:t=fill,drawbox=y=ih-48:h=48:color=black@0.85:t=fill"
 
-                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-ss", str(p1_start), "-t", str(p1_dur), "-i", target_in, "-map_metadata", "-1", "-vf", vf_clean, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f1], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-ss", str(p2_start), "-t", str(p2_dur), "-i", target_in, "-map_metadata", "-1", "-vf", vf_clean, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f2], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-ss", str(p3_start), "-t", str(p3_dur), "-i", target_in, "-map_metadata", "-1", "-vf", vf_clean, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f3], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-ss", str(p1_start), "-t", str(p1_dur), "-i", target_in, "-map_metadata", "-1", "-vf", vf_10th_drop, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f1], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-ss", str(p2_start), "-t", str(p2_dur), "-i", target_in, "-map_metadata", "-1", "-vf", vf_10th_drop, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f2], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-ss", str(p3_start), "-t", str(p3_dur), "-i", target_in, "-map_metadata", "-1", "-vf", vf_10th_drop, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f3], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
                     with open(list_file, "w") as lf:
                         lf.write(f"file '{f1}'\nfile '{f2}'\nfile '{f3}'\n")
@@ -316,10 +322,9 @@ with tab_shield:
                             try: os.remove(temp_f)
                             except Exception: pass
                 else:
-                    vf_str = "select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),hflip,crop=iw*0.82:ih*0.82,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=40:color=black@0.75:t=fill,drawbox=y=ih-48:h=48:color=black@0.85:t=fill"
                     cmd = [
                         ffmpeg_exe, "-nostdin", "-y", "-ss", "8", "-i", target_in,
-                        "-map_metadata", "-1", "-vf", vf_str, "-af", af_clear,
+                        "-map_metadata", "-1", "-vf", vf_10th_drop, "-af", af_clear,
                         "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28",
                         "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k", target_out
                     ]
@@ -332,27 +337,27 @@ with tab_shield:
                     st.session_state.detected_info = info
                     st.session_state.current_output_video = target_out
                     st.session_state.process_ready = True
-                    st.success(f"🎉 ویڈیو تمام 26 شیلڈز کے ساتھ صرف **{dur} سیکنڈ** میں تیار ہو گئی!")
+                    st.success(f"🎉 ویڈیو 1/10واں فریم کٹس اور شفلنگ کے ساتھ صرف **{dur} سیکنڈ** میں تیار ہو گئی!")
                 else:
                     st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ براہ کرم فائل دوبارہ منتخب کریں۔")
 
 # -----------------
-# TAB 2: TRUE 100% PURE FULL-SCREEN 9:16 SHORTS (NO BLACK BARS, NO BOXES)
+# TAB 2: PURE FULL-SCREEN 9:16 SHORTS WITH 1/10th FRAME DROP
 # -----------------
 with tab_shorts:
-    st.write("### 📱 100% پیور فل اسکرین 9:16 وائرل شارٹس جنریٹر")
-    st.info("💡 **پیور فل اسکرین ریشو:** اصل ویڈیو پوری موبائل اسکرین پر 100% فل (720x1280) آئے گی (کوئی کالی پٹی یا درمیانی ڈبہ نہیں ہوگا) اور تمام 26 اینٹی کاپی رائٹ شیلڈز لاگو ہوں گی!")
+    st.write("### 📱 پیور فل اسکرین 9:16 شارٹس (ہر سیکنڈ 1/10واں فریم کٹ)")
+    st.info("💡 **نو بلیک بارز:** اصل ویڈیو پوری موبائل اسکرین پر 100% فل آئے گی، ہر سیکنڈ سے دسواں حصہ مستقل کٹے گا اور شروع کے لوگو خودکار ختم ہوں گے!")
     
     col_sh1, col_sh2 = st.columns(2)
     with col_sh1:
-        num_shorts = st.selectbox("کتنے فل اسکرین وائرل شارٹس بنانے ہیں؟", [
+        num_shorts = st.selectbox("کتنے فل اسکرین شارٹس بنانے ہیں؟", [
             "1 شارٹ (Best Climax Hook)",
             "2 شارٹس (Opening + Climax)",
             "3 شارٹس (Hook + Story + Climax)",
             "5 شارٹس (Full Multi-Highlight Pack)"
         ], key="num_sh_pure")
     with col_sh2:
-        short_dur = st.selectbox("ہر شارٹ کا دورانیہ:", ["30 سیکنڈ (30s - سب سے زیادہ وائرل)", "15 سیکنڈ (15s)", "60 سیکنڈ (60s)"], key="dur_sh_pure")
+        short_dur = st.selectbox("ہر شارٹ کا دورانیہ:", ["30 سیکنڈ (30s - وائرل)", "15 سیکنڈ (15s)", "60 سیکنڈ (60s)"], key="dur_sh_pure")
 
     count_target = 1 if "1" in num_shorts else 2 if "2" in num_shorts else 3 if "3" in num_shorts else 5
     dur_sec_target = 30 if "30" in short_dur else 15 if "15" in short_dur else 60
@@ -360,7 +365,7 @@ with tab_shorts:
     up_shorts_file = st.file_uploader("📂 لمبی ویڈیو فائل یہاں اپلوڈ کریں (5 تا 30 منٹ):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_shorts_pure")
     url_shorts_input = st.text_input("🔗 یا لمبی ویڈیو کا یوٹیوب لنک ڈالیں:", placeholder="https://www.youtube.com/watch?v=...", key="url_shorts_pure")
 
-    if st.button(f"🚀 خودکار طریقے سے {count_target} فل اسکرین 9:16 شارٹس مع ٹائٹلز و تھمب نیل بنائیں", type="primary", key="btn_run_shorts_pure"):
+    if st.button(f"🚀 خودکار طریقے سے {count_target} فل اسکرین 9:16 شارٹس بنائیں", type="primary", key="btn_run_shorts_pure"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"shorts_in_{uid}.mp4"
         has_input = False
@@ -394,14 +399,13 @@ with tab_shorts:
             status_text = st.empty()
 
             for idx, start_pt in enumerate(points, 1):
-                status_text.write(f"⚡ فل اسکرین 9:16 شارٹ #{idx} کٹ کر کے 26 شیلڈز لگائی جا رہی ہیں...")
+                status_text.write(f"⚡ فل اسکرین 9:16 شارٹ #{idx} پر 1/10واں فریم کٹ اور شیلڈز لگائی جا رہی ہیں...")
                 short_out = f"pure_short_{uid}_{idx}.mp4"
                 
-                # TRUE PURE 100% FULL-SCREEN 9:16 (THE VIDEO ITSELF FILLS THE ENTIRE MOBILE SCREEN):
-                # scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1
-                # This guarantees that the entire video fills 100% of 9:16 without letterbox, pillarbox, or canvas boxes!
+                # TRUE PURE 100% FULL-SCREEN 9:16 + 1/10th FRAME DROP PER SECOND:
+                # select='mod(n,10)<9' drops index 9 out of every 10 frames (10% frames deleted every single second)
                 vf_pure_fullscreen_916 = (
-                    "select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),"
+                    "select='mod(n\\,10)<9',setpts=0.90*N/(24*TB),"
                     "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,"
                     "hflip,eq=contrast=1.20:saturation=1.26:brightness=0.02,"
                     "drawbox=y=0:h=40:color=black@0.70:t=fill,drawbox=y=ih-50:h=50:color=black@0.80:t=fill"
@@ -427,7 +431,7 @@ with tab_shorts:
             
             st.session_state.detected_info = info
             st.session_state.generated_shorts = created_shorts
-            status_text.success(f"🎉 آپ کے تمام **{len(created_shorts)} پیور فل اسکرین 9:16 شارٹس** تیار ہیں!")
+            status_text.success(f"🎉 آپ کے تمام **{len(created_shorts)} پیور فل اسکرین 9:16 شارٹس** 1/10ویں فریم کٹ کے ساتھ تیار ہیں!")
 
     # DISPLAY SHORTS & SHORTS-SPECIFIC VIRAL METADATA DASHBOARD
     if st.session_state.generated_shorts:
@@ -496,11 +500,11 @@ with tab_clip:
                     info['title'] = title_fetched
             
         if has_input and os.path.exists(target_in):
-            with st.spinner("کلپ کٹ کر کے 26 شیلڈز لگائی جا رہی ہیں..."):
+            with st.spinner("کلپ کٹ کر کے 1/10واں فریم کٹس لگائے جا رہے ہیں..."):
                 ffmpeg_exe = get_ffmpeg()
                 start_sec = start_min * 60
                 dur_sec = clip_len * 60
-                vf = "select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),hflip,crop=iw*0.80:ih*0.80,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=36:color=black@0.75:t=fill,drawbox=y=ih-44:h=44:color=black@0.85:t=fill"
+                vf = "select='mod(n\\,10)<9',setpts=0.90*N/(24*TB),hflip,crop=iw*0.80:ih*0.80,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=36:color=black@0.75:t=fill,drawbox=y=ih-44:h=44:color=black@0.85:t=fill"
                 af = "highpass=f=75,lowpass=f=8200,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
                 
                 cmd = [
@@ -590,21 +594,6 @@ with tab_lofi:
             mime="audio/mp4",
             use_container_width=True
         )
-        
-        st.markdown("---")
-        st.write("#### 🧠 گانے کے وائرل لوفی ٹائٹلز، ہیش ٹیگز اور اینیمی تھمب نیل پرامپٹ:")
-        clean_s_title, song_titles, song_tags, song_thumb_prompt = analyze_video_and_generate_exact_prompt(st.session_state.detected_info.get('title', 'Chill Lo-Fi Track'), is_song=True)
-        
-        c_song1, c_song2 = st.columns(2)
-        with c_song1:
-            st.markdown("**🔥 وائرل لوفی ٹائٹلز (1-Click Copy):**")
-            for t in song_titles:
-                st.code(t, language="text")
-            st.markdown("**🏷️ وائرل میوزک ہیش ٹیگز:**")
-            st.code(song_tags, language="text")
-        with c_song2:
-            st.markdown("**🎨 لوفی اینیمی وال پیپر تھمب نیل پرامپٹ:**")
-            st.code(song_thumb_prompt, language="text")
 
 # -----------------
 # TAB 5: PRO AI MOVIE MASTER STUDIO (UNLIMITED)
@@ -676,4 +665,4 @@ if st.session_state.process_ready and active_out and os.path.exists(active_out) 
         st.info("💡 یہ پرامپٹ اصلی اداکار کے فیشل فیچرز کے ساتھ تیار کیا گیا ہے۔ اوپر دائیں کونے سے کاپی کریں:")
         st.code(exact_thumb_prompt, language="text")
 
-st.markdown("<p style='text-align: center; font-size: 11px; color: #64748b; margin-top: 20px;'>ES Ultra Pure Full-Screen Studio | 100% Free & Unlimited</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 11px; color: #64748b; margin-top: 20px;'>ES Ultra 1/10th Frame Drop Studio | 100% Free & Unlimited</p>", unsafe_allow_html=True)
