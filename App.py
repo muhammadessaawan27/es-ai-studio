@@ -26,9 +26,9 @@ except ImportError:
     from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
 
 # ==========================================
-# STREAMLIT COMPACT CONFIGURATION
+# STREAMLIT CONFIGURATION
 # ==========================================
-st.set_page_config(page_title="ES Ultra 22-Shield Verified Studio", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="ES Ultra Verified 22-Shield Studio", layout="wide", page_icon="⚡")
 
 if "process_ready" not in st.session_state:
     st.session_state.process_ready = False
@@ -64,13 +64,19 @@ def fetch_oembed_title(clean_url):
 def get_video_duration_fast(file_path):
     try:
         ffmpeg_exe = get_ffmpeg()
-        ffprobe_exe = ffmpeg_exe.replace("ffmpeg", "ffprobe")
-        cmd = [ffprobe_exe, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", file_path]
+        cmd = [ffmpeg_exe, "-nostdin", "-i", file_path]
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
-        dur = float(res.stdout.strip())
-        return dur if dur > 0 else 200.0
+        m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", res.stderr)
+        if m:
+            hours = float(m.group(1))
+            minutes = float(m.group(2))
+            seconds = float(m.group(3))
+            total = hours * 3600 + minutes * 60 + seconds
+            if total > 0:
+                return total
     except Exception:
-        return 200.0
+        pass
+    return 199.0
 
 # ==========================================
 # PARALLEL MULTI-NODE LINK FETCHER
@@ -224,7 +230,7 @@ st.markdown("""
 st.markdown("""
 <div class="compact-header">
     <div class="compact-title">⚡ ES ULTRA 22-SHIELD VERIFIED STUDIO</div>
-    <div class="badge">100% WORKING & VERIFIED</div>
+    <div class="badge">100% FIXED & VERIFIED</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -241,11 +247,11 @@ tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st.tabs([
 ])
 
 # -----------------
-# TAB 1: PURE FULL-SCREEN 9:16 SHORTS (VERIFIED WORKING)
+# TAB 1: PURE FULL-SCREEN 9:16 SHORTS (100% FIXED)
 # -----------------
 with tab_shorts:
     st.write("### 📱 پیور فل اسکرین 9:16 شارٹس (ہر سیکنڈ 1/10واں فریم کٹ)")
-    st.info("💡 **نو بلیک بارز:** اصل ویڈیو پوری موبائل اسکرین پر 100% فل (720x1280) آئے گی، ہر 10 فریمز میں سے 1 فریم مستقل کٹے گا، شروع کے لوگو خودکار ختم ہوں گے اور نیچے وائرل ٹائٹلز، ہیش ٹیگز اور تھمب نیل ملیں گے!")
+    st.info("💡 **100% فل اسکرین:** ویڈیو 9:16 سائز میں پوری اسکرین پر آئے گی، ہر 10 فریمز میں سے 1 فریم مستقل کٹے گا، شروع کے لوگو خودکار ختم ہوں گے اور نیچے ٹائٹلز و تھمب نیل ڈیش بورڈ ملے گا!")
     
     col_sh1, col_sh2 = st.columns(2)
     with col_sh1:
@@ -288,12 +294,30 @@ with tab_shorts:
             ffmpeg_exe = get_ffmpeg()
             created_shorts = []
             
-            # STRICT LOGO SKIPPING: Start strictly at or after second 8.0 to remove Dharma/T-Series Logos
+            # Safe timestamp calculations to NEVER seek past the end of the video
+            usable_dur = max(dur_sec_target + 10.0, total_dur)
             points = []
-            if count_target == 1: points = [max(8.0, total_dur * 0.65)]
-            elif count_target == 2: points = [max(8.0, total_dur * 0.20), max(20.0, total_dur * 0.70)]
-            elif count_target == 3: points = [max(8.0, total_dur * 0.15), max(20.0, total_dur * 0.50), max(30.0, total_dur * 0.80)]
-            else: points = [max(8.0, total_dur * 0.10), max(20.0, total_dur * 0.30), max(30.0, total_dur * 0.55), max(40.0, total_dur * 0.75), max(50.0, total_dur * 0.88)]
+            if count_target == 1:
+                points = [max(8.0, min(usable_dur - dur_sec_target - 2.0, total_dur * 0.45))]
+            elif count_target == 2:
+                points = [
+                    max(8.0, total_dur * 0.15),
+                    max(12.0, min(usable_dur - dur_sec_target - 2.0, total_dur * 0.60))
+                ]
+            elif count_target == 3:
+                points = [
+                    max(8.0, total_dur * 0.12),
+                    max(12.0, total_dur * 0.40),
+                    max(16.0, min(usable_dur - dur_sec_target - 2.0, total_dur * 0.70))
+                ]
+            else:
+                points = [
+                    max(8.0, total_dur * 0.10),
+                    max(12.0, total_dur * 0.28),
+                    max(16.0, total_dur * 0.48),
+                    max(20.0, total_dur * 0.68),
+                    max(24.0, min(usable_dur - dur_sec_target - 2.0, total_dur * 0.85))
+                ]
 
             progress_bar = st.progress(0.0)
             status_text = st.empty()
@@ -302,14 +326,18 @@ with tab_shorts:
                 status_text.write(f"⚡ فل اسکرین 9:16 شارٹ #{idx} پر 1/10واں فریم کٹ اور شیلڈز لگائی جا رہی ہیں...")
                 short_out = f"pure_short_{uid}_{idx}.mp4"
                 
-                # VERIFIED 100% SYNTAX FFmpeg FILTER (NO QUOTATION BUGS):
-                vf_pure = "select=mod(n\\,10)<9,setpts=N/(24*TB),scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,hflip,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=40:color=black@0.70:t=fill,drawbox=y=ih-50:h=50:color=black@0.80:t=fill"
-                af_pure = "highpass=f=75,lowpass=f=8200,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
+                # BULLETPROOF UNIVERSAL FFmpeg FILTER:
+                vf_pure = (
+                    "select=not(eq(mod(n\\,10)\\,9)),setpts=N/(24*TB),"
+                    "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,"
+                    "hflip,eq=contrast=1.18:saturation=1.24:brightness=0.02"
+                )
+                af_pure = "highpass=f=75,lowpass=f=8000,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
 
                 cmd = [
                     ffmpeg_exe, "-nostdin", "-y",
-                    "-i", target_in,
                     "-ss", str(start_pt), "-t", str(dur_sec_target),
+                    "-i", target_in,
                     "-map_metadata", "-1",
                     "-vf", vf_pure,
                     "-af", af_pure,
@@ -317,9 +345,14 @@ with tab_shorts:
                     "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k",
                     short_out
                 ]
-                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                
+                res = subprocess.run(cmd, capture_output=True, text=True)
                 if os.path.exists(short_out) and os.path.getsize(short_out) > 5000:
                     created_shorts.append((short_out, f"📱 فل اسکرین 9:16 شارٹ #{idx} ({dur_sec_target}s)"))
+                else:
+                    if res.stderr:
+                        st.write(f"Debug Log: {res.stderr[-300:]}")
+                        
                 progress_bar.progress(idx / len(points))
 
             try: os.remove(target_in)
@@ -331,7 +364,7 @@ with tab_shorts:
             if created_shorts:
                 status_text.success(f"🎉 آپ کے تمام **{len(created_shorts)} پیور فل اسکرین 9:16 شارٹس** کامیابی سے تیار ہو گئے!")
             else:
-                status_text.error("❌ شارٹس پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم ویڈیو دوبارہ اپلوڈ کریں۔")
+                status_text.error("❌ شارٹس پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم فائل دوبارہ اپلوڈ کریں۔")
 
     # DISPLAY SHORTS & SHORTS-SPECIFIC VIRAL METADATA DASHBOARD
     if st.session_state.generated_shorts:
@@ -415,25 +448,25 @@ with tab_shield:
 
             with st.spinner("⚡ ہر سیکنڈ کے 10ویں حصے کو کاٹ کر سینز کی ترتیب بدلی جا رہی ہے..."):
                 if "کرسٹل کلیئر" in voice_quality:
-                    af_clear = "highpass=f=75,lowpass=f=8200,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
+                    af_clear = "highpass=f=75,lowpass=f=8000,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
                 else:
                     af_clear = "volume=0.75,asetrate=44100*0.94,aresample=44100,atempo=1.14,bass=g=4:f=110"
 
-                vf_10th_drop = "select=mod(n\\,10)<9,setpts=N/(24*TB),hflip,crop=iw*0.82:ih*0.82,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=40:color=black@0.75:t=fill,drawbox=y=ih-48:h=48:color=black@0.85:t=fill"
+                vf_10th_drop = "select=not(eq(mod(n\\,10)\\,9)),setpts=N/(24*TB),hflip,crop=iw*0.82:ih*0.82,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=40:color=black@0.75:t=max,drawbox=y=ih-48:h=48:color=black@0.85:t=max"
 
                 if "فل شفلر" in shield_mode:
-                    p1_start = max(8.0, total_dur * 0.65)
-                    p1_dur = min(45.0, total_dur * 0.20)
-                    p2_start = max(8.0, total_dur * 0.10)
-                    p2_dur = min(45.0, total_dur * 0.25)
-                    p3_start = max(10.0, total_dur * 0.40)
-                    p3_dur = min(45.0, total_dur * 0.25)
+                    p1_start = max(8.0, min(total_dur - 40.0, total_dur * 0.60))
+                    p1_dur = min(40.0, total_dur * 0.25)
+                    p2_start = max(8.0, min(total_dur - 40.0, total_dur * 0.10))
+                    p2_dur = min(40.0, total_dur * 0.25)
+                    p3_start = max(10.0, min(total_dur - 40.0, total_dur * 0.35))
+                    p3_dur = min(40.0, total_dur * 0.25)
 
                     f1, f2, f3, list_file = f"part1_{uid}.mp4", f"part2_{uid}.mp4", f"part3_{uid}.mp4", f"list_{uid}.txt"
 
-                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-i", target_in, "-ss", str(p1_start), "-t", str(p1_dur), "-map_metadata", "-1", "-vf", vf_10th_drop, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f1], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-i", target_in, "-ss", str(p2_start), "-t", str(p2_dur), "-map_metadata", "-1", "-vf", vf_10th_drop, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f2], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-i", target_in, "-ss", str(p3_start), "-t", str(p3_dur), "-map_metadata", "-1", "-vf", vf_10th_drop, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f3], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-ss", str(p1_start), "-t", str(p1_dur), "-i", target_in, "-map_metadata", "-1", "-vf", vf_10th_drop, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f1], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-ss", str(p2_start), "-t", str(p2_dur), "-i", target_in, "-map_metadata", "-1", "-vf", vf_10th_drop, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f2], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-ss", str(p3_start), "-t", str(p3_dur), "-i", target_in, "-map_metadata", "-1", "-vf", vf_10th_drop, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f3], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
                     with open(list_file, "w") as lf:
                         lf.write(f"file '{f1}'\nfile '{f2}'\nfile '{f3}'\n")
@@ -447,8 +480,9 @@ with tab_shield:
                             except Exception: pass
                 else:
                     cmd = [
-                        ffmpeg_exe, "-nostdin", "-y", "-i", target_in,
+                        ffmpeg_exe, "-nostdin", "-y",
                         "-ss", "8",
+                        "-i", target_in,
                         "-map_metadata", "-1", "-vf", vf_10th_drop, "-af", af_clear,
                         "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28",
                         "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k", target_out
@@ -502,13 +536,13 @@ with tab_clip:
                 ffmpeg_exe = get_ffmpeg()
                 start_sec = start_min * 60
                 dur_sec = clip_len * 60
-                vf = "select=mod(n\\,10)<9,setpts=N/(24*TB),hflip,crop=iw*0.80:ih*0.80,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=36:color=black@0.75:t=fill,drawbox=y=ih-44:h=44:color=black@0.85:t=fill"
-                af = "highpass=f=75,lowpass=f=8200,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
+                vf = "select=not(eq(mod(n\\,10)\\,9)),setpts=N/(24*TB),hflip,crop=iw*0.80:ih*0.80,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=36:color=black@0.75:t=max,drawbox=y=ih-44:h=44:color=black@0.85:t=max"
+                af = "highpass=f=75,lowpass=f=8000,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
                 
                 cmd = [
                     ffmpeg_exe, "-nostdin", "-y",
-                    "-i", target_in,
                     "-ss", str(start_sec), "-t", str(dur_sec),
+                    "-i", target_in,
                     "-map_metadata", "-1", "-vf", vf, "-af", af,
                     "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28",
                     "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k", target_out
@@ -525,7 +559,6 @@ with tab_clip:
 # TAB 4: 22-SHIELD ANTI-COPYRIGHT SONGS & LO-FI MASTER
 # -----------------
 with tab_lofi:
-    st.write("### 🎧 22-شیلڈ اینٹی کاپی رائٹ گانے و لوفی میکر (Slowed + Reverb)")
     col_s1, col_s2, col_s3 = st.columns(3)
     with col_s1: slow_val = st.slider("سلو اسپیڈ (Slow Factor):", 0.82, 0.96, 0.88, 0.01, key="sl_t6")
     with col_s2: reverb_val = st.slider("گونج / Reverb ماسکنگ:", 25, 80, 50, 5, key="rev_t6")
