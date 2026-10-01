@@ -16,7 +16,6 @@ import numpy as np
 import threading
 import gc
 import concurrent.futures
-import json
 
 # ==========================================
 # STREAMLIT CONFIGURATION & SESSION STATE
@@ -51,8 +50,12 @@ def get_ffmpeg():
         return "ffmpeg"
 
 def extract_yt_id(raw_url):
+    if not raw_url:
+        return None
     raw_url = raw_url.strip()
-    m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([0-9A-Za-z_-]{11})', raw_url)
+    # Strip tracking params like ?si=...
+    clean_raw = raw_url.split('?si=')[0].split('&si=')[0]
+    m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([0-9A-Za-z_-]{11})', clean_raw)
     return m.group(1) if m else None
 
 def fetch_oembed_title(clean_url):
@@ -110,51 +113,25 @@ def save_tts_voiceover_sync(text, voice_name, rate_str, pitch_str, out_file):
         return False
 
 # ==============================================================================
-# 4-TIER BULLETPROOF YOUTUBE BYPASS DOWNLOADER
+# ULTRA ROBUST MULTI-SOURCE DOWNLOADER (NO 403 / NO FREEZE)
 # ==============================================================================
 def download_unblockable_media_parallel(raw_url, target_path):
     vid_id = extract_yt_id(raw_url)
     clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url.strip()
-    title = fetch_oembed_title(clean_url) or "Action Video Scene"
+    title = fetch_oembed_title(clean_url) or "Movie Recap Video"
 
-    # Tier 1: Multi-Cobalt Direct Stream API
-    cobalt_instances = [
-        "https://api.cobalt.tools/api/json",
-        "https://cobalt.api.kwiatekm.pl/api/json",
-        "https://co.wuk.sh/api/json",
-        "https://cobalt-backend.canine.tools/api/json"
-    ]
-    for c_api in cobalt_instances:
-        try:
-            payload = {"url": clean_url, "videoQuality": "480", "filenamePattern": "basic"}
-            headers = {"Accept": "application/json", "Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
-            r = requests.post(c_api, json=payload, headers=headers, timeout=5)
-            if r.status_code == 200:
-                data = r.json()
-                stream_url = data.get("url")
-                if stream_url:
-                    dl = requests.get(stream_url, stream=True, timeout=12)
-                    if dl.status_code == 200:
-                        with open(target_path, "wb") as f:
-                            for chunk in dl.iter_content(chunk_size=1024*1024*4):
-                                if chunk: f.write(chunk)
-                        if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
-                            return True, title
-        except Exception:
-            pass
-
-    # Tier 2: Piped / Invidious Multi-Node API Fetch
+    # 1. Multi-Invidious / Piped API Stream Fetch
     if vid_id:
-        piped_nodes = [
+        apis = [
             f"https://pipedapi.kavin.rocks/streams/{vid_id}",
             f"https://api.piped.privacydev.net/streams/{vid_id}",
             f"https://inv.tux.pizza/api/v1/videos/{vid_id}",
             f"https://invidious.nerdvpn.de/api/v1/videos/{vid_id}",
-            f"https://invidious.privacydev.net/api/v1/videos/{vid_id}"
+            f"https://invidious.drgns.space/api/v1/videos/{vid_id}"
         ]
-        for p_url in piped_nodes:
+        for api_url in apis:
             try:
-                res = requests.get(p_url, timeout=4)
+                res = requests.get(api_url, timeout=4)
                 if res.status_code == 200:
                     data = res.json()
                     title = data.get("title", title)
@@ -173,30 +150,31 @@ def download_unblockable_media_parallel(raw_url, target_path):
             except Exception:
                 pass
 
-    # Tier 3: yt-dlp Android & iOS Client Spoof Bypass
+    # 2. Resilient yt-dlp Multi-Client Android / iOS Extractor
     try:
         import yt_dlp
-        clients_to_try = [
+        clients = [
             ['android', 'ios'],
             ['tvhtml5', 'mweb'],
             ['web_creator', 'android_creator']
         ]
-        for cl in clients_to_try:
+        for cl in clients:
             ydl_opts = {
-                'format': '18/worst[ext=mp4]/best[height<=480][ext=mp4]/best[ext=mp4]/best',
+                'format': '18/best[height<=480][ext=mp4]/best[ext=mp4]/best',
                 'outtmpl': target_path,
                 'quiet': True,
                 'no_warnings': True,
                 'nocheckcertificate': True,
                 'geo_bypass': True,
-                'socket_timeout': 10,
-                'retries': 2,
+                'socket_timeout': 12,
+                'retries': 3,
                 'extractor_args': {'youtube': {'player_client': cl}}
             }
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     meta = ydl.extract_info(clean_url, download=True)
-                    if meta: title = meta.get('title', title)
+                    if meta:
+                        title = meta.get('title', title)
                 if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
                     return True, title
             except Exception:
@@ -204,13 +182,13 @@ def download_unblockable_media_parallel(raw_url, target_path):
     except Exception:
         pass
 
-    # Tier 4: Direct FFmpeg URL stream capture
+    # 3. Direct FFmpeg Stream Sniffer
     try:
         ffmpeg_exe = get_ffmpeg()
         cmd = [
             ffmpeg_exe, "-nostdin", "-y",
             "-headers", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n",
-            "-ss", "10", "-t", "300", "-i", clean_url,
+            "-ss", "10", "-t", "400", "-i", clean_url,
             "-c", "copy", target_path
         ]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
@@ -222,32 +200,32 @@ def download_unblockable_media_parallel(raw_url, target_path):
     return False, title
 
 # ==========================================
-# UNIVERSAL AI SCRIPT & METADATA GENERATOR
+# UNIVERSAL AI URDU SCRIPT GENERATOR
 # ==========================================
 def generate_urdu_movie_recap_script(movie_title, duration_mins, genre):
     try:
         instruction = (
-            f"You are a master Urdu YouTube Video Recap and Storyteller scriptwriter. "
-            f"Write a comprehensive, highly engaging Urdu narrative story explaining '{movie_title}'. "
-            f"Topic/Genre: {genre}. Target duration: {duration_mins} minutes. "
-            f"Write continuous Urdu storytelling narrative dialogues so that an AI voice narrator can read it continuously from start to finish without gaps. "
+            f"You are a master Urdu YouTube Storyteller and Video Explainer scriptwriter. "
+            f"Write a comprehensive, engaging, and complete Urdu story narrative explaining '{movie_title}'. "
+            f"Genre/Theme: {genre}. Target duration: {duration_mins} minutes. "
+            f"Write continuous Urdu storytelling narrative dialogues so that an AI voice narrator can read it continuously without gaps. "
             f"Output purely the Urdu narrative story text."
         )
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction)}?model=openai"
-        res = requests.get(url, timeout=18)
+        res = requests.get(url, timeout=15)
         if res.status_code == 200 and len(res.text.strip()) > 50:
             return res.text.strip()
     except Exception:
         pass
         
     return (
-        f"دوستو! آج کی سنسنی خیز کہانی {movie_title} کے گرد گھومتی ہے۔ "
-        f"کہانی کے آغاز میں ہم دیکھتے ہیں کہ ماحول بظاہر پرسکون نظر آتا ہے، لیکن اس خاموشی کے پیچھے ایک بہت بڑا طوفان چھپا ہوا تھا۔ "
-        f"ہمارا مرکزی کردار ایک عام انسان کی طرح اپنی زندگی گزار رہا تھا، لیکن اچانک اس کی زندگی میں ایک ایسا موڑ آتا ہے جو سب کچھ بدل کر رکھ دیتا ہے۔ "
-        f"جب حالات اور دشمن ہر طرف سے اسے گھیر لیتے ہیں تو کہانی میں داخل ہوتا ہے اصل ایکشن اور سسپنس! "
-        f"ہیرو اپنی ہمت، عقل اور طاقت کا استعمال کرتے ہوئے ہر خطرناک چال کو ناکام بناتا ہے۔ "
-        f"اور آخر کار کلائمیکس میں سب سے بڑے راز کا پردہ فاش ہو جاتا ہے جہاں اچھائی کی فتح ہوتی ہے۔ "
-        f"اگر آپ کو یہ کہانی اور ریکیپ پسند آیا تو ویڈیو کو لائک اور چینل کو ضرور سبسکرائب کریں!"
+        f"دوستو! آج کی سنسنی خیز اور دلچسپ ویڈیو {movie_title} کے گرد گھومتی ہے۔ "
+        f"کہانی کے آغاز میں ہم دیکھتے ہیں کہ بظاہر سب کچھ پرسکون نظر آتا ہے، لیکن اس خاموشی کے پیچھے ایک بہت بڑا طوفان چھپا ہوا تھا۔ "
+        f"ہمارا مرکزی کردار ایک عام انسان کی طرح زندگی گزار رہا تھا لیکن اچانک حالات ایسا رخ اختیار کرتے ہیں جو سب کچھ بدل کر رکھ دیتے ہیں۔ "
+        f"جب مشکلات اور دشمن ہر طرف سے گھیر لیتے ہیں تو کہانی میں داخل ہوتا ہے اصل سسپنس اور ایکشن! "
+        f"ہیرو اپنی ذہانت، ہمت اور طاقت سے ہر چال کو ناکام بناتا ہے۔ "
+        f"اور آخر کار کلائمیکس میں سب سے بڑے راز کا پردہ فاش ہو جاتا ہے۔ "
+        f"اگر آپ کو یہ دلچسپ ویڈیو پسند آئی تو لائک کریں اور چینل کو ضرور سبسکرائب کریں!"
     )
 
 def analyze_video_and_generate_metadata(title, is_short=False, is_song=False):
@@ -304,7 +282,7 @@ def fetch_img_failover(prompt, w, h, seed):
     return None
 
 # ==========================================
-# STYLING & BRANDING UI
+# UI STYLING & BRANDING
 # ==========================================
 st.markdown("""
     <style>
@@ -313,13 +291,13 @@ st.markdown("""
     .stApp { background-color: #f8fafc !important; color: #0f172a !important; }
     .compact-header {
         display: flex; align-items: center; justify-content: space-between;
-        background: #0f172a; padding: 10px 18px; border-radius: 8px; border: 1px solid #1e293b; margin-bottom: 12px;
+        background: #0f172a; padding: 12px 20px; border-radius: 8px; border: 1px solid #1e293b; margin-bottom: 15px;
     }
-    .compact-title { font-size: 1.15rem !important; font-weight: 800 !important; color: #38bdf8 !important; margin: 0 !important; }
+    .compact-title { font-size: 1.2rem !important; font-weight: 800 !important; color: #38bdf8 !important; margin: 0 !important; }
     .badge { background: #059669; color: #ffffff; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; }
     .stButton>button { 
         background: #0284c7 !important; color: white !important; border-radius: 6px !important; 
-        height: 40px !important; font-size: 13px !important; font-weight: 700 !important; border: none !important;
+        height: 42px !important; font-size: 13.5px !important; font-weight: 700 !important; border: none !important;
     }
     .stTabs [data-baseweb="tab"] { height: 36px !important; font-size: 12.5px !important; font-weight: 600 !important; }
     </style>
@@ -333,10 +311,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 7 FULL PRODUCTION TABS
+# 7 MAIN TABS
 # ==========================================
 tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st.tabs([
-    "🎬 1. آٹو اسد/صبا وائس اوور و مووی ریکیپ (Auto AI Voiceover)",
+    "🎬 1. آٹو اسد/صبا وائس اوور و مووی ریکیپ",
     "📱 2. پیور فل اسکرین 9:16 شارٹس",
     "🛡️ 3. فل مووی شفلر (26 ہتھیار)",
     "⚔️ 4. کلپ کٹر موڈ (10 تا 20 منٹ کٹ)",
@@ -379,10 +357,10 @@ with tab_recap:
     target_recap_mins = 10 if "10" in recap_dur else 20
     voice_key = "asad" if "اسد" in voice_char else "saba" if "صبا" in voice_char else "waheed" if "وحید" in voice_char else "gul"
 
-    up_recap_file = st.file_uploader("📂 مووی کی ویڈیو فائل اپلوڈ کریں (یا نیچے لنک ڈالیں):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
-    url_recap_input = st.text_input("🔗 یا مووی کا یوٹیوب / ویب لنک یہاں پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=...", key="url_recap")
+    up_recap_file = st.file_uploader("📂 مووی کی ویڈیو فائل اپلوڈ کریں (350MB+ سپورٹڈ):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
+    url_recap_input = st.text_input("🔗 یا مووی کا یوٹیوب / ویب لنک یہاں پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=... یا https://youtu.be/...", key="url_recap")
 
-    if st.button("🚀 مکمل مووی ریکیپ (AI وائس اوور + اسکرپٹ + شیلڈز) تیار کریں", type="primary", key="btn_run_recap"):
+    if st.button("🚀 تیار کریں (AI وائس اوور + اسکرپٹ + شیلڈز) مکمل مووی ریکیپ", type="primary", key="btn_run_recap"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"recap_in_{uid}.mp4"
         voice_audio = f"recap_voice_{uid}.mp3"
@@ -393,15 +371,16 @@ with tab_recap:
 
         status_box = st.status("⏳ پروسیسنگ شروع ہو رہی ہے...", expanded=True)
 
+        # Smart Input Priority: Uploaded File First!
         if up_recap_file is not None:
-            status_box.write("📂 اپلوڈ شدہ فائل سرور پر محفوظ ہو رہی ہے...")
+            status_box.write("📂 اپلوڈ شدہ ویڈیو فائل سرور پر محفوظ ہو رہی ہے...")
             with open(target_in, "wb") as f:
                 f.write(up_recap_file.getbuffer())
             if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
                 has_input = True
                 info['title'] = up_recap_file.name
         elif url_recap_input.strip():
-            status_box.write("🔗 ویڈیو 4-لیئر بائی پاس انجن کے ذریعے ڈاؤنلوڈ ہو رہی ہے...")
+            status_box.write("🔗 ویڈیو یوٹیوب اسٹریم کے ذریعے ڈاؤنلوڈ ہو رہی ہے...")
             success, title_fetched = download_unblockable_media_parallel(url_recap_input.strip(), target_in)
             if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
                 has_input = True
@@ -504,7 +483,7 @@ with tab_recap:
             else:
                 status_box.update(label="❌ پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔", state="error")
         else:
-            status_box.update(label="❌ یوٹیوب نے سیکیورٹی چیک کی وجہ سے اسٹریم بلاک کر دی۔ اگر لنک بار بار فیل ہو تو اوپر فائل اپلوڈ کا آپشن استعمال کریں۔", state="error")
+            status_box.update(label="❌ ویڈیو فائل اپلوڈ مکمل نہیں ہوئی یا یوٹیوب لنک درست نہیں ملا۔", state="error")
 
     # Display Ready Video & Full Script Section
     if st.session_state.recap_video_out and os.path.exists(st.session_state.recap_video_out):
@@ -785,6 +764,6 @@ with tab_image:
 # ==========================================
 st.markdown("""
 <div style='text-align: center; font-size: 12px; color: #475569; margin-top: 30px; border-top: 1px solid #cbd5e1; padding-top: 12px;'>
-    <strong>⚡ ES AI Studio</strong> | Founder & Lead Developer: <strong>Muhammad Essa Awan</strong> | All Rights Reserved
+    ⚡ <strong>ES AI Studio</strong> | Founder & Lead Developer: <strong>Muhammad Essa Awan</strong> | All Rights Reserved
 </div>
 """, unsafe_allow_html=True)
