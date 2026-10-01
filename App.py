@@ -67,7 +67,7 @@ def extract_gdrive_id(raw_url):
 def fetch_oembed_title(clean_url):
     try:
         req_url = f"https://noembed.com/embed?url={urllib.parse.quote(clean_url)}"
-        res = requests.get(req_url, timeout=4)
+        res = requests.get(req_url, timeout=3)
         if res.status_code == 200:
             return res.json().get("title", "")
     except Exception:
@@ -78,7 +78,7 @@ def get_video_duration_fast(file_path):
     try:
         ffmpeg_exe = get_ffmpeg()
         cmd = [ffmpeg_exe, "-nostdin", "-i", file_path]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
         m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", res.stderr)
         if m:
             hours = float(m.group(1))
@@ -129,34 +129,19 @@ def save_multilang_voiceover_sync(text, voice_key, out_file):
 # ==============================================================================
 def download_google_drive_robust(file_id, target_path):
     session = requests.Session()
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "*/*"
-    }
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     urls_to_try = [
         f"https://drive.usercontent.google.com/download?id={file_id}&export=download&authuser=0&confirm=t",
         f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
     ]
     for download_url in urls_to_try:
         try:
-            res = session.get(download_url, stream=True, timeout=25, headers=headers)
-            content_type = res.headers.get("content-type", "").lower()
-            if "html" in content_type:
-                confirm_match = re.search(r'confirm=([0-9A-Za-z_\-]+)', res.text)
-                if confirm_match:
-                    token = confirm_match.group(1)
-                    retry_url = f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm={token}"
-                    res = session.get(retry_url, stream=True, timeout=25, headers=headers)
-
+            res = session.get(download_url, stream=True, timeout=20, headers=headers)
             with open(target_path, "wb") as f:
                 for chunk in res.iter_content(chunk_size=1024 * 1024 * 8):
                     if chunk: f.write(chunk)
-                        
             if os.path.exists(target_path) and os.path.getsize(target_path) > 30000:
-                with open(target_path, "rb") as f_check:
-                    head = f_check.read(100)
-                    if b"<!DOCTYPE" not in head and b"<html" not in head:
-                        return True, "Google Drive Movie File"
+                return True, "Google Drive Movie File"
         except Exception:
             continue
     return False, ""
@@ -165,29 +150,25 @@ def download_unblockable_media_parallel(raw_url, target_path):
     raw_url = raw_url.strip()
     title = fetch_oembed_title(raw_url) or "Action Movie Video"
 
-    # 1. Google Drive Auto-Detection
+    # 1. Google Drive
     g_id = extract_gdrive_id(raw_url)
     if ("drive.google.com" in raw_url or "docs.google.com" in raw_url) and g_id:
         ok, t = download_google_drive_robust(g_id, target_path)
         if ok: return True, t
         return False, "Google Drive Permission Error"
 
-    # 2. Dailymotion Link Engine (100% Unblocked on Cloud)
+    # 2. Dailymotion Link Engine (100% Unblocked)
     if "dailymotion.com" in raw_url or "dai.ly" in raw_url:
         try:
             import yt_dlp
-            ffmpeg_exe = get_ffmpeg()
-            ffmpeg_dir = os.path.dirname(ffmpeg_exe) if os.path.isabs(ffmpeg_exe) else None
             ydl_opts = {
-                'format': 'best[height<=720]/best',
+                'format': 'best[height<=480]/best',
                 'outtmpl': target_path,
                 'quiet': True,
                 'no_warnings': True,
                 'nocheckcertificate': True,
-                'socket_timeout': 30,
-                'retries': 3
+                'socket_timeout': 15
             }
-            if ffmpeg_dir: ydl_opts['ffmpeg_location'] = ffmpeg_dir
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 meta = ydl.extract_info(raw_url, download=True)
                 if meta: title = meta.get('title', title)
@@ -196,7 +177,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
         except Exception:
             pass
 
-    # 3. MP4Moviez & Direct Video Links (Pixeldrain, FastDL, HubCloud, Dropbox, Direct MP4)
+    # 3. Direct Video / MP4Moviez Links (Pixeldrain, FastDL, Dropbox, Direct MP4)
     if raw_url.startswith("http") and ("youtube.com" not in raw_url and "youtu.be" not in raw_url):
         direct_url = raw_url
         if "pixeldrain.com/u/" in raw_url:
@@ -205,24 +186,17 @@ def download_unblockable_media_parallel(raw_url, target_path):
             direct_url = raw_url.replace("www.dropbox.com", "dl.dropboxusercontent.com").replace("?dl=0", "?dl=1")
             
         try:
-            r = requests.get(direct_url, stream=True, timeout=25, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                "Referer": raw_url
-            })
+            r = requests.get(direct_url, stream=True, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
             if r.status_code == 200:
                 with open(target_path, "wb") as f:
                     for chunk in r.iter_content(chunk_size=1024 * 1024 * 8):
                         if chunk: f.write(chunk)
                 if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
-                    cd = r.headers.get('content-disposition', '')
-                    if 'filename=' in cd:
-                        m_fn = re.search(r'filename=["\']?([^"\']+)["\']?', cd)
-                        if m_fn: title = m_fn.group(1)
-                    return True, title if title != "Action Movie Video" else "MP4Moviez Direct Video"
+                    return True, "Direct Stream Video"
         except Exception:
             pass
 
-    # 4. YouTube Multi-Node Fallback
+    # 4. YouTube Multi-Node Parallel Stream
     m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([0-9A-Za-z_-]{11})', raw_url)
     if m:
         vid_id = m.group(1)
@@ -233,7 +207,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
         ]
         for api_url in apis:
             try:
-                res = requests.get(api_url, timeout=5)
+                res = requests.get(api_url, timeout=4)
                 if res.status_code == 200:
                     data = res.json()
                     title = data.get("title", title)
@@ -242,12 +216,12 @@ def download_unblockable_media_parallel(raw_url, target_path):
                     if mp4s:
                         dl_url = mp4s[0].get("url", "")
                         if dl_url:
-                            r_file = requests.get(dl_url, stream=True, timeout=12)
+                            r_file = requests.get(dl_url, stream=True, timeout=8)
                             if r_file.status_code == 200:
                                 with open(target_path, "wb") as f:
                                     for chunk in r_file.iter_content(chunk_size=1024 * 1024 * 4):
                                         if chunk: f.write(chunk)
-                                if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                                if os.path.exists(target_path) and os.path.getsize(target_path) > 5000:
                                     return True, title
             except Exception:
                 pass
@@ -256,20 +230,19 @@ def download_unblockable_media_parallel(raw_url, target_path):
 
 # ==============================================================================
 # REAL CANONICAL MOVIE PLOT AI STORY GENERATOR
-# ==============================================================================
+# ==========================================
 def generate_exact_movie_recap_script(movie_title, duration_mins, genre, target_lang):
     clean_title = re.sub(r'[\(\[\{].*?[\)\]\}]', '', movie_title).strip()
     try:
         instruction = (
-            f"You are an expert film analyst and movie recap narrator. "
-            f"Explain the ACTUAL, CANONICAL story, plot twists, character actions, and climax of the real movie or video titled '{clean_title}'. "
-            f"Do NOT invent a generic fake story. Identify what this actual movie is about and explain its real storyline. "
-            f"Target Language: {target_lang}. Genre/Theme: {genre}. Target duration: {duration_mins} minutes narrative. "
-            f"Write continuous, highly engaging storytelling text for an AI narrator without stage notes or brackets."
+            f"You are a master film story recap narrator. "
+            f"Write a concise, engaging, and complete story recap explaining the real canonical storyline of '{clean_title}'. "
+            f"Language: {target_lang}. Genre: {genre}. Duration: {duration_mins} minutes narrative. "
+            f"Write 150-200 continuous storytelling words without brackets for an AI voice narrator."
         )
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction)}?model=openai"
-        res = requests.get(url, timeout=18)
-        if res.status_code == 200 and len(res.text.strip()) > 60:
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200 and len(res.text.strip()) > 50:
             return res.text.strip()
     except Exception:
         pass
@@ -286,26 +259,44 @@ def analyze_video_and_generate_metadata(title, is_short=False, is_song=False):
     if not clean_t: clean_t = title
     
     if is_song:
-        exact_thumb_prompt = f"Anime aesthetic 4K Lo-Fi wallpaper for '{clean_t[:45]}', cozy neon room, aesthetic lighting, 16:9."
-        titles = [f"🎧 {clean_t[:45]} (Slowed + Reverb Lo-Fi Remix)", f"🌙 {clean_t[:45]} - Deep Relaxing Aesthetic Vibe", f"✨ Pure Nostalgia Vibes | {clean_t[:40]}"]
-        hashtags = "#SlowedAndReverb #LofiRemix #ChillMusic #AestheticAudio #LoFiBeats"
+        exact_thumb_prompt = f"Anime aesthetic 4K Lo-Fi wallpaper for '{clean_t[:45]}', cozy neon room, 16:9."
+        titles = [f"🎧 {clean_t[:45]} (Slowed + Reverb Remix)", f"🌙 {clean_t[:45]} - Deep Relaxing Vibe", f"✨ Nostalgia | {clean_t[:40]}"]
+        hashtags = "#SlowedAndReverb #LofiRemix #ChillMusic #AestheticAudio"
     elif is_short:
-        exact_thumb_prompt = f"Hyper-realistic 8K vertical cinematic poster 9:16 for YouTube Shorts of '{clean_t[:45]}', intense expression, 35mm photography."
-        titles = [f"🔥 {clean_t[:40]} - UNSTOPPABLE Climax Scene! 😱 #Shorts", f"⚡ The Most Intense Moment of {clean_t[:35]} 🔥 #Shorts", f"😱 Best Action Climax in {clean_t[:38]} #ViralShorts"]
-        hashtags = "#Shorts #YouTubeShorts #ViralShorts #TrendingShorts #MovieClimax"
+        exact_thumb_prompt = f"Hyper-realistic 8K vertical poster 9:16 for Shorts of '{clean_t[:45]}', intense expression."
+        titles = [f"🔥 {clean_t[:40]} - UNSTOPPABLE Scene! 😱 #Shorts", f"⚡ Intense Moment of {clean_t[:35]} 🔥 #Shorts", f"😱 Best Climax in {clean_t[:38]} #ViralShorts"]
+        hashtags = "#Shorts #YouTubeShorts #ViralShorts #TrendingShorts"
     else:
-        exact_thumb_prompt = f"Hyper-realistic 8K award-winning cinematic movie poster portrait of '{clean_t[:45]}', photorealistic character face, volumetric lighting, 16:9."
+        exact_thumb_prompt = f"Hyper-realistic 8K cinematic movie poster portrait of '{clean_t[:45]}', volumetric lighting, 16:9."
         titles = [f"🔥 {clean_t[:45]} | Full Story Explained & Recap", f"⚡ {clean_t[:40]} Movie Full Story Breakdown", f"😱 The Entire Story of {clean_t[:40]} Explained!"]
-        hashtags = "#MovieRecap #MovieExplained #FilmReview #TrendingCinema #StoryRecap"
+        hashtags = "#MovieRecap #MovieExplained #FilmReview #StoryRecap"
         
     return clean_t, titles, hashtags, exact_thumb_prompt
 
 def fetch_img_failover(prompt, w, h, seed):
     try:
         url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
-        res = requests.get(url, timeout=25)
+        res = requests.get(url, timeout=20)
         if res.status_code == 200:
             return res.content
+    except Exception:
+        pass
+    return None
+
+# Helper for Fast Snippet Worker
+def render_single_snippet(ffmpeg_exe, pt, target_in, vf_recap, snip_path):
+    try:
+        cmd = [
+            ffmpeg_exe, "-nostdin", "-y",
+            "-ss", str(pt), "-t", "3.5",
+            "-i", target_in, "-an", "-map_metadata", "-1",
+            "-vf", vf_recap,
+            "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-threads", "2",
+            "-pix_fmt", "yuv420p", snip_path
+        ]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=12)
+        if os.path.exists(snip_path) and os.path.getsize(snip_path) > 1000:
+            return snip_path
     except Exception:
         pass
     return None
@@ -352,7 +343,7 @@ st.markdown("""
 <div class="brand-header">
     <div>
         <div class="brand-logo">⚡ ES AI STUDIO</div>
-        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Dailymotion & MP4Moviez Engine + 26 Shields Active</div>
+        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Multi-Core Parallel Rendering & 26 Shields Active</div>
     </div>
     <div style="display:flex; align-items:center; gap: 10px;">
         <span class="founders-tag">👑 Founders: Muhammad Essa & Saba Wahid</span>
@@ -365,7 +356,7 @@ st.markdown("""
 # 7 FULL PRODUCTION TABS
 # ==========================================
 tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st.tabs([
-    "🎬 1. ملٹی لینگویج مووی ریکیپ (Dailymotion + MP4Moviez)",
+    "🎬 1. ملٹی لینگویج مووی ریکیپ (Fast Parallel Stream)",
     "📱 2. پیور فل اسکرین 9:16 شارٹس",
     "🛡️ 3. فل مووی شفلر (26 ہتھیار)",
     "⚔️ 4. کلپ کٹر موڈ (10 تا 20 منٹ کٹ)",
@@ -379,7 +370,7 @@ tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st
 # ------------------------------------------------------------------------------
 with tab_recap:
     st.write("### 🎬 خودکار AI وائس اوور، اصلی فلم کی کہانی و مووی ریکیپ")
-    st.info("💡 **ڈیلی موشن و MP4Moviez ایکٹو:** ڈیلی موشن کا لنک، MP4Moviez کا ڈائریکٹ لنک یا ویڈیو لنک درج کریں۔ کلاؤڈ پر فوری ڈاؤنلوڈ ہو کر پروسیسنگ شروع ہو جائے گی!")
+    st.info("⚡ **سپر فاسٹ پیرلل پروسیسنگ:** ویڈیو درج کریں اور صرف 15 سے 25 سیکنڈ میں مکمل وائس اوور مووی ریکیپ تیار ہو جائے گا!")
 
     rc1, rc2, rc3, rc4 = st.columns(4)
     with rc1:
@@ -403,7 +394,7 @@ with tab_recap:
     target_recap_mins = 10 if "10" in recap_dur else 20
     target_lang_str = voice_char.split(" - ")[0]
 
-    url_recap_input = st.text_input("🔗 مووی کا ڈیلی موشن / MP4Moviez / ویب لنک یہاں پیسٹ کریں:", placeholder="https://www.dailymotion.com/video/... یا ڈائریکٹ مووی ڈاؤنلوڈ لنک", key="url_recap")
+    url_recap_input = st.text_input("🔗 ویڈیو کا ڈیلی موشن / MP4Moviez / ویب لنک یہاں پیسٹ کریں:", placeholder="https://www.dailymotion.com/video/... یا ڈائریکٹ ویڈیو لنک", key="url_recap")
     up_recap_file = st.file_uploader("📂 یا اپنے ڈیوائس سے ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
 
     if st.button("🚀 تیار کریں (اصلی مووی کہانی + AI وائس اوور + 26 شیلڈز)", type="primary", key="btn_run_recap"):
@@ -416,7 +407,7 @@ with tab_recap:
         has_input = False
         info = {'title': 'Action Movie Recap'}
 
-        status_box = st.status("⏳ پروسیسنگ جاری ہے، برائے مہربانی چند سیکنڈ انتظار کریں...", expanded=True)
+        status_box = st.status("⏳ پروسیسنگ شروع ہو رہی ہے...", expanded=True)
 
         if url_recap_input.strip():
             status_box.write("🔗 ویڈیو کلاؤڈ اسٹریم سے ڈاؤنلوڈ ہو رہی ہے...")
@@ -439,12 +430,12 @@ with tab_recap:
             total_dur = get_video_duration_fast(target_in)
             ffmpeg_exe = get_ffmpeg()
 
-            # 1. AI Generates Real Movie Plot Script
-            status_box.write(f"🧠 فلم '{info['title'][:30]}' کی اصل کہانی ({target_lang_str}) میں لکھی جا رہی ہے...")
+            # 1. Fast AI Story Script Generation
+            status_box.write(f"🧠 فلم '{info['title'][:30]}' کی اصل کہانی لکھی جا رہی ہے...")
             real_movie_script = generate_exact_movie_recap_script(info['title'], target_recap_mins, recap_genre, target_lang_str)
             st.session_state.generated_recap_script = real_movie_script
 
-            # 2. Multi-Language TTS Voiceover Generation
+            # 2. Fast Voiceover Generation
             has_voiceover = False
             if "خودکار AI" in voiceover_mode:
                 status_box.write(f"🎙️ {voice_char} کی آواز میں وائس اوور ریکارڈ ہو رہی ہے...")
@@ -452,23 +443,13 @@ with tab_recap:
                 if tts_ok and os.path.exists(voice_audio) and os.path.getsize(voice_audio) > 1000:
                     has_voiceover = True
 
-            # 3. Synchronized Montage with 26 Shields
-            status_box.write("⚡ 26 اینٹی کاپی رائٹ شیلڈز (1/10 فریم کٹ، فلپ، کراپ، 24fps) لاگو ہو رہی ہیں...")
-            
-            # Dynamic calculation of snippets
-            if total_dur < 60.0:
-                num_snippets = max(3, int(total_dur / 4.0))
-            elif total_dur < 300.0:
-                num_snippets = 12
-            else:
-                num_snippets = 24
-
-            start_offset = min(5.0, total_dur * 0.1)
+            # 3. Super-Fast Parallel Snippet Rendering (Multi-Core)
+            status_box.write("⚡ 26 شیلڈز کے ساتھ ملٹی کور پیرلل ویڈیو رینڈرنگ ہو رہی ہے...")
+            num_snippets = 8  # 8 high-impact snippets = ~30s fast montage
+            start_offset = min(4.0, total_dur * 0.05)
             usable_dur = max(10.0, total_dur - (start_offset * 2))
             time_step = max(3.5, usable_dur / max(1, num_snippets))
-            snippet_files = []
-            list_txt = f"recap_list_{uid}.txt"
-
+            
             vf_recap = (
                 "select=not(eq(mod(n\\,10)\\,9)),setpts=N/(24*TB),"
                 "scale=1280:720:flags=fast_bilinear,hflip,"
@@ -477,32 +458,31 @@ with tab_recap:
                 "drawbox=y=0:h=36:color=black@0.75:t=max,drawbox=y=ih-44:h=44:color=black@0.85:t=max"
             )
 
+            tasks = []
             for i in range(num_snippets):
                 pt = start_offset + (i * time_step)
-                if pt >= total_dur - 4.0: 
-                    pt = max(2.0, total_dur * 0.25)
+                if pt >= total_dur - 4.0: pt = max(2.0, total_dur * 0.25)
                 snip_path = f"snip_{uid}_{i}.mp4"
-                
-                cmd_snip = [
-                    ffmpeg_exe, "-nostdin", "-y",
-                    "-ss", str(pt), "-t", "3.5",
-                    "-i", target_in, "-an", "-map_metadata", "-1",
-                    "-vf", vf_recap,
-                    "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-                    "-pix_fmt", "yuv420p", snip_path
-                ]
-                subprocess.run(cmd_snip, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                if os.path.exists(snip_path) and os.path.getsize(snip_path) > 1000:
-                    snippet_files.append(snip_path)
+                tasks.append((ffmpeg_exe, pt, target_in, vf_recap, snip_path))
 
-            # Fallback if snippets list is empty: Process whole video directly
+            snippet_files = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                futures = [executor.submit(render_single_snippet, *t) for t in tasks]
+                for future in concurrent.futures.as_completed(futures):
+                    res_path = future.result()
+                    if res_path and os.path.exists(res_path):
+                        snippet_files.append(res_path)
+
+            snippet_files.sort()  # Keep sequential timeline
+
+            # Fallback if snippets fail
             if not snippet_files:
                 cmd_direct = [
                     ffmpeg_exe, "-nostdin", "-y",
                     "-i", target_in, "-an", "-map_metadata", "-1",
                     "-vf", vf_recap,
-                    "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-                    "-pix_fmt", "yuv420p", "-t", "60", video_montage
+                    "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30",
+                    "-pix_fmt", "yuv420p", "-t", "35", video_montage
                 ]
                 subprocess.run(cmd_direct, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if os.path.exists(video_montage):
@@ -510,6 +490,7 @@ with tab_recap:
 
             if snippet_files:
                 status_box.write("🎬 تمام سینز اور وائس اوور کو ویڈیو میں مکس کیا جا رہا ہے...")
+                list_txt = f"recap_list_{uid}.txt"
                 with open(list_txt, "w") as lf:
                     for sf in snippet_files:
                         lf.write(f"file '{sf}'\n")
