@@ -200,6 +200,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
 
     # 3. MP4Moviez & Direct Video Links (Pixeldrain, FastDL, HubCloud, Dropbox, Direct MP4)
     if raw_url.startswith("http") and ("youtube.com" not in raw_url and "youtu.be" not in raw_url):
+        # Auto-convert Pixeldrain share to API direct download
         direct_url = raw_url
         if "pixeldrain.com/u/" in raw_url:
             direct_url = raw_url.replace("pixeldrain.com/u/", "pixeldrain.com/api/file/")
@@ -216,6 +217,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
                     for chunk in r.iter_content(chunk_size=1024 * 1024 * 8):
                         if chunk: f.write(chunk)
                 if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                    # Check if filename is in headers
                     cd = r.headers.get('content-disposition', '')
                     if 'filename=' in cd:
                         m_fn = re.search(r'filename=["\']?([^"\']+)["\']?', cd)
@@ -224,6 +226,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
         except Exception:
             pass
 
+        # yt-dlp Universal Web Video Fallback (Archive.org, Vimeo, Facebook, etc.)
         try:
             import yt_dlp
             ydl_opts = {
@@ -433,7 +436,6 @@ with tab_recap:
         voice_audio = f"recap_voice_{uid}.mp3"
         video_montage = f"recap_video_{uid}.mp4"
         final_recap_out = f"final_recap_{uid}.mp4"
-        output_ready_path = ""  # Fixed: Pre-initialized to prevent NameError
         has_input = False
         info = {'title': 'Action Movie Recap'}
 
@@ -544,7 +546,7 @@ with tab_recap:
             if os.path.exists(target_in): os.remove(target_in)
             if os.path.exists(voice_audio): os.remove(voice_audio)
 
-            if output_ready_path and os.path.exists(output_ready_path) and os.path.getsize(output_ready_path) > 5000:
+            if os.path.exists(output_ready_path) and os.path.getsize(output_ready_path) > 5000:
                 st.session_state.recap_video_out = output_ready_path
                 st.session_state.detected_info = info
                 status_box.update(label="🎉 آپ کی مووی ریکیپ ویڈیو 100% تیار ہے!", state="complete", expanded=False)
