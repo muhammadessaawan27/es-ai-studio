@@ -119,65 +119,82 @@ def save_tts_voiceover_sync(text, voice_name, rate_str, pitch_str, out_file):
         return False
 
 # ==============================================================================
-# GOOGLE DRIVE & UNIVERSAL CLOUD MEDIA DOWNLOADER (NO 403 / NO FREEZE)
+# NEW 2026 GOOGLE DRIVE USERCONTENT HIGH-SPEED STREAM ENGINE
 # ==============================================================================
-def download_google_drive(file_id, target_path):
-    try:
-        session = requests.Session()
-        url = f"https://drive.google.com/uc?export=download&id={file_id}"
-        res = session.get(url, stream=True, timeout=20)
-        
-        token = None
-        for k, v in res.cookies.items():
-            if k.startswith('download_warning'):
-                token = v
-                break
-                
-        if not token:
-            confirm_match = re.search(r'confirm=([0-9A-Za-z_]+)', res.text)
-            if confirm_match:
-                token = confirm_match.group(1)
-                
-        if token:
-            url = f"https://drive.google.com/uc?export=download&confirm={token}&id={file_id}"
-            res = session.get(url, stream=True, timeout=20)
+def download_google_drive_robust(file_id, target_path):
+    session = requests.Session()
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "*/*"
+    }
+    
+    # 2026 High Speed Direct UserContent CDN Endpoints
+    urls_to_try = [
+        f"https://drive.usercontent.google.com/download?id={file_id}&export=download&authuser=0&confirm=t",
+        f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t",
+        f"https://docs.google.com/uc?export=download&id={file_id}"
+    ]
+    
+    for download_url in urls_to_try:
+        try:
+            res = session.get(download_url, stream=True, timeout=25, headers=headers)
             
-        with open(target_path, "wb") as f:
-            for chunk in res.iter_content(chunk_size=1024*1024*8):
-                if chunk: f.write(chunk)
-                
-        if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
-            return True, "Google Drive Movie File"
-    except Exception:
-        pass
+            # Check if Google returned an HTML login or access error
+            content_type = res.headers.get("content-type", "").lower()
+            if "html" in content_type:
+                # Look for virus scan confirmation token in HTML
+                confirm_match = re.search(r'confirm=([0-9A-Za-z_\-]+)', res.text)
+                if confirm_match:
+                    token = confirm_match.group(1)
+                    retry_url = f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm={token}"
+                    res = session.get(retry_url, stream=True, timeout=25, headers=headers)
+
+            # Stream chunks directly to disk (Zero RAM congestion)
+            with open(target_path, "wb") as f:
+                for chunk in res.iter_content(chunk_size=1024 * 1024 * 8):
+                    if chunk:
+                        f.write(chunk)
+                        
+            if os.path.exists(target_path) and os.path.getsize(target_path) > 30000:
+                # Verify that the downloaded file is a real video and not an HTML error
+                with open(target_path, "rb") as f_check:
+                    head = f_check.read(100)
+                    if b"<!DOCTYPE" not in head and b"<html" not in head:
+                        return True, "Google Drive Movie File"
+        except Exception:
+            continue
+            
     return False, ""
 
 def download_unblockable_media_parallel(raw_url, target_path):
     raw_url = raw_url.strip()
     
-    # 1. Check if it's a Google Drive Link (100% Reliable & Fast)
+    # 1. Google Drive Link Check (Instant 5-Second Bypass)
     g_id = extract_gdrive_id(raw_url)
-    if "drive.google.com" in raw_url and g_id:
-        ok, title = download_google_drive(g_id, target_path)
-        if ok: return True, title
+    if ("drive.google.com" in raw_url or "docs.google.com" in raw_url) and g_id:
+        ok, title = download_google_drive_robust(g_id, target_path)
+        if ok:
+            return True, title
+        else:
+            return False, "Google Drive Permission Error"
 
-    # 2. Check if it's a Direct MP4 / Video File URL
+    # 2. Direct MP4 / Cloud File Link
     if raw_url.startswith("http") and ("drive.google.com" not in raw_url) and not extract_yt_id(raw_url):
         try:
-            r = requests.get(raw_url, stream=True, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+            r = requests.get(raw_url, stream=True, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
             if r.status_code == 200:
                 with open(target_path, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=1024*1024*4):
+                    for chunk in r.iter_content(chunk_size=1024*1024*8):
                         if chunk: f.write(chunk)
                 if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
                     return True, "Direct Stream Video"
         except Exception:
             pass
 
-    # 3. High Speed Piped / Invidious Stream Fetch for YouTube
+    # 3. YouTube Multi-API Piped / Invidious Fallback
     vid_id = extract_yt_id(raw_url)
     clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url
-    title = fetch_oembed_title(clean_url) or "Action Video Track"
+    title = fetch_oembed_title(clean_url) or "Action Video Scene"
 
     if vid_id:
         apis = [
@@ -208,14 +225,10 @@ def download_unblockable_media_parallel(raw_url, target_path):
             except Exception:
                 pass
 
-    # 4. Resilient yt-dlp Multi-Client Android / iOS / Embedded Bypass
+    # 4. yt-dlp Android & Embedded Fallback
     try:
         import yt_dlp
-        clients = [
-            ['android', 'ios'],
-            ['tv_embedded', 'tvhtml5'],
-            ['web_creator', 'android_creator']
-        ]
+        clients = [['android', 'ios'], ['tv_embedded', 'tvhtml5']]
         for cl in clients:
             ydl_opts = {
                 'format': '18/best[height<=480][ext=mp4]/best[ext=mp4]/best',
@@ -231,8 +244,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     meta = ydl.extract_info(clean_url, download=True)
-                    if meta:
-                        title = meta.get('title', title)
+                    if meta: title = meta.get('title', title)
                 if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
                     return True, title
             except Exception:
@@ -366,7 +378,7 @@ st.markdown("""
 <div class="brand-header">
     <div>
         <div class="brand-logo">⚡ ES AI STUDIO</div>
-        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Google Drive + YouTube 26-Shield Storyteller Studio</div>
+        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Google Drive Direct CDN & 26-Shield Storyteller Studio</div>
     </div>
     <div style="display:flex; align-items:center; gap: 10px;">
         <span class="founders-tag">👑 Founders: Essa & Saba Waheed</span>
@@ -393,7 +405,14 @@ tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st
 # ------------------------------------------------------------------------------
 with tab_recap:
     st.write("### 🎬 خودکار AI وائس اوور، اردو اسکرپٹ و مووی ریکیپ جنریٹر")
-    st.info("💡 **گوگل ڈرائیو و یوٹیوب سپورٹ:** گوگل ڈرائیو، یوٹیوب یا ڈائریکٹ لنک ڈالتے ہی خودکار اردو کہانی لکھی جائے گی، اسد، صبا یا وحید کی آواز میں وائس اوور ہوگا اور 26 شیلڈز لاگو کر کے مکمل ویڈیو تیار ہوگی۔")
+    
+    # Direct Link Generator Helper Box
+    with st.expander("🔗 **گوگل ڈرائیو شیئرنگ گائیڈ (صرف 1 منٹ میں درست پبلک لنک بنائیں):**", expanded=False):
+        st.markdown("""
+        1. اپنے گوگل ڈرائیو میں ویڈیو پر **3 نقطوں (`⋮`)** پر کلک کریں۔
+        2. **Share / Manage access** پر جا کر **General Access** کو **"Anyone with the link" (جس کے پاس بھی لنک ہو)** کر دیں۔
+        3. **Copy Link** کر کے نیچے لنک والے باکس میں پیسٹ کریں۔
+        """)
 
     rc1, rc2, rc3, rc4 = st.columns(4)
     with rc1:
@@ -422,7 +441,7 @@ with tab_recap:
     target_recap_mins = 10 if "10" in recap_dur else 20
     voice_key = "asad" if "اسد" in voice_char else "saba" if "صبا" in voice_char else "waheed" if "وحید" in voice_char else "gul"
 
-    url_recap_input = st.text_input("🔗 گوگل ڈرائیو لنک / یوٹیوب لنک / ویب لنک یہاں پیسٹ کریں (ڈائریکٹ فاسٹ ڈاؤنلوڈ):", placeholder="https://drive.google.com/file/d/... یا https://youtu.be/...", key="url_recap")
+    url_recap_input = st.text_input("🔗 گوگل ڈرائیو لنک / ویڈیو ویب لنک یہاں پیسٹ کریں (سب سے تیز اور پکا طریقہ):", placeholder="https://drive.google.com/file/d/... یا ڈائریکٹ لنک", key="url_recap")
     up_recap_file = st.file_uploader("📂 یا اپنے ڈیوائس سے ویڈیو فائل منتخب کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
 
     if st.button("🚀 تیار کریں (AI وائس اوور + اسکرپٹ + شیلڈز) مکمل مووی ریکیپ", type="primary", key="btn_run_recap"):
@@ -442,8 +461,11 @@ with tab_recap:
             if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
                 has_input = True
                 info['title'] = title_fetched
+            else:
+                if "Permission" in title_fetched:
+                    status_box.update(label="❌ گوگل ڈرائیو پر فائل 'Anyone with the link' پبلک نہیں ہے۔ براہِ کرم گوگل ڈرائیو میں Share پر جا کر پبلک کریں۔", state="error")
         elif up_recap_file is not None:
-            status_box.write("📂 اپلوڈ شدہ ویڈیو فائل کو ڈسک پر اسٹریم کیا جا رہا ہے...")
+            status_box.write("📂 اپلوڈ شدہ ویڈیو فائل کو ڈسک پر محفوظ کیا جا رہا ہے...")
             with open(target_in, "wb") as f:
                 while True:
                     chunk = up_recap_file.read(1024 * 1024 * 8)
@@ -550,7 +572,8 @@ with tab_recap:
             else:
                 status_box.update(label="❌ پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔", state="error")
         else:
-            status_box.update(label="❌ ویڈیو حاصل نہیں ہو سکی۔ براہِ کرم لنک چیک کریں۔", state="error")
+            if not has_input and "Permission" not in status_box.label:
+                status_box.update(label="❌ ویڈیو حاصل نہیں ہو سکی۔ براہِ کرم گوگل ڈرائیو لنک کی شیئرنگ سیٹنگ 'Anyone with the link' چیک کریں۔", state="error")
 
     # Display Ready Video & Full Script Section
     if st.session_state.recap_video_out and os.path.exists(st.session_state.recap_video_out):
@@ -603,7 +626,7 @@ with tab_shorts:
     count_target = 1 if "1" in num_shorts else 2 if "2" in num_shorts else 3
     dur_sec_target = 30 if "30" in short_dur else 15 if "15" in short_dur else 60
 
-    url_shorts_input = st.text_input("🔗 گوگل ڈرائیو یا یوٹیوب لنک ڈالیں:", placeholder="https://drive.google.com/... یا https://...", key="url_shorts_pure")
+    url_shorts_input = st.text_input("🔗 گوگل ڈرائیو یا ویڈیو لنک ڈالیں:", placeholder="https://drive.google.com/... یا https://...", key="url_shorts_pure")
     up_shorts_file = st.file_uploader("📂 یا ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_shorts_pure")
 
     if st.button(f"🚀 {count_target} فل اسکرین 9:16 شارٹس بنائیں", type="primary", key="btn_run_shorts_pure"):
@@ -680,7 +703,7 @@ with tab_shield:
     with c1: shield_mode = st.selectbox("شیلڈ اسٹائل:", ["🛡️ فل شفلر: لوگو کٹ + سین شفل + 1/10واں کٹ", "⚡ لکیری موڈ: لوگو کٹ + 1/10واں کٹ"], key="sm_t1")
     with c2: voice_quality = st.selectbox("ڈبنگ:", ["🔊 کرسٹل کلیئر بیریٹون ڈبنگ", "🎵 نیچرل اسمارٹ پچ"], key="am_t1")
 
-    url_input = st.text_input("🔗 گوگل ڈرائیو یا یوٹیوب لنک ڈالیں:", placeholder="https://drive.google.com/... یا https://...", key="url_main")
+    url_input = st.text_input("🔗 گوگل ڈرائیو یا ویڈیو لنک ڈالیں:", placeholder="https://drive.google.com/... یا https://...", key="url_main")
     up_file = st.file_uploader("📂 یا ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_main")
 
     if st.button("🚀 فل ویڈیو تیار کریں", type="primary", key="btn_main"):
