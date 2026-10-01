@@ -21,7 +21,7 @@ import concurrent.futures
 # STREAMLIT CONFIGURATION & SESSION STATE
 # ==========================================
 st.set_page_config(
-    page_title="ES AI Studio | Essa & Saba",
+    page_title="ES AI Studio | Essa & Saba Waheed",
     layout="wide",
     page_icon="⚡"
 )
@@ -53,7 +53,6 @@ def extract_yt_id(raw_url):
     if not raw_url:
         return None
     raw_url = raw_url.strip()
-    # Strip tracking parameters (?si=..., &t=..., etc.)
     clean_raw = raw_url.split('?si=')[0].split('&si=')[0].split('?t=')[0]
     m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([0-9A-Za-z_-]{11})', clean_raw)
     return m.group(1) if m else None
@@ -113,14 +112,28 @@ def save_tts_voiceover_sync(text, voice_name, rate_str, pitch_str, out_file):
         return False
 
 # ==============================================================================
-# ULTRA ROBUST MULTI-SOURCE DOWNLOADER (NO 403 / NO FREEZE)
+# UNIVERSAL CLOUD MEDIA DOWNLOADER (YOUTUBE, DIRECT MP4, DRIVE, ETC.)
 # ==============================================================================
 def download_unblockable_media_parallel(raw_url, target_path):
+    raw_url = raw_url.strip()
     vid_id = extract_yt_id(raw_url)
-    clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url.strip()
+    clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url
     title = fetch_oembed_title(clean_url) or "Action Video Track"
 
-    # 1. High Speed Piped / Invidious Multi-Node Stream Fetch
+    # 1. Direct Web/MP4/Drive Stream Download (Fastest for non-YouTube or Direct URLs)
+    if not vid_id and raw_url.startswith("http"):
+        try:
+            r = requests.get(raw_url, stream=True, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code == 200:
+                with open(target_path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=1024*1024*4):
+                        if chunk: f.write(chunk)
+                if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                    return True, "Direct Stream Video"
+        except Exception:
+            pass
+
+    # 2. High Speed Multi-Node Piped / Invidious Stream Fetch
     if vid_id:
         apis = [
             f"https://pipedapi.kavin.rocks/streams/{vid_id}",
@@ -140,7 +153,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
                     if mp4s:
                         dl_url = mp4s[0].get("url", "")
                         if dl_url:
-                            r_file = requests.get(dl_url, stream=True, timeout=8)
+                            r_file = requests.get(dl_url, stream=True, timeout=10)
                             if r_file.status_code == 200:
                                 with open(target_path, "wb") as f:
                                     for chunk in r_file.iter_content(chunk_size=1024*1024*4):
@@ -150,12 +163,12 @@ def download_unblockable_media_parallel(raw_url, target_path):
             except Exception:
                 pass
 
-    # 2. Resilient yt-dlp Multi-Client Android / iOS Extractor
+    # 3. Resilient yt-dlp Multi-Client Android / iOS / Embedded Bypass
     try:
         import yt_dlp
         clients = [
             ['android', 'ios'],
-            ['tvhtml5', 'mweb'],
+            ['tv_embedded', 'tvhtml5'],
             ['web_creator', 'android_creator']
         ]
         for cl in clients:
@@ -182,7 +195,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
     except Exception:
         pass
 
-    # 3. Direct FFmpeg Stream Sniffer
+    # 4. Direct FFmpeg Stream Sniffer
     try:
         ffmpeg_exe = get_ffmpeg()
         cmd = [
@@ -282,44 +295,46 @@ def fetch_img_failover(prompt, w, h, seed):
     return None
 
 # ==========================================
-# GLOWING LOGO & BRANDING UI (ESSA & SABA)
+# CLEAN, BRIGHT & READABLE LIGHT THEME
 # ==========================================
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;600;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; font-size: 13px !important; }
-    .stApp { background-color: #090d16 !important; color: #f1f5f9 !important; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; font-size: 13.5px !important; }
     
-    /* Glowing Neon Logo Header */
+    /* Clean Light Theme */
+    .stApp { background-color: #ffffff !important; color: #0f172a !important; }
+    
+    /* Modern Header */
     .brand-header {
-        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
-        padding: 16px 24px; border-radius: 12px; border: 1px solid #38bdf8;
-        box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
+        background: #0f172a; color: #ffffff; padding: 14px 22px; border-radius: 10px;
         display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+        border-bottom: 3px solid #0284c7;
     }
-    .brand-logo {
-        font-family: 'Orbitron', sans-serif !important;
-        font-size: 1.4rem !important; font-weight: 900 !important;
-        background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        letter-spacing: 1px;
-    }
+    .brand-logo { font-size: 1.35rem !important; font-weight: 800 !important; color: #38bdf8 !important; }
     .founders-tag {
-        font-size: 12px; font-weight: 700; color: #fbbf24;
-        background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.4);
+        font-size: 12.5px; font-weight: 700; color: #fbbf24;
+        background: rgba(251, 191, 36, 0.15); border: 1px solid #fbbf24;
         padding: 5px 12px; border-radius: 20px;
     }
     .badge-26 {
-        background: linear-gradient(90deg, #059669, #10b981); color: #ffffff;
-        padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
+        background: #059669; color: #ffffff; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800;
     }
+    
+    /* Input Fields & Text Visibility */
+    .stTextInput>div>div>input, .stSelectbox>div>div>div {
+        background-color: #f8fafc !important; color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important; font-size: 13.5px !important; font-weight: 600 !important;
+    }
+    label { color: #0f172a !important; font-weight: 700 !important; font-size: 13px !important; }
+    
+    /* Primary Action Buttons */
     .stButton>button { 
-        background: linear-gradient(90deg, #0284c7, #2563eb) !important; color: white !important;
-        border-radius: 8px !important; height: 44px !important; font-size: 14px !important; font-weight: 700 !important;
-        border: none !important; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4) !important;
+        background: #0284c7 !important; color: #ffffff !important; border-radius: 8px !important; 
+        height: 44px !important; font-size: 14px !important; font-weight: 700 !important; border: none !important;
     }
-    .stTabs [data-baseweb="tab"] { height: 38px !important; font-size: 12.5px !important; font-weight: 700 !important; color: #94a3b8; }
-    .stTabs [aria-selected="true"] { color: #38bdf8 !important; border-bottom-color: #38bdf8 !important; }
+    .stTabs [data-baseweb="tab"] { height: 38px !important; font-size: 13px !important; font-weight: 700 !important; color: #475569; }
+    .stTabs [aria-selected="true"] { color: #0284c7 !important; border-bottom: 2px solid #0284c7 !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -327,17 +342,17 @@ st.markdown("""
 <div class="brand-header">
     <div>
         <div class="brand-logo">⚡ ES AI STUDIO</div>
-        <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Ultra 26-Shield Anti-Copyright & Video Storyteller Engine</div>
+        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Ultra 26-Shield Anti-Copyright & Video Storyteller Studio</div>
     </div>
     <div style="display:flex; align-items:center; gap: 10px;">
-        <span class="founders-tag">👑 Founders: Muhammad Essa & Saba</span>
+        <span class="founders-tag">👑 Founders: Essa & Saba Waheed</span>
         <span class="badge-26">26 SHIELDS ACTIVE</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 7 FULL PRODUCTION TABS
+# 7 PRODUCTION TABS
 # ==========================================
 tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st.tabs([
     "🎬 1. آٹو اسد/صبا وائس اوور و مووی ریکیپ",
@@ -354,7 +369,7 @@ tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st
 # ------------------------------------------------------------------------------
 with tab_recap:
     st.write("### 🎬 خودکار AI وائس اوور، اردو اسکرپٹ و مووی ریکیپ جنریٹر")
-    st.info("⚡ **سپر فاسٹ اسٹریم:** لنک ڈالتے ہی 15 سے 30 سیکنڈ میں خودکار اردو کہانی لکھی جائے گی، اسد یا صبا کی آواز میں وائس اوور ہوگا اور 26 شیلڈز لاگو کر کے 100% تیار ویڈیو سامنے آ جائے گی۔")
+    st.info("💡 **سپر فاسٹ اسٹریم:** لنک یا فائل ڈالتے ہی خودکار اردو کہانی لکھی جائے گی، اسد، صبا یا وحید کی آواز میں وائس اوور ہوگا اور 26 شیلڈز لاگو کر کے مکمل ویڈیو تیار ہوگی۔")
 
     rc1, rc2, rc3, rc4 = st.columns(4)
     with rc1:
@@ -383,8 +398,8 @@ with tab_recap:
     target_recap_mins = 10 if "10" in recap_dur else 20
     voice_key = "asad" if "اسد" in voice_char else "saba" if "صبا" in voice_char else "waheed" if "وحید" in voice_char else "gul"
 
-    url_recap_input = st.text_input("🔗 مووی کا یوٹیوب / ویب لنک یہاں پیسٹ کریں (سب سے تیز ترین طریقہ):", placeholder="https://www.youtube.com/watch?v=... یا https://youtu.be/...", key="url_recap")
-    up_recap_file = st.file_uploader("📂 یا چھوٹی ویڈیو فائل اپلوڈ کریں (10MB سے 150MB تک):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
+    url_recap_input = st.text_input("🔗 مووی کا یوٹیوب / گوگل ڈرائیو / ویب لنک یہاں پیسٹ کریں (سب سے تیز طریقہ):", placeholder="https://www.youtube.com/watch?v=... یا https://youtu.be/...", key="url_recap")
+    up_recap_file = st.file_uploader("📂 یا اپنے ڈیوائس سے ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
 
     if st.button("🚀 تیار کریں (AI وائس اوور + اسکرپٹ + شیلڈز) مکمل مووی ریکیپ", type="primary", key="btn_run_recap"):
         uid = str(uuid.uuid4())[:8]
@@ -397,17 +412,19 @@ with tab_recap:
 
         status_box = st.status("⏳ پروسیسنگ شروع ہو رہی ہے...", expanded=True)
 
-        # Smart Input Detection
         if url_recap_input.strip():
-            status_box.write("🔗 ویڈیو یوٹیوب فاسٹ اسٹریم کے ذریعے فیچ ہو رہی ہے...")
+            status_box.write("🔗 ویڈیو کلاؤڈ اسٹریم بائی پاس کے ذریعے ڈاؤنلوڈ ہو رہی ہے...")
             success, title_fetched = download_unblockable_media_parallel(url_recap_input.strip(), target_in)
             if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
                 has_input = True
                 info['title'] = title_fetched
         elif up_recap_file is not None:
-            status_box.write("📂 اپلوڈ شدہ ویڈیو فائل محفوظ ہو رہی ہے...")
+            status_box.write("📂 اپلوڈ شدہ ویڈیو فائل کو ڈسک پر اسٹریم کیا جا رہا ہے...")
             with open(target_in, "wb") as f:
-                f.write(up_recap_file.getbuffer())
+                while True:
+                    chunk = up_recap_file.read(1024 * 1024 * 8)
+                    if not chunk: break
+                    f.write(chunk)
             if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
                 has_input = True
                 info['title'] = up_recap_file.name
@@ -509,7 +526,7 @@ with tab_recap:
             else:
                 status_box.update(label="❌ پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔", state="error")
         else:
-            status_box.update(label="❌ ویڈیو لنک درست نہیں ہے یا پروسیس نہیں ہو سکی۔", state="error")
+            status_box.update(label="❌ ویڈیو لنک درست نہیں ہے یا حاصل نہیں ہو سکی۔", state="error")
 
     # Display Ready Video & Full Script Section
     if st.session_state.recap_video_out and os.path.exists(st.session_state.recap_video_out):
@@ -527,7 +544,7 @@ with tab_recap:
 
         st.markdown("---")
         st.subheader("📖 مکمل اردو وائس اوور اسکرپٹ (Urdu Voiceover Narrative):")
-        st.info("💡 یہ مکمل اردو کہانی اسکرپٹ ہے جسے آپ خود پڑھنے کے لیے بھی محفوظ رکھ سکتے ہیں:")
+        st.info("💡 یہ مکمل اردو کہانی اسکرپٹ ہے جسے آپ محفوظ رکھ سکتے ہیں:")
         st.code(st.session_state.generated_recap_script, language="markdown")
 
         st.markdown("---")
@@ -562,7 +579,7 @@ with tab_shorts:
     count_target = 1 if "1" in num_shorts else 2 if "2" in num_shorts else 3
     dur_sec_target = 30 if "30" in short_dur else 15 if "15" in short_dur else 60
 
-    url_shorts_input = st.text_input("🔗 یوٹیوب لنک ڈالیں:", placeholder="https://...", key="url_shorts_pure")
+    url_shorts_input = st.text_input("🔗 یوٹیوب یا ویڈیو لنک ڈالیں:", placeholder="https://...", key="url_shorts_pure")
     up_shorts_file = st.file_uploader("📂 یا ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_shorts_pure")
 
     if st.button(f"🚀 {count_target} فل اسکرین 9:16 شارٹس بنائیں", type="primary", key="btn_run_shorts_pure"):
@@ -786,10 +803,10 @@ with tab_image:
                 st.image(img_bytes, caption="Generated AI Image")
 
 # ==========================================
-# FOOTER BRANDING (ESSA & SABA)
+# FOOTER BRANDING (ESSA & SABA WAHEED)
 # ==========================================
 st.markdown("""
-<div style='text-align: center; font-size: 12px; color: #64748b; margin-top: 30px; border-top: 1px solid #1e293b; padding-top: 14px;'>
-    ⚡ <strong>ES AI Studio</strong> | Founders: <strong>Muhammad Essa & Saba</strong> | All Rights Reserved © 2026
+<div style='text-align: center; font-size: 13px; color: #475569; margin-top: 32px; border-top: 2px solid #e2e8f0; padding-top: 14px; font-weight: 600;'>
+    ⚡ <strong>ES AI Studio</strong> | Founders: <strong>Essa & Saba Waheed</strong> | All Rights Reserved © 2026
 </div>
 """, unsafe_allow_html=True)
