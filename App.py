@@ -13,9 +13,6 @@ import subprocess
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 import io
 import numpy as np
-import threading
-import gc
-import concurrent.futures
 
 # ==========================================
 # STREAMLIT CONFIGURATION & SESSION STATE
@@ -49,14 +46,6 @@ def get_ffmpeg():
     except Exception:
         return "ffmpeg"
 
-def extract_yt_id(raw_url):
-    if not raw_url:
-        return None
-    raw_url = raw_url.strip()
-    clean_raw = raw_url.split('?si=')[0].split('&si=')[0].split('?t=')[0]
-    m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([0-9A-Za-z_-]{11})', clean_raw)
-    return m.group(1) if m else None
-
 def extract_gdrive_id(raw_url):
     if not raw_url:
         return None
@@ -89,7 +78,7 @@ def get_video_duration_fast(file_path):
                 return total
     except Exception:
         pass
-    return 600.0
+    return 300.0
 
 def clean_text_for_tts(raw_text):
     clean = re.sub(r'[#\*\_]', '', raw_text)
@@ -127,7 +116,7 @@ def save_multilang_voiceover_sync(text, voice_key, out_file):
         return False
 
 # ==============================================================================
-# UNIVERSAL MEDIA DOWNLOADER (DAILYMOTION + MP4MOVIEZ + DIRECT MP4 + CLOUD)
+# UNIVERSAL MEDIA DOWNLOADER
 # ==============================================================================
 def download_google_drive_robust(file_id, target_path):
     session = requests.Session()
@@ -151,7 +140,7 @@ def download_google_drive_robust(file_id, target_path):
                     res = session.get(retry_url, stream=True, timeout=25, headers=headers)
 
             with open(target_path, "wb") as f:
-                for chunk in res.iter_content(chunk_size=1024 * 1024 * 8):
+                for chunk in res.iter_content(chunk_size=1024 * 1024 * 4):
                     if chunk: f.write(chunk)
                         
             if os.path.exists(target_path) and os.path.getsize(target_path) > 30000:
@@ -167,14 +156,14 @@ def download_unblockable_media_parallel(raw_url, target_path):
     raw_url = raw_url.strip()
     title = fetch_oembed_title(raw_url) or "Action Movie Video"
 
-    # 1. Google Drive Auto-Detection
+    # 1. Google Drive
     g_id = extract_gdrive_id(raw_url)
     if ("drive.google.com" in raw_url or "docs.google.com" in raw_url) and g_id:
         ok, t = download_google_drive_robust(g_id, target_path)
         if ok: return True, t
         return False, "Google Drive Permission Error"
 
-    # 2. Dailymotion Link Engine
+    # 2. Dailymotion Engine
     if "dailymotion.com" in raw_url or "dai.ly" in raw_url:
         try:
             import yt_dlp
@@ -186,8 +175,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
                 'quiet': True,
                 'no_warnings': True,
                 'nocheckcertificate': True,
-                'socket_timeout': 30,
-                'retries': 3
+                'socket_timeout': 30
             }
             if ffmpeg_dir: ydl_opts['ffmpeg_location'] = ffmpeg_dir
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -198,7 +186,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
         except Exception:
             pass
 
-    # 3. MP4Moviez & Direct Video Links (Pixeldrain, FastDL, HubCloud, Dropbox, Direct MP4)
+    # 3. Direct Link / Pixeldrain / Dropbox
     if raw_url.startswith("http") and ("youtube.com" not in raw_url and "youtu.be" not in raw_url):
         direct_url = raw_url
         if "pixeldrain.com/u/" in raw_url:
@@ -213,14 +201,14 @@ def download_unblockable_media_parallel(raw_url, target_path):
             })
             if r.status_code == 200:
                 with open(target_path, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=1024 * 1024 * 8):
+                    for chunk in r.iter_content(chunk_size=1024 * 1024 * 4):
                         if chunk: f.write(chunk)
                 if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
                     cd = r.headers.get('content-disposition', '')
                     if 'filename=' in cd:
                         m_fn = re.search(r'filename=["\']?([^"\']+)["\']?', cd)
                         if m_fn: title = m_fn.group(1)
-                    return True, title if title != "Action Movie Video" else "MP4Moviez Direct Video"
+                    return True, title if title != "Action Movie Video" else "Direct Video File"
         except Exception:
             pass
 
@@ -242,7 +230,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
         except Exception:
             pass
 
-    # 4. YouTube Fallback
+    # 4. YouTube
     m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([0-9A-Za-z_-]{11})', raw_url)
     if m:
         vid_id = m.group(1)
@@ -282,13 +270,12 @@ def generate_exact_movie_recap_script(movie_title, duration_mins, genre, target_
     try:
         instruction = (
             f"You are an expert film analyst and movie recap narrator. "
-            f"Explain the ACTUAL, CANONICAL story, plot twists, character actions, and climax of the real movie or video titled '{clean_title}'. "
-            f"Do NOT invent a generic fake story. Identify what this actual movie is about and explain its real storyline. "
+            f"Explain the ACTUAL story, plot twists, character actions, and climax of the real movie or video titled '{clean_title}'. "
             f"Target Language: {target_lang}. Genre/Theme: {genre}. Target duration: {duration_mins} minutes narrative. "
             f"Write continuous, highly engaging storytelling text for an AI narrator without stage notes or brackets."
         )
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction)}?model=openai"
-        res = requests.get(url, timeout=18)
+        res = requests.get(url, timeout=15)
         if res.status_code == 200 and len(res.text.strip()) > 60:
             return res.text.strip()
     except Exception:
@@ -423,7 +410,6 @@ with tab_recap:
     target_recap_mins = 10 if "10" in recap_dur else 20
     target_lang_str = voice_char.split(" - ")[0]
 
-    # Universal Single Link Input Box
     url_recap_input = st.text_input("🔗 مووی کا ڈیلی موشن / MP4Moviez / ویب لنک یہاں پیسٹ کریں:", placeholder="https://www.dailymotion.com/video/... یا ڈائریکٹ مووی ڈاؤنلوڈ لنک", key="url_recap")
     up_recap_file = st.file_uploader("📂 یا اپنے ڈیوائس سے ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
 
@@ -431,7 +417,6 @@ with tab_recap:
         uid = str(uuid.uuid4())[:8]
         target_in = f"recap_in_{uid}.mp4"
         voice_audio = f"recap_voice_{uid}.mp3"
-        video_montage = f"recap_video_{uid}.mp4"
         final_recap_out = f"final_recap_{uid}.mp4"
         output_ready_path = ""
         has_input = False
@@ -449,7 +434,7 @@ with tab_recap:
             status_box.write("📂 اپلوڈ شدہ فائل محفوظ ہو رہی ہے...")
             with open(target_in, "wb") as f:
                 while True:
-                    chunk = up_recap_file.read(1024 * 1024 * 8)
+                    chunk = up_recap_file.read(1024 * 1024 * 4)
                     if not chunk: break
                     f.write(chunk)
             if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
@@ -460,12 +445,12 @@ with tab_recap:
             total_dur = get_video_duration_fast(target_in)
             ffmpeg_exe = get_ffmpeg()
 
-            # 1. AI Generates Real Movie Plot Script
+            # 1. AI Real Story Script
             status_box.write(f"🧠 فلم '{info['title'][:30]}' کی اصل کہانی ({target_lang_str}) میں لکھی جا رہی ہے...")
             real_movie_script = generate_exact_movie_recap_script(info['title'], target_recap_mins, recap_genre, target_lang_str)
             st.session_state.generated_recap_script = real_movie_script
 
-            # 2. Multi-Language TTS Voiceover Generation
+            # 2. Voiceover
             has_voiceover = False
             if "خودکار AI" in voiceover_mode:
                 status_box.write(f"🎙️ {voice_char} کی آواز میں وائس اوور ریکارڈ ہو رہی ہے...")
@@ -473,113 +458,65 @@ with tab_recap:
                 if tts_ok and os.path.exists(voice_audio) and os.path.getsize(voice_audio) > 1000:
                     has_voiceover = True
 
-            # 3. Synchronized Montage with 26 Shields
-            status_box.write("⚡ 26 اینٹی کاپی رائٹ شیلڈز (1/10 فریم کٹ، فلپ، کراپ، 24fps) لاگو ہو رہی ہیں...")
-            start_offset = 8.0
-            usable_movie_dur = max(30.0, total_dur - 16.0)
-            num_snippets = 18
-            time_step = max(3.0, usable_movie_dur / num_snippets)
-            snippet_files = []
-            list_txt = f"recap_list_{uid}.txt"
-
+            # 3. 26 Shields Processing (Rock-Solid Filter)
+            status_box.write("⚡ 26 اینٹی کاپی رائٹ شیلڈز (کراپ، کلر شفٹ، ڈرا باکس، 24fps) لاگو ہو رہی ہیں...")
+            
             vf_recap = (
-                "select=not(eq(mod(n\\,10)\\,9)),setpts=N/(24*TB),"
-                "scale=1280:720:flags=fast_bilinear,hflip,"
-                "crop=iw*0.84:ih*0.84,scale=1280:720,"
-                "eq=contrast=1.18:saturation=1.22:brightness=0.02,"
-                "drawbox=y=0:h=36:color=black@0.75:t=max,drawbox=y=ih-44:h=44:color=black@0.85:t=max"
+                "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,"
+                "hflip,crop=1080:600:(1280-1080)/2:(720-600)/2,scale=1280:720,"
+                "eq=contrast=1.16:saturation=1.20:brightness=0.02,"
+                "drawbox=y=0:h=36:color=black@0.75:t=fill,drawbox=y=ih-44:h=44:color=black@0.85:t=fill,"
+                "fps=24"
             )
 
-            for i in range(num_snippets):
-                pt = start_offset + (i * time_step)
-                if pt >= total_dur - 5.0: pt = max(5.0, total_dur * 0.35)
-                snip_path = f"snip_{uid}_{i}.mp4"
-                
-                cmd_snip = [
+            start_cut = min(10.0, max(0.0, total_dur * 0.1))
+            run_dur = min(total_dur - start_cut - 2.0, 90.0)
+            if run_dur < 10.0: run_dur = total_dur
+
+            if has_voiceover and os.path.exists(voice_audio):
+                cmd_render = [
                     ffmpeg_exe, "-nostdin", "-y",
-                    "-ss", str(pt), "-t", "4.0",
-                    "-i", target_in, "-an", "-map_metadata", "-1",
+                    "-ss", str(start_cut), "-t", str(run_dur), "-i", target_in,
+                    "-i", voice_audio,
+                    "-map_metadata", "-1",
                     "-vf", vf_recap,
-                    "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-                    "-pix_fmt", "yuv420p", snip_path
+                    "-map", "0:v:0", "-map", "1:a:0",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-shortest", "-movflags", "+faststart",
+                    final_recap_out
                 ]
-                subprocess.run(cmd_snip, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                if os.path.exists(snip_path) and os.path.getsize(snip_path) > 1000:
-                    snippet_files.append(snip_path)
-
-            if snippet_files:
-                status_box.write("🎬 تمام سینز اور وائس اوور کو ویڈیو میں مکس کیا جا رہا ہے...")
-                with open(list_txt, "w") as lf:
-                    for sf in snippet_files:
-                        lf.write(f"file '{sf}'\n")
-
-                if has_voiceover and os.path.exists(voice_audio):
-                    cmd_mux = [
-                        ffmpeg_exe, "-nostdin", "-y",
-                        "-f", "concat", "-safe", "0", "-stream_loop", "-1", "-i", list_txt,
-                        "-i", voice_audio,
-                        "-map", "0:v:0", "-map", "1:a:0",
-                        "-c:v", "copy",
-                        "-c:a", "aac", "-b:a", "128k",
-                        "-shortest", "-movflags", "+faststart",
-                        final_recap_out
-                    ]
-                    subprocess.run(cmd_mux, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    output_ready_path = final_recap_out
-                else:
-                    cmd_concat_recap = [
-                        ffmpeg_exe, "-nostdin", "-y", "-f", "concat", "-safe", "0",
-                        "-i", list_txt,
-                        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-                        "-shortest", "-c:v", "copy", "-c:a", "aac", "-b:a", "64k",
-                        "-movflags", "+faststart", video_montage
-                    ]
-                    subprocess.run(cmd_concat_recap, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    output_ready_path = video_montage
-
-                for sf in snippet_files:
-                    if os.path.exists(sf): os.remove(sf)
-                if os.path.exists(list_txt): os.remove(list_txt)
             else:
-                # Direct Pass Fallback if snippets failed
-                status_box.write("⚡ ڈائریکٹ شیلڈ انجن سے ویڈیو تیار کی جا رہی ہے...")
-                if has_voiceover and os.path.exists(voice_audio):
-                    cmd_direct = [
-                        ffmpeg_exe, "-nostdin", "-y",
-                        "-ss", "5", "-t", "60", "-i", target_in,
-                        "-i", voice_audio,
-                        "-map_metadata", "-1", "-vf", vf_recap,
-                        "-map", "0:v:0", "-map", "1:a:0",
-                        "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-                        "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart",
-                        final_recap_out
-                    ]
-                    subprocess.run(cmd_direct, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    output_ready_path = final_recap_out
-                else:
-                    cmd_direct = [
-                        ffmpeg_exe, "-nostdin", "-y",
-                        "-ss", "5", "-t", "60", "-i", target_in,
-                        "-map_metadata", "-1", "-vf", vf_recap,
-                        "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-                        "-movflags", "+faststart", video_montage
-                    ]
-                    subprocess.run(cmd_direct, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    output_ready_path = video_montage
+                cmd_render = [
+                    ffmpeg_exe, "-nostdin", "-y",
+                    "-ss", str(start_cut), "-t", str(run_dur), "-i", target_in,
+                    "-map_metadata", "-1",
+                    "-vf", vf_recap,
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-pix_fmt", "yuv420p",
+                    "-an", "-movflags", "+faststart",
+                    final_recap_out
+                ]
 
-            if os.path.exists(target_in): os.remove(target_in)
-            if os.path.exists(voice_audio): os.remove(voice_audio)
+            subprocess.run(cmd_render, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-            if output_ready_path and os.path.exists(output_ready_path) and os.path.getsize(output_ready_path) > 3000:
+            if os.path.exists(target_in):
+                try: os.remove(target_in)
+                except Exception: pass
+            if os.path.exists(voice_audio):
+                try: os.remove(voice_audio)
+                except Exception: pass
+
+            if os.path.exists(final_recap_out) and os.path.getsize(final_recap_out) > 3000:
+                output_ready_path = final_recap_out
                 st.session_state.recap_video_out = output_ready_path
                 st.session_state.detected_info = info
                 status_box.update(label="🎉 آپ کی مووی ریکیپ ویڈیو 100% تیار ہے!", state="complete", expanded=False)
             else:
                 status_box.update(label="❌ ویڈیو تیار نہ ہو سکی۔ دوبارہ کوشش کریں۔", state="error")
         else:
-            status_box.update(label="❌ ویڈیو حاصل نہیں ہو سکی۔ درست ڈیلی موشن یا MP4Moviez لنک درج کریں۔", state="error")
+            status_box.update(label="❌ ویڈیو ڈاؤنلوڈ نہ ہو سکی۔ درست ڈیلی موشن یا ڈائریکٹ مووی لنک درج کریں۔", state="error")
 
-    # Display Ready Video & Full Script Section
+    # Display Ready Video Section
     if st.session_state.recap_video_out and os.path.exists(st.session_state.recap_video_out):
         st.divider()
         st.subheader("🎬 تیار شدہ مووی ریکیپ ویڈیو (26 شیلڈز و وائس اوور کے ساتھ):")
@@ -595,11 +532,10 @@ with tab_recap:
 
         st.markdown("---")
         st.subheader("📖 فلم کا مکمل تحریری اسکرپٹ (Real Story Script):")
-        st.info("💡 یہ اسکرین پر چلنے والی ویڈیو کی اصل کہانی کا تحریری اسکرپٹ ہے:")
         st.code(st.session_state.generated_recap_script, language="markdown")
 
         st.markdown("---")
-        st.subheader("🔥 وائرل ٹائٹلز، ہیش ٹیگز اور تھمب نیل پرامپٹ (1-Click Copy):")
+        st.subheader("🔥 وائرل ٹائٹلز، ہیش ٹیگز اور تھمب نیل پرامپٹ:")
         raw_title = st.session_state.detected_info.get('title', 'Movie Recap Video')
         clean_hero_title, titles, hashtags, exact_thumb_prompt = analyze_video_and_generate_metadata(raw_title, is_short=False)
         
@@ -618,16 +554,16 @@ with tab_recap:
 # TAB 2: PURE FULL-SCREEN 9:16 SHORTS
 # ------------------------------------------------------------------------------
 with tab_shorts:
-    st.write("### 📱 پیور فل اسکرین 9:16 شارٹس (ہر سیکنڈ 1/10واں فریم کٹ)")
+    st.write("### 📱 پیور فل اسکرین 9:16 شارٹس")
     col_sh1, col_sh2 = st.columns(2)
     with col_sh1:
         num_shorts = st.selectbox("کتنے فل اسکرین شارٹس بنانے ہیں؟", [
-            "1 شارٹ (Best Climax Hook)", "2 شارٹس (Opening + Climax)", "3 شارٹس (Hook + Story + Climax)"
+            "1 شارٹ (Best Climax Hook)", "2 شارٹس (Opening + Climax)"
         ], key="num_sh_pure")
     with col_sh2:
         short_dur = st.selectbox("ہر شارٹ کا دورانیہ:", ["30 سیکنڈ (30s)", "15 سیکنڈ (15s)", "60 سیکنڈ (60s)"], key="dur_sh_pure")
 
-    count_target = 1 if "1" in num_shorts else 2 if "2" in num_shorts else 3
+    count_target = 1 if "1" in num_shorts else 2
     dur_sec_target = 30 if "30" in short_dur else 15 if "15" in short_dur else 60
 
     url_shorts_input = st.text_input("🔗 مووی یا ویڈیو کا لنک ڈالیں:", placeholder="https://www.dailymotion.com/video/... یا ڈائریکٹ لنک", key="url_shorts_pure")
@@ -657,17 +593,15 @@ with tab_shorts:
             ffmpeg_exe = get_ffmpeg()
             created_shorts = []
             
-            usable_dur = max(dur_sec_target + 10.0, total_dur)
-            points = [max(8.0, min(usable_dur - dur_sec_target - 2.0, total_dur * 0.45))] if count_target == 1 else [max(8.0, total_dur * 0.15), max(12.0, min(usable_dur - dur_sec_target - 2.0, total_dur * 0.60))]
+            points = [max(5.0, total_dur * 0.40)] if count_target == 1 else [max(5.0, total_dur * 0.15), max(10.0, total_dur * 0.55)]
 
             for idx, start_pt in enumerate(points, 1):
                 short_out = f"pure_short_{uid}_{idx}.mp4"
                 vf_pure = (
-                    "select=not(eq(mod(n\\,10)\\,9)),setpts=N/(24*TB),"
                     "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,"
-                    "hflip,eq=contrast=1.18:saturation=1.24:brightness=0.02"
+                    "hflip,eq=contrast=1.18:saturation=1.22:brightness=0.02,fps=24"
                 )
-                af_pure = "highpass=f=75,lowpass=f=8000,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
+                af_pure = "volume=0.9,asetrate=44100*0.96,aresample=44100,atempo=1.04"
 
                 cmd = [
                     ffmpeg_exe, "-nostdin", "-y",
@@ -678,7 +612,7 @@ with tab_shorts:
                     short_out
                 ]
                 subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                if os.path.exists(short_out) and os.path.getsize(short_out) > 5000:
+                if os.path.exists(short_out) and os.path.getsize(short_out) > 3000:
                     created_shorts.append((short_out, f"📱 فل اسکرین 9:16 شارٹ #{idx} ({dur_sec_target}s)"))
 
             try: os.remove(target_in)
@@ -699,14 +633,10 @@ with tab_shorts:
                 st.download_button(label=f"📥 ڈاؤنلوڈ شارٹ #{i+1}", data=s_bytes, file_name=f"short_{i+1}.mp4", mime="video/mp4", key=f"dl_p_{i}")
 
 # ------------------------------------------------------------------------------
-# TAB 3: FULL MOVIE SCENE SHUFFLER (26 WEAPONS)
+# TAB 3: FULL MOVIE SHUFFLER (26 WEAPONS)
 # ------------------------------------------------------------------------------
 with tab_shield:
-    st.write("### 🛡️ فل مووی شفلر (ہر سیکنڈ 1/10واں فریم کٹ + سین شفلنگ)")
-    c1, c2 = st.columns(2)
-    with c1: shield_mode = st.selectbox("شیلڈ اسٹائل:", ["🛡️ فل شفلر: لوگو کٹ + سین شفل + 1/10واں کٹ", "⚡ لکیری موڈ: لوگو کٹ + 1/10واں کٹ"], key="sm_t1")
-    with c2: voice_quality = st.selectbox("ڈبنگ:", ["🔊 کرسٹل کلیئر بیریٹون ڈبنگ", "🎵 نیچرل اسمارٹ پچ"], key="am_t1")
-
+    st.write("### 🛡️ فل مووی شفلر (26 اینٹی کاپی رائٹ شیلڈز)")
     url_input = st.text_input("🔗 مووی کا ڈیلی موشن یا ویڈیو لنک ڈالیں:", placeholder="https://www.dailymotion.com/video/...", key="url_main")
     up_file = st.file_uploader("📂 یا ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_main")
 
@@ -732,11 +662,11 @@ with tab_shield:
 
         if has_input and os.path.exists(target_in):
             ffmpeg_exe = get_ffmpeg()
-            af_clear = "highpass=f=75,lowpass=f=8000,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
-            vf_10th_drop = "select=not(eq(mod(n\\,10)\\,9)),setpts=N/(24*TB),hflip,crop=iw*0.82:ih*0.82,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=40:color=black@0.75:t=max,drawbox=y=ih-48:h=48:color=black@0.85:t=max"
+            af_clear = "volume=0.9,asetrate=44100*0.96,aresample=44100,atempo=1.04"
+            vf_10th_drop = "hflip,crop=iw*0.84:ih*0.84,scale=1280:720,eq=contrast=1.18:saturation=1.22:brightness=0.02,drawbox=y=0:h=36:color=black@0.75:t=fill,drawbox=y=ih-44:h=44:color=black@0.85:t=fill,fps=24"
 
             cmd = [
-                ffmpeg_exe, "-nostdin", "-y", "-ss", "8", "-i", target_in,
+                ffmpeg_exe, "-nostdin", "-y", "-ss", "5", "-i", target_in,
                 "-map_metadata", "-1", "-vf", vf_10th_drop, "-af", af_clear,
                 "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
                 "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k", target_out
@@ -745,7 +675,7 @@ with tab_shield:
             try: os.remove(target_in)
             except Exception: pass
 
-            if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
+            if os.path.exists(target_out) and os.path.getsize(target_out) > 3000:
                 st.session_state.detected_info = info
                 st.session_state.current_output_video = target_out
                 st.session_state.process_ready = True
@@ -780,8 +710,8 @@ with tab_clip:
             ffmpeg_exe = get_ffmpeg()
             start_sec = start_min * 60
             dur_sec = clip_len * 60
-            vf = "select=not(eq(mod(n\\,10)\\,9)),setpts=N/(24*TB),hflip,crop=iw*0.80:ih*0.80,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=36:color=black@0.75:t=max,drawbox=y=ih-44:h=44:color=black@0.85:t=max"
-            af = "highpass=f=75,lowpass=f=8000,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
+            vf = "hflip,crop=iw*0.82:ih*0.82,scale=1280:720,eq=contrast=1.18:saturation=1.22:brightness=0.02,drawbox=y=0:h=36:color=black@0.75:t=fill,drawbox=y=ih-44:h=44:color=black@0.85:t=fill,fps=24"
+            af = "volume=0.9,asetrate=44100*0.96,aresample=44100,atempo=1.04"
             
             cmd = [
                 ffmpeg_exe, "-nostdin", "-y", "-ss", str(start_sec), "-t", str(dur_sec),
@@ -790,7 +720,7 @@ with tab_clip:
                 "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k", target_out
             ]
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
+            if os.path.exists(target_out) and os.path.getsize(target_out) > 3000:
                 st.video(open(target_out, 'rb').read())
                 st.download_button(label="📥 ڈاؤنلوڈ کلپ", data=open(target_out, 'rb').read(), file_name="clip.mp4", mime="video/mp4")
                 try: os.remove(target_in)
@@ -818,7 +748,7 @@ with tab_lofi:
                 
             ffmpeg_exe = get_ffmpeg()
             sample_rate = int(44100 * slow_val)
-            af_song_22 = f"highpass=f=40,asetrate={sample_rate},aresample=44100:async=1,aecho=0.8:0.88:{reverb_val}:0.4,bass=g={bass_val}:f=105,treble=g=-3:f=3500,aphaser=in_gain=0.9:out_gain=0.8:delay=2.5:decay=0.35:speed=0.4:type=t,alimiter=limit=0.95"
+            af_song_22 = f"highpass=f=40,asetrate={sample_rate},aresample=44100:async=1,aecho=0.8:0.88:{reverb_val}:0.4,bass=g={bass_val}:f=105,treble=g=-3:f=3500,alimiter=limit=0.95"
             
             cmd_song = [
                 ffmpeg_exe, "-nostdin", "-y", "-i", target_in,
@@ -826,7 +756,7 @@ with tab_lofi:
                 "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", target_out
             ]
             subprocess.run(cmd_song, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
+            if os.path.exists(target_out) and os.path.getsize(target_out) > 3000:
                 st.audio(open(target_out, 'rb').read())
                 st.download_button(label="📥 ڈاؤنلوڈ لوفی گانا", data=open(target_out, 'rb').read(), file_name="lofi_track.mp4", mime="audio/mp4")
                 try: os.remove(target_in)
@@ -854,7 +784,7 @@ with tab_image:
                 st.image(img_bytes, caption="Generated AI Image")
 
 # ==========================================
-# FOOTER BRANDING (MUHAMMAD ESSA & SABA WAHID)
+# FOOTER BRANDING
 # ==========================================
 st.markdown("""
 <div style='text-align: center; font-size: 13px; color: #475569; margin-top: 32px; border-top: 2px solid #e2e8f0; padding-top: 14px; font-weight: 600;'>
