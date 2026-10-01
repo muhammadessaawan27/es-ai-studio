@@ -80,9 +80,6 @@ if "generated_recap_script" not in st.session_state:
 if "recap_video_out" not in st.session_state:
     st.session_state.recap_video_out = ""
 
-# ==========================================
-# SYSTEM CORE HELPERS
-# ==========================================
 def get_ffmpeg():
     try:
         import imageio_ffmpeg
@@ -168,53 +165,12 @@ def save_multilang_voiceover_sync(text, voice_key, out_file):
         return False
 
 # ==============================================================================
-# HIGH SPEED DOWNLOADER WITH AUTHENTIC YOUTUBE COOKIES & FFMPEG MERGE
+# FAST STREAM DOWNLOADER WITH COOKIES
 # ==============================================================================
-def download_google_drive_robust(file_id, target_path):
-    session = requests.Session()
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "*/*"
-    }
-    urls_to_try = [
-        f"https://drive.usercontent.google.com/download?id={file_id}&export=download&authuser=0&confirm=t",
-        f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
-    ]
-    for download_url in urls_to_try:
-        try:
-            res = session.get(download_url, stream=True, timeout=25, headers=headers)
-            content_type = res.headers.get("content-type", "").lower()
-            if "html" in content_type:
-                confirm_match = re.search(r'confirm=([0-9A-Za-z_\-]+)', res.text)
-                if confirm_match:
-                    token = confirm_match.group(1)
-                    retry_url = f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm={token}"
-                    res = session.get(retry_url, stream=True, timeout=25, headers=headers)
-
-            with open(target_path, "wb") as f:
-                for chunk in res.iter_content(chunk_size=1024 * 1024 * 8):
-                    if chunk: f.write(chunk)
-                        
-            if os.path.exists(target_path) and os.path.getsize(target_path) > 30000:
-                with open(target_path, "rb") as f_check:
-                    head = f_check.read(100)
-                    if b"<!DOCTYPE" not in head and b"<html" not in head:
-                        return True, "Google Drive Movie File"
-        except Exception:
-            continue
-    return False, ""
-
 def download_unblockable_media_parallel(raw_url, target_path):
     raw_url = raw_url.strip()
     
-    # 1. Google Drive Auto-Detection
-    g_id = extract_gdrive_id(raw_url)
-    if ("drive.google.com" in raw_url or "docs.google.com" in raw_url) and g_id:
-        ok, title = download_google_drive_robust(g_id, target_path)
-        if ok: return True, title
-        return False, "Google Drive Permission Error"
-
-    # 2. Direct MP4 / Cloud File Link
+    # 1. Direct MP4 / Cloud File Link
     if raw_url.startswith("http") and ("drive.google.com" not in raw_url) and not extract_yt_id(raw_url):
         direct_url = raw_url.replace("www.dropbox.com", "dl.dropboxusercontent.com").replace("?dl=0", "?dl=1")
         try:
@@ -228,7 +184,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
         except Exception:
             pass
 
-    # 3. Authenticated YouTube Download using Cookies + Universal Format Merge
+    # 2. Authenticated YouTube Fast Download using Cookies
     vid_id = extract_yt_id(raw_url)
     clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url
     title = fetch_oembed_title(clean_url) or "Action Movie Video"
@@ -240,15 +196,14 @@ def download_unblockable_media_parallel(raw_url, target_path):
         ffmpeg_dir = os.path.dirname(ffmpeg_exe) if os.path.isabs(ffmpeg_exe) else None
 
         ydl_opts = {
-            'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo+bestaudio/best',
+            'format': '18/worst[ext=mp4]/best[height<=480][ext=mp4]/best[height<=720]/best',
             'outtmpl': target_path,
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'geo_bypass': True,
-            'socket_timeout': 25,
-            'retries': 5,
-            'merge_output_format': 'mp4',
+            'socket_timeout': 20,
+            'retries': 3,
             'extractor_args': {'youtube': {'player_client': ['android', 'ios', 'tvhtml5', 'web']}}
         }
         if ffmpeg_dir:
@@ -261,38 +216,10 @@ def download_unblockable_media_parallel(raw_url, target_path):
             if meta:
                 title = meta.get('title', title)
                 
-        if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+        if os.path.exists(target_path) and os.path.getsize(target_path) > 5000:
             return True, title
     except Exception:
         pass
-
-    # Fallback to Invidious Proxy Stream
-    if vid_id:
-        apis = [
-            f"https://pipedapi.kavin.rocks/streams/{vid_id}",
-            f"https://inv.tux.pizza/api/v1/videos/{vid_id}",
-            f"https://invidious.nerdvpn.de/api/v1/videos/{vid_id}"
-        ]
-        for api_url in apis:
-            try:
-                res = requests.get(api_url, timeout=5)
-                if res.status_code == 200:
-                    data = res.json()
-                    title = data.get("title", title)
-                    streams = data.get("videoStreams", []) or data.get("formatStreams", [])
-                    mp4s = [s for s in streams if "mp4" in s.get("container", "").lower() or "video/mp4" in s.get("mimeType", "").lower()] or streams
-                    if mp4s:
-                        dl_url = mp4s[0].get("url", "")
-                        if dl_url:
-                            r_file = requests.get(dl_url, stream=True, timeout=12)
-                            if r_file.status_code == 200:
-                                with open(target_path, "wb") as f:
-                                    for chunk in r_file.iter_content(chunk_size=1024 * 1024 * 4):
-                                        if chunk: f.write(chunk)
-                                if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
-                                    return True, title
-            except Exception:
-                pass
 
     return False, title
 
@@ -316,27 +243,12 @@ def generate_exact_movie_recap_script(movie_title, duration_mins, genre, target_
     except Exception:
         pass
         
-    if "Hindi" in target_lang:
-        return (
-            f"दोस्तों! आज ہم بات کر رہے ہیں فلم {clean_title} کی پوری کہانی کے بارے میں۔ "
-            f"فلم کے آغاز میں مرکزی کردار اپنی زندگی میں آگے بڑھ رہا ہوتا ہے، لیکن جلد ہی اس کے سامنے ایک غیر متوقع بحران آتا ہے۔ "
-            f"جیسے جیسے کہانی آگے بڑھتی ہے، سسپنس اور ایکشن اپنے عروج پر پہنچتا ہے اور آخر میں تمام رازوں کا پردہ فاش ہوتا ہے۔ "
-            f"اگر آپ کو یہ ویڈیو پسند آئی تو لائک اور سبسکرائب ضرور کریں!"
-        )
-    elif "English" in target_lang:
-        return (
-            f"Welcome back everyone! Today we are breaking down the entire storyline of {clean_title}. "
-            f"The movie begins by introducing our main protagonist facing an unprecedented challenge. "
-            f"As tensions rise, surprising twists unveil the real mastermind behind the events leading to an epic climax. "
-            f"If you enjoyed this recap, please hit the like button and subscribe for more breakdown videos!"
-        )
-    else:
-        return (
-            f"دوستو! آج ہم فلم {clean_title} کی اصل اور مکمل کہانی کا جائزہ لے رہے ہیں۔ "
-            f"کہانی کے آغاز میں ہمارا مرکزی کردار ایک بڑے چیلنج کا سامنا کرتا ہے جس کے بعد غیر متوقع موڑ سامنے آتے ہیں۔ "
-            f"جیسے جیسے کہانی آگے بڑھتی ہے، سسپنس اور ایکشن اپنے عروج پر پہنچتا ہے اور کلائمیکس پر شاندار انجام ہوتا ہے۔ "
-            f"اگر آپ کو یہ کہانی اور مووی ریکیپ پسند آیا تو ویڈیو کو لائک اور چینل کو ضرور سبسکرائب کریں!"
-        )
+    return (
+        f"دوستو! آج ہم فلم {clean_title} کی اصل اور مکمل کہانی کا جائزہ لے رہے ہیں۔ "
+        f"کہانی کے آغاز میں ہمارا مرکزی کردار ایک بڑے چیلنج کا سامنا کرتا ہے جس کے بعد غیر متوقع موڑ سامنے آتے ہیں۔ "
+        f"جیسے جیسے کہانی آگے بڑھتی ہے، سسپنس اور ایکشن اپنے عروج پر پہنچتا ہے اور کلائمیکس پر شاندار انجام ہوتا ہے۔ "
+        f"اگر آپ کو یہ کہانی اور مووی ریکیپ پسند آیا تو ویڈیو کو لائک اور چینل کو ضرور سبسکرائب کریں!"
+    )
 
 def analyze_video_and_generate_metadata(title, is_short=False, is_song=False):
     clean_t = re.sub(r'[\(\[\{].*?[\)\]\}]', '', title).strip()
@@ -344,27 +256,15 @@ def analyze_video_and_generate_metadata(title, is_short=False, is_song=False):
     
     if is_song:
         exact_thumb_prompt = f"Anime aesthetic 4K Lo-Fi wallpaper for '{clean_t[:45]}', cozy neon room, aesthetic lighting, 16:9."
-        titles = [
-            f"🎧 {clean_t[:45]} (Slowed + Reverb Lo-Fi Remix)",
-            f"🌙 {clean_t[:45]} - Deep Relaxing Aesthetic Vibe",
-            f"✨ Pure Nostalgia Vibes | {clean_t[:40]}"
-        ]
+        titles = [f"🎧 {clean_t[:45]} (Slowed + Reverb Lo-Fi Remix)", f"🌙 {clean_t[:45]} - Deep Relaxing Aesthetic Vibe", f"✨ Pure Nostalgia Vibes | {clean_t[:40]}"]
         hashtags = "#SlowedAndReverb #LofiRemix #ChillMusic #AestheticAudio #LoFiBeats"
     elif is_short:
         exact_thumb_prompt = f"Hyper-realistic 8K vertical cinematic poster 9:16 for YouTube Shorts of '{clean_t[:45]}', intense expression, 35mm photography."
-        titles = [
-            f"🔥 {clean_t[:40]} - UNSTOPPABLE Climax Scene! 😱 #Shorts",
-            f"⚡ The Most Intense Moment of {clean_t[:35]} 🔥 #Shorts",
-            f"😱 Best Action Climax in {clean_t[:38]} #ViralShorts"
-        ]
+        titles = [f"🔥 {clean_t[:40]} - UNSTOPPABLE Climax Scene! 😱 #Shorts", f"⚡ The Most Intense Moment of {clean_t[:35]} 🔥 #Shorts", f"😱 Best Action Climax in {clean_t[:38]} #ViralShorts"]
         hashtags = "#Shorts #YouTubeShorts #ViralShorts #TrendingShorts #MovieClimax"
     else:
         exact_thumb_prompt = f"Hyper-realistic 8K award-winning cinematic movie poster portrait of '{clean_t[:45]}', photorealistic character face, volumetric lighting, 16:9."
-        titles = [
-            f"🔥 {clean_t[:45]} | Full Story Explained & Recap",
-            f"⚡ {clean_t[:40]} Movie Full Story Breakdown",
-            f"😱 The Entire Story of {clean_t[:40]} Explained!"
-        ]
+        titles = [f"🔥 {clean_t[:45]} | Full Story Explained & Recap", f"⚡ {clean_t[:40]} Movie Full Story Breakdown", f"😱 The Entire Story of {clean_t[:40]} Explained!"]
         hashtags = "#MovieRecap #MovieExplained #FilmReview #TrendingCinema #StoryRecap"
         
     return clean_t, titles, hashtags, exact_thumb_prompt
@@ -421,7 +321,7 @@ st.markdown("""
 <div class="brand-header">
     <div>
         <div class="brand-logo">⚡ ES AI STUDIO</div>
-        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">YouTube Authenticated Engine & 26 Shields Active</div>
+        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Fast Stream Authenticated Engine & 26 Shields Active</div>
     </div>
     <div style="display:flex; align-items:center; gap: 10px;">
         <span class="founders-tag">👑 Founders: Muhammad Essa & Saba Wahid</span>
@@ -448,7 +348,7 @@ tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st
 # ------------------------------------------------------------------------------
 with tab_recap:
     st.write("### 🎬 خودکار AI وائس اوور، اصلی فلم کی کہانی و مووی ریکیپ")
-    st.info("⚡ **یوٹیوب و کلاؤڈ سیشن ایکٹو:** یوٹیوب لنک، گوگل ڈرائیو یا ویڈیو لنک درج کریں۔ ککیز بائی پاس کے ذریعے ویڈیو فوری ڈاؤنلوڈ ہو کر پروسیس ہوگی!")
+    st.info("⚡ **فاسٹ اسٹریم ایکٹو:** یوٹیوب لنک یا ویڈیو لنک درج کر کے بٹن دبائیں اور صرف 15 سے 30 سیکنڈ انتظار کریں، ویڈیو تیار ہو جائے گی!")
 
     rc1, rc2, rc3, rc4 = st.columns(4)
     with rc1:
@@ -472,8 +372,7 @@ with tab_recap:
     target_recap_mins = 10 if "10" in recap_dur else 20
     target_lang_str = voice_char.split(" - ")[0]
 
-    # Universal Single Link Input Box
-    url_recap_input = st.text_input("🔗 ویڈیو کا یوٹیوب / گوگل ڈرائیو / ویب لنک یہاں پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=... یا https://youtu.be/...", key="url_recap")
+    url_recap_input = st.text_input("🔗 ویڈیو کا یوٹیوب / ویب لنک یہاں پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=... یا https://youtu.be/...", key="url_recap")
     up_recap_file = st.file_uploader("📂 یا اپنے ڈیوائس سے ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
 
     if st.button("🚀 تیار کریں (اصلی مووی کہانی + AI وائس اوور + 26 شیلڈز)", type="primary", key="btn_run_recap"):
@@ -484,18 +383,15 @@ with tab_recap:
         final_recap_out = f"final_recap_{uid}.mp4"
         has_input = False
         info = {'title': 'Action Movie Recap'}
-        error_msg = ""
 
-        status_box = st.status("⏳ پروسیسنگ شروع ہو رہی ہے...", expanded=True)
+        status_box = st.status("⏳ پروسیسنگ جاری ہے، برائے مہربانی چند سیکنڈ انتظار کریں...", expanded=True)
 
         if url_recap_input.strip():
-            status_box.write("🔗 ویڈیو یوٹیوب سیشن کے ذریعے ہائی اسپیڈ ڈاؤنلوڈ ہو رہی ہے...")
+            status_box.write("🔗 ویڈیو یوٹیوب لاگ ان سیشن کے ذریعے فاسٹ ڈاؤنلوڈ ہو رہی ہے...")
             success, title_fetched = download_unblockable_media_parallel(url_recap_input.strip(), target_in)
             if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
                 has_input = True
                 info['title'] = title_fetched
-            else:
-                error_msg = title_fetched
         elif up_recap_file is not None:
             status_box.write("📂 اپلوڈ شدہ ویڈیو فائل کو محفوظ کیا جا رہا ہے...")
             with open(target_in, "wb") as f:
@@ -511,8 +407,8 @@ with tab_recap:
             total_dur = get_video_duration_fast(target_in)
             ffmpeg_exe = get_ffmpeg()
 
-            # 1. AI Generates Real Movie Plot Script in Selected Language
-            status_box.write(f"🧠 فلم '{info['title'][:30]}' کا اصل پلاٹ اور کہانی ({target_lang_str}) میں لکھی جا رہی ہے...")
+            # 1. AI Generates Real Movie Plot Script
+            status_box.write(f"🧠 فلم '{info['title'][:30]}' کی اصل کہانی ({target_lang_str}) میں لکھی جا رہی ہے...")
             real_movie_script = generate_exact_movie_recap_script(info['title'], target_recap_mins, recap_genre, target_lang_str)
             st.session_state.generated_recap_script = real_movie_script
 
@@ -559,7 +455,7 @@ with tab_recap:
                     snippet_files.append(snip_path)
 
             if snippet_files:
-                status_box.write("🎬 تمام سینز اور منتخب زبان کے وائس اوور کو مکس کیا جا رہا ہے...")
+                status_box.write("🎬 تمام سینز اور وائس اوور کو ویڈیو میں مکس کیا جا رہا ہے...")
                 with open(list_txt, "w") as lf:
                     for sf in snippet_files:
                         lf.write(f"file '{sf}'\n")
@@ -602,7 +498,7 @@ with tab_recap:
             else:
                 status_box.update(label="❌ ویڈیو تیار نہ ہو سکی۔ دوبارہ کوشش کریں۔", state="error")
         else:
-            status_box.update(label="❌ ویڈیو حاصل نہیں ہو سکی۔ درست یوٹیوب لنک درج کریں۔", state="error")
+            status_box.update(label="❌ ویڈیو حاصل نہیں ہو سکی۔ درست لنک درج کریں۔", state="error")
 
     # Display Ready Video & Full Script Section
     if st.session_state.recap_video_out and os.path.exists(st.session_state.recap_video_out):
