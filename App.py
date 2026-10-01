@@ -15,8 +15,6 @@ import io
 import numpy as np
 import threading
 import gc
-import sqlite3
-import hashlib
 import concurrent.futures
 
 # ==========================================
@@ -30,16 +28,8 @@ except ImportError:
 # ==========================================
 # STREAMLIT COMPACT CONFIGURATION
 # ==========================================
-st.set_page_config(page_title="ES Ultra Opus-Clip & 26-Shield Studio", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="ES Ultra 26-Shield Pure Full-Screen Studio", layout="wide", page_icon="⚡")
 
-if "enable_watermark" not in st.session_state:
-    st.session_state.enable_watermark = True
-if "enable_bg_music" not in st.session_state:
-    st.session_state.enable_bg_music = True
-if "logged_in_user" not in st.session_state:
-    st.session_state.logged_in_user = "demo_user"
-if "msgs" not in st.session_state:
-    st.session_state.msgs = []
 if "process_ready" not in st.session_state:
     st.session_state.process_ready = False
 if "detected_info" not in st.session_state:
@@ -49,22 +39,12 @@ if "current_output_video" not in st.session_state:
 if "generated_shorts" not in st.session_state:
     st.session_state.generated_shorts = []
 
-render_semaphore = threading.Semaphore(value=2)
-
 def get_ffmpeg():
     try:
         import imageio_ffmpeg
         return imageio_ffmpeg.get_ffmpeg_exe()
     except Exception:
         return "ffmpeg"
-
-def hash_password(password):
-    salt = b"sglowina_saas_salt_1234"
-    return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000).hex()
-
-def verify_password(password, hashed):
-    salt = b"sglowina_saas_salt_1234"
-    return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000).hex() == hashed
 
 def extract_yt_id(raw_url):
     raw_url = raw_url.strip()
@@ -91,88 +71,6 @@ def get_video_duration_fast(file_path):
         return dur if dur > 0 else 200.0
     except Exception:
         return 200.0
-
-# ==========================================
-# DATABASE LAYER
-# ==========================================
-def get_db_connection():
-    pg_url = os.environ.get("DATABASE_URL")
-    if pg_url:
-        try:
-            import psycopg2
-            return psycopg2.connect(pg_url)
-        except Exception:
-            pass
-    conn = sqlite3.connect("sglowina_saas_v21.db", check_same_thread=False, timeout=30.0)
-    conn.row_factory = sqlite3.Row
-    try:
-        conn.execute("PRAGMA journal_mode=WAL;")
-    except Exception:
-        pass
-    return conn
-
-def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    is_sqlite = not hasattr(conn, "closed")
-    serial_primary = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sqlite else "SERIAL PRIMARY KEY"
-    
-    cursor.execute(f"""
-        CREATE TABLE IF NOT EXISTS users (
-            id {serial_primary},
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            plan TEXT DEFAULT 'Free',
-            credits INTEGER DEFAULT 50,
-            role TEXT DEFAULT 'User',
-            status TEXT DEFAULT 'Active',
-            created_at TEXT
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS coupons (
-            code TEXT PRIMARY KEY,
-            credits INTEGER,
-            uses_left INTEGER
-        )
-    """)
-    
-    cursor.execute("SELECT COUNT(*) FROM coupons WHERE code = 'ESSASABA'")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO coupons (code, credits, uses_left) VALUES ('ESSASABA', 100, 1000)")
-    
-    h_admin = hash_password("786")
-    for u, e in [("essasaba", "essasaba@sglowina.ai"), ("essa_awan", "essa@sglowina.ai")]:
-        cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (u,))
-        if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                           (u, e, h_admin, "Enterprise", 5000, "Admin", "2026-10-01"))
-                           
-    conn.commit()
-    conn.close()
-
-init_db()
-
-def authenticate_user(username, password):
-    username = username.strip().lower()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT password_hash FROM users WHERE LOWER(username) = LOWER(?)", (username,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return verify_password(password.strip(), row['password_hash'])
-    return False
-
-def get_user_data(username):
-    username = username.strip().lower()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,))
-    row = cursor.fetchone()
-    conn.close()
-    return row
 
 # ==========================================
 # PARALLEL MULTI-NODE LINK FETCHER
@@ -203,7 +101,7 @@ def try_download_node(node_url, vid_id, target_path):
 def download_unblockable_media_parallel(raw_url, target_path):
     vid_id = extract_yt_id(raw_url)
     clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url.strip()
-    title = fetch_oembed_title(clean_url) or "Action Video Scene"
+    title = fetch_oembed_title(clean_url) or "Media Track"
     
     if vid_id:
         nodes = [
@@ -249,10 +147,21 @@ def extract_celebrity_name(title):
     t_clean = re.sub(r'[\(\[\{].*?[\)\]\}]', '', title).strip()
     return t_clean if t_clean else title
 
-def analyze_video_and_generate_exact_prompt(title, is_short=False):
+def analyze_video_and_generate_exact_prompt(title, is_short=False, is_song=False):
     clean_t = extract_celebrity_name(title)
     
-    if is_short:
+    if is_song:
+        exact_thumb_prompt = (
+            f"Anime aesthetic 4K Lo-Fi relaxing wallpaper thumbnail for '{clean_t[:45]}', cozy neon bedroom, "
+            f"soft purple and cyan aesthetic lighting, rain on window, retro tape recorder, cinematic lo-fi anime art, 16:9 aspect ratio."
+        )
+        titles = [
+            f"🎧 {clean_t[:45]} (Slowed + Reverb Lo-Fi Remix) | Midnight Chill",
+            f"🌙 {clean_t[:45]} - Deep Relaxing Aesthetic Vibe (Master HD)",
+            f"✨ Pure Nostalgia Vibes | {clean_t[:40]} (Slowed Lo-Fi Version)"
+        ]
+        hashtags = "#SlowedAndReverb #LofiRemix #ChillMusic #AestheticAudio #MidnightVibes #LoFiBeats #ViralSong"
+    elif is_short:
         exact_thumb_prompt = (
             f"Hyper-realistic 8K vertical cinematic poster thumbnail 9:16 for YouTube Shorts of '{clean_t[:45]}', "
             f"exact recognizable facial features of the lead actor, intense dramatic angry expression, photorealistic eyes and skin texture, "
@@ -303,7 +212,7 @@ st.markdown("""
         background: #ffffff; padding: 8px 16px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 12px;
     }
     .compact-title { font-size: 1.15rem !important; font-weight: 800 !important; color: #0284c7 !important; margin: 0 !important; }
-    .badge { background: #0f172a; color: #ffffff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge { background: #059669; color: #ffffff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
     .stButton>button { 
         background: #0284c7 !important; color: white !important; border-radius: 6px !important; 
         height: 38px !important; font-size: 13px !important; font-weight: 600 !important; border: none !important;
@@ -314,43 +223,22 @@ st.markdown("""
 
 st.markdown("""
 <div class="compact-header">
-    <div class="compact-title">⚡ ES ULTRA 26-SHIELD OPUS-CLIPS STUDIO</div>
-    <div class="badge">OPUS-STYLE 9:16 SMART FIT ACTIVE</div>
+    <div class="compact-title">⚡ ES ULTRA 26-SHIELD PURE FULL-SCREEN STUDIO</div>
+    <div class="badge">100% PURE 9:16 FULL-SCREEN SHORTS</div>
 </div>
 """, unsafe_allow_html=True)
 
 # ==========================================
 # NAVIGATION TABS
 # ==========================================
-tab_auth, tab_shield, tab_shorts, tab_clip, tab_movie, tab_image, tab_lofi = st.tabs([
-    "🔑 Sign In",
+tab_shield, tab_shorts, tab_clip, tab_lofi, tab_movie, tab_image = st.tabs([
     "🛡️ 1. فل اینٹی کاپی رائٹ شیلڈ (26 ہتھیار + شفلر)",
-    "📱 2. اوپس کلپ اسمارٹ شارٹس (Opus-Clip 9:16 Smart Fit)",
-    "⚔️ 3. کلپ کٹر موڈ (10 تا 20 منٹ)",
-    "🎬 4. پرو AI مووی اسٹوڈیو",
-    "🎨 5. پرو AI امیج اسٹوڈیو",
-    "🎧 6. لوفی گانے (Slowed + Reverb)"
+    "📱 2. پیور فل اسکرین 9:16 شارٹس (100% Full-Screen 9:16)",
+    "⚔️ 3. کلپ کٹر موڈ (10 تا 20 منٹ کٹ)",
+    "🎧 4. اینٹی کاپی رائٹ لوفی و گانے (Slowed + Reverb)",
+    "🎬 5. پرو AI مووی اسٹوڈیو (Unlimited)",
+    "🎨 6. پرو AI امیج اسٹوڈیو (Unlimited)"
 ])
-
-# -----------------
-# TAB 0: AUTHENTICATION
-# -----------------
-with tab_auth:
-    st.write("### 🔑 Sglowina & ES Portal")
-    u_db = get_user_data(st.session_state.logged_in_user)
-    if u_db:
-        st.success(f"لاگ ان: **{st.session_state.logged_in_user}** | پلان: **{u_db['plan']}** | بیلنس: **{u_db['credits']}** کوائنز 🪙")
-    with st.form("auth_form"):
-        u_name = st.text_input("Username")
-        p_word = st.text_input("Password", type="password")
-        if st.form_submit_button("Sign In 🚀"):
-            if authenticate_user(u_name, p_word):
-                st.session_state.logged_in_user = u_name.strip().lower()
-                st.success(f"خوش آمدید {u_name}! لاگ ان کامیاب۔")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error("غلط کریڈینشلز۔")
 
 # -----------------
 # TAB 1: 26-LAYER FULL ANTI-COPYRIGHT SHIELD & SHUFFLER
@@ -449,30 +337,30 @@ with tab_shield:
                     st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ براہ کرم فائل دوبارہ منتخب کریں۔")
 
 # -----------------
-# TAB 2: OPUS-CLIP STYLE 9:16 SMART FIT SHORTS (NO CUTTING + ALL 26 SHIELDS)
+# TAB 2: TRUE 100% PURE FULL-SCREEN 9:16 SHORTS (NO BLACK BARS, NO BOXES)
 # -----------------
 with tab_shorts:
-    st.write("### 📱 اوپس کلپ (Opus Clip) جیسا 9:16 اسمارٹ شارٹس جنریٹر")
-    st.info("💡 **Opus Clip فارمولا:** اداکار کا چہرہ یا سائیڈز بالکل نہیں کٹیں گی! اوپر اور نیچے سنیمیٹک بلرڈ کینوس رہے گا جبکہ درمیان میں پوری ویڈیو صاف اور مکمل نظر آئے گی، اور تمام 26 اینٹی کاپی رائٹ شیلڈز لاگو ہوں گی۔")
+    st.write("### 📱 100% پیور فل اسکرین 9:16 وائرل شارٹس جنریٹر")
+    st.info("💡 **پیور فل اسکرین ریشو:** اصل ویڈیو پوری موبائل اسکرین پر 100% فل (720x1280) آئے گی (کوئی کالی پٹی یا درمیانی ڈبہ نہیں ہوگا) اور تمام 26 اینٹی کاپی رائٹ شیلڈز لاگو ہوں گی!")
     
     col_sh1, col_sh2 = st.columns(2)
     with col_sh1:
-        num_shorts = st.selectbox("کتنے وائرل شارٹس بنانے ہیں؟", [
+        num_shorts = st.selectbox("کتنے فل اسکرین وائرل شارٹس بنانے ہیں؟", [
             "1 شارٹ (Best Climax Hook)",
             "2 شارٹس (Opening + Climax)",
             "3 شارٹس (Hook + Story + Climax)",
             "5 شارٹس (Full Multi-Highlight Pack)"
-        ], key="num_sh_opus")
+        ], key="num_sh_pure")
     with col_sh2:
-        short_dur = st.selectbox("ہر شارٹ کا دورانیہ:", ["30 سیکنڈ (30s - سب سے زیادہ وائرل)", "15 سیکنڈ (15s)", "60 سیکنڈ (60s)"], key="dur_sh_opus")
+        short_dur = st.selectbox("ہر شارٹ کا دورانیہ:", ["30 سیکنڈ (30s - سب سے زیادہ وائرل)", "15 سیکنڈ (15s)", "60 سیکنڈ (60s)"], key="dur_sh_pure")
 
     count_target = 1 if "1" in num_shorts else 2 if "2" in num_shorts else 3 if "3" in num_shorts else 5
     dur_sec_target = 30 if "30" in short_dur else 15 if "15" in short_dur else 60
 
-    up_shorts_file = st.file_uploader("📂 لمبی ویڈیو فائل یہاں اپلوڈ کریں (5 تا 30 منٹ):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_shorts_opus")
-    url_shorts_input = st.text_input("🔗 یا لمبی ویڈیو کا یوٹیوب لنک ڈالیں:", placeholder="https://www.youtube.com/watch?v=...", key="url_shorts_opus")
+    up_shorts_file = st.file_uploader("📂 لمبی ویڈیو فائل یہاں اپلوڈ کریں (5 تا 30 منٹ):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_shorts_pure")
+    url_shorts_input = st.text_input("🔗 یا لمبی ویڈیو کا یوٹیوب لنک ڈالیں:", placeholder="https://www.youtube.com/watch?v=...", key="url_shorts_pure")
 
-    if st.button(f"🚀 اوپس کلپ انداز میں {count_target} وائرل شارٹس مع ٹائٹلز و تھمب نیل بنائیں", type="primary", key="btn_run_shorts_opus"):
+    if st.button(f"🚀 خودکار طریقے سے {count_target} فل اسکرین 9:16 شارٹس مع ٹائٹلز و تھمب نیل بنائیں", type="primary", key="btn_run_shorts_pure"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"shorts_in_{uid}.mp4"
         has_input = False
@@ -506,25 +394,24 @@ with tab_shorts:
             status_text = st.empty()
 
             for idx, start_pt in enumerate(points, 1):
-                status_text.write(f"⚡ اوپس کلپ شارٹ #{idx} کٹ کر کے 9:16 اسمارٹ کینوس اور 26 شیلڈز لگائی جا رہی ہیں...")
-                short_out = f"opus_short_{uid}_{idx}.mp4"
+                status_text.write(f"⚡ فل اسکرین 9:16 شارٹ #{idx} کٹ کر کے 26 شیلڈز لگائی جا رہی ہیں...")
+                short_out = f"pure_short_{uid}_{idx}.mp4"
                 
-                # OPUS CLIP DUAL-LAYER SMART CANVAS (ZERO FACIAL CUTTING):
-                # Layer 1 (Background): Full 9:16 blurred motion canvas
-                # Layer 2 (Foreground): 100% full original video centered (720x405) with 0% side clipping!
-                filter_complex_opus = (
-                    "[0:v]select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),split=2[v1][v2];"
-                    "[v1]scale=160:284,scale=720:1280[bg];"
-                    "[v2]scale=720:405:flags=fast_bilinear,hflip,eq=contrast=1.20:saturation=1.26:brightness=0.02[fg];"
-                    "[bg][fg]overlay=(W-w)/2:(H-h)/2:shortest=1,drawbox=y=0:h=40:color=black@0.70:t=fill,drawbox=y=ih-50:h=50:color=black@0.80:t=fill[outv]"
+                # TRUE PURE 100% FULL-SCREEN 9:16 (THE VIDEO ITSELF FILLS THE ENTIRE MOBILE SCREEN):
+                # scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1
+                # This guarantees that the entire video fills 100% of 9:16 without letterbox, pillarbox, or canvas boxes!
+                vf_pure_fullscreen_916 = (
+                    "select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),"
+                    "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,"
+                    "hflip,eq=contrast=1.20:saturation=1.26:brightness=0.02,"
+                    "drawbox=y=0:h=40:color=black@0.70:t=fill,drawbox=y=ih-50:h=50:color=black@0.80:t=fill"
                 )
                 af_shield = "highpass=f=75,lowpass=f=8200,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
 
                 cmd = [
                     ffmpeg_exe, "-nostdin", "-y", "-ss", str(start_pt), "-t", str(dur_sec_target),
                     "-i", target_in, "-map_metadata", "-1",
-                    "-filter_complex", filter_complex_opus,
-                    "-map", "[outv]", "-map", "0:a?",
+                    "-vf", vf_pure_fullscreen_916,
                     "-af", af_shield,
                     "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28",
                     "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k",
@@ -532,7 +419,7 @@ with tab_shorts:
                 ]
                 subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if os.path.exists(short_out) and os.path.getsize(short_out) > 5000:
-                    created_shorts.append((short_out, f"📱 اوپس کلپ شارٹ #{idx} ({dur_sec_target}s)"))
+                    created_shorts.append((short_out, f"📱 فل اسکرین 9:16 شارٹ #{idx} ({dur_sec_target}s)"))
                 progress_bar.progress(idx / len(points))
 
             try: os.remove(target_in)
@@ -540,12 +427,12 @@ with tab_shorts:
             
             st.session_state.detected_info = info
             st.session_state.generated_shorts = created_shorts
-            status_text.success(f"🎉 آپ کے تمام **{len(created_shorts)} اوپس کلپ شارٹس** بغیر کسی چہرے کے کٹے اور 26 شیلڈز کے ساتھ تیار ہیں!")
+            status_text.success(f"🎉 آپ کے تمام **{len(created_shorts)} پیور فل اسکرین 9:16 شارٹس** تیار ہیں!")
 
     # DISPLAY SHORTS & SHORTS-SPECIFIC VIRAL METADATA DASHBOARD
     if st.session_state.generated_shorts:
         st.divider()
-        st.subheader("📱 تیار شدہ اوپس کلپ شارٹس (Download YouTube Shorts / Reels):")
+        st.subheader("📱 تیار شدہ فل اسکرین 9:16 شارٹس (Download YouTube Shorts / Reels):")
         cols = st.columns(len(st.session_state.generated_shorts))
         for i, (s_path, s_title) in enumerate(st.session_state.generated_shorts):
             with cols[i]:
@@ -553,11 +440,11 @@ with tab_shorts:
                 s_bytes = open(s_path, 'rb').read()
                 st.video(s_bytes)
                 st.download_button(
-                    label=f"📥 ڈاؤنلوڈ شارٹ #{i+1}",
+                    label=f"📥 ڈاؤنلوڈ فل شارٹ #{i+1}",
                     data=s_bytes,
-                    file_name=f"opus_short_{i+1}.mp4",
+                    file_name=f"fullscreen_short_{i+1}.mp4",
                     mime="video/mp4",
-                    key=f"dl_opus_{i}"
+                    key=f"dl_pure_{i}"
                 )
 
         st.markdown("---")
@@ -576,12 +463,6 @@ with tab_shorts:
         with c_meta2:
             st.markdown(f"**🎨 9:16 ورٹیکل شارٹس تھمب نیل پرامپٹ ({clean_hero_title[:25]}):**")
             st.code(s_thumb_prompt, language="text")
-            with st.expander("🖼️ شارٹس کے لیے AI تھمب نیل پریویو دیکھیں"):
-                thumb_gen_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(s_thumb_prompt)}?width=720&height=1280&nologo=true&model=flux"
-                try:
-                    st.image(thumb_gen_url, caption="Vertical 9:16 Shorts Thumbnail (Flux AI)", use_column_width=True)
-                except Exception:
-                    st.write("پرامپٹ کو کاپی کر کے استعمال کریں۔")
 
 # -----------------
 # TAB 3: CLIP CUTTER
@@ -637,48 +518,21 @@ with tab_clip:
                     except Exception: pass
 
 # -----------------
-# TAB 4: PRO AI MOVIE MASTER STUDIO (RESTORED)
-# -----------------
-with tab_movie:
-    st.write("### 🎬 Pro AI Cinematic Movie Production")
-    m_script = st.text_area("مووی اسکرپٹ (اردو یا انگلش):", height=120, placeholder="ایک خوبصورت جنگل میں شیر شکار کی تلاش میں ہے...")
-    mc1, mc2, mc3 = st.columns(3)
-    with mc1: mv = st.selectbox("وائس (Voice):", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
-    with mc2: mr = st.selectbox("ریشو:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    with mc3: ms = st.selectbox("اسٹائل:", ["Realistic HD", "Cinematic Film", "3D Cartoon"])
-    
-    if st.button("Generate Master Movie 🚀"):
-        st.info("اے آئی ویڈیو جنریشن شروع ہو چکی ہے۔")
-
-# -----------------
-# TAB 5: PRO AI IMAGE STUDIO (RESTORED)
-# -----------------
-with tab_image:
-    st.write("### 🎨 Pro AI Visual & Canvas Studio")
-    p_i = st.text_area("تصویر کی تفصیل لکھیں:", height=90, placeholder="A high-tech cybernetic warrior standing in neon city...")
-    ic1, ic2 = st.columns(2)
-    with ic1: i_style = st.selectbox("Visual Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Dark Gothic"])
-    with ic2: i_size = st.selectbox("Resolution:", ["YouTube HD (1280x720)", "Square (1:1)", "TikTok (720x1280)"])
-    
-    if st.button("Generate AI Image 🎨"):
-        dim = {"YouTube HD (1280x720)": (1280, 720), "Square (1:1)": (1024, 1024), "TikTok (720x1280)": (720, 1280)}
-        w, h = dim[i_size]
-        img_bytes = fetch_img_failover(p_i, w, h, random.randint(1, 999999))
-        if img_bytes:
-            st.image(img_bytes, caption="Generated AI Image")
-
-# -----------------
-# TAB 6: LO-FI & SONGS
+# TAB 4: 26-SHIELD ANTI-COPYRIGHT SONGS & LO-FI MASTER
 # -----------------
 with tab_lofi:
-    col_s1, col_s2 = st.columns(2)
-    with col_s1: slow_val = st.slider("سلو اسپیڈ:", 0.80, 0.96, 0.88, 0.01, key="sl_t6")
-    with col_s2: reverb_val = st.slider("گونج / Reverb:", 20, 80, 50, 5, key="rev_t6")
-        
-    song_url = st.text_input("🔗 گانے کا لنک:", placeholder="https://...", key="song_url6")
-    upload_opt3 = st.file_uploader("📂 یا آڈیو فائل منتخب کریں:", type=["mp3", "wav", "mp4", "m4a"], key="up_t6")
+    st.write("### 🎧 26-شیلڈ اینٹی کاپی رائٹ گانے و لوفی میکر (Slowed + Reverb)")
+    st.info("💡 **فل آڈیو شیلڈ آن:** نان-لینئیر پچ شفٹنگ، سٹیریو فیز ڈسپرژن، سب-بیس اور ہارمونک ریورب سے گانے کا آڈیو فنگر پرنٹ 100% بدل جائے گا اور کلیم نہیں آئے گا!")
     
-    if st.button("🚀 فاسٹ لوفی بنائیں", type="primary", key="run_t6"):
+    col_s1, col_s2, col_s3 = st.columns(3)
+    with col_s1: slow_val = st.slider("سلو اسپیڈ (Slow Factor):", 0.82, 0.96, 0.88, 0.01, key="sl_t6")
+    with col_s2: reverb_val = st.slider("گونج / Reverb ماسکنگ:", 25, 80, 50, 5, key="rev_t6")
+    with col_s3: bass_val = st.slider("سب-بیس بوسٹ (Sub-Bass):", 2, 12, 6, key="bass_t6")
+        
+    song_url = st.text_input("🔗 گانے کا یوٹیوب یا آڈیو لنک:", placeholder="https://...", key="song_url6")
+    upload_opt3 = st.file_uploader("📂 یا گانے کی فائل اپلوڈ کریں (MP3/MP4/WAV/M4A):", type=["mp3", "wav", "mp4", "m4a"], key="up_t6")
+    
+    if st.button("🚀 گانے پر 26 اینٹی کاپی رائٹ شیلڈز لگائیں اور لوفی ماسٹر بنائیں", type="primary", key="run_t6"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"song_in_{uid}.mp4"
         target_out = f"song_out_{uid}.mp4"
@@ -698,14 +552,23 @@ with tab_lofi:
                     info['title'] = title_fetched
             
         if has_input and os.path.exists(target_in):
-            with st.spinner("لوفی گانا تیار ہو رہا ہے..."):
+            with st.spinner("⚡ گانے پر تمام 26 اینٹی کاپی رائٹ آڈیو شیلڈز لگائی جا رہی ہیں..."):
                 ffmpeg_exe = get_ffmpeg()
                 sample_rate = int(44100 * slow_val)
-                af_filter = f"asetrate={sample_rate},aresample=44100,aecho=0.8:0.88:{reverb_val}:0.4,bass=g=6:f=110"
+                
+                af_song_26 = (
+                    f"highpass=f=40,"
+                    f"asetrate={sample_rate},aresample=44100:async=1,"
+                    f"aecho=0.8:0.88:{reverb_val}:0.4,"
+                    f"bass=g={bass_val}:f=105,treble=g=-3:f=3500,"
+                    f"aphaser=in_gain=0.9:out_gain=0.8:delay=2.5:decay=0.35:speed=0.4:type=t,"
+                    f"alimiter=limit=0.95"
+                )
+                
                 cmd_song = [
                     ffmpeg_exe, "-nostdin", "-y", "-i", target_in,
-                    "-map_metadata", "-1", "-af", af_filter, "-c:v", "copy",
-                    "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", target_out
+                    "-map_metadata", "-1", "-af", af_song_26, "-c:v", "copy",
+                    "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", target_out
                 ]
                 subprocess.run(cmd_song, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
@@ -715,11 +578,70 @@ with tab_lofi:
                     try: os.remove(target_in)
                     except Exception: pass
 
+    if st.session_state.process_ready and st.session_state.current_output_video and "song_out" in st.session_state.current_output_video:
+        st.divider()
+        st.write("#### 🎧 پروسیس شدہ 26-شیلڈ اینٹی کاپی رائٹ گانا:")
+        s_bytes = open(st.session_state.current_output_video, 'rb').read()
+        st.audio(s_bytes)
+        st.download_button(
+            label="📥 محفوظ لوفی گانا ڈاؤنلوڈ کریں (Download Lo-Fi MP4/Audio)",
+            data=s_bytes,
+            file_name=f"lofi_protected_{os.path.basename(st.session_state.current_output_video)}",
+            mime="audio/mp4",
+            use_container_width=True
+        )
+        
+        st.markdown("---")
+        st.write("#### 🧠 گانے کے وائرل لوفی ٹائٹلز، ہیش ٹیگز اور اینیمی تھمب نیل پرامپٹ:")
+        clean_s_title, song_titles, song_tags, song_thumb_prompt = analyze_video_and_generate_exact_prompt(st.session_state.detected_info.get('title', 'Chill Lo-Fi Track'), is_song=True)
+        
+        c_song1, c_song2 = st.columns(2)
+        with c_song1:
+            st.markdown("**🔥 وائرل لوفی ٹائٹلز (1-Click Copy):**")
+            for t in song_titles:
+                st.code(t, language="text")
+            st.markdown("**🏷️ وائرل میوزک ہیش ٹیگز:**")
+            st.code(song_tags, language="text")
+        with c_song2:
+            st.markdown("**🎨 لوفی اینیمی وال پیپر تھمب نیل پرامپٹ:**")
+            st.code(song_thumb_prompt, language="text")
+
+# -----------------
+# TAB 5: PRO AI MOVIE MASTER STUDIO (UNLIMITED)
+# -----------------
+with tab_movie:
+    st.write("### 🎬 Pro AI Cinematic Movie Production (100% Free & Unlimited)")
+    m_script = st.text_area("مووی اسکرپٹ (اردو یا انگلش):", height=120, placeholder="ایک خوبصورت جنگل میں شیر شکار کی تلاش میں ہے...")
+    mc1, mc2, mc3 = st.columns(3)
+    with mc1: mv = st.selectbox("وائس (Voice):", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
+    with mc2: mr = st.selectbox("ریشو:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
+    with mc3: ms = st.selectbox("اسٹائل:", ["Realistic HD", "Cinematic Film", "3D Cartoon"])
+    
+    if st.button("Generate Master Movie 🚀"):
+        st.info("اے آئی ویڈیو جنریشن شروع ہو چکی ہے۔")
+
+# -----------------
+# TAB 6: PRO AI IMAGE STUDIO (UNLIMITED)
+# -----------------
+with tab_image:
+    st.write("### 🎨 Pro AI Visual & Canvas Studio (100% Free & Unlimited)")
+    p_i = st.text_area("تصویر کی تفصیل لکھیں:", height=90, placeholder="A high-tech cybernetic warrior standing in neon city...")
+    ic1, ic2 = st.columns(2)
+    with ic1: i_style = st.selectbox("Visual Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Dark Gothic"])
+    with ic2: i_size = st.selectbox("Resolution:", ["YouTube HD (1280x720)", "Square (1:1)", "TikTok (720x1280)"])
+    
+    if st.button("Generate AI Image 🎨"):
+        dim = {"YouTube HD (1280x720)": (1280, 720), "Square (1:1)": (1024, 1024), "TikTok (720x1280)": (720, 1280)}
+        w, h = dim[i_size]
+        img_bytes = fetch_img_failover(p_i, w, h, random.randint(1, 999999))
+        if img_bytes:
+            st.image(img_bytes, caption="Generated AI Image")
+
 # ==========================================
 # OUTPUT & 1-CLICK COPY DASHBOARD (FOR TAB 1 FULL VIDEO)
 # ==========================================
 active_out = st.session_state.current_output_video
-if st.session_state.process_ready and active_out and os.path.exists(active_out) and os.path.getsize(active_out) > 5000:
+if st.session_state.process_ready and active_out and os.path.exists(active_out) and os.path.getsize(active_out) > 5000 and "song_out" not in active_out:
     st.divider()
     st.write("#### 🎬 پروسیس شدہ 100% اینٹی کاپی رائٹ ویڈیو:")
     
@@ -754,4 +676,4 @@ if st.session_state.process_ready and active_out and os.path.exists(active_out) 
         st.info("💡 یہ پرامپٹ اصلی اداکار کے فیشل فیچرز کے ساتھ تیار کیا گیا ہے۔ اوپر دائیں کونے سے کاپی کریں:")
         st.code(exact_thumb_prompt, language="text")
 
-st.markdown("<p style='text-align: center; font-size: 11px; color: #64748b; margin-top: 20px;'>ES Ultra Opus-Clip Studio Suite | Developers: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 11px; color: #64748b; margin-top: 20px;'>ES Ultra Pure Full-Screen Studio | 100% Free & Unlimited</p>", unsafe_allow_html=True)
