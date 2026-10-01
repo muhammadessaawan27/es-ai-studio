@@ -21,7 +21,7 @@ import concurrent.futures
 # STREAMLIT CONFIGURATION & SESSION STATE
 # ==========================================
 st.set_page_config(
-    page_title="ES AI Studio | Essa & Saba Waheed",
+    page_title="ES AI Studio | Muhammad Essa & Saba Wahid",
     layout="wide",
     page_icon="⚡"
 )
@@ -97,20 +97,28 @@ def clean_text_for_tts(raw_text):
     clean = re.sub(r'https?://\S+', '', clean)
     return clean.strip()
 
-# Multi-Voice TTS Generator (Asad, Saba, Salman/Waheed, Gul)
-def save_tts_voiceover_sync(text, voice_name, rate_str, pitch_str, out_file):
+# ==========================================
+# MULTI-LANGUAGE TTS ENGINE
+# ==========================================
+VOICE_DATABASE = {
+    "Urdu - Asad (Deep Male)": ("ur-PK-AsadNeural", "-10%", "-15Hz"),
+    "Urdu - Saba (Natural Female)": ("ur-PK-SabaNeural", "+0%", "+0Hz"),
+    "Hindi - Madhur (Deep Male)": ("hi-IN-MadhurNeural", "-5%", "-10Hz"),
+    "Hindi - Swara (Natural Female)": ("hi-IN-SwaraNeural", "+0%", "+0Hz"),
+    "English - Guy (Deep Narrative Male)": ("en-US-GuyNeural", "-5%", "-10Hz"),
+    "English - Jenny (Pro Female)": ("en-US-JennyNeural", "+0%", "+0Hz"),
+    "Punjabi - Gagan (Natural Male)": ("pa-IN-GaganNeural", "+0%", "+0Hz"),
+    "Pashto - Gul Nawaz (Natural Male)": ("ps-AF-GulNawazNeural", "+0%", "+0Hz"),
+    "Arabic - Hamed (Pro Male)": ("ar-SA-HamedNeural", "+0%", "-5Hz")
+}
+
+def save_multilang_voiceover_sync(text, voice_key, out_file):
     try:
         clean_t = clean_text_for_tts(text)
-        voice_map = {
-            "asad": "ur-PK-AsadNeural",
-            "saba": "ur-PK-SabaNeural",
-            "waheed": "ur-IN-SalmanNeural",
-            "gul": "ur-IN-GulNeural"
-        }
-        chosen_voice = voice_map.get(voice_name.lower(), "ur-PK-AsadNeural")
+        voice_id, rate_str, pitch_str = VOICE_DATABASE.get(voice_key, ("ur-PK-AsadNeural", "-10%", "-15Hz"))
         
         async def amain():
-            communicate = edge_tts.Communicate(clean_t, chosen_voice, rate=rate_str, pitch=pitch_str)
+            communicate = edge_tts.Communicate(clean_t, voice_id, rate=rate_str, pitch=pitch_str)
             await communicate.save(out_file)
             
         asyncio.run(amain())
@@ -118,67 +126,54 @@ def save_tts_voiceover_sync(text, voice_name, rate_str, pitch_str, out_file):
     except Exception as e:
         return False
 
-# ==============================================================================
-# NEW 2026 GOOGLE DRIVE USERCONTENT HIGH-SPEED STREAM ENGINE
-# ==============================================================================
+# ==========================================
+# GOOGLE DRIVE & CLOUD MEDIA DOWNLOADER
+# ==========================================
 def download_google_drive_robust(file_id, target_path):
     session = requests.Session()
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Accept": "*/*"
     }
-    
-    # 2026 High Speed Direct UserContent CDN Endpoints
     urls_to_try = [
         f"https://drive.usercontent.google.com/download?id={file_id}&export=download&authuser=0&confirm=t",
-        f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t",
-        f"https://docs.google.com/uc?export=download&id={file_id}"
+        f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
     ]
-    
     for download_url in urls_to_try:
         try:
             res = session.get(download_url, stream=True, timeout=25, headers=headers)
-            
-            # Check if Google returned an HTML login or access error
             content_type = res.headers.get("content-type", "").lower()
             if "html" in content_type:
-                # Look for virus scan confirmation token in HTML
                 confirm_match = re.search(r'confirm=([0-9A-Za-z_\-]+)', res.text)
                 if confirm_match:
                     token = confirm_match.group(1)
                     retry_url = f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm={token}"
                     res = session.get(retry_url, stream=True, timeout=25, headers=headers)
 
-            # Stream chunks directly to disk (Zero RAM congestion)
             with open(target_path, "wb") as f:
                 for chunk in res.iter_content(chunk_size=1024 * 1024 * 8):
-                    if chunk:
-                        f.write(chunk)
+                    if chunk: f.write(chunk)
                         
             if os.path.exists(target_path) and os.path.getsize(target_path) > 30000:
-                # Verify that the downloaded file is a real video and not an HTML error
                 with open(target_path, "rb") as f_check:
                     head = f_check.read(100)
                     if b"<!DOCTYPE" not in head and b"<html" not in head:
                         return True, "Google Drive Movie File"
         except Exception:
             continue
-            
     return False, ""
 
 def download_unblockable_media_parallel(raw_url, target_path):
     raw_url = raw_url.strip()
     
-    # 1. Google Drive Link Check (Instant 5-Second Bypass)
+    # 1. Google Drive
     g_id = extract_gdrive_id(raw_url)
     if ("drive.google.com" in raw_url or "docs.google.com" in raw_url) and g_id:
         ok, title = download_google_drive_robust(g_id, target_path)
-        if ok:
-            return True, title
-        else:
-            return False, "Google Drive Permission Error"
+        if ok: return True, title
+        return False, "Google Drive Permission Error"
 
-    # 2. Direct MP4 / Cloud File Link
+    # 2. Direct MP4 / Cloud File
     if raw_url.startswith("http") and ("drive.google.com" not in raw_url) and not extract_yt_id(raw_url):
         try:
             r = requests.get(raw_url, stream=True, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
@@ -194,15 +189,14 @@ def download_unblockable_media_parallel(raw_url, target_path):
     # 3. YouTube Multi-API Piped / Invidious Fallback
     vid_id = extract_yt_id(raw_url)
     clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url
-    title = fetch_oembed_title(clean_url) or "Action Video Scene"
+    title = fetch_oembed_title(clean_url) or "Action Movie Video"
 
     if vid_id:
         apis = [
             f"https://pipedapi.kavin.rocks/streams/{vid_id}",
             f"https://api.piped.privacydev.net/streams/{vid_id}",
             f"https://inv.tux.pizza/api/v1/videos/{vid_id}",
-            f"https://invidious.nerdvpn.de/api/v1/videos/{vid_id}",
-            f"https://invidious.drgns.space/api/v1/videos/{vid_id}"
+            f"https://invidious.nerdvpn.de/api/v1/videos/{vid_id}"
         ]
         for api_url in apis:
             try:
@@ -254,75 +248,77 @@ def download_unblockable_media_parallel(raw_url, target_path):
 
     return False, title
 
-# ==========================================
-# UNIVERSAL AI URDU SCRIPT GENERATOR
-# ==========================================
-def generate_urdu_movie_recap_script(movie_title, duration_mins, genre):
+# ==============================================================================
+# REAL MOVIE PLOT AI STORY GENERATOR (EXACT MOVIE STORY)
+# ==============================================================================
+def generate_exact_movie_recap_script(movie_title, duration_mins, genre, target_lang):
+    clean_title = re.sub(r'[\(\[\{].*?[\)\]\}]', '', movie_title).strip()
     try:
         instruction = (
-            f"You are a master Urdu YouTube Storyteller and Video Explainer scriptwriter. "
-            f"Write a comprehensive, engaging, and complete Urdu story narrative explaining '{movie_title}'. "
-            f"Genre/Theme: {genre}. Target duration: {duration_mins} minutes. "
-            f"Write continuous Urdu storytelling narrative dialogues so that an AI voice narrator can read it continuously without gaps. "
-            f"Output purely the Urdu narrative story text."
+            f"You are an expert film analyst and movie recap narrator. "
+            f"Explain the ACTUAL, CANONICAL story, plot twists, character actions, and climax of the real movie or video titled '{clean_title}'. "
+            f"Do NOT invent a generic fake story. Identify what this actual movie is about and explain its real storyline. "
+            f"Target Language: {target_lang}. Genre/Theme: {genre}. Target duration: {duration_mins} minutes narrative. "
+            f"Write continuous, highly engaging storytelling text for an AI narrator without stage notes or brackets."
         )
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction)}?model=openai"
-        res = requests.get(url, timeout=15)
-        if res.status_code == 200 and len(res.text.strip()) > 50:
+        res = requests.get(url, timeout=18)
+        if res.status_code == 200 and len(res.text.strip()) > 60:
             return res.text.strip()
     except Exception:
         pass
         
-    return (
-        f"دوستو! آج کی سنسنی خیز اور دلچسپ ویڈیو {movie_title} کے گرد گھومتی ہے۔ "
-        f"کہانی کے آغاز میں ہم دیکھتے ہیں کہ بظاہر سب کچھ پرسکون نظر آتا ہے، لیکن اس خاموشی کے پیچھے ایک بہت بڑا طوفان چھپا ہوا تھا۔ "
-        f"ہمارا مرکزی کردار ایک عام انسان کی طرح زندگی گزار رہا تھا لیکن اچانک حالات ایسا رخ اختیار کرتے ہیں جو سب کچھ بدل کر رکھ دیتے ہیں۔ "
-        f"جب مشکلات اور دشمن ہر طرف سے گھیر لیتے ہیں تو کہانی میں داخل ہوتا ہے اصل سسپنس اور ایکشن! "
-        f"ہیرو اپنی ذہانت، ہمت اور طاقت سے ہر چال کو ناکام بناتا ہے۔ "
-        f"اور آخر کار کلائمیکس میں سب سے بڑے راز کا پردہ فاش ہو جاتا ہے۔ "
-        f"اگر آپ کو یہ دلچسپ ویڈیو پسند آئی تو لائک کریں اور چینل کو ضرور سبسکرائب کریں!"
-    )
+    # Language-aware fallback
+    if "Hindi" in target_lang:
+        return (
+            f"दोस्तों! आज हम बात कर रहे हैं फिल्म {clean_title} की पूरी कहानी के बारे में। "
+            f"फिल्म की शुरुआत में मुख्य किरदार अपनी जिंदगी में आगे बढ़ रहा होता है, लेकिन जल्द ही उसके सामने एक अप्रत्याशित संकट आता है। "
+            f"जैसे-जैसे कहानी आगे बढ़ती है, सस्पेंस और एक्शन चरम पर पहुंच जाता है और अंत में सभी रहस्यों का पर्दाफाश होता है। "
+            f"अगर आपको यह एक्सप्लेनेशन पसंद आया तो वीडियो को लाइक करें और चैनल को सब्सक्राइब करें!"
+        )
+    elif "English" in target_lang:
+        return (
+            f"Welcome back everyone! Today we are breaking down the entire storyline of {clean_title}. "
+            f"The movie begins by introducing our main protagonist facing an unprecedented challenge. "
+            f"As tensions rise, surprising twists unveil the real mastermind behind the events leading to an epic climax. "
+            f"If you enjoyed this recap, please hit the like button and subscribe for more breakdown videos!"
+        )
+    else:
+        return (
+            f"دوستو! آج ہم فلم {clean_title} کی اصل اور مکمل کہانی کا جائزہ لے رہے ہیں۔ "
+            f"کہانی کے آغاز میں ہمارا مرکزی کردار ایک بڑے چیلنج کا سامنا کرتا ہے جس کے بعد غیر متوقع موڑ سامنے آتے ہیں۔ "
+            f"جیسے جیسے کہانی آگے بڑھتی ہے، سسپنس اور ایکشن اپنے عروج پر پہنچتا ہے اور کلائمیکس پر شاندار انجام ہوتا ہے۔ "
+            f"اگر آپ کو یہ کہانی اور مووی ریکیپ پسند آیا تو ویڈیو کو لائک اور چینل کو ضرور سبسکرائب کریں!"
+        )
 
 def analyze_video_and_generate_metadata(title, is_short=False, is_song=False):
     clean_t = re.sub(r'[\(\[\{].*?[\)\]\}]', '', title).strip()
     if not clean_t: clean_t = title
     
     if is_song:
-        exact_thumb_prompt = (
-            f"Anime aesthetic 4K Lo-Fi relaxing wallpaper thumbnail for '{clean_t[:45]}', cozy neon bedroom, "
-            f"soft purple and cyan aesthetic lighting, rain on window, retro tape recorder, cinematic lo-fi anime art, 16:9 aspect ratio."
-        )
+        exact_thumb_prompt = f"Anime aesthetic 4K Lo-Fi wallpaper for '{clean_t[:45]}', cozy neon room, aesthetic lighting, 16:9."
         titles = [
-            f"🎧 {clean_t[:45]} (Slowed + Reverb Lo-Fi Remix) | Midnight Chill",
-            f"🌙 {clean_t[:45]} - Deep Relaxing Aesthetic Vibe (Master HD)",
-            f"✨ Pure Nostalgia Vibes | {clean_t[:40]} (Slowed Lo-Fi Version)"
+            f"🎧 {clean_t[:45]} (Slowed + Reverb Lo-Fi Remix)",
+            f"🌙 {clean_t[:45]} - Deep Relaxing Aesthetic Vibe",
+            f"✨ Pure Nostalgia Vibes | {clean_t[:40]}"
         ]
-        hashtags = "#SlowedAndReverb #LofiRemix #ChillMusic #AestheticAudio #MidnightVibes #LoFiBeats #ViralSong"
+        hashtags = "#SlowedAndReverb #LofiRemix #ChillMusic #AestheticAudio #LoFiBeats"
     elif is_short:
-        exact_thumb_prompt = (
-            f"Hyper-realistic 8K vertical cinematic poster thumbnail 9:16 for YouTube Shorts of '{clean_t[:45]}', "
-            f"exact recognizable character face, intense dramatic angry expression, photorealistic eyes and skin texture, "
-            f"35mm film photography, neon rim lighting, flying sparks, vertical 9:16 composition, blockbuster movie aesthetics."
-        )
+        exact_thumb_prompt = f"Hyper-realistic 8K vertical cinematic poster 9:16 for YouTube Shorts of '{clean_t[:45]}', intense expression, 35mm photography."
         titles = [
             f"🔥 {clean_t[:40]} - UNSTOPPABLE Climax Scene! 😱 #Shorts",
             f"⚡ The Most Intense Moment of {clean_t[:35]} 🔥 #Shorts",
             f"😱 Best Action Climax in {clean_t[:38]} #ViralShorts"
         ]
-        hashtags = "#Shorts #YouTubeShorts #ViralShorts #TrendingShorts #MovieClimax #ActionShorts #CinemaReels"
+        hashtags = "#Shorts #YouTubeShorts #ViralShorts #TrendingShorts #MovieClimax"
     else:
-        exact_thumb_prompt = (
-            f"Hyper-realistic 8K award-winning cinematic movie poster portrait of '{clean_t[:45]}', "
-            f"exact recognizable facial features, photorealistic skin pores and eyes, intense dramatic emotional expression, "
-            f"35mm film photography, volumetric cinematic lighting, action sparks and debris background, high visual contrast, "
-            f"ultra-detailed blockbuster aesthetic, 16:9 aspect ratio, masterpiece quality, no cartoon, no distortion."
-        )
+        exact_thumb_prompt = f"Hyper-realistic 8K award-winning cinematic movie poster portrait of '{clean_t[:45]}', photorealistic character face, volumetric lighting, 16:9."
         titles = [
-            f"🔥 {clean_t[:45]} | Full Story Recap & Explanation in Urdu",
-            f"⚡ {clean_t[:40]} Story Explained in Hindi/Urdu (Full Breakdown)",
+            f"🔥 {clean_t[:45]} | Full Story Explained & Recap",
+            f"⚡ {clean_t[:40]} Movie Full Story Breakdown",
             f"😱 The Entire Story of {clean_t[:40]} Explained!"
         ]
-        hashtags = "#MovieRecap #MovieExplained #UrduMovieRecap #FilmReview #TrendingCinema #StoryRecap"
+        hashtags = "#MovieRecap #MovieExplained #FilmReview #TrendingCinema #StoryRecap"
         
     return clean_t, titles, hashtags, exact_thumb_prompt
 
@@ -337,7 +333,7 @@ def fetch_img_failover(prompt, w, h, seed):
     return None
 
 # ==========================================
-# CLEAN & BRIGHT THEME (ESSA & SABA WAHEED)
+# CLEAN & BRIGHT THEME (ESSA & SABA WAHID)
 # ==========================================
 st.markdown("""
     <style>
@@ -378,10 +374,10 @@ st.markdown("""
 <div class="brand-header">
     <div>
         <div class="brand-logo">⚡ ES AI STUDIO</div>
-        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Google Drive Direct CDN & 26-Shield Storyteller Studio</div>
+        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Multi-Language Real Movie Plot & 26-Shield Studio</div>
     </div>
     <div style="display:flex; align-items:center; gap: 10px;">
-        <span class="founders-tag">👑 Founders: Essa & Saba Waheed</span>
+        <span class="founders-tag">👑 Founders: Muhammad Essa & Saba Wahid</span>
         <span class="badge-26">26 SHIELDS ACTIVE</span>
     </div>
 </div>
@@ -391,7 +387,7 @@ st.markdown("""
 # 7 FULL PRODUCTION TABS
 # ==========================================
 tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st.tabs([
-    "🎬 1. آٹو اسد/صبا وائس اوور و مووی ریکیپ",
+    "🎬 1. ملٹی لینگویج مووی ریکیپ (Real Story + Multi-Voice)",
     "📱 2. پیور فل اسکرین 9:16 شارٹس",
     "🛡️ 3. فل مووی شفلر (26 ہتھیار)",
     "⚔️ 4. کلپ کٹر موڈ (10 تا 20 منٹ کٹ)",
@@ -401,32 +397,26 @@ tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st
 ])
 
 # ------------------------------------------------------------------------------
-# TAB 1: AI AUTO ASAD / SABA VOICEOVER & RECAP STUDIO (DUAL MODE + 26 SHIELDS)
+# TAB 1: MULTI-LANGUAGE AI REAL MOVIE PLOT RECAP STUDIO
 # ------------------------------------------------------------------------------
 with tab_recap:
-    st.write("### 🎬 خودکار AI وائس اوور، اردو اسکرپٹ و مووی ریکیپ جنریٹر")
+    st.write("### 🎬 خودکار AI وائس اوور، اصلی فلم کی کہانی و مووی ریکیپ")
     
-    # Direct Link Generator Helper Box
-    with st.expander("🔗 **گوگل ڈرائیو شیئرنگ گائیڈ (صرف 1 منٹ میں درست پبلک لنک بنائیں):**", expanded=False):
+    with st.expander("ℹ️ **گوگل ڈرائیو شیئرنگ کا آسان طریقہ (1 منٹ گائیڈ):**", expanded=False):
         st.markdown("""
         1. اپنے گوگل ڈرائیو میں ویڈیو پر **3 نقطوں (`⋮`)** پر کلک کریں۔
-        2. **Share / Manage access** پر جا کر **General Access** کو **"Anyone with the link" (جس کے پاس بھی لنک ہو)** کر دیں۔
-        3. **Copy Link** کر کے نیچے لنک والے باکس میں پیسٹ کریں۔
+        2. **Share / Manage access** میں **General Access** کو **"Anyone with the link"** کر دیں۔
+        3. **Copy Link** کر کے نیچے پیسٹ کریں۔
         """)
 
     rc1, rc2, rc3, rc4 = st.columns(4)
     with rc1:
         voiceover_mode = st.selectbox("وائس اوور کا طریقہ:", [
             "🎙️ خودکار AI وائس اوور (100% تیار ویڈیو)",
-            "📝 مینوئل موڈ (صرف ویڈیو میوٹ + اردو اسکرپٹ)"
+            "📝 مینوئل موڈ (صرف ویڈیو میوٹ + تحریری اسکرپٹ)"
         ], key="rc_vmode")
     with rc2:
-        voice_char = st.selectbox("وائس اوور آواز منتخب کریں:", [
-            "🎙️ اسد - بھاری بیریٹون (Asad Deep Voice -15Hz)",
-            "🎙️ صبا - نیچرل فی میل (Saba Urdu Voice)",
-            "🎙️ وحید / سلمان - کلیئر میل (Salman/Waheed)",
-            "🎙️ گل - فیمیل اسمارٹ (Gul Urdu)"
-        ], key="rc_vchar")
+        voice_char = st.selectbox("کہانی کی زبان و آواز (Language & Voice):", list(VOICE_DATABASE.keys()), key="rc_vchar")
     with rc3:
         recap_dur = st.selectbox("مووی ریکیپ کا دورانیہ:", ["10 منٹ ریکیپ (10 Mins)", "20 منٹ ریکیپ (20 Mins)"], key="rc_dur")
     with rc4:
@@ -439,12 +429,12 @@ with tab_recap:
         ], key="rc_genre")
 
     target_recap_mins = 10 if "10" in recap_dur else 20
-    voice_key = "asad" if "اسد" in voice_char else "saba" if "صبا" in voice_char else "waheed" if "وحید" in voice_char else "gul"
+    target_lang_str = voice_char.split(" - ")[0]
 
-    url_recap_input = st.text_input("🔗 گوگل ڈرائیو لنک / ویڈیو ویب لنک یہاں پیسٹ کریں (سب سے تیز اور پکا طریقہ):", placeholder="https://drive.google.com/file/d/... یا ڈائریکٹ لنک", key="url_recap")
+    url_recap_input = st.text_input("🔗 گوگل ڈرائیو لنک / ویڈیو لنک یہاں پیسٹ کریں:", placeholder="https://drive.google.com/file/d/... یا ڈائریکٹ لنک", key="url_recap")
     up_recap_file = st.file_uploader("📂 یا اپنے ڈیوائس سے ویڈیو فائل منتخب کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
 
-    if st.button("🚀 تیار کریں (AI وائس اوور + اسکرپٹ + شیلڈز) مکمل مووی ریکیپ", type="primary", key="btn_run_recap"):
+    if st.button("🚀 تیار کریں (اصلی مووی کہانی + AI وائس اوور + 26 شیلڈز)", type="primary", key="btn_run_recap"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"recap_in_{uid}.mp4"
         voice_audio = f"recap_voice_{uid}.mp3"
@@ -452,6 +442,7 @@ with tab_recap:
         final_recap_out = f"final_recap_{uid}.mp4"
         has_input = False
         info = {'title': 'Action Movie Recap'}
+        error_reason = ""
 
         status_box = st.status("⏳ پروسیسنگ شروع ہو رہی ہے...", expanded=True)
 
@@ -462,10 +453,9 @@ with tab_recap:
                 has_input = True
                 info['title'] = title_fetched
             else:
-                if "Permission" in title_fetched:
-                    status_box.update(label="❌ گوگل ڈرائیو پر فائل 'Anyone with the link' پبلک نہیں ہے۔ براہِ کرم گوگل ڈرائیو میں Share پر جا کر پبلک کریں۔", state="error")
+                error_reason = title_fetched
         elif up_recap_file is not None:
-            status_box.write("📂 اپلوڈ شدہ ویڈیو فائل کو ڈسک پر محفوظ کیا جا رہا ہے...")
+            status_box.write("📂 اپلوڈ شدہ ویڈیو فائل کو محفوظ کیا جا رہا ہے...")
             with open(target_in, "wb") as f:
                 while True:
                     chunk = up_recap_file.read(1024 * 1024 * 8)
@@ -479,18 +469,16 @@ with tab_recap:
             total_dur = get_video_duration_fast(target_in)
             ffmpeg_exe = get_ffmpeg()
 
-            # 1. AI Generates Urdu Movie Script
-            status_box.write("🧠 فلم کی مکمل اردو کہانی (وائس اوور اسکرپٹ) لکھی جا رہی ہے...")
-            urdu_script = generate_urdu_movie_recap_script(info['title'], target_recap_mins, recap_genre)
-            st.session_state.generated_recap_script = urdu_script
+            # 1. AI Generates Real Movie Plot Script in Selected Language
+            status_box.write(f"🧠 فلم '{info['title'][:30]}' کا اصل پلاٹ اور کہانی ({target_lang_str}) میں لکھی جا رہی ہے...")
+            real_movie_script = generate_exact_movie_recap_script(info['title'], target_recap_mins, recap_genre, target_lang_str)
+            st.session_state.generated_recap_script = real_movie_script
 
-            # 2. TTS Voiceover Generation
+            # 2. Multi-Language TTS Voiceover Generation
             has_voiceover = False
             if "خودکار AI" in voiceover_mode:
                 status_box.write(f"🎙️ {voice_char} کی آواز میں وائس اوور ریکارڈ ہو رہی ہے...")
-                pitch_val = "-15Hz" if voice_key == "asad" else "+0Hz"
-                rate_val = "-10%" if voice_key == "asad" else "+0%"
-                tts_ok = save_tts_voiceover_sync(urdu_script, voice_key, rate_val, pitch_val, voice_audio)
+                tts_ok = save_multilang_voiceover_sync(real_movie_script, voice_char, voice_audio)
                 if tts_ok and os.path.exists(voice_audio) and os.path.getsize(voice_audio) > 1000:
                     has_voiceover = True
 
@@ -529,7 +517,7 @@ with tab_recap:
                     snippet_files.append(snip_path)
 
             if snippet_files:
-                status_box.write("🎬 تمام اسنیپٹس، شیلڈز اور وائس اوور کو مکس کیا جا رہا ہے...")
+                status_box.write("🎬 تمام سینز اور منتخب زبان کے وائس اوور کو مکس کیا جا رہا ہے...")
                 with open(list_txt, "w") as lf:
                     for sf in snippet_files:
                         lf.write(f"file '{sf}'\n")
@@ -570,10 +558,12 @@ with tab_recap:
                 st.session_state.detected_info = info
                 status_box.update(label="🎉 آپ کی مووی ریکیپ ویڈیو 100% تیار ہے!", state="complete", expanded=False)
             else:
-                status_box.update(label="❌ پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔", state="error")
+                status_box.update(label="❌ ویڈیو تیار نہ ہو سکی۔ دوبارہ کوشش کریں۔", state="error")
         else:
-            if not has_input and "Permission" not in status_box.label:
-                status_box.update(label="❌ ویڈیو حاصل نہیں ہو سکی۔ براہِ کرم گوگل ڈرائیو لنک کی شیئرنگ سیٹنگ 'Anyone with the link' چیک کریں۔", state="error")
+            if "Permission" in error_reason:
+                status_box.update(label="❌ گوگل ڈرائیو پر فائل 'Anyone with the link' نہیں ہے۔ براہِ کرم گوگل ڈرائیو میں Share پر جا کر پبلک کریں۔", state="error")
+            else:
+                status_box.update(label="❌ ویڈیو حاصل نہیں ہو سکی۔ درست لنک یا فائل درج کریں۔", state="error")
 
     # Display Ready Video & Full Script Section
     if st.session_state.recap_video_out and os.path.exists(st.session_state.recap_video_out):
@@ -590,8 +580,8 @@ with tab_recap:
         )
 
         st.markdown("---")
-        st.subheader("📖 مکمل اردو وائس اوور اسکرپٹ (Urdu Voiceover Narrative):")
-        st.info("💡 یہ مکمل اردو کہانی اسکرپٹ ہے جسے آپ محفوظ رکھ سکتے ہیں:")
+        st.subheader("📖 فلم کا مکمل تحریری اسکرپٹ (Real Story Script):")
+        st.info("💡 یہ اسکرین پر چلنے والی ویڈیو کی اصل کہانی کا تحریری اسکرپٹ ہے:")
         st.code(st.session_state.generated_recap_script, language="markdown")
 
         st.markdown("---")
@@ -850,10 +840,10 @@ with tab_image:
                 st.image(img_bytes, caption="Generated AI Image")
 
 # ==========================================
-# FOOTER BRANDING (ESSA & SABA WAHEED)
+# FOOTER BRANDING (MUHAMMAD ESSA & SABA WAHID)
 # ==========================================
 st.markdown("""
 <div style='text-align: center; font-size: 13px; color: #475569; margin-top: 32px; border-top: 2px solid #e2e8f0; padding-top: 14px; font-weight: 600;'>
-    ⚡ <strong>ES AI Studio</strong> | Founders: <strong>Essa & Saba Waheed</strong> | All Rights Reserved © 2026
+    ⚡ <strong>ES AI Studio</strong> | Founders: <strong>Muhammad Essa & Saba Wahid</strong> | All Rights Reserved © 2026
 </div>
 """, unsafe_allow_html=True)
