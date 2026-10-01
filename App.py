@@ -56,7 +56,6 @@ def ensure_cookies_file():
     except Exception:
         return None
 
-# Create cookies file immediately upon load
 COOKIE_FILE_PATH = ensure_cookies_file()
 
 # ==========================================
@@ -169,7 +168,7 @@ def save_multilang_voiceover_sync(text, voice_key, out_file):
         return False
 
 # ==============================================================================
-# HIGH SPEED DOWNLOADER WITH AUTHENTIC YOUTUBE COOKIES & DRIVE BYPASS
+# HIGH SPEED DOWNLOADER WITH AUTHENTIC YOUTUBE COOKIES & FFMPEG MERGE
 # ==============================================================================
 def download_google_drive_robust(file_id, target_path):
     session = requests.Session()
@@ -229,7 +228,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
         except Exception:
             pass
 
-    # 3. Authenticated YouTube Download using Cookies (100% Working)
+    # 3. Authenticated YouTube Download using Cookies + Universal Format Merge
     vid_id = extract_yt_id(raw_url)
     clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url
     title = fetch_oembed_title(clean_url) or "Action Movie Video"
@@ -237,16 +236,23 @@ def download_unblockable_media_parallel(raw_url, target_path):
     try:
         import yt_dlp
         cookie_file = ensure_cookies_file()
+        ffmpeg_exe = get_ffmpeg()
+        ffmpeg_dir = os.path.dirname(ffmpeg_exe) if os.path.isabs(ffmpeg_exe) else None
+
         ydl_opts = {
-            'format': '18/best[height<=480][ext=mp4]/best[ext=mp4]/best',
+            'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo+bestaudio/best',
             'outtmpl': target_path,
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'geo_bypass': True,
-            'socket_timeout': 20,
-            'retries': 5
+            'socket_timeout': 25,
+            'retries': 5,
+            'merge_output_format': 'mp4',
+            'extractor_args': {'youtube': {'player_client': ['android', 'ios', 'tvhtml5', 'web']}}
         }
+        if ffmpeg_dir:
+            ydl_opts['ffmpeg_location'] = ffmpeg_dir
         if cookie_file and os.path.exists(cookie_file):
             ydl_opts['cookiefile'] = cookie_file
 
@@ -260,7 +266,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
     except Exception:
         pass
 
-    # Fallback to Invidious Node Proxy if cookie refresh needed
+    # Fallback to Invidious Proxy Stream
     if vid_id:
         apis = [
             f"https://pipedapi.kavin.rocks/streams/{vid_id}",
@@ -269,7 +275,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
         ]
         for api_url in apis:
             try:
-                res = requests.get(api_url, timeout=4)
+                res = requests.get(api_url, timeout=5)
                 if res.status_code == 200:
                     data = res.json()
                     title = data.get("title", title)
@@ -278,7 +284,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
                     if mp4s:
                         dl_url = mp4s[0].get("url", "")
                         if dl_url:
-                            r_file = requests.get(dl_url, stream=True, timeout=10)
+                            r_file = requests.get(dl_url, stream=True, timeout=12)
                             if r_file.status_code == 200:
                                 with open(target_path, "wb") as f:
                                     for chunk in r_file.iter_content(chunk_size=1024 * 1024 * 4):
@@ -312,9 +318,9 @@ def generate_exact_movie_recap_script(movie_title, duration_mins, genre, target_
         
     if "Hindi" in target_lang:
         return (
-            f"दोस्तों! आज हम बात कर रहे हैं फिल्म {clean_title} की पूरी कहानी के बारे में। "
-            f"फिल्म की शुरुआत में मुख्य किरदार अपनी जिंदगी में आगे बढ़ रहा होता है, लेकिन जल्द ही उसके सामने एक अप्रत्याशित संकट आता है। "
-            f"जैसे-जैसे कहानी आगे बढ़ती है, सस्पेंस और एक्शन चरम पर पहुंच जाता है और अंत में सभी रहस्यों का पर्दाफाश होता है। "
+            f"दोस्तों! आज ہم بات کر رہے ہیں فلم {clean_title} کی پوری کہانی کے بارے میں۔ "
+            f"فلم کے آغاز میں مرکزی کردار اپنی زندگی میں آگے بڑھ رہا ہوتا ہے، لیکن جلد ہی اس کے سامنے ایک غیر متوقع بحران آتا ہے۔ "
+            f"جیسے جیسے کہانی آگے بڑھتی ہے، سسپنس اور ایکشن اپنے عروج پر پہنچتا ہے اور آخر میں تمام رازوں کا پردہ فاش ہوتا ہے۔ "
             f"اگر آپ کو یہ ویڈیو پسند آئی تو لائک اور سبسکرائب ضرور کریں!"
         )
     elif "English" in target_lang:
@@ -483,7 +489,7 @@ with tab_recap:
         status_box = st.status("⏳ پروسیسنگ شروع ہو رہی ہے...", expanded=True)
 
         if url_recap_input.strip():
-            status_box.write("🔗 ویڈیو یوٹیوب لاگ ان سیشن کے ذریعے ڈاؤنلوڈ ہو رہی ہے...")
+            status_box.write("🔗 ویڈیو یوٹیوب سیشن کے ذریعے ہائی اسپیڈ ڈاؤنلوڈ ہو رہی ہے...")
             success, title_fetched = download_unblockable_media_parallel(url_recap_input.strip(), target_in)
             if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
                 has_input = True
