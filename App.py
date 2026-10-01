@@ -30,7 +30,7 @@ except ImportError:
 # ==========================================
 # STREAMLIT COMPACT CONFIGURATION
 # ==========================================
-st.set_page_config(page_title="ES Ultra 26-Shield Full-Screen Shorts Studio", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="ES Ultra Opus-Clip & 26-Shield Studio", layout="wide", page_icon="⚡")
 
 if "enable_watermark" not in st.session_state:
     st.session_state.enable_watermark = True
@@ -93,7 +93,7 @@ def get_video_duration_fast(file_path):
         return 200.0
 
 # ==========================================
-# DATABASE LAYER (PostgreSQL & SQLite WAL)
+# DATABASE LAYER
 # ==========================================
 def get_db_connection():
     pg_url = os.environ.get("DATABASE_URL")
@@ -249,20 +249,35 @@ def extract_celebrity_name(title):
     t_clean = re.sub(r'[\(\[\{].*?[\)\]\}]', '', title).strip()
     return t_clean if t_clean else title
 
-def analyze_video_and_generate_exact_prompt(title):
+def analyze_video_and_generate_exact_prompt(title, is_short=False):
     clean_t = extract_celebrity_name(title)
-    exact_thumb_prompt = (
-        f"Hyper-realistic 8K award-winning cinematic movie poster portrait of the lead actor in '{clean_t[:45]}', "
-        f"exact recognizable facial features, photorealistic skin pores and eyes, intense dramatic emotional expression, "
-        f"35mm film photography, volumetric cinematic lighting, action sparks and debris background, high visual contrast, "
-        f"ultra-detailed blockbuster aesthetic, 16:9 aspect ratio, masterpiece quality, no cartoon, no distortion."
-    )
-    titles = [
-        f"🔥 {clean_t[:45]} | Full Action Breakdown & Uncut Climax!",
-        f"⚡ Unstoppable High Voltage Moments | {clean_t[:40]}",
-        f"😱 Dramatic Climax Highlights: {clean_t[:40]}"
-    ]
-    hashtags = "#MovieClimax #ActionHighlights #BlockbusterMovie #TrendingCinema #ViralScene #MovieRecap"
+    
+    if is_short:
+        exact_thumb_prompt = (
+            f"Hyper-realistic 8K vertical cinematic poster thumbnail 9:16 for YouTube Shorts of '{clean_t[:45]}', "
+            f"exact recognizable facial features of the lead actor, intense dramatic angry expression, photorealistic eyes and skin texture, "
+            f"35mm film photography, neon rim lighting, flying sparks, vertical 9:16 composition, blockbuster movie aesthetics."
+        )
+        titles = [
+            f"🔥 {clean_t[:40]} - UNSTOPPABLE Climax Scene! 😱 #Shorts",
+            f"⚡ The Most Intense Moment of {clean_t[:35]} 🔥 #Shorts",
+            f"😱 Best Action Climax in {clean_t[:38]} #ViralShorts"
+        ]
+        hashtags = "#Shorts #YouTubeShorts #ViralShorts #TrendingShorts #MovieClimax #ActionShorts #CinemaReels"
+    else:
+        exact_thumb_prompt = (
+            f"Hyper-realistic 8K award-winning cinematic movie poster portrait of the lead actor in '{clean_t[:45]}', "
+            f"exact recognizable facial features, photorealistic skin pores and eyes, intense dramatic emotional expression, "
+            f"35mm film photography, volumetric cinematic lighting, action sparks and debris background, high visual contrast, "
+            f"ultra-detailed blockbuster aesthetic, 16:9 aspect ratio, masterpiece quality, no cartoon, no distortion."
+        )
+        titles = [
+            f"🔥 {clean_t[:45]} | Full Action Breakdown & Uncut Climax!",
+            f"⚡ Unstoppable High Voltage Moments | {clean_t[:40]}",
+            f"😱 Dramatic Climax Highlights: {clean_t[:40]}"
+        ]
+        hashtags = "#MovieClimax #ActionHighlights #BlockbusterMovie #TrendingCinema #ViralScene #MovieRecap"
+        
     return clean_t, titles, hashtags, exact_thumb_prompt
 
 def fetch_img_failover(prompt, w, h, seed):
@@ -299,8 +314,8 @@ st.markdown("""
 
 st.markdown("""
 <div class="compact-header">
-    <div class="compact-title">⚡ ES ULTRA 26-SHIELD FULL-SCREEN STUDIO</div>
-    <div class="badge">100% FULL-SCREEN 9:16 SHORTS</div>
+    <div class="compact-title">⚡ ES ULTRA 26-SHIELD OPUS-CLIPS STUDIO</div>
+    <div class="badge">OPUS-STYLE 9:16 SMART FIT ACTIVE</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -310,7 +325,7 @@ st.markdown("""
 tab_auth, tab_shield, tab_shorts, tab_clip, tab_movie, tab_image, tab_lofi = st.tabs([
     "🔑 Sign In",
     "🛡️ 1. فل اینٹی کاپی رائٹ شیلڈ (26 ہتھیار + شفلر)",
-    "📱 2. فل اسکرین 9:16 شارٹس (Full Screen Edge-to-Edge)",
+    "📱 2. اوپس کلپ اسمارٹ شارٹس (Opus-Clip 9:16 Smart Fit)",
     "⚔️ 3. کلپ کٹر موڈ (10 تا 20 منٹ)",
     "🎬 4. پرو AI مووی اسٹوڈیو",
     "🎨 5. پرو AI امیج اسٹوڈیو",
@@ -388,9 +403,9 @@ with tab_shield:
                     af_clear = "volume=0.75,asetrate=44100*0.94,aresample=44100,atempo=1.14,bass=g=4:f=110"
 
                 if "سین شفل" in shield_mode:
-                    p1_start = max(6.0, total_dur * 0.65)
+                    p1_start = max(8.0, total_dur * 0.65)
                     p1_dur = min(45.0, total_dur * 0.20)
-                    p2_start = max(6.0, total_dur * 0.10)
+                    p2_start = max(8.0, total_dur * 0.10)
                     p2_dur = min(45.0, total_dur * 0.25)
                     p3_start = max(10.0, total_dur * 0.40)
                     p3_dur = min(45.0, total_dur * 0.25)
@@ -415,7 +430,7 @@ with tab_shield:
                 else:
                     vf_str = "select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),hflip,crop=iw*0.82:ih*0.82,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=40:color=black@0.75:t=fill,drawbox=y=ih-48:h=48:color=black@0.85:t=fill"
                     cmd = [
-                        ffmpeg_exe, "-nostdin", "-y", "-ss", "6", "-i", target_in,
+                        ffmpeg_exe, "-nostdin", "-y", "-ss", "8", "-i", target_in,
                         "-map_metadata", "-1", "-vf", vf_str, "-af", af_clear,
                         "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28",
                         "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k", target_out
@@ -434,34 +449,34 @@ with tab_shield:
                     st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ براہ کرم فائل دوبارہ منتخب کریں۔")
 
 # -----------------
-# TAB 2: TRUE 100% FULL-SCREEN 9:16 SHORTS (NO BLACK BARS)
+# TAB 2: OPUS-CLIP STYLE 9:16 SMART FIT SHORTS (NO CUTTING + ALL 26 SHIELDS)
 # -----------------
 with tab_shorts:
-    st.write("### 📱 100% فل اسکرین وائرل شارٹس جنریٹر (Edge-to-Edge 9:16)")
-    st.info("💡 **فل اسکرین ڈائریکشن آن:** کوئی کالی پٹی (Black Bars) نہیں آئے گی! لمبی ویڈیو کا اصل فوکس سین خودکار طور پر فل اسکرین 9:16 ریشو میں ڈھل جائے گا اور 26 شیلڈز لاگو ہوں گی۔")
+    st.write("### 📱 اوپس کلپ (Opus Clip) جیسا 9:16 اسمارٹ شارٹس جنریٹر")
+    st.info("💡 **Opus Clip فارمولا:** اداکار کا چہرہ یا سائیڈز بالکل نہیں کٹیں گی! اوپر اور نیچے سنیمیٹک بلرڈ کینوس رہے گا جبکہ درمیان میں پوری ویڈیو صاف اور مکمل نظر آئے گی، اور تمام 26 اینٹی کاپی رائٹ شیلڈز لاگو ہوں گی۔")
     
     col_sh1, col_sh2 = st.columns(2)
     with col_sh1:
-        num_shorts = st.selectbox("کتنے فل اسکرین وائرل شارٹس بنانے ہیں؟", [
+        num_shorts = st.selectbox("کتنے وائرل شارٹس بنانے ہیں؟", [
             "1 شارٹ (Best Climax Hook)",
             "2 شارٹس (Opening + Climax)",
             "3 شارٹس (Hook + Story + Climax)",
             "5 شارٹس (Full Multi-Highlight Pack)"
-        ], key="num_sh_fs")
+        ], key="num_sh_opus")
     with col_sh2:
-        short_dur = st.selectbox("ہر شارٹ کا دورانیہ:", ["30 سیکنڈ (30s - سب سے زیادہ وائرل)", "15 سیکنڈ (15s)", "60 سیکنڈ (60s)"], key="dur_sh_fs")
+        short_dur = st.selectbox("ہر شارٹ کا دورانیہ:", ["30 سیکنڈ (30s - سب سے زیادہ وائرل)", "15 سیکنڈ (15s)", "60 سیکنڈ (60s)"], key="dur_sh_opus")
 
     count_target = 1 if "1" in num_shorts else 2 if "2" in num_shorts else 3 if "3" in num_shorts else 5
     dur_sec_target = 30 if "30" in short_dur else 15 if "15" in short_dur else 60
 
-    up_shorts_file = st.file_uploader("📂 لمبی ویڈیو فائل یہاں اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_shorts_fs")
-    url_shorts_input = st.text_input("🔗 یا لمبی ویڈیو کا یوٹیوب لنک ڈالیں:", placeholder="https://www.youtube.com/watch?v=...", key="url_shorts_fs")
+    up_shorts_file = st.file_uploader("📂 لمبی ویڈیو فائل یہاں اپلوڈ کریں (5 تا 30 منٹ):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_shorts_opus")
+    url_shorts_input = st.text_input("🔗 یا لمبی ویڈیو کا یوٹیوب لنک ڈالیں:", placeholder="https://www.youtube.com/watch?v=...", key="url_shorts_opus")
 
-    if st.button(f"🚀 خودکار طریقے سے {count_target} فل اسکرین 9:16 شارٹس تیار کریں", type="primary", key="btn_run_shorts_fs"):
+    if st.button(f"🚀 اوپس کلپ انداز میں {count_target} وائرل شارٹس مع ٹائٹلز و تھمب نیل بنائیں", type="primary", key="btn_run_shorts_opus"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"shorts_in_{uid}.mp4"
         has_input = False
-        info = {'title': 'Long Video Highlights'}
+        info = {'title': 'Viral Action Shorts'}
 
         if up_shorts_file is not None:
             with open(target_in, "wb") as f:
@@ -480,50 +495,57 @@ with tab_shorts:
             ffmpeg_exe = get_ffmpeg()
             created_shorts = []
             
+            # STRICT LOGO SKIPPING: Start strictly at or after second 8.0 to remove Dharma/T-Series Logos
             points = []
-            if count_target == 1: points = [max(12.0, total_dur * 0.65)]
-            elif count_target == 2: points = [max(12.0, total_dur * 0.20), max(20.0, total_dur * 0.70)]
-            elif count_target == 3: points = [max(12.0, total_dur * 0.15), max(20.0, total_dur * 0.50), max(30.0, total_dur * 0.80)]
-            else: points = [max(12.0, total_dur * 0.10), max(20.0, total_dur * 0.30), max(30.0, total_dur * 0.55), max(40.0, total_dur * 0.75), max(50.0, total_dur * 0.90)]
+            if count_target == 1: points = [max(8.0, total_dur * 0.65)]
+            elif count_target == 2: points = [max(8.0, total_dur * 0.20), max(20.0, total_dur * 0.70)]
+            elif count_target == 3: points = [max(8.0, total_dur * 0.15), max(20.0, total_dur * 0.50), max(30.0, total_dur * 0.80)]
+            else: points = [max(8.0, total_dur * 0.10), max(20.0, total_dur * 0.30), max(30.0, total_dur * 0.55), max(40.0, total_dur * 0.75), max(50.0, total_dur * 0.88)]
 
             progress_bar = st.progress(0.0)
             status_text = st.empty()
 
             for idx, start_pt in enumerate(points, 1):
-                status_text.write(f"⚡ فل اسکرین شارٹ #{idx} کٹ کر کے 9:16 اور 26 شیلڈز لگائی جا رہی ہیں...")
-                short_out = f"viral_short_fs_{uid}_{idx}.mp4"
+                status_text.write(f"⚡ اوپس کلپ شارٹ #{idx} کٹ کر کے 9:16 اسمارٹ کینوس اور 26 شیلڈز لگائی جا رہی ہیں...")
+                short_out = f"opus_short_{uid}_{idx}.mp4"
                 
-                # 100% TRUE FULL-SCREEN 9:16 DYNAMIC EDGE-TO-EDGE CROP (ZERO BLACK BARS)
-                # Cropping (ih*9/16):ih directly scales to 720x1280 filling 100% of the mobile screen!
-                vf_vertical_fullscreen = (
-                    "select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),"
-                    "crop=ih*(9/16):ih,scale=720:1280:flags=fast_bilinear,"
-                    "hflip,eq=contrast=1.20:saturation=1.26:brightness=0.02,"
-                    "drawbox=y=0:h=40:color=black@0.70:t=fill,drawbox=y=ih-50:h=50:color=black@0.80:t=fill"
+                # OPUS CLIP DUAL-LAYER SMART CANVAS (ZERO FACIAL CUTTING):
+                # Layer 1 (Background): Full 9:16 blurred motion canvas
+                # Layer 2 (Foreground): 100% full original video centered (720x405) with 0% side clipping!
+                filter_complex_opus = (
+                    "[0:v]select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),split=2[v1][v2];"
+                    "[v1]scale=160:284,scale=720:1280[bg];"
+                    "[v2]scale=720:405:flags=fast_bilinear,hflip,eq=contrast=1.20:saturation=1.26:brightness=0.02[fg];"
+                    "[bg][fg]overlay=(W-w)/2:(H-h)/2:shortest=1,drawbox=y=0:h=40:color=black@0.70:t=fill,drawbox=y=ih-50:h=50:color=black@0.80:t=fill[outv]"
                 )
                 af_shield = "highpass=f=75,lowpass=f=8200,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
 
                 cmd = [
                     ffmpeg_exe, "-nostdin", "-y", "-ss", str(start_pt), "-t", str(dur_sec_target),
-                    "-i", target_in, "-map_metadata", "-1", "-vf", vf_vertical_fullscreen, "-af", af_shield,
+                    "-i", target_in, "-map_metadata", "-1",
+                    "-filter_complex", filter_complex_opus,
+                    "-map", "[outv]", "-map", "0:a?",
+                    "-af", af_shield,
                     "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28",
                     "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k",
                     short_out
                 ]
                 subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if os.path.exists(short_out) and os.path.getsize(short_out) > 5000:
-                    created_shorts.append((short_out, f"📱 فل اسکرین شارٹ #{idx} ({dur_sec_target}s)"))
+                    created_shorts.append((short_out, f"📱 اوپس کلپ شارٹ #{idx} ({dur_sec_target}s)"))
                 progress_bar.progress(idx / len(points))
 
             try: os.remove(target_in)
             except Exception: pass
             
+            st.session_state.detected_info = info
             st.session_state.generated_shorts = created_shorts
-            status_text.success(f"🎉 آپ کے تمام **{len(created_shorts)} فل اسکرین 9:16 شارٹس** تیار ہیں!")
+            status_text.success(f"🎉 آپ کے تمام **{len(created_shorts)} اوپس کلپ شارٹس** بغیر کسی چہرے کے کٹے اور 26 شیلڈز کے ساتھ تیار ہیں!")
 
+    # DISPLAY SHORTS & SHORTS-SPECIFIC VIRAL METADATA DASHBOARD
     if st.session_state.generated_shorts:
         st.divider()
-        st.subheader("📱 100% فل اسکرین شارٹس (Download YouTube Shorts / Reels):")
+        st.subheader("📱 تیار شدہ اوپس کلپ شارٹس (Download YouTube Shorts / Reels):")
         cols = st.columns(len(st.session_state.generated_shorts))
         for i, (s_path, s_title) in enumerate(st.session_state.generated_shorts):
             with cols[i]:
@@ -531,12 +553,35 @@ with tab_shorts:
                 s_bytes = open(s_path, 'rb').read()
                 st.video(s_bytes)
                 st.download_button(
-                    label=f"📥 ڈاؤنلوڈ فل اسکرین شارٹ #{i+1}",
+                    label=f"📥 ڈاؤنلوڈ شارٹ #{i+1}",
                     data=s_bytes,
-                    file_name=f"fullscreen_short_{i+1}.mp4",
+                    file_name=f"opus_short_{i+1}.mp4",
                     mime="video/mp4",
-                    key=f"dl_sh_fs_{i}"
+                    key=f"dl_opus_{i}"
                 )
+
+        st.markdown("---")
+        st.subheader("🧠 شارٹس کے لیے وائرل #Shorts ٹائٹلز، ہیش ٹیگز اور 9:16 تھمب نیل پرامپٹ (1-Click Copy):")
+        raw_title = st.session_state.detected_info.get('title', 'Viral Action Short')
+        clean_hero_title, s_titles, s_hashtags, s_thumb_prompt = analyze_video_and_generate_exact_prompt(raw_title, is_short=True)
+        
+        c_meta1, c_meta2 = st.columns(2)
+        with c_meta1:
+            st.markdown("**🔥 وائرل شارٹس ٹائٹلز (کاپی کرنے کے لیے اوپر دائیں آئیکن دبائیں):**")
+            for idx, t in enumerate(s_titles, 1):
+                st.code(t, language="text")
+            st.markdown("**🏷️ وائرل شارٹس ہیش ٹیگز:**")
+            st.code(s_hashtags, language="text")
+
+        with c_meta2:
+            st.markdown(f"**🎨 9:16 ورٹیکل شارٹس تھمب نیل پرامپٹ ({clean_hero_title[:25]}):**")
+            st.code(s_thumb_prompt, language="text")
+            with st.expander("🖼️ شارٹس کے لیے AI تھمب نیل پریویو دیکھیں"):
+                thumb_gen_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(s_thumb_prompt)}?width=720&height=1280&nologo=true&model=flux"
+                try:
+                    st.image(thumb_gen_url, caption="Vertical 9:16 Shorts Thumbnail (Flux AI)", use_column_width=True)
+                except Exception:
+                    st.write("پرامپٹ کو کاپی کر کے استعمال کریں۔")
 
 # -----------------
 # TAB 3: CLIP CUTTER
@@ -671,7 +716,7 @@ with tab_lofi:
                     except Exception: pass
 
 # ==========================================
-# OUTPUT & 1-CLICK COPY DASHBOARD
+# OUTPUT & 1-CLICK COPY DASHBOARD (FOR TAB 1 FULL VIDEO)
 # ==========================================
 active_out = st.session_state.current_output_video
 if st.session_state.process_ready and active_out and os.path.exists(active_out) and os.path.getsize(active_out) > 5000:
@@ -693,7 +738,7 @@ if st.session_state.process_ready and active_out and os.path.exists(active_out) 
     st.write("#### 🧠 اصلی ہیرو کے چہرے والا AI تھمب نیل پرامپٹ و وائرل ٹائٹلز (1-Click Copy):")
     
     raw_title = st.session_state.detected_info.get('title', 'Action Video')
-    clean_hero_title, titles, hashtags, exact_thumb_prompt = analyze_video_and_generate_exact_prompt(raw_title)
+    clean_hero_title, titles, hashtags, exact_thumb_prompt = analyze_video_and_generate_exact_prompt(raw_title, is_short=False)
     
     col_out1, col_out2 = st.columns(2)
     with col_out1:
@@ -709,4 +754,4 @@ if st.session_state.process_ready and active_out and os.path.exists(active_out) 
         st.info("💡 یہ پرامپٹ اصلی اداکار کے فیشل فیچرز کے ساتھ تیار کیا گیا ہے۔ اوپر دائیں کونے سے کاپی کریں:")
         st.code(exact_thumb_prompt, language="text")
 
-st.markdown("<p style='text-align: center; font-size: 11px; color: #64748b; margin-top: 20px;'>ES Ultra 26-Shield Studio Suite | Developers: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 11px; color: #64748b; margin-top: 20px;'>ES Ultra Opus-Clip Studio Suite | Developers: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
