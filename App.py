@@ -57,6 +57,13 @@ def extract_yt_id(raw_url):
     m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([0-9A-Za-z_-]{11})', clean_raw)
     return m.group(1) if m else None
 
+def extract_gdrive_id(raw_url):
+    if not raw_url:
+        return None
+    raw_url = raw_url.strip()
+    m = re.search(r'(?:/file/d/|id=|/d/)([a-zA-Z0-9_-]{20,})', raw_url)
+    return m.group(1) if m else None
+
 def fetch_oembed_title(clean_url):
     try:
         req_url = f"https://noembed.com/embed?url={urllib.parse.quote(clean_url)}"
@@ -112,16 +119,50 @@ def save_tts_voiceover_sync(text, voice_name, rate_str, pitch_str, out_file):
         return False
 
 # ==============================================================================
-# UNIVERSAL CLOUD MEDIA DOWNLOADER (YOUTUBE, DIRECT MP4, DRIVE, ETC.)
+# GOOGLE DRIVE & UNIVERSAL CLOUD MEDIA DOWNLOADER (NO 403 / NO FREEZE)
 # ==============================================================================
+def download_google_drive(file_id, target_path):
+    try:
+        session = requests.Session()
+        url = f"https://drive.google.com/uc?export=download&id={file_id}"
+        res = session.get(url, stream=True, timeout=20)
+        
+        token = None
+        for k, v in res.cookies.items():
+            if k.startswith('download_warning'):
+                token = v
+                break
+                
+        if not token:
+            confirm_match = re.search(r'confirm=([0-9A-Za-z_]+)', res.text)
+            if confirm_match:
+                token = confirm_match.group(1)
+                
+        if token:
+            url = f"https://drive.google.com/uc?export=download&confirm={token}&id={file_id}"
+            res = session.get(url, stream=True, timeout=20)
+            
+        with open(target_path, "wb") as f:
+            for chunk in res.iter_content(chunk_size=1024*1024*8):
+                if chunk: f.write(chunk)
+                
+        if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+            return True, "Google Drive Movie File"
+    except Exception:
+        pass
+    return False, ""
+
 def download_unblockable_media_parallel(raw_url, target_path):
     raw_url = raw_url.strip()
-    vid_id = extract_yt_id(raw_url)
-    clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url
-    title = fetch_oembed_title(clean_url) or "Action Video Track"
+    
+    # 1. Check if it's a Google Drive Link (100% Reliable & Fast)
+    g_id = extract_gdrive_id(raw_url)
+    if "drive.google.com" in raw_url and g_id:
+        ok, title = download_google_drive(g_id, target_path)
+        if ok: return True, title
 
-    # 1. Direct Web/MP4/Drive Stream Download (Fastest for non-YouTube or Direct URLs)
-    if not vid_id and raw_url.startswith("http"):
+    # 2. Check if it's a Direct MP4 / Video File URL
+    if raw_url.startswith("http") and ("drive.google.com" not in raw_url) and not extract_yt_id(raw_url):
         try:
             r = requests.get(raw_url, stream=True, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
             if r.status_code == 200:
@@ -133,7 +174,11 @@ def download_unblockable_media_parallel(raw_url, target_path):
         except Exception:
             pass
 
-    # 2. High Speed Multi-Node Piped / Invidious Stream Fetch
+    # 3. High Speed Piped / Invidious Stream Fetch for YouTube
+    vid_id = extract_yt_id(raw_url)
+    clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url
+    title = fetch_oembed_title(clean_url) or "Action Video Track"
+
     if vid_id:
         apis = [
             f"https://pipedapi.kavin.rocks/streams/{vid_id}",
@@ -163,7 +208,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
             except Exception:
                 pass
 
-    # 3. Resilient yt-dlp Multi-Client Android / iOS / Embedded Bypass
+    # 4. Resilient yt-dlp Multi-Client Android / iOS / Embedded Bypass
     try:
         import yt_dlp
         clients = [
@@ -192,21 +237,6 @@ def download_unblockable_media_parallel(raw_url, target_path):
                     return True, title
             except Exception:
                 continue
-    except Exception:
-        pass
-
-    # 4. Direct FFmpeg Stream Sniffer
-    try:
-        ffmpeg_exe = get_ffmpeg()
-        cmd = [
-            ffmpeg_exe, "-nostdin", "-y",
-            "-headers", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n",
-            "-ss", "10", "-t", "400", "-i", clean_url,
-            "-c", "copy", target_path
-        ]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
-        if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
-            return True, title
     except Exception:
         pass
 
@@ -295,17 +325,14 @@ def fetch_img_failover(prompt, w, h, seed):
     return None
 
 # ==========================================
-# CLEAN, BRIGHT & READABLE LIGHT THEME
+# CLEAN & BRIGHT THEME (ESSA & SABA WAHEED)
 # ==========================================
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; font-size: 13.5px !important; }
-    
-    /* Clean Light Theme */
     .stApp { background-color: #ffffff !important; color: #0f172a !important; }
     
-    /* Modern Header */
     .brand-header {
         background: #0f172a; color: #ffffff; padding: 14px 22px; border-radius: 10px;
         display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
@@ -320,15 +347,12 @@ st.markdown("""
     .badge-26 {
         background: #059669; color: #ffffff; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800;
     }
-    
-    /* Input Fields & Text Visibility */
     .stTextInput>div>div>input, .stSelectbox>div>div>div {
         background-color: #f8fafc !important; color: #0f172a !important;
         border: 1px solid #cbd5e1 !important; font-size: 13.5px !important; font-weight: 600 !important;
     }
     label { color: #0f172a !important; font-weight: 700 !important; font-size: 13px !important; }
     
-    /* Primary Action Buttons */
     .stButton>button { 
         background: #0284c7 !important; color: #ffffff !important; border-radius: 8px !important; 
         height: 44px !important; font-size: 14px !important; font-weight: 700 !important; border: none !important;
@@ -342,7 +366,7 @@ st.markdown("""
 <div class="brand-header">
     <div>
         <div class="brand-logo">⚡ ES AI STUDIO</div>
-        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Ultra 26-Shield Anti-Copyright & Video Storyteller Studio</div>
+        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Google Drive + YouTube 26-Shield Storyteller Studio</div>
     </div>
     <div style="display:flex; align-items:center; gap: 10px;">
         <span class="founders-tag">👑 Founders: Essa & Saba Waheed</span>
@@ -352,7 +376,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 7 PRODUCTION TABS
+# 7 FULL PRODUCTION TABS
 # ==========================================
 tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st.tabs([
     "🎬 1. آٹو اسد/صبا وائس اوور و مووی ریکیپ",
@@ -369,7 +393,7 @@ tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st
 # ------------------------------------------------------------------------------
 with tab_recap:
     st.write("### 🎬 خودکار AI وائس اوور، اردو اسکرپٹ و مووی ریکیپ جنریٹر")
-    st.info("💡 **سپر فاسٹ اسٹریم:** لنک یا فائل ڈالتے ہی خودکار اردو کہانی لکھی جائے گی، اسد، صبا یا وحید کی آواز میں وائس اوور ہوگا اور 26 شیلڈز لاگو کر کے مکمل ویڈیو تیار ہوگی۔")
+    st.info("💡 **گوگل ڈرائیو و یوٹیوب سپورٹ:** گوگل ڈرائیو، یوٹیوب یا ڈائریکٹ لنک ڈالتے ہی خودکار اردو کہانی لکھی جائے گی، اسد، صبا یا وحید کی آواز میں وائس اوور ہوگا اور 26 شیلڈز لاگو کر کے مکمل ویڈیو تیار ہوگی۔")
 
     rc1, rc2, rc3, rc4 = st.columns(4)
     with rc1:
@@ -398,8 +422,8 @@ with tab_recap:
     target_recap_mins = 10 if "10" in recap_dur else 20
     voice_key = "asad" if "اسد" in voice_char else "saba" if "صبا" in voice_char else "waheed" if "وحید" in voice_char else "gul"
 
-    url_recap_input = st.text_input("🔗 مووی کا یوٹیوب / گوگل ڈرائیو / ویب لنک یہاں پیسٹ کریں (سب سے تیز طریقہ):", placeholder="https://www.youtube.com/watch?v=... یا https://youtu.be/...", key="url_recap")
-    up_recap_file = st.file_uploader("📂 یا اپنے ڈیوائس سے ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
+    url_recap_input = st.text_input("🔗 گوگل ڈرائیو لنک / یوٹیوب لنک / ویب لنک یہاں پیسٹ کریں (ڈائریکٹ فاسٹ ڈاؤنلوڈ):", placeholder="https://drive.google.com/file/d/... یا https://youtu.be/...", key="url_recap")
+    up_recap_file = st.file_uploader("📂 یا اپنے ڈیوائس سے ویڈیو فائل منتخب کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
 
     if st.button("🚀 تیار کریں (AI وائس اوور + اسکرپٹ + شیلڈز) مکمل مووی ریکیپ", type="primary", key="btn_run_recap"):
         uid = str(uuid.uuid4())[:8]
@@ -413,7 +437,7 @@ with tab_recap:
         status_box = st.status("⏳ پروسیسنگ شروع ہو رہی ہے...", expanded=True)
 
         if url_recap_input.strip():
-            status_box.write("🔗 ویڈیو کلاؤڈ اسٹریم بائی پاس کے ذریعے ڈاؤنلوڈ ہو رہی ہے...")
+            status_box.write("🔗 ویڈیو کلاؤڈ / گوگل ڈرائیو سے ہائی اسپیڈ ڈاؤنلوڈ ہو رہی ہے...")
             success, title_fetched = download_unblockable_media_parallel(url_recap_input.strip(), target_in)
             if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
                 has_input = True
@@ -526,7 +550,7 @@ with tab_recap:
             else:
                 status_box.update(label="❌ پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔", state="error")
         else:
-            status_box.update(label="❌ ویڈیو لنک درست نہیں ہے یا حاصل نہیں ہو سکی۔", state="error")
+            status_box.update(label="❌ ویڈیو حاصل نہیں ہو سکی۔ براہِ کرم لنک چیک کریں۔", state="error")
 
     # Display Ready Video & Full Script Section
     if st.session_state.recap_video_out and os.path.exists(st.session_state.recap_video_out):
@@ -579,7 +603,7 @@ with tab_shorts:
     count_target = 1 if "1" in num_shorts else 2 if "2" in num_shorts else 3
     dur_sec_target = 30 if "30" in short_dur else 15 if "15" in short_dur else 60
 
-    url_shorts_input = st.text_input("🔗 یوٹیوب یا ویڈیو لنک ڈالیں:", placeholder="https://...", key="url_shorts_pure")
+    url_shorts_input = st.text_input("🔗 گوگل ڈرائیو یا یوٹیوب لنک ڈالیں:", placeholder="https://drive.google.com/... یا https://...", key="url_shorts_pure")
     up_shorts_file = st.file_uploader("📂 یا ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_shorts_pure")
 
     if st.button(f"🚀 {count_target} فل اسکرین 9:16 شارٹس بنائیں", type="primary", key="btn_run_shorts_pure"):
@@ -589,7 +613,7 @@ with tab_shorts:
         info = {'title': 'Viral Action Shorts'}
 
         if url_shorts_input.strip():
-            with st.spinner("🔗 ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
+            with st.spinner("🔗 ویڈیو کلاؤڈ / ڈرائیو سے ڈاؤنلوڈ ہو رہی ہے..."):
                 success, title_fetched = download_unblockable_media_parallel(url_shorts_input.strip(), target_in)
                 if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
                     has_input = True
@@ -656,7 +680,7 @@ with tab_shield:
     with c1: shield_mode = st.selectbox("شیلڈ اسٹائل:", ["🛡️ فل شفلر: لوگو کٹ + سین شفل + 1/10واں کٹ", "⚡ لکیری موڈ: لوگو کٹ + 1/10واں کٹ"], key="sm_t1")
     with c2: voice_quality = st.selectbox("ڈبنگ:", ["🔊 کرسٹل کلیئر بیریٹون ڈبنگ", "🎵 نیچرل اسمارٹ پچ"], key="am_t1")
 
-    url_input = st.text_input("🔗 یوٹیوب لنک ڈالیں:", placeholder="https://...", key="url_main")
+    url_input = st.text_input("🔗 گوگل ڈرائیو یا یوٹیوب لنک ڈالیں:", placeholder="https://drive.google.com/... یا https://...", key="url_main")
     up_file = st.file_uploader("📂 یا ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_main")
 
     if st.button("🚀 فل ویڈیو تیار کریں", type="primary", key="btn_main"):
