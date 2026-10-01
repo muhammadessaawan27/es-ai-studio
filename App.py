@@ -17,48 +17,6 @@ import threading
 import gc
 import concurrent.futures
 
-# ==============================================================================
-# PROPER TAB-SEPARATED AUTHENTIC YOUTUBE COOKIES
-# ==============================================================================
-def ensure_cookies_file():
-    cookie_path = "cookies.txt"
-    try:
-        # Netscape format with strict TAB delimiters
-        lines = [
-            "# Netscape HTTP Cookie File",
-            "# https://curl.haxx.se/rfc/cookie_spec.html",
-            "# This is a generated file! Do not edit.",
-            ".youtube.com\tTRUE\t/\tTRUE\t1791176355\t__Secure-BUCKET\tCMoF",
-            ".youtube.com\tTRUE\t/\tTRUE\t1811420578\tLOGIN_INFO\tAFmmF2swRQIgYx-A8t552HceYqwtgmhJzZt30jCJc0x0PIOQW2869pcCIQDhsBES59hYj2Q52eQ9oYqFQSKj_I2LhWkJzrlHcTKTlw:QUQ3MjNmeFJrZG9CTm9zOVYyVm5KZ24zR3FRWVNpTEdTNWpGd21nLWFMbjdxLXgwSzZRbzdjRERBR2I0OEhTQ0FROUh3Vzk2MXFtQjVwZjVUSVR0WVNVcGhhYUJXdWlUdGh2eFVRblA3NjZsaEJ0S3pMQVNmN3h3WGFLdEtsdU1UVjlMMFBmZXc4VWV5QUN3c3N6QU1xNUZCaHFTNHh3bnZ1ZHN0eXNXSDhRSmxISjFuQzY4NER3ZmFKYjN6blFWN1ZuQklmSE5KUjNJRElzZ2g1Mm16OFJHanQzSVVvVmUyQQ==",
-            ".youtube.com\tTRUE\t/\tTRUE\t1825416666\tPREF\ttz=Asia.Karachi&f7=100&f5=20000",
-            ".youtube.com\tTRUE\t/\tFALSE\t1823696801\tSID\tg.a000CgmtoRDCf_NmUVMPewfYL2dq5mS_RxLLTUzJXCiitQzI2bAB87O2GAFIBZGM4EbA9dkNLwACgYKAXgSARYSFQHGX2Mi1GyNONtDTDkXKfFGtC8l5RoVAUF8yKrkw1iN55Mp9YKzd2RoDtRT0076",
-            ".youtube.com\tTRUE\t/\tTRUE\t1823696801\t__Secure-1PSID\tg.a000CgmtoRDCf_NmUVMPewfYL2dq5mS_RxLLTUzJXCiitQzI2bABotFk8-O93hBDQMsfug80vgACgYKARUSARYSFQHGX2Mir3MZxLSUgjUkgBuAOB4zGBoVAUF8yKolYLq7rj-yX4Uuvbgav0zx0076",
-            ".youtube.com\tTRUE\t/\tTRUE\t1823696801\t__Secure-3PSID\tg.a000CgmtoRDCf_NmUVMPewfYL2dq5mS_RxLLTUzJXCiitQzI2bABjMSQFt-pLPQFhaSVf3hVwgACgYKAVUSARYSFQHGX2MiYeeQtzK6W7IufpV1qV4CZxoVAUF8yKoWyTRK8fg4HLIkeTceZ6A10076",
-            ".youtube.com\tTRUE\t/\tFALSE\t1823696801\tHSID\tAkKASWmbzy75RsdyS",
-            ".youtube.com\tTRUE\t/\tTRUE\t1823696801\tSSID\tAPohdYdTPzRFkfk0W",
-            ".youtube.com\tTRUE\t/\tFALSE\t1823696801\tAPISID\taALpAI9HwzoolDtd/AKdx8RyipLsF6sTjW",
-            ".youtube.com\tTRUE\t/\tTRUE\t1823696801\tSAPISID\t8MkcuQpllZeAQJl5/ACPRp6UR_zGSQGse3",
-            ".youtube.com\tTRUE\t/\tTRUE\t1823696801\t__Secure-1PAPISID\t8MkcuQpllZeAQJl5/ACPRp6UR_zGSQGse3",
-            ".youtube.com\tTRUE\t/\tTRUE\t1823696801\t__Secure-3PAPISID\t8MkcuQpllZeAQJl5/ACPRp6UR_zGSQGse3",
-            ".youtube.com\tTRUE\t/\tTRUE\t1822392675\t__Secure-1PSIDTS\tsidts-CjIBkldj_wFhozFQx6d8mJ599E1xH-vuOjwbMsvdTFfum4hKItd0ObXShfhPFQpQR0M3kRAA",
-            ".youtube.com\tTRUE\t/\tTRUE\t1822392675\t__Secure-3PSIDTS\tsidts-CjIBkldj_wFhozFQx6d8mJ599E1xH-vuOjwbMsvdTFfum4hKItd0ObXShfhPFQpQR0M3kRAA",
-            ".youtube.com\tTRUE\t/\tFALSE\t1822392685\tSIDCC\tAKEyXzVYTV-3INe0w0Jiz9mCwFFYjbstPIDMfh_BYTDWz58XpvP_ANyNXsT4UjZHucMJy7gygw",
-            ".youtube.com\tTRUE\t/\tTRUE\t1822392685\t__Secure-1PSIDCC\tAKEyXzWepV6w3aAl4hk6yrmrARqXsWgnK1XyKqh582bGVNeSEhd6iMOdDGJEM1RwvLe5L83ycpA",
-            ".youtube.com\tTRUE\t/\tTRUE\t1822392685\t__Secure-3PSIDCC\tAKEyXzUdj-9E3Ik8-Ggmb3Y2wb4w_v8yI8pKk5WIWlCQfWjtdNPrDiBZ994RGIhXgk5Gx72oVb8",
-            ".youtube.com\tTRUE\t/\tTRUE\t1806408672\tVISITOR_INFO1_LIVE\tKpf1TJjqFGE",
-            ".youtube.com\tTRUE\t/\tTRUE\t1806408672\tVISITOR_PRIVACY_METADATA\tCgJQSxIEGgAgIQ%3D%3D",
-            ".youtube.com\tTRUE\t/\tTRUE\t0\tYSC\tLG6L7BeDtuQ",
-            ".youtube.com\tTRUE\t/\tTRUE\t1806408660\t__Secure-ROLLOUT_TOKEN\tCLaQ1crowIjZShDnuYSb-MeSAxjzp82U5ZiXAw%3D%3D",
-            ".youtube.com\tTRUE\t/\tTRUE\t1806408664\t__Secure-YNID\t22.YT=C8_mIqI4F5xFISn1rByVdBIhoJxv4CTTstbgdy7FFabxKaU_s6gpwylksnM_N9MW_dCTgDSzP__KXbP846viZkK-Oh3FgXQs4qFrIChvFiYU5D2ea-mcKMPkmYGnyTv8mK71XieSxHXMQzd1cH4esEImI3Z0XCnqVPtyTaUKMgIFOcPKZ6EvoiZj5FTPONTXEuiOl-Y3TwdPpqmN8R_kGcwJTuQH1mRfGIwXWD0UF2AzVPi6t-xHycBdoQeH1jfn26CY2dNG9ssZx_c_9UraXgoDpggnUqdPrxAw801DbSpowDwZKFtubmY7psMf8zaXkAJ95Js_Alwxgt3au00Rww"
-        ]
-        with open(cookie_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines))
-        return cookie_path
-    except Exception:
-        return None
-
-COOKIE_FILE_PATH = ensure_cookies_file()
-
 # ==========================================
 # STREAMLIT CONFIGURATION & SESSION STATE
 # ==========================================
@@ -88,10 +46,15 @@ def get_ffmpeg():
     except Exception:
         return "ffmpeg"
 
+def extract_yt_id(raw_url):
+    raw_url = raw_url.strip()
+    m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([0-9A-Za-z_-]{11})', raw_url)
+    return m.group(1) if m else None
+
 def fetch_oembed_title(clean_url):
     try:
         req_url = f"https://noembed.com/embed?url={urllib.parse.quote(clean_url)}"
-        res = requests.get(req_url, timeout=4)
+        res = requests.get(req_url, timeout=3)
         if res.status_code == 200:
             return res.json().get("title", "")
     except Exception:
@@ -102,7 +65,7 @@ def get_video_duration_fast(file_path):
     try:
         ffmpeg_exe = get_ffmpeg()
         cmd = [ffmpeg_exe, "-nostdin", "-i", file_path]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
         m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", res.stderr)
         if m:
             hours = float(m.group(1))
@@ -140,98 +103,104 @@ def save_multilang_voiceover_sync(text, voice_key, out_file):
     try:
         clean_t = clean_text_for_tts(text)
         voice_id, rate_str, pitch_str = VOICE_DATABASE.get(voice_key, ("ur-PK-AsadNeural", "-10%", "-15Hz"))
-        
         async def amain():
             communicate = edge_tts.Communicate(clean_t, voice_id, rate=rate_str, pitch=pitch_str)
             await communicate.save(out_file)
-            
         asyncio.run(amain())
         return True
     except Exception:
         return False
 
 # ==============================================================================
-# FAST STREAM DOWNLOADER WITH AUTHENTIC COOKIES
+# ORIGINAL PARALLEL MULTI-NODE UNBLOCKABLE DOWNLOADER (THE WORKING ENGINE)
 # ==============================================================================
+def try_download_node(node_url, vid_id, target_path):
+    try:
+        # Invidious API
+        if "piped" not in node_url:
+            api_url = f"{node_url}/api/v1/videos/{vid_id}"
+            res = requests.get(api_url, timeout=3)
+            if res.status_code == 200:
+                data = res.json()
+                title = data.get("title", "Action Video")
+                streams = data.get("formatStreams", [])
+                mp4s = [s for s in streams if "mp4" in s.get("container", "").lower() or "video/mp4" in s.get("type", "").lower()] or streams
+                if mp4s:
+                    dl_url = mp4s[-1]["url"]
+                    if dl_url.startswith("/"): dl_url = node_url + dl_url
+                    r_file = requests.get(dl_url, stream=True, timeout=8)
+                    if r_file.status_code == 200:
+                        with open(target_path, "wb") as f:
+                            for chunk in r_file.iter_content(chunk_size=1024*1024*4):
+                                if chunk: f.write(chunk)
+                        if os.path.exists(target_path) and os.path.getsize(target_path) > 5000:
+                            return True, title
+        else:
+            # Piped API
+            api_url = f"{node_url}/streams/{vid_id}"
+            res = requests.get(api_url, timeout=3)
+            if res.status_code == 200:
+                data = res.json()
+                title = data.get("title", "Action Video")
+                streams = data.get("videoStreams", [])
+                mp4s = [s for s in streams if "mp4" in s.get("container", "").lower() or "video/mp4" in s.get("mimeType", "").lower()] or streams
+                if mp4s:
+                    dl_url = mp4s[0]["url"]
+                    r_file = requests.get(dl_url, stream=True, timeout=8)
+                    if r_file.status_code == 200:
+                        with open(target_path, "wb") as f:
+                            for chunk in r_file.iter_content(chunk_size=1024*1024*4):
+                                if chunk: f.write(chunk)
+                        if os.path.exists(target_path) and os.path.getsize(target_path) > 5000:
+                            return True, title
+    except Exception:
+        pass
+    return False, ""
+
 def download_unblockable_media_parallel(raw_url, target_path):
-    raw_url = raw_url.strip()
-    title = fetch_oembed_title(raw_url) or "Action Movie Video"
-
-    # 1. Direct MP4 / Cloud File Link
-    if raw_url.startswith("http") and ("youtube.com" not in raw_url and "youtu.be" not in raw_url and "drive.google.com" not in raw_url):
-        direct_url = raw_url.replace("www.dropbox.com", "dl.dropboxusercontent.com").replace("?dl=0", "?dl=1")
-        try:
-            r = requests.get(direct_url, stream=True, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-            if r.status_code == 200:
-                with open(target_path, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=1024 * 1024 * 8):
-                        if chunk: f.write(chunk)
-                if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
-                    return True, "Direct Stream Video"
-        except Exception:
-            pass
-
-    # 2. Authenticated YouTube Download using Cookies (Web Client Match)
+    vid_id = extract_yt_id(raw_url)
+    clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url.strip()
+    title = fetch_oembed_title(clean_url) or "Action Video Track"
+    
+    # 1. Parallel Multi-Node Fast Fetch (Original 2026 Active Cluster)
+    if vid_id:
+        nodes = [
+            "https://inv.nadeko.net",
+            "https://yewtu.be",
+            "https://pipedapi.kavin.rocks",
+            "https://pipedapi.leptons.xyz",
+            "https://piped-api.privacy.com.de",
+            "https://inv.tux.pizza",
+            "https://invidious.nerdvpn.de",
+            "https://invidious.drgns.space"
+        ]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(try_download_node, node, vid_id, target_path) for node in nodes]
+            for future in concurrent.futures.as_completed(futures):
+                success, t = future.result()
+                if success:
+                    return True, t
+                    
+    # 2. Resilient yt-dlp Fallback with iOS/Android Creator Bypass
     try:
         import yt_dlp
-        cookie_file = ensure_cookies_file()
-        ffmpeg_exe = get_ffmpeg()
-        ffmpeg_dir = os.path.dirname(ffmpeg_exe) if os.path.isabs(ffmpeg_exe) else None
-
         ydl_opts = {
-            'format': '18/best[height<=480][ext=mp4]/best[ext=mp4]/best',
+            'format': '18/best[height<=720][ext=mp4]/best[ext=mp4]/best',
             'outtmpl': target_path,
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'geo_bypass': True,
-            'socket_timeout': 30,
-            'retries': 3
+            'socket_timeout': 6,
+            'extractor_args': {'youtube': {'player_client': ['ios', 'android_creator', 'tvhtml5']}}
         }
-        if ffmpeg_dir:
-            ydl_opts['ffmpeg_location'] = ffmpeg_dir
-        if cookie_file and os.path.exists(cookie_file):
-            ydl_opts['cookiefile'] = cookie_file
-
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            meta = ydl.extract_info(raw_url, download=True)
-            if meta:
-                title = meta.get('title', title)
-                
+            meta = ydl.extract_info(clean_url, download=True)
+            if meta: title = meta.get('title', title)
         if os.path.exists(target_path) and os.path.getsize(target_path) > 5000:
             return True, title
     except Exception:
         pass
-
-    # 3. Fallback: Rapid Invidious API
-    m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([0-9A-Za-z_-]{11})', raw_url)
-    if m:
-        vid_id = m.group(1)
-        apis = [
-            f"https://pipedapi.kavin.rocks/streams/{vid_id}",
-            f"https://inv.tux.pizza/api/v1/videos/{vid_id}",
-            f"https://invidious.nerdvpn.de/api/v1/videos/{vid_id}"
-        ]
-        for api_url in apis:
-            try:
-                res = requests.get(api_url, timeout=5)
-                if res.status_code == 200:
-                    data = res.json()
-                    title = data.get("title", title)
-                    streams = data.get("videoStreams", []) or data.get("formatStreams", [])
-                    mp4s = [s for s in streams if "mp4" in s.get("container", "").lower() or "video/mp4" in s.get("mimeType", "").lower()] or streams
-                    if mp4s:
-                        dl_url = mp4s[0].get("url", "")
-                        if dl_url:
-                            r_file = requests.get(dl_url, stream=True, timeout=12)
-                            if r_file.status_code == 200:
-                                with open(target_path, "wb") as f:
-                                    for chunk in r_file.iter_content(chunk_size=1024 * 1024 * 4):
-                                        if chunk: f.write(chunk)
-                                if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
-                                    return True, title
-            except Exception:
-                pass
 
     return False, title
 
@@ -333,7 +302,7 @@ st.markdown("""
 <div class="brand-header">
     <div>
         <div class="brand-logo">⚡ ES AI STUDIO</div>
-        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">YouTube Authenticated Engine & 26 Shields Active</div>
+        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Multi-Node Parallel Stream Engine & 26 Shields Active</div>
     </div>
     <div style="display:flex; align-items:center; gap: 10px;">
         <span class="founders-tag">👑 Founders: Muhammad Essa & Saba Wahid</span>
@@ -360,7 +329,7 @@ tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st
 # ------------------------------------------------------------------------------
 with tab_recap:
     st.write("### 🎬 خودکار AI وائس اوور، اصلی فلم کی کہانی و مووی ریکیپ")
-    st.info("⚡ **یوٹیوب و کلاؤڈ سیشن ایکٹو:** یوٹیوب لنک درج کریں اور بٹن دبائیں۔ ویڈیو ڈاؤنلوڈ ہو کر پروسیسنگ شروع ہو جائے گی!")
+    st.info("⚡ **ملٹی تھریڈ پیرلل ڈاؤنلوڈر ایکٹو:** یوٹیوب لنک درج کریں اور بٹن دبائیں۔ ویڈیو ڈاؤنلوڈ ہو کر پروسیسنگ شروع ہو جائے گی!")
 
     rc1, rc2, rc3, rc4 = st.columns(4)
     with rc1:
@@ -399,7 +368,7 @@ with tab_recap:
         status_box = st.status("⏳ پروسیسنگ جاری ہے، برائے مہربانی چند سیکنڈ انتظار کریں...", expanded=True)
 
         if url_recap_input.strip():
-            status_box.write("🔗 ویڈیو ڈاؤنلوڈ ہو رہی ہے...")
+            status_box.write("🔗 ویڈیو پیرلل ملٹی نوڈز کے ذریعے فاسٹ ڈاؤنلوڈ ہو رہی ہے...")
             success, title_fetched = download_unblockable_media_parallel(url_recap_input.strip(), target_in)
             if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
                 has_input = True
