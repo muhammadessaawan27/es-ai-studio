@@ -16,17 +16,7 @@ import numpy as np
 import threading
 import gc
 import concurrent.futures
-
-# ==========================================
-# MOVIEPY & FFMPEG IMPORTS
-# ==========================================
-try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
-except ImportError:
-    try:
-        from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
-    except Exception:
-        pass
+import json
 
 # ==========================================
 # STREAMLIT CONFIGURATION & SESSION STATE
@@ -68,7 +58,7 @@ def extract_yt_id(raw_url):
 def fetch_oembed_title(clean_url):
     try:
         req_url = f"https://noembed.com/embed?url={urllib.parse.quote(clean_url)}"
-        res = requests.get(req_url, timeout=3)
+        res = requests.get(req_url, timeout=4)
         if res.status_code == 200:
             return res.json().get("title", "")
     except Exception:
@@ -98,11 +88,10 @@ def clean_text_for_tts(raw_text):
     clean = re.sub(r'https?://\S+', '', clean)
     return clean.strip()
 
-# Multi-Voice TTS Generator (Asad, Saba, Waheed / Gul)
+# Multi-Voice TTS Generator (Asad, Saba, Salman/Waheed, Gul)
 def save_tts_voiceover_sync(text, voice_name, rate_str, pitch_str, out_file):
     try:
         clean_t = clean_text_for_tts(text)
-        # Voice Mapping
         voice_map = {
             "asad": "ur-PK-AsadNeural",
             "saba": "ur-PK-SabaNeural",
@@ -118,73 +107,113 @@ def save_tts_voiceover_sync(text, voice_name, rate_str, pitch_str, out_file):
         asyncio.run(amain())
         return True
     except Exception as e:
-        st.warning(f"Voiceover Warning: {e}")
         return False
 
-# ==========================================
-# RESILIENT YOUTUBE FAST DOWNLOADER (NO FREEZE)
-# ==========================================
-def try_download_node(node_url, vid_id, target_path):
-    try:
-        api_url = f"{node_url}/api/v1/videos/{vid_id}"
-        res = requests.get(api_url, timeout=3)
-        if res.status_code == 200:
-            data = res.json()
-            title = data.get("title", "Action Video")
-            streams = data.get("formatStreams", [])
-            mp4s = [s for s in streams if "mp4" in s.get("container", "").lower() or "video/mp4" in s.get("type", "").lower()] or streams
-            if mp4s:
-                dl_url = mp4s[-1]["url"]
-                if dl_url.startswith("/"): dl_url = node_url + dl_url
-                r_file = requests.get(dl_url, stream=True, timeout=6)
-                if r_file.status_code == 200:
-                    with open(target_path, "wb") as f:
-                        for chunk in r_file.iter_content(chunk_size=1024*1024*4):
-                            if chunk: f.write(chunk)
-                    if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
-                        return True, title
-    except Exception:
-        pass
-    return False, ""
-
+# ==============================================================================
+# 4-TIER BULLETPROOF YOUTUBE BYPASS DOWNLOADER
+# ==============================================================================
 def download_unblockable_media_parallel(raw_url, target_path):
     vid_id = extract_yt_id(raw_url)
     clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url.strip()
-    title = fetch_oembed_title(clean_url) or "Action Video Track"
-    
-    # 1. Fast Parallel Invidious Node Fetch
-    if vid_id:
-        nodes = [
-            "https://inv.tux.pizza",
-            "https://invidious.nerdvpn.de",
-            "https://invidious.privacydev.net",
-            "https://invidious.drgns.space",
-            "https://invidious.projectsegfau.lt"
-        ]
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(try_download_node, node, vid_id, target_path) for node in nodes]
-            for future in concurrent.futures.as_completed(futures):
-                success, t = future.result()
-                if success:
-                    return True, t
+    title = fetch_oembed_title(clean_url) or "Action Video Scene"
 
-    # 2. Resilient Fallback to yt-dlp Android/iOS client
+    # Tier 1: Multi-Cobalt Direct Stream API
+    cobalt_instances = [
+        "https://api.cobalt.tools/api/json",
+        "https://cobalt.api.kwiatekm.pl/api/json",
+        "https://co.wuk.sh/api/json",
+        "https://cobalt-backend.canine.tools/api/json"
+    ]
+    for c_api in cobalt_instances:
+        try:
+            payload = {"url": clean_url, "videoQuality": "480", "filenamePattern": "basic"}
+            headers = {"Accept": "application/json", "Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
+            r = requests.post(c_api, json=payload, headers=headers, timeout=5)
+            if r.status_code == 200:
+                data = r.json()
+                stream_url = data.get("url")
+                if stream_url:
+                    dl = requests.get(stream_url, stream=True, timeout=12)
+                    if dl.status_code == 200:
+                        with open(target_path, "wb") as f:
+                            for chunk in dl.iter_content(chunk_size=1024*1024*4):
+                                if chunk: f.write(chunk)
+                        if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                            return True, title
+        except Exception:
+            pass
+
+    # Tier 2: Piped / Invidious Multi-Node API Fetch
+    if vid_id:
+        piped_nodes = [
+            f"https://pipedapi.kavin.rocks/streams/{vid_id}",
+            f"https://api.piped.privacydev.net/streams/{vid_id}",
+            f"https://inv.tux.pizza/api/v1/videos/{vid_id}",
+            f"https://invidious.nerdvpn.de/api/v1/videos/{vid_id}",
+            f"https://invidious.privacydev.net/api/v1/videos/{vid_id}"
+        ]
+        for p_url in piped_nodes:
+            try:
+                res = requests.get(p_url, timeout=4)
+                if res.status_code == 200:
+                    data = res.json()
+                    title = data.get("title", title)
+                    streams = data.get("videoStreams", []) or data.get("formatStreams", [])
+                    mp4s = [s for s in streams if "mp4" in s.get("container", "").lower() or "video/mp4" in s.get("mimeType", "").lower()] or streams
+                    if mp4s:
+                        dl_url = mp4s[0].get("url", "")
+                        if dl_url:
+                            r_file = requests.get(dl_url, stream=True, timeout=8)
+                            if r_file.status_code == 200:
+                                with open(target_path, "wb") as f:
+                                    for chunk in r_file.iter_content(chunk_size=1024*1024*4):
+                                        if chunk: f.write(chunk)
+                                if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                                    return True, title
+            except Exception:
+                pass
+
+    # Tier 3: yt-dlp Android & iOS Client Spoof Bypass
     try:
         import yt_dlp
-        ydl_opts = {
-            'format': '18/best[height<=480][ext=mp4]/best[ext=mp4]/best',
-            'outtmpl': target_path,
-            'quiet': True,
-            'no_warnings': True,
-            'nocheckcertificate': True,
-            'geo_bypass': True,
-            'socket_timeout': 10,
-            'retries': 3,
-            'extractor_args': {'youtube': {'player_client': ['android', 'ios', 'web']}}
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            meta = ydl.extract_info(clean_url, download=True)
-            if meta: title = meta.get('title', title)
+        clients_to_try = [
+            ['android', 'ios'],
+            ['tvhtml5', 'mweb'],
+            ['web_creator', 'android_creator']
+        ]
+        for cl in clients_to_try:
+            ydl_opts = {
+                'format': '18/worst[ext=mp4]/best[height<=480][ext=mp4]/best[ext=mp4]/best',
+                'outtmpl': target_path,
+                'quiet': True,
+                'no_warnings': True,
+                'nocheckcertificate': True,
+                'geo_bypass': True,
+                'socket_timeout': 10,
+                'retries': 2,
+                'extractor_args': {'youtube': {'player_client': cl}}
+            }
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    meta = ydl.extract_info(clean_url, download=True)
+                    if meta: title = meta.get('title', title)
+                if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                    return True, title
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    # Tier 4: Direct FFmpeg URL stream capture
+    try:
+        ffmpeg_exe = get_ffmpeg()
+        cmd = [
+            ffmpeg_exe, "-nostdin", "-y",
+            "-headers", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n",
+            "-ss", "10", "-t", "300", "-i", clean_url,
+            "-c", "copy", target_path
+        ]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
         if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
             return True, title
     except Exception:
@@ -350,7 +379,7 @@ with tab_recap:
     target_recap_mins = 10 if "10" in recap_dur else 20
     voice_key = "asad" if "اسد" in voice_char else "saba" if "صبا" in voice_char else "waheed" if "وحید" in voice_char else "gul"
 
-    up_recap_file = st.file_uploader("📂 مووی کی ویڈیو فائل اپلوڈ کریں (یا لنک ڈالیں):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
+    up_recap_file = st.file_uploader("📂 مووی کی ویڈیو فائل اپلوڈ کریں (یا نیچے لنک ڈالیں):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
     url_recap_input = st.text_input("🔗 یا مووی کا یوٹیوب / ویب لنک یہاں پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=...", key="url_recap")
 
     if st.button("🚀 مکمل مووی ریکیپ (AI وائس اوور + اسکرپٹ + شیلڈز) تیار کریں", type="primary", key="btn_run_recap"):
@@ -372,7 +401,7 @@ with tab_recap:
                 has_input = True
                 info['title'] = up_recap_file.name
         elif url_recap_input.strip():
-            status_box.write("🔗 ویڈیو فاسٹ اسٹریم بائی پاس کے ذریعے ڈاؤنلوڈ ہو رہی ہے...")
+            status_box.write("🔗 ویڈیو 4-لیئر بائی پاس انجن کے ذریعے ڈاؤنلوڈ ہو رہی ہے...")
             success, title_fetched = download_unblockable_media_parallel(url_recap_input.strip(), target_in)
             if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
                 has_input = True
@@ -475,7 +504,7 @@ with tab_recap:
             else:
                 status_box.update(label="❌ پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔", state="error")
         else:
-            status_box.update(label="❌ ویڈیو فائل یا لنک درست نہیں ہے۔", state="error")
+            status_box.update(label="❌ یوٹیوب نے سیکیورٹی چیک کی وجہ سے اسٹریم بلاک کر دی۔ اگر لنک بار بار فیل ہو تو اوپر فائل اپلوڈ کا آپشن استعمال کریں۔", state="error")
 
     # Display Ready Video & Full Script Section
     if st.session_state.recap_video_out and os.path.exists(st.session_state.recap_video_out):
