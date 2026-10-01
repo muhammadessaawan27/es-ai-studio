@@ -30,7 +30,7 @@ except ImportError:
 # ==========================================
 # STREAMLIT COMPACT CONFIGURATION
 # ==========================================
-st.set_page_config(page_title="ES Ultra 26-Shield AI Studio Suite", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="ES Ultra 26-Shield Full-Screen Shorts Studio", layout="wide", page_icon="⚡")
 
 if "enable_watermark" not in st.session_state:
     st.session_state.enable_watermark = True
@@ -57,9 +57,6 @@ def get_ffmpeg():
         return imageio_ffmpeg.get_ffmpeg_exe()
     except Exception:
         return "ffmpeg"
-
-def make_even(val):
-    return int(val) if int(val) % 2 == 0 else int(val) + 1
 
 def hash_password(password):
     salt = b"sglowina_saas_salt_1234"
@@ -140,17 +137,6 @@ def init_db():
             uses_left INTEGER
         )
     """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS local_payments (
-            id TEXT PRIMARY KEY,
-            username TEXT,
-            method TEXT,
-            trx_id TEXT UNIQUE,
-            amount REAL,
-            status TEXT DEFAULT 'Pending',
-            created_at TEXT
-        )
-    """)
     
     cursor.execute("SELECT COUNT(*) FROM coupons WHERE code = 'ESSASABA'")
     if cursor.fetchone()[0] == 0:
@@ -187,14 +173,6 @@ def get_user_data(username):
     row = cursor.fetchone()
     conn.close()
     return row
-
-def deduct_user_credits(username, amount):
-    username = username.strip().lower()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE LOWER(username) = LOWER(?)", (amount, username))
-    conn.commit()
-    conn.close()
 
 # ==========================================
 # PARALLEL MULTI-NODE LINK FETCHER
@@ -297,16 +275,6 @@ def fetch_img_failover(prompt, w, h, seed):
         pass
     return None
 
-def save_audio_safe(text, voice, rate, pitch, filename):
-    try:
-        async def amain():
-            communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
-            await communicate.save(filename)
-        asyncio.run(amain())
-        return True
-    except Exception:
-        return False
-
 # ==========================================
 # SLEEK COMPACT DASHBOARD STYLING
 # ==========================================
@@ -331,33 +299,32 @@ st.markdown("""
 
 st.markdown("""
 <div class="compact-header">
-    <div class="compact-title">⚡ ES ULTRA 26-SHIELD AI STUDIO SUITE</div>
-    <div class="badge">26 ANTI-COPYRIGHT WEAPONS ACTIVE</div>
+    <div class="compact-title">⚡ ES ULTRA 26-SHIELD FULL-SCREEN STUDIO</div>
+    <div class="badge">100% FULL-SCREEN 9:16 SHORTS</div>
 </div>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# NAVIGATION TABS (ALL COMPREHENSIVE TABS RESTORED)
+# NAVIGATION TABS
 # ==========================================
-tab_auth, tab_shield, tab_shorts, tab_clip, tab_movie, tab_image, tab_lofi, tab_enterprise = st.tabs([
-    "🔑 Sign In & Auth",
+tab_auth, tab_shield, tab_shorts, tab_clip, tab_movie, tab_image, tab_lofi = st.tabs([
+    "🔑 Sign In",
     "🛡️ 1. فل اینٹی کاپی رائٹ شیلڈ (26 ہتھیار + شفلر)",
-    "📱 2. آٹومیٹک وائرل شارٹس (26 شیلڈز کے ساتھ)",
-    "⚔️ 3. کلپ کٹر موڈ (10 تا 20 منٹ کٹ)",
+    "📱 2. فل اسکرین 9:16 شارٹس (Full Screen Edge-to-Edge)",
+    "⚔️ 3. کلپ کٹر موڈ (10 تا 20 منٹ)",
     "🎬 4. پرو AI مووی اسٹوڈیو",
     "🎨 5. پرو AI امیج اسٹوڈیو",
-    "🎧 6. لوفی گانے (Slowed + Reverb)",
-    "💳 7. انٹرفیس و پیمنٹس"
+    "🎧 6. لوفی گانے (Slowed + Reverb)"
 ])
 
 # -----------------
 # TAB 0: AUTHENTICATION
 # -----------------
 with tab_auth:
-    st.write("### 🔑 Sglowina & ES Authentication Portal")
+    st.write("### 🔑 Sglowina & ES Portal")
     u_db = get_user_data(st.session_state.logged_in_user)
     if u_db:
-        st.success(f"لاگ ان اکاؤنٹ: **{st.session_state.logged_in_user}** | پلان: **{u_db['plan']}** | بیلنس: **{u_db['credits']}** کوائنز 🪙")
+        st.success(f"لاگ ان: **{st.session_state.logged_in_user}** | پلان: **{u_db['plan']}** | بیلنس: **{u_db['credits']}** کوائنز 🪙")
     with st.form("auth_form"):
         u_name = st.text_input("Username")
         p_word = st.text_input("Password", type="password")
@@ -368,7 +335,7 @@ with tab_auth:
                 time.sleep(1)
                 st.rerun()
             else:
-                st.error("غلط یوزر نیم یا پاس ورڈ۔")
+                st.error("غلط کریڈینشلز۔")
 
 # -----------------
 # TAB 1: 26-LAYER FULL ANTI-COPYRIGHT SHIELD & SHUFFLER
@@ -377,7 +344,7 @@ with tab_shield:
     c1, c2 = st.columns(2)
     with c1:
         shield_mode = st.selectbox("اینٹی کاپی رائٹ شیلڈ اسٹائل:", [
-            "🛡️ 26 ہتھیار: لوگو اسٹرپ + سین شفل + 0.75s کٹ + اسپیڈ وارپ (100% محفوظ)",
+            "🛡️ 26 ہتھیار: لوگو کٹ + سین شفل + 0.75s کٹ + اسپیڈ وارپ (100% محفوظ)",
             "⚡ الٹرا فاسٹ کٹ + اسپیڈ وارپ + لیٹرباکس"
         ], key="sm_t1")
     with c2:
@@ -462,35 +429,35 @@ with tab_shield:
                     st.session_state.detected_info = info
                     st.session_state.current_output_video = target_out
                     st.session_state.process_ready = True
-                    st.success(f"🎉 ویڈیو تمام 26 شیلڈز اور صاف ڈبنگ کے ساتھ صرف **{dur} سیکنڈ** میں تیار ہو گئی!")
+                    st.success(f"🎉 ویڈیو تمام 26 شیلڈز کے ساتھ صرف **{dur} سیکنڈ** میں تیار ہو گئی!")
                 else:
                     st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ براہ کرم فائل دوبارہ منتخب کریں۔")
 
 # -----------------
-# TAB 2: AUTO VIRAL SHORTS WITH DIRECT 26-SHIELD ENGINES
+# TAB 2: TRUE 100% FULL-SCREEN 9:16 SHORTS (NO BLACK BARS)
 # -----------------
 with tab_shorts:
-    st.write("### 📱 لانگ ویڈیو سے خودکار 26-شیلڈ وائرل شارٹس جنریٹر")
-    st.info("💡 **براہِ راست شارٹس شیلڈ:** آپ کو پہلے لمبی ویڈیو بنانے کی ضرورت نہیں! کسی بھی 5 تا 30 منٹ کی لمبی ویڈیو کو یہاں ڈالیں، تمام 26 اینٹی کاپی رائٹ شیلڈز خودکار طور پر لگ کر 9:16 وائرل ریلز تیار ہو جائیں گی۔")
+    st.write("### 📱 100% فل اسکرین وائرل شارٹس جنریٹر (Edge-to-Edge 9:16)")
+    st.info("💡 **فل اسکرین ڈائریکشن آن:** کوئی کالی پٹی (Black Bars) نہیں آئے گی! لمبی ویڈیو کا اصل فوکس سین خودکار طور پر فل اسکرین 9:16 ریشو میں ڈھل جائے گا اور 26 شیلڈز لاگو ہوں گی۔")
     
     col_sh1, col_sh2 = st.columns(2)
     with col_sh1:
-        num_shorts = st.selectbox("کتنے وائرل شارٹس بنانے ہیں؟", [
+        num_shorts = st.selectbox("کتنے فل اسکرین وائرل شارٹس بنانے ہیں؟", [
             "1 شارٹ (Best Climax Hook)",
             "2 شارٹس (Opening + Climax)",
             "3 شارٹس (Hook + Story + Climax)",
             "5 شارٹس (Full Multi-Highlight Pack)"
-        ], key="num_sh2")
+        ], key="num_sh_fs")
     with col_sh2:
-        short_dur = st.selectbox("ہر شارٹ کا دورانیہ:", ["30 سیکنڈ (30s - سب سے زیادہ وائرل)", "15 سیکنڈ (15s)", "60 سیکنڈ (60s)"], key="dur_sh2")
+        short_dur = st.selectbox("ہر شارٹ کا دورانیہ:", ["30 سیکنڈ (30s - سب سے زیادہ وائرل)", "15 سیکنڈ (15s)", "60 سیکنڈ (60s)"], key="dur_sh_fs")
 
     count_target = 1 if "1" in num_shorts else 2 if "2" in num_shorts else 3 if "3" in num_shorts else 5
     dur_sec_target = 30 if "30" in short_dur else 15 if "15" in short_dur else 60
 
-    up_shorts_file = st.file_uploader("📂 لمبی ویڈیو فائل یہاں اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_shorts2")
-    url_shorts_input = st.text_input("🔗 یا لمبی ویڈیو کا لنک ڈالیں:", placeholder="https://www.youtube.com/watch?v=...", key="url_shorts2")
+    up_shorts_file = st.file_uploader("📂 لمبی ویڈیو فائل یہاں اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_shorts_fs")
+    url_shorts_input = st.text_input("🔗 یا لمبی ویڈیو کا یوٹیوب لنک ڈالیں:", placeholder="https://www.youtube.com/watch?v=...", key="url_shorts_fs")
 
-    if st.button(f"🚀 خودکار طریقے سے {count_target} محفوظ وائرل شارٹس تیار کریں", type="primary", key="btn_run_shorts2"):
+    if st.button(f"🚀 خودکار طریقے سے {count_target} فل اسکرین 9:16 شارٹس تیار کریں", type="primary", key="btn_run_shorts_fs"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"shorts_in_{uid}.mp4"
         has_input = False
@@ -523,38 +490,40 @@ with tab_shorts:
             status_text = st.empty()
 
             for idx, start_pt in enumerate(points, 1):
-                status_text.write(f"⚡ وائرل شارٹ #{idx} پر تمام 26 اینٹی کاپی رائٹ شیلڈز اور 9:16 ورٹیکل کٹ لگ رہی ہے...")
-                short_out = f"viral_short_{uid}_{idx}.mp4"
+                status_text.write(f"⚡ فل اسکرین شارٹ #{idx} کٹ کر کے 9:16 اور 26 شیلڈز لگائی جا رہی ہیں...")
+                short_out = f"viral_short_fs_{uid}_{idx}.mp4"
                 
-                vf_vertical = (
+                # 100% TRUE FULL-SCREEN 9:16 DYNAMIC EDGE-TO-EDGE CROP (ZERO BLACK BARS)
+                # Cropping (ih*9/16):ih directly scales to 720x1280 filling 100% of the mobile screen!
+                vf_vertical_fullscreen = (
                     "select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),"
-                    "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2:black,"
-                    "hflip,eq=contrast=1.20:saturation=1.24:brightness=0.02,"
-                    "drawbox=y=0:h=60:color=black@0.75:t=fill,drawbox=y=ih-70:h=70:color=black@0.85:t=fill"
+                    "crop=ih*(9/16):ih,scale=720:1280:flags=fast_bilinear,"
+                    "hflip,eq=contrast=1.20:saturation=1.26:brightness=0.02,"
+                    "drawbox=y=0:h=40:color=black@0.70:t=fill,drawbox=y=ih-50:h=50:color=black@0.80:t=fill"
                 )
                 af_shield = "highpass=f=75,lowpass=f=8200,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
 
                 cmd = [
                     ffmpeg_exe, "-nostdin", "-y", "-ss", str(start_pt), "-t", str(dur_sec_target),
-                    "-i", target_in, "-map_metadata", "-1", "-vf", vf_vertical, "-af", af_shield,
+                    "-i", target_in, "-map_metadata", "-1", "-vf", vf_vertical_fullscreen, "-af", af_shield,
                     "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28",
                     "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k",
                     short_out
                 ]
                 subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if os.path.exists(short_out) and os.path.getsize(short_out) > 5000:
-                    created_shorts.append((short_out, f"🔥 وائرل شارٹ #{idx} ({dur_sec_target}s)"))
+                    created_shorts.append((short_out, f"📱 فل اسکرین شارٹ #{idx} ({dur_sec_target}s)"))
                 progress_bar.progress(idx / len(points))
 
             try: os.remove(target_in)
             except Exception: pass
             
             st.session_state.generated_shorts = created_shorts
-            status_text.success(f"🎉 آپ کے تمام **{len(created_shorts)} وائرل شارٹس** 26 اینٹی کاپی رائٹ شیلڈز کے ساتھ تیار ہیں!")
+            status_text.success(f"🎉 آپ کے تمام **{len(created_shorts)} فل اسکرین 9:16 شارٹس** تیار ہیں!")
 
     if st.session_state.generated_shorts:
         st.divider()
-        st.subheader("📱 تیار شدہ وائرل شارٹس (Download YouTube Shorts / Reels):")
+        st.subheader("📱 100% فل اسکرین شارٹس (Download YouTube Shorts / Reels):")
         cols = st.columns(len(st.session_state.generated_shorts))
         for i, (s_path, s_title) in enumerate(st.session_state.generated_shorts):
             with cols[i]:
@@ -562,11 +531,11 @@ with tab_shorts:
                 s_bytes = open(s_path, 'rb').read()
                 st.video(s_bytes)
                 st.download_button(
-                    label=f"📥 ڈاؤنلوڈ شارٹ #{i+1}",
+                    label=f"📥 ڈاؤنلوڈ فل اسکرین شارٹ #{i+1}",
                     data=s_bytes,
-                    file_name=f"viral_short_{i+1}.mp4",
+                    file_name=f"fullscreen_short_{i+1}.mp4",
                     mime="video/mp4",
-                    key=f"dl_sh2_{i}"
+                    key=f"dl_sh_fs_{i}"
                 )
 
 # -----------------
@@ -634,7 +603,7 @@ with tab_movie:
     with mc3: ms = st.selectbox("اسٹائل:", ["Realistic HD", "Cinematic Film", "3D Cartoon"])
     
     if st.button("Generate Master Movie 🚀"):
-        st.info("اے آئی ویڈیو جنریشن کا پروسیس شروع ہو گیا ہے۔")
+        st.info("اے آئی ویڈیو جنریشن شروع ہو چکی ہے۔")
 
 # -----------------
 # TAB 5: PRO AI IMAGE STUDIO (RESTORED)
@@ -701,19 +670,6 @@ with tab_lofi:
                     try: os.remove(target_in)
                     except Exception: pass
 
-# -----------------
-# TAB 7: ENTERPRISE, PAYMENTS & PROMO
-# -----------------
-with tab_enterprise:
-    st.write("### 💳 پاکستانی لوکل پیمنٹ و سبسکرپشن (EasyPaisa / JazzCash)")
-    st.info("💚 **EasyPaisa Account:** 03086834020 (Saba Wahid) | ❤️ **JazzCash:** 03240755475 (Ayisha bi bi)")
-    
-    with st.form("promo_form"):
-        p_code = st.text_input("پرومو کوڈ درج کریں (e.g. ESSASABA):")
-        if st.form_submit_button("Redeem Promo 🎁"):
-            if p_code.strip().upper() == "ESSASABA":
-                st.success("مبارک ہو! 100 کوائنز آپ کے اکاؤنٹ میں شامل ہو گئے۔")
-
 # ==========================================
 # OUTPUT & 1-CLICK COPY DASHBOARD
 # ==========================================
@@ -753,4 +709,4 @@ if st.session_state.process_ready and active_out and os.path.exists(active_out) 
         st.info("💡 یہ پرامپٹ اصلی اداکار کے فیشل فیچرز کے ساتھ تیار کیا گیا ہے۔ اوپر دائیں کونے سے کاپی کریں:")
         st.code(exact_thumb_prompt, language="text")
 
-st.markdown("<p style='text-align: center; font-size: 11px; color: #64748b; margin-top: 20px;'>ES Ultra 26-Shield AI Studio Suite | Developers: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 11px; color: #64748b; margin-top: 20px;'>ES Ultra 26-Shield Studio Suite | Developers: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
