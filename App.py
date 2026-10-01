@@ -39,6 +39,9 @@ if "generated_recap_script" not in st.session_state:
 if "recap_video_out" not in st.session_state:
     st.session_state.recap_video_out = ""
 
+# ==========================================
+# SYSTEM CORE HELPERS
+# ==========================================
 def get_ffmpeg():
     try:
         import imageio_ffmpeg
@@ -47,14 +50,24 @@ def get_ffmpeg():
         return "ffmpeg"
 
 def extract_yt_id(raw_url):
+    if not raw_url:
+        return None
     raw_url = raw_url.strip()
-    m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([0-9A-Za-z_-]{11})', raw_url)
+    clean_raw = raw_url.split('?si=')[0].split('&si=')[0].split('?t=')[0]
+    m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([0-9A-Za-z_-]{11})', clean_raw)
+    return m.group(1) if m else None
+
+def extract_gdrive_id(raw_url):
+    if not raw_url:
+        return None
+    raw_url = raw_url.strip()
+    m = re.search(r'(?:/file/d/|id=|/d/)([a-zA-Z0-9_-]{20,})', raw_url)
     return m.group(1) if m else None
 
 def fetch_oembed_title(clean_url):
     try:
         req_url = f"https://noembed.com/embed?url={urllib.parse.quote(clean_url)}"
-        res = requests.get(req_url, timeout=3)
+        res = requests.get(req_url, timeout=4)
         if res.status_code == 200:
             return res.json().get("title", "")
     except Exception:
@@ -65,7 +78,7 @@ def get_video_duration_fast(file_path):
     try:
         ffmpeg_exe = get_ffmpeg()
         cmd = [ffmpeg_exe, "-nostdin", "-i", file_path]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", res.stderr)
         if m:
             hours = float(m.group(1))
@@ -103,104 +116,164 @@ def save_multilang_voiceover_sync(text, voice_key, out_file):
     try:
         clean_t = clean_text_for_tts(text)
         voice_id, rate_str, pitch_str = VOICE_DATABASE.get(voice_key, ("ur-PK-AsadNeural", "-10%", "-15Hz"))
+        
         async def amain():
             communicate = edge_tts.Communicate(clean_t, voice_id, rate=rate_str, pitch=pitch_str)
             await communicate.save(out_file)
+            
         asyncio.run(amain())
         return True
     except Exception:
         return False
 
 # ==============================================================================
-# ORIGINAL PARALLEL MULTI-NODE UNBLOCKABLE DOWNLOADER (THE WORKING ENGINE)
+# UNIVERSAL MEDIA DOWNLOADER (DAILYMOTION + MP4MOVIEZ + DIRECT MP4 + CLOUD)
 # ==============================================================================
-def try_download_node(node_url, vid_id, target_path):
-    try:
-        # Invidious API
-        if "piped" not in node_url:
-            api_url = f"{node_url}/api/v1/videos/{vid_id}"
-            res = requests.get(api_url, timeout=3)
-            if res.status_code == 200:
-                data = res.json()
-                title = data.get("title", "Action Video")
-                streams = data.get("formatStreams", [])
-                mp4s = [s for s in streams if "mp4" in s.get("container", "").lower() or "video/mp4" in s.get("type", "").lower()] or streams
-                if mp4s:
-                    dl_url = mp4s[-1]["url"]
-                    if dl_url.startswith("/"): dl_url = node_url + dl_url
-                    r_file = requests.get(dl_url, stream=True, timeout=8)
-                    if r_file.status_code == 200:
-                        with open(target_path, "wb") as f:
-                            for chunk in r_file.iter_content(chunk_size=1024*1024*4):
-                                if chunk: f.write(chunk)
-                        if os.path.exists(target_path) and os.path.getsize(target_path) > 5000:
-                            return True, title
-        else:
-            # Piped API
-            api_url = f"{node_url}/streams/{vid_id}"
-            res = requests.get(api_url, timeout=3)
-            if res.status_code == 200:
-                data = res.json()
-                title = data.get("title", "Action Video")
-                streams = data.get("videoStreams", [])
-                mp4s = [s for s in streams if "mp4" in s.get("container", "").lower() or "video/mp4" in s.get("mimeType", "").lower()] or streams
-                if mp4s:
-                    dl_url = mp4s[0]["url"]
-                    r_file = requests.get(dl_url, stream=True, timeout=8)
-                    if r_file.status_code == 200:
-                        with open(target_path, "wb") as f:
-                            for chunk in r_file.iter_content(chunk_size=1024*1024*4):
-                                if chunk: f.write(chunk)
-                        if os.path.exists(target_path) and os.path.getsize(target_path) > 5000:
-                            return True, title
-    except Exception:
-        pass
+def download_google_drive_robust(file_id, target_path):
+    session = requests.Session()
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "*/*"
+    }
+    urls_to_try = [
+        f"https://drive.usercontent.google.com/download?id={file_id}&export=download&authuser=0&confirm=t",
+        f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
+    ]
+    for download_url in urls_to_try:
+        try:
+            res = session.get(download_url, stream=True, timeout=25, headers=headers)
+            content_type = res.headers.get("content-type", "").lower()
+            if "html" in content_type:
+                confirm_match = re.search(r'confirm=([0-9A-Za-z_\-]+)', res.text)
+                if confirm_match:
+                    token = confirm_match.group(1)
+                    retry_url = f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm={token}"
+                    res = session.get(retry_url, stream=True, timeout=25, headers=headers)
+
+            with open(target_path, "wb") as f:
+                for chunk in res.iter_content(chunk_size=1024 * 1024 * 8):
+                    if chunk: f.write(chunk)
+                        
+            if os.path.exists(target_path) and os.path.getsize(target_path) > 30000:
+                with open(target_path, "rb") as f_check:
+                    head = f_check.read(100)
+                    if b"<!DOCTYPE" not in head and b"<html" not in head:
+                        return True, "Google Drive Movie File"
+        except Exception:
+            continue
     return False, ""
 
 def download_unblockable_media_parallel(raw_url, target_path):
-    vid_id = extract_yt_id(raw_url)
-    clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url.strip()
-    title = fetch_oembed_title(clean_url) or "Action Video Track"
-    
-    # 1. Parallel Multi-Node Fast Fetch (Original 2026 Active Cluster)
-    if vid_id:
-        nodes = [
-            "https://inv.nadeko.net",
-            "https://yewtu.be",
-            "https://pipedapi.kavin.rocks",
-            "https://pipedapi.leptons.xyz",
-            "https://piped-api.privacy.com.de",
-            "https://inv.tux.pizza",
-            "https://invidious.nerdvpn.de",
-            "https://invidious.drgns.space"
+    raw_url = raw_url.strip()
+    title = fetch_oembed_title(raw_url) or "Action Movie Video"
+
+    # 1. Google Drive Auto-Detection
+    g_id = extract_gdrive_id(raw_url)
+    if ("drive.google.com" in raw_url or "docs.google.com" in raw_url) and g_id:
+        ok, t = download_google_drive_robust(g_id, target_path)
+        if ok: return True, t
+        return False, "Google Drive Permission Error"
+
+    # 2. Dailymotion Link Engine (100% Unblocked on Cloud)
+    if "dailymotion.com" in raw_url or "dai.ly" in raw_url:
+        try:
+            import yt_dlp
+            ffmpeg_exe = get_ffmpeg()
+            ffmpeg_dir = os.path.dirname(ffmpeg_exe) if os.path.isabs(ffmpeg_exe) else None
+            ydl_opts = {
+                'format': 'best[height<=720]/best',
+                'outtmpl': target_path,
+                'quiet': True,
+                'no_warnings': True,
+                'nocheckcertificate': True,
+                'socket_timeout': 30,
+                'retries': 3
+            }
+            if ffmpeg_dir: ydl_opts['ffmpeg_location'] = ffmpeg_dir
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                meta = ydl.extract_info(raw_url, download=True)
+                if meta: title = meta.get('title', title)
+            if os.path.exists(target_path) and os.path.getsize(target_path) > 5000:
+                return True, title
+        except Exception:
+            pass
+
+    # 3. MP4Moviez & Direct Video Links (Pixeldrain, FastDL, HubCloud, Dropbox, Direct MP4)
+    if raw_url.startswith("http") and ("youtube.com" not in raw_url and "youtu.be" not in raw_url):
+        # Auto-convert Pixeldrain share to API direct download
+        direct_url = raw_url
+        if "pixeldrain.com/u/" in raw_url:
+            direct_url = raw_url.replace("pixeldrain.com/u/", "pixeldrain.com/api/file/")
+        elif "dropbox.com" in raw_url:
+            direct_url = raw_url.replace("www.dropbox.com", "dl.dropboxusercontent.com").replace("?dl=0", "?dl=1")
+            
+        try:
+            r = requests.get(direct_url, stream=True, timeout=25, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                "Referer": raw_url
+            })
+            if r.status_code == 200:
+                with open(target_path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=1024 * 1024 * 8):
+                        if chunk: f.write(chunk)
+                if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                    # Check if filename is in headers
+                    cd = r.headers.get('content-disposition', '')
+                    if 'filename=' in cd:
+                        m_fn = re.search(r'filename=["\']?([^"\']+)["\']?', cd)
+                        if m_fn: title = m_fn.group(1)
+                    return True, title if title != "Action Movie Video" else "MP4Moviez Direct Video"
+        except Exception:
+            pass
+
+        # yt-dlp Universal Web Video Fallback (Archive.org, Vimeo, Facebook, etc.)
+        try:
+            import yt_dlp
+            ydl_opts = {
+                'format': 'best[height<=720]/best',
+                'outtmpl': target_path,
+                'quiet': True,
+                'no_warnings': True,
+                'nocheckcertificate': True,
+                'socket_timeout': 30
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                meta = ydl.extract_info(raw_url, download=True)
+                if meta: title = meta.get('title', title)
+            if os.path.exists(target_path) and os.path.getsize(target_path) > 5000:
+                return True, title
+        except Exception:
+            pass
+
+    # 4. YouTube Multi-Node Fallback
+    m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([0-9A-Za-z_-]{11})', raw_url)
+    if m:
+        vid_id = m.group(1)
+        apis = [
+            f"https://pipedapi.kavin.rocks/streams/{vid_id}",
+            f"https://inv.nadeko.net/api/v1/videos/{vid_id}",
+            f"https://yewtu.be/api/v1/videos/{vid_id}"
         ]
-        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-            futures = [executor.submit(try_download_node, node, vid_id, target_path) for node in nodes]
-            for future in concurrent.futures.as_completed(futures):
-                success, t = future.result()
-                if success:
-                    return True, t
-                    
-    # 2. Resilient yt-dlp Fallback with iOS/Android Creator Bypass
-    try:
-        import yt_dlp
-        ydl_opts = {
-            'format': '18/best[height<=720][ext=mp4]/best[ext=mp4]/best',
-            'outtmpl': target_path,
-            'quiet': True,
-            'no_warnings': True,
-            'nocheckcertificate': True,
-            'geo_bypass': True,
-            'socket_timeout': 6,
-            'extractor_args': {'youtube': {'player_client': ['ios', 'android_creator', 'tvhtml5']}}
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            meta = ydl.extract_info(clean_url, download=True)
-            if meta: title = meta.get('title', title)
-        if os.path.exists(target_path) and os.path.getsize(target_path) > 5000:
-            return True, title
-    except Exception:
-        pass
+        for api_url in apis:
+            try:
+                res = requests.get(api_url, timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    title = data.get("title", title)
+                    streams = data.get("videoStreams", []) or data.get("formatStreams", [])
+                    mp4s = [s for s in streams if "mp4" in s.get("container", "").lower() or "video/mp4" in s.get("mimeType", "").lower()] or streams
+                    if mp4s:
+                        dl_url = mp4s[0].get("url", "")
+                        if dl_url:
+                            r_file = requests.get(dl_url, stream=True, timeout=12)
+                            if r_file.status_code == 200:
+                                with open(target_path, "wb") as f:
+                                    for chunk in r_file.iter_content(chunk_size=1024 * 1024 * 4):
+                                        if chunk: f.write(chunk)
+                                if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                                    return True, title
+            except Exception:
+                pass
 
     return False, title
 
@@ -302,7 +375,7 @@ st.markdown("""
 <div class="brand-header">
     <div>
         <div class="brand-logo">⚡ ES AI STUDIO</div>
-        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Multi-Node Parallel Stream Engine & 26 Shields Active</div>
+        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Dailymotion & MP4Moviez Engine + 26 Shields Active</div>
     </div>
     <div style="display:flex; align-items:center; gap: 10px;">
         <span class="founders-tag">👑 Founders: Muhammad Essa & Saba Wahid</span>
@@ -315,7 +388,7 @@ st.markdown("""
 # 7 FULL PRODUCTION TABS
 # ==========================================
 tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st.tabs([
-    "🎬 1. ملٹی لینگویج مووی ریکیپ (Real Story + Multi-Voice)",
+    "🎬 1. ملٹی لینگویج مووی ریکیپ (Dailymotion + MP4Moviez)",
     "📱 2. پیور فل اسکرین 9:16 شارٹس",
     "🛡️ 3. فل مووی شفلر (26 ہتھیار)",
     "⚔️ 4. کلپ کٹر موڈ (10 تا 20 منٹ کٹ)",
@@ -329,7 +402,7 @@ tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st
 # ------------------------------------------------------------------------------
 with tab_recap:
     st.write("### 🎬 خودکار AI وائس اوور، اصلی فلم کی کہانی و مووی ریکیپ")
-    st.info("⚡ **ملٹی تھریڈ پیرلل ڈاؤنلوڈر ایکٹو:** یوٹیوب لنک درج کریں اور بٹن دبائیں۔ ویڈیو ڈاؤنلوڈ ہو کر پروسیسنگ شروع ہو جائے گی!")
+    st.info("💡 **ڈیلی موشن و MP4Moviez ایکٹو:** ڈیلی موشن کا لنک، MP4Moviez کا ڈائریکٹ لنک یا ویڈیو لنک درج کریں۔ کلاؤڈ پر فوری ڈاؤنلوڈ ہو کر پروسیسنگ شروع ہو جائے گی!")
 
     rc1, rc2, rc3, rc4 = st.columns(4)
     with rc1:
@@ -353,7 +426,8 @@ with tab_recap:
     target_recap_mins = 10 if "10" in recap_dur else 20
     target_lang_str = voice_char.split(" - ")[0]
 
-    url_recap_input = st.text_input("🔗 ویڈیو کا یوٹیوب / ویب لنک یہاں پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=... یا https://youtu.be/...", key="url_recap")
+    # Universal Single Link Input Box
+    url_recap_input = st.text_input("🔗 مووی کا ڈیلی موشن / MP4Moviez / ویب لنک یہاں پیسٹ کریں:", placeholder="https://www.dailymotion.com/video/... یا ڈائریکٹ مووی ڈاؤنلوڈ لنک", key="url_recap")
     up_recap_file = st.file_uploader("📂 یا اپنے ڈیوائس سے ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
 
     if st.button("🚀 تیار کریں (اصلی مووی کہانی + AI وائس اوور + 26 شیلڈز)", type="primary", key="btn_run_recap"):
@@ -368,7 +442,7 @@ with tab_recap:
         status_box = st.status("⏳ پروسیسنگ جاری ہے، برائے مہربانی چند سیکنڈ انتظار کریں...", expanded=True)
 
         if url_recap_input.strip():
-            status_box.write("🔗 ویڈیو پیرلل ملٹی نوڈز کے ذریعے فاسٹ ڈاؤنلوڈ ہو رہی ہے...")
+            status_box.write("🔗 ویڈیو کلاؤڈ اسٹریم سے ڈاؤنلوڈ ہو رہی ہے...")
             success, title_fetched = download_unblockable_media_parallel(url_recap_input.strip(), target_in)
             if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
                 has_input = True
@@ -479,7 +553,7 @@ with tab_recap:
             else:
                 status_box.update(label="❌ ویڈیو تیار نہ ہو سکی۔ دوبارہ کوشش کریں۔", state="error")
         else:
-            status_box.update(label="❌ ویڈیو حاصل نہیں ہو سکی۔ درست لنک درج کریں۔", state="error")
+            status_box.update(label="❌ ویڈیو حاصل نہیں ہو سکی۔ درست ڈیلی موشن یا MP4Moviez لنک درج کریں۔", state="error")
 
     # Display Ready Video & Full Script Section
     if st.session_state.recap_video_out and os.path.exists(st.session_state.recap_video_out):
@@ -532,7 +606,7 @@ with tab_shorts:
     count_target = 1 if "1" in num_shorts else 2 if "2" in num_shorts else 3
     dur_sec_target = 30 if "30" in short_dur else 15 if "15" in short_dur else 60
 
-    url_shorts_input = st.text_input("🔗 یوٹیوب یا ویڈیو لنک ڈالیں:", placeholder="https://www.youtube.com/watch?v=...", key="url_shorts_pure")
+    url_shorts_input = st.text_input("🔗 مووی یا ویڈیو کا لنک ڈالیں:", placeholder="https://www.dailymotion.com/video/... یا ڈائریکٹ لنک", key="url_shorts_pure")
     up_shorts_file = st.file_uploader("📂 یا ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_shorts_pure")
 
     if st.button(f"🚀 {count_target} فل اسکرین 9:16 شارٹس بنائیں", type="primary", key="btn_run_shorts_pure"):
@@ -609,7 +683,7 @@ with tab_shield:
     with c1: shield_mode = st.selectbox("شیلڈ اسٹائل:", ["🛡️ فل شفلر: لوگو کٹ + سین شفل + 1/10واں کٹ", "⚡ لکیری موڈ: لوگو کٹ + 1/10واں کٹ"], key="sm_t1")
     with c2: voice_quality = st.selectbox("ڈبنگ:", ["🔊 کرسٹل کلیئر بیریٹون ڈبنگ", "🎵 نیچرل اسمارٹ پچ"], key="am_t1")
 
-    url_input = st.text_input("🔗 یوٹیوب یا ویڈیو لنک ڈالیں:", placeholder="https://www.youtube.com/watch?v=...", key="url_main")
+    url_input = st.text_input("🔗 مووی کا ڈیلی موشن یا ویڈیو لنک ڈالیں:", placeholder="https://www.dailymotion.com/video/...", key="url_main")
     up_file = st.file_uploader("📂 یا ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_main")
 
     if st.button("🚀 فل ویڈیو تیار کریں", type="primary", key="btn_main"):
