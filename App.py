@@ -436,6 +436,7 @@ with tab_recap:
         voice_audio = f"recap_voice_{uid}.mp3"
         video_montage = f"recap_video_{uid}.mp4"
         final_recap_out = f"final_recap_{uid}.mp4"
+        output_ready_path = ""  # Fixed: Pre-initialized to guarantee NameError is 100% resolved
         has_input = False
         info = {'title': 'Action Movie Recap'}
 
@@ -546,7 +547,7 @@ with tab_recap:
             if os.path.exists(target_in): os.remove(target_in)
             if os.path.exists(voice_audio): os.remove(voice_audio)
 
-            if os.path.exists(output_ready_path) and os.path.getsize(output_ready_path) > 5000:
+            if output_ready_path and os.path.exists(output_ready_path) and os.path.getsize(output_ready_path) > 5000:
                 st.session_state.recap_video_out = output_ready_path
                 st.session_state.detected_info = info
                 status_box.update(label="🎉 آپ کی مووی ریکیپ ویڈیو 100% تیار ہے!", state="complete", expanded=False)
