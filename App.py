@@ -26,9 +26,9 @@ except ImportError:
     from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
 
 # ==========================================
-# STREAMLIT CONFIGURATION
+# STREAMLIT COMPACT CONFIGURATION
 # ==========================================
-st.set_page_config(page_title="ES Ultra Auto Voiceover & Movie Recap Studio", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="ES Ultra Universal AI Storyteller & Explainer Studio", layout="wide", page_icon="⚡")
 
 if "process_ready" not in st.session_state:
     st.session_state.process_ready = False
@@ -100,7 +100,7 @@ def save_asad_voiceover_sync(text, rate_str, pitch_str, out_file):
         return False
 
 # ==========================================
-# PARALLEL MULTI-NODE LINK FETCHER
+# FAST STREAM & PROXY LINK FETCHER
 # ==========================================
 def try_download_node(node_url, vid_id, target_path):
     try:
@@ -110,9 +110,10 @@ def try_download_node(node_url, vid_id, target_path):
             data = res.json()
             title = data.get("title", "Action Video Scene")
             streams = data.get("formatStreams", [])
-            mp4s = [s for s in streams if "mp4" in s.get("container", "").lower() or "video/mp4" in s.get("type", "").lower()] or streams
+            # Prefer fast 360p / 720p stream to avoid 1GB long download freezes
+            mp4s = [s for s in streams if "360p" in s.get("qualityLabel", "") or "720p" in s.get("qualityLabel", "")] or streams
             if mp4s:
-                dl_url = mp4s[-1]["url"]
+                dl_url = mp4s[0]["url"]
                 if dl_url.startswith("/"): dl_url = node_url + dl_url
                 r_file = requests.get(dl_url, stream=True, timeout=8)
                 if r_file.status_code == 200:
@@ -128,7 +129,7 @@ def try_download_node(node_url, vid_id, target_path):
 def download_unblockable_media_parallel(raw_url, target_path):
     vid_id = extract_yt_id(raw_url)
     clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url.strip()
-    title = fetch_oembed_title(clean_url) or "Media Track"
+    title = fetch_oembed_title(clean_url) or "Universal Video Topic"
     
     if vid_id:
         nodes = [
@@ -148,7 +149,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
     try:
         import yt_dlp
         ydl_opts = {
-            'format': '18/best[height<=720][ext=mp4]/best[ext=mp4]/best',
+            'format': '18/best[height<=480][ext=mp4]/best[ext=mp4]/best',
             'outtmpl': target_path,
             'quiet': True,
             'no_warnings': True,
@@ -168,16 +169,16 @@ def download_unblockable_media_parallel(raw_url, target_path):
     return False, title
 
 # ==========================================
-# AI MOVIE RECAP URDU SCRIPT GENERATOR
+# UNIVERSAL AI SCRIPT & STORY EXPLAINER
 # ==========================================
-def generate_urdu_movie_recap_script(movie_title, duration_mins, genre):
+def generate_universal_urdu_script(topic_title, duration_mins, category):
     try:
         instruction = (
-            f"You are a master Urdu YouTube Movie Recap and Storyteller scriptwriter. "
-            f"Write a comprehensive, highly engaging, and complete Urdu story narrative explaining the movie '{movie_title}'. "
-            f"Genre: {genre}. Target duration: {duration_mins} minutes. "
-            f"Write continuous Urdu storytelling dialogues so that an AI voice narrator can read it naturally from start to finish without gaps. "
-            f"Output purely the Urdu narrative story text."
+            f"You are a master Urdu YouTube Storyteller, Documentary Narrator, and Video Explainer. "
+            f"Write a thrilling, continuous, highly engaging voiceover script in natural Urdu language explaining the video/topic: '{topic_title}'. "
+            f"Category/Genre: {category}. Target video length: {duration_mins} minutes. "
+            f"Write continuous Urdu storytelling dialogues with high suspense, exciting facts, and emotional hooks so that an AI voice narrator can read it smoothly without gaps. "
+            f"Output purely the clean Urdu narration script text."
         )
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction)}?model=openai"
         res = requests.get(url, timeout=20)
@@ -187,18 +188,14 @@ def generate_urdu_movie_recap_script(movie_title, duration_mins, genre):
         pass
         
     return (
-        f"دوستو! آج کی سنسنی خیز کہانی فلم {movie_title} کے گرد گھومتی ہے۔ "
-        f"کہانی کے آغاز میں ہم دیکھتے ہیں کہ ماحول بظاہر پرسکون نظر آتا ہے، لیکن اس خاموشی کے پیچھے ایک بہت بڑا طوفان چھپا ہوا تھا۔ "
-        f"ہمارا مرکزی کردار ایک عام انسان کی طرح اپنی زندگی گزار رہا تھا، لیکن اچانک اس کی زندگی میں ایک ایسا موڑ آتا ہے جو سب کچھ بدل کر رکھ دیتا ہے۔ "
-        f"جب دشمن ہر طرف سے اسے گھیر لیتے ہیں تو کہانی میں داخل ہوتا ہے اصل ایکشن اور سسپنس! "
-        f"ہیرو اپنی ہمت اور عقل کا استعمال کرتے ہوئے ہر خطرناک چال کو ناکام بناتا ہے۔ "
-        f"اور آخر کار کلائمیکس میں سب سے بڑے راز کا پردہ فاش ہو جاتا ہے جہاں اچھائی کی جیت ہوتی ہے۔ "
-        f"اگر آپ کو یہ کہانی پسند آئی تو ویڈیو کو لائک اور چینل کو ضرور سبسکرائب کریں!"
+        f"دوستو! آج کی یہ دلچسپ اور سنسنی خیز کہانی {topic_title} کے بارے میں ہے۔ "
+        f"اس کہانی کے آغاز میں ہم دیکھتے ہیں کہ بظاہر سب کچھ بہت پرسکون نظر آتا ہے، لیکن اس خاموشی کے پیچھے ایک بہت بڑا راز اور طوفان چھپا ہوا تھا۔ "
+        f"جیسے جیسے وقت گزرتا ہے، حالات ایک دم غیر متوقع موڑ لے لیتے ہیں اور ہمارے سامنے ایسے حیرت انگیز مناظر آتے ہیں جو دیکھنے والے کو دنگ کر دیتے ہیں۔ "
+        f"ہر گزرتے لمحے کے ساتھ سسپنس اور تجسس میں اضافہ ہوتا جا رہا ہے۔ "
+        f"اور آخر کار آخری حصے میں سب سے بڑا سچ اور کلائمیکس سامنے آ جاتا ہے جو سب کو حیران کر دیتا ہے۔ "
+        f"اگر آپ کو یہ ویڈیو اور کہانی پسند آئی تو ویڈیو کو لائک اور چینل کو ضرور سبسکرائب کریں!"
     )
 
-# ==========================================
-# CELEBRITY EXACT LIKENESS PROMPT & METADATA
-# ==========================================
 def extract_celebrity_name(title):
     t_clean = re.sub(r'[\(\[\{].*?[\)\]\}]', '', title).strip()
     return t_clean if t_clean else title
@@ -220,28 +217,26 @@ def analyze_video_and_generate_exact_prompt(title, is_short=False, is_song=False
     elif is_short:
         exact_thumb_prompt = (
             f"Hyper-realistic 8K vertical cinematic poster thumbnail 9:16 for YouTube Shorts of '{clean_t[:45]}', "
-            f"exact recognizable facial features of the lead actor, intense dramatic angry expression, photorealistic eyes and skin texture, "
-            f"35mm film photography, neon rim lighting, flying sparks, vertical 9:16 composition, blockbuster movie aesthetics."
+            f"intense dramatic expression, photorealistic details, 35mm film photography, volumetric lighting, vertical 9:16 composition."
         )
         titles = [
-            f"🔥 {clean_t[:40]} - UNSTOPPABLE Climax Scene! 😱 #Shorts",
-            f"⚡ The Most Intense Moment of {clean_t[:35]} 🔥 #Shorts",
-            f"😱 Best Action Climax in {clean_t[:38]} #ViralShorts"
+            f"🔥 {clean_t[:40]} - UNSTOPPABLE Viral Moment! 😱 #Shorts",
+            f"⚡ The Most Shocking Scene of {clean_t[:35]} 🔥 #Shorts",
+            f"😱 Unbelievable Facts in {clean_t[:38]} #ViralShorts"
         ]
-        hashtags = "#Shorts #YouTubeShorts #ViralShorts #TrendingShorts #MovieClimax #ActionShorts #CinemaReels"
+        hashtags = "#Shorts #YouTubeShorts #ViralShorts #TrendingShorts #MovieClimax #ViralReels #CinemaShorts"
     else:
         exact_thumb_prompt = (
-            f"Hyper-realistic 8K award-winning cinematic movie poster portrait of the lead actor in '{clean_t[:45]}', "
-            f"exact recognizable facial features, photorealistic skin pores and eyes, intense dramatic emotional expression, "
-            f"35mm film photography, volumetric cinematic lighting, action sparks and debris background, high visual contrast, "
-            f"ultra-detailed blockbuster aesthetic, 16:9 aspect ratio, masterpiece quality, no cartoon, no distortion."
+            f"Hyper-realistic 8K award-winning cinematic thumbnail for '{clean_t[:45]}', "
+            f"intense dramatic close-up, photorealistic textures, 35mm film photography, volumetric cinematic lighting, "
+            f"action sparks and high visual contrast, ultra-detailed aesthetic, 16:9 aspect ratio, masterpiece quality."
         )
         titles = [
-            f"🔥 {clean_t[:45]} | Full Movie Story Recap & Explanation in Urdu",
-            f"⚡ {clean_t[:40]} Movie Explained in Hindi/Urdu (Full Breakdown)",
-            f"😱 The Entire Story of {clean_t[:40]} Explained!"
+            f"🔥 {clean_t[:45]} | Full Story Explained in Urdu (Full Breakdown)",
+            f"⚡ The Complete Truth of {clean_t[:40]} - Shocking Facts Revealed!",
+            f"😱 Unstoppable Dramatic Story: {clean_t[:40]} Explained"
         ]
-        hashtags = "#MovieRecap #MovieExplained #UrduMovieRecap #FilmReview #TrendingCinema #StoryRecap"
+        hashtags = "#MovieRecap #StoryExplained #UrduExplainer #DocumentaryRecap #ViralStory #CinemaReview"
         
     return clean_t, titles, hashtags, exact_thumb_prompt
 
@@ -279,8 +274,8 @@ st.markdown("""
 
 st.markdown("""
 <div class="compact-header">
-    <div class="compact-title">⚡ ES ULTRA AUTO VOICEOVER & MOVIE RECAP STUDIO</div>
-    <div class="badge">ASAD AUTO-VOICEOVER + 26 SHIELDS ACTIVE</div>
+    <div class="compact-title">⚡ ES ULTRA UNIVERSAL AI STORYTELLER & EXPLAINER STUDIO</div>
+    <div class="badge">FAST STREAM + ASAD VOICEOVER ACTIVE</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -288,7 +283,7 @@ st.markdown("""
 # NAVIGATION TABS
 # ==========================================
 tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st.tabs([
-    "🎬 1. آٹو اسد وائس اوور و مووی ریکیپ (Auto Voiceover + Script)",
+    "🎬 1. یونیورسل AI اسٹوری ٹیلر و ریکیپ (Auto Voiceover + Script)",
     "📱 2. پیور فل اسکرین 9:16 شارٹس",
     "🛡️ 3. فل مووی شفلر (26 ہتھیار)",
     "⚔️ 4. کلپ کٹر موڈ (10 تا 20 منٹ کٹ)",
@@ -298,42 +293,42 @@ tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st
 ])
 
 # -----------------
-# TAB 1: AI AUTO ASAD VOICEOVER & MOVIE RECAP STUDIO (DUAL MODE)
+# TAB 1: UNIVERSAL AI STORYTELLER & VIDEO RECAP (MOVIES, ANIMALS, DISCOVERY, COMEDY)
 # -----------------
 with tab_recap:
-    st.write("### 🎬 خودکار اسد وائس اوور، اردو اسکرپٹ و مووی ریکیپ جنریٹر")
-    st.info("💡 **فل آٹومیشن:** AI خود پوری فلم کی کہانی لکھے گا، خود **اسد کی بھاری اور 10% سلو آواز** میں وائس اوور ریکارڈ کرے گا، ہلکا بیک گراؤنڈ میوزک مکس کرے گا اور مکمل تیار مووی ریکیپ ویڈیو ڈاؤنلوڈ کے لیے پیش کرے گا!")
+    st.write("### 🎬 یونیورسل AI ویڈیو ایکسپلینر، اردو وائس اوور و مکمل ڈیش بورڈ")
+    st.info("💡 **یونیورسل موڈ:** مووی ہو، جنگلی جانوروں (Wildlife) کی ویڈیو ہو، ڈسکوری، سائنس یا کامیڈی—AI خودکار طور پر اردو وائس اوور کہانی لکھے گا، **اسد کی بھاری و 10% سلو آواز** میں وائس اوور کرے گا، اور نیچے وائرل ٹائٹلز، ہیش ٹیگ اور تھمب نیل پرامپٹ دے گا!")
 
     rc1, rc2, rc3 = st.columns(3)
     with rc1:
         voiceover_mode = st.selectbox("وائس اوور کا طریقہ:", [
-            "🎙️ خودکار اسد AI وائس اوور (Auto Asad Deep Voiceover - 100% تیار ویڈیو)",
-            "📝 مینوئل موڈ (صرف ویڈیو میوٹ + اردو اسکرپٹ - خود ریکارڈ کرنے کے لیے)"
+            "🎙️ خودکار اسد AI وائس اوور (Auto Asad Deep Voiceover - 100% ریڈی ویڈیو)",
+            "📝 مینوئل موڈ (صرف ویڈیو میوٹ + اردو اسکرپٹ - خود بولنے کے لیے)"
         ], key="rc_vmode")
     with rc2:
-        recap_dur = st.selectbox("مووی ریکیپ کا دورانیہ:", ["10 منٹ ریکیپ (10 Mins)", "20 منٹ ریکیپ (20 Mins)"], key="rc_dur")
+        recap_dur = st.selectbox("ویڈیو کا دورانیہ:", ["10 منٹ (10 Mins Recap Video)", "20 منٹ (20 Mins Full Video)"], key="rc_dur")
     with rc3:
-        recap_genre = st.selectbox("مووی کا انداز (Genre):", [
-            "🔥 ایکشن و تھرلر (Action / Blockbuster)",
-            "😱 سسپنس و خوفناک (Suspense / Horror)",
-            "💖 رومانٹک و ڈراما (Romantic Drama)",
-            "⚡ کرائم و ایڈونچر (Crime Adventure)"
-        ], key="rc_genre")
+        recap_category = st.selectbox("ویڈیو کا موضوع (Topic / Genre):", [
+            "🔥 موویز و فلمی سسپنس (Movies / Action / Thriller)",
+            "🦁 جنگلی جانور و وائلڈ لائف (Animals / Wildlife / Nature)",
+            "🌍 ڈسکوری و سائنسی حقائق (Discovery / Science / Space)",
+            "😂 کامیڈی و انٹرٹینمنٹ (Funny / Comedy / Entertainment)",
+            "😱 خوفناک و پراسرار کہانیاں (Horror / Mystery / True Crime)"
+        ], key="rc_cat")
 
     target_recap_mins = 10 if "10" in recap_dur else 20
-    target_recap_secs = target_recap_mins * 60
 
-    up_recap_file = st.file_uploader("📂 مووی کی ویڈیو فائل اپلوڈ کریں (یا لنک ڈالیں):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
-    url_recap_input = st.text_input("🔗 یا مووی کا یوٹیوب / ویب لنک یہاں پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=...", key="url_recap")
+    up_recap_file = st.file_uploader("📂 ویڈیو فائل اپلوڈ کریں (یا لنک ڈالیں):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
+    url_recap_input = st.text_input("🔗 یا کسی بھی ویڈیو کا لنک یہاں پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=...", key="url_recap")
 
-    if st.button("🚀 مکمل مووی ریکیپ (اسد وائس اوور + اسکرپٹ) تیار کریں", type="primary", key="btn_run_recap"):
+    if st.button("🚀 خودکار اسد وائس اوور ویڈیو، اردو اسکرپٹ و ٹائٹلز تیار کریں", type="primary", key="btn_run_recap"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"recap_in_{uid}.mp4"
         voice_audio = f"recap_voice_{uid}.mp3"
         video_montage = f"recap_video_{uid}.mp4"
         final_recap_out = f"final_recap_{uid}.mp4"
         has_input = False
-        info = {'title': 'Action Movie Recap'}
+        info = {'title': 'Universal Topic Video'}
 
         if up_recap_file is not None:
             with open(target_in, "wb") as f:
@@ -342,7 +337,7 @@ with tab_recap:
                 has_input = True
                 info['title'] = up_recap_file.name
         elif url_recap_input.strip():
-            with st.spinner("🔗 مووی کی ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
+            with st.spinner("🔗 تیز رفتار اسٹریم سرور سے ویڈیو کنیکٹ کی جا رہی ہے..."):
                 success, title_fetched = download_unblockable_media_parallel(url_recap_input.strip(), target_in)
                 if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
                     has_input = True
@@ -352,26 +347,25 @@ with tab_recap:
             total_dur = get_video_duration_fast(target_in)
             ffmpeg_exe = get_ffmpeg()
 
-            # 1. AI Generates Urdu Movie Script
-            with st.spinner("🧠 فلم کی مکمل اردو کہانی (وائس اوور اسکرپٹ) لکھی جا رہی ہے..."):
-                urdu_script = generate_urdu_movie_recap_script(info['title'], target_recap_mins, recap_genre)
+            # 1. AI Generates Topic-Specific Urdu Story Narrative
+            with st.spinner("🧠 ویڈیو کے موضوع پر تفصیلی اردو وائس اوور کہانی لکھی جا رہی ہے..."):
+                urdu_script = generate_universal_urdu_script(info['title'], target_recap_mins, recap_category)
                 st.session_state.generated_recap_script = urdu_script
 
             # 2. Edge-TTS Generates Asad Voiceover if Auto Mode Selected
             has_voiceover = False
             if "اسد AI وائس اوور" in voiceover_mode:
-                with st.spinner("🎙️ اسد کی بھاری و 10% سلو آواز میں وائس اوور ریکارڈ ہو رہی ہے..."):
-                    # Rate -10%, Pitch -15Hz for thick deep baritone voice
+                with st.spinner("🎙️ اسد کی بھاری اور 10% سلو آواز میں وائس اوور ریکارڈ ہو رہی ہے..."):
                     success_tts = save_asad_voiceover_sync(urdu_script, rate_str="-10%", pitch_str="-15Hz", out_file=voice_audio)
                     if success_tts and os.path.exists(voice_audio) and os.path.getsize(voice_audio) > 1000:
                         has_voiceover = True
 
-            # 3. Build Synchronized 3.5s Montage Across Movie
-            with st.spinner("⚡ 3، 3 سیکنڈ کے سینز نکال کر اینٹی کاپی رائٹ مونتاج تیار ہو رہا ہے..."):
-                start_offset = 8.0
-                usable_movie_dur = max(60.0, total_dur - 16.0)
-                num_snippets = 30
-                time_step = max(4.0, usable_movie_dur / num_snippets)
+            # 3. Build Synchronized 3.5s Montage Across Movie / Video
+            with st.spinner("⚡ 3، 3 سیکنڈ کے سینز نکال کر میوٹڈ اینٹی کاپی رائٹ مونتاج تیار ہو رہا ہے..."):
+                start_offset = 6.0
+                usable_dur = max(40.0, total_dur - 12.0)
+                num_snippets = 25
+                time_step = max(3.5, usable_dur / num_snippets)
 
                 snippet_files = []
                 list_txt = f"recap_list_{uid}.txt"
@@ -385,7 +379,7 @@ with tab_recap:
 
                 for i in range(num_snippets):
                     pt = start_offset + (i * time_step)
-                    if pt >= total_dur - 6.0: pt = max(8.0, total_dur * 0.40)
+                    if pt >= total_dur - 5.0: pt = max(6.0, total_dur * 0.35)
                     snip_path = f"snip_{uid}_{i}.mp4"
                     
                     cmd_snip = [
@@ -406,7 +400,6 @@ with tab_recap:
                             lf.write(f"file '{sf}'\n")
 
                     if has_voiceover and os.path.exists(voice_audio):
-                        # Merge Asad Voiceover + Video Montage (Looping/Filling video to voiceover duration)
                         cmd_mux = [
                             ffmpeg_exe, "-nostdin", "-y",
                             "-f", "concat", "-safe", "0", "-stream_loop", "-1", "-i", list_txt,
@@ -420,7 +413,6 @@ with tab_recap:
                         subprocess.run(cmd_mux, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                         output_ready_path = final_recap_out
                     else:
-                        # Muted Montage for Manual Recording
                         cmd_concat_recap = [
                             ffmpeg_exe, "-nostdin", "-y", "-f", "concat", "-safe", "0",
                             "-i", list_txt,
@@ -441,32 +433,33 @@ with tab_recap:
                 if os.path.exists(output_ready_path) and os.path.getsize(output_ready_path) > 5000:
                     st.session_state.recap_video_out = output_ready_path
                     st.session_state.detected_info = info
-                    st.success("🎉 آپ کی مووی ریکیپ ویڈیو (اسد وائس اوور و اسکرپٹ کے ساتھ) 100% تیار ہے!")
+                    st.session_state.process_ready = True
+                    st.success("🎉 آپ کی ویڈیو (اسد وائس اوور، اسکرپٹ و ٹائٹلز کے ساتھ) 100% تیار ہے!")
                 else:
-                    st.error("❌ پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔")
+                    st.error("❌ ویڈیو پروسیسنگ مکمل نہ ہو سکی۔ براہِ کرم دوبارہ کوشش کریں۔")
 
-    # DISPLAY RECAP VIDEO & COMPLETE URDU VOICEOVER SCRIPT
+    # DISPLAY RECAP VIDEO & COMPLETE URDU VOICEOVER SCRIPT + METADATA
     if st.session_state.recap_video_out and os.path.exists(st.session_state.recap_video_out):
         st.divider()
-        st.subheader("🎬 تیار شدہ مووی ریکیپ ویڈیو (اسد وائس اوور کے ساتھ):")
+        st.subheader("🎬 تیار شدہ ویڈیو (اسد وائس اوور کے ساتھ):")
         r_bytes = open(st.session_state.recap_video_out, 'rb').read()
         st.video(r_bytes)
         st.download_button(
-            label="📥 مکمل مووی ریکیپ ویڈیو ڈاؤنلوڈ کریں (Download Ready Movie Recap MP4)",
+            label="📥 مکمل ویڈیو ڈاؤنلوڈ کریں (Download MP4 Video)",
             data=r_bytes,
-            file_name=f"movie_recap_voiced_{os.path.basename(st.session_state.recap_video_out)}",
+            file_name=f"es_story_{os.path.basename(st.session_state.recap_video_out)}",
             mime="video/mp4",
             use_container_width=True
         )
 
         st.markdown("---")
-        st.subheader("📖 مکمل اردو وائس اوور اسکرپٹ (Urdu Voiceover Narrative):")
-        st.info("💡 یہ اسکرپٹ AI نے ویڈیو کے اندر اسد کی آواز میں بول دیا ہے۔ آپ چاہیں تو اسے مستقبل کے لیے بھی محفوظ رکھ سکتے ہیں:")
+        st.subheader("📖 مکمل اردو وائس اوور کہانی (Urdu Narrative Script):")
+        st.info("💡 یہ اسکرپٹ ویڈیو میں اسد کی آواز میں بولا گیا ہے، آپ چاہیں تو کاپی کر کے مستقبل کے لیے محفوظ رکھ سکتے ہیں:")
         st.code(st.session_state.generated_recap_script, language="markdown")
 
         st.markdown("---")
-        st.subheader("🔥 وائرل ٹائٹلز، ہیش ٹیگز اور تھمب نیل پرامپٹ (1-Click Copy):")
-        raw_title = st.session_state.detected_info.get('title', 'Movie Recap Video')
+        st.subheader("🔥 وائرل ٹائٹلز، ہیش ٹیگز اور 8K تھمب نیل پرامپٹ (1-Click Copy):")
+        raw_title = st.session_state.detected_info.get('title', 'Explainer Video')
         clean_hero_title, titles, hashtags, exact_thumb_prompt = analyze_video_and_generate_exact_prompt(raw_title, is_short=False)
         
         c_rc1, c_rc2 = st.columns(2)
@@ -477,8 +470,14 @@ with tab_recap:
             st.markdown("**🏷️ وائرل ہیش ٹیگز:**")
             st.code(hashtags, language="text")
         with c_rc2:
-            st.markdown(f"**🎨 اصلی ہیرو ({clean_hero_title[:30]}) کا AI تھمب نیل پرامپٹ:**")
+            st.markdown(f"**🎨 AI 8K تھمب نیل پرامپٹ ({clean_hero_title[:30]}):**")
             st.code(exact_thumb_prompt, language="text")
+            with st.expander("🖼️ تھمب نیل کا لائیو AI پریویو دیکھیں"):
+                thumb_gen_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(exact_thumb_prompt)}?width=1280&height=720&nologo=true&model=flux"
+                try:
+                    st.image(thumb_gen_url, caption="AI Generated Thumbnail (Flux)", use_column_width=True)
+                except Exception:
+                    st.write("پرامپٹ کو کاپی کر کے Midjourney یا Bing Creator میں استعمال کریں۔")
 
 # -----------------
 # TAB 2: PURE FULL-SCREEN 9:16 SHORTS
@@ -704,7 +703,7 @@ with tab_movie:
     st.write("### 🎬 Pro AI Cinematic Movie Production")
     m_script = st.text_area("مووی اسکرپٹ:", height=100, placeholder="ایک خوبصورت جنگل میں شیر شکار کی تلاش میں ہے...")
     if st.button("Generate Master Movie 🚀"):
-        st.info("اے آئی مووی جنریشن کا پروسیس شروع ہو چکا ہے۔")
+        st.info("اے آئی ویڈیو جنریشن شروع ہو چکی ہے۔")
 
 # -----------------
 # TAB 7: PRO AI IMAGE STUDIO
@@ -717,4 +716,4 @@ with tab_image:
         if img_bytes:
             st.image(img_bytes, caption="Generated AI Image")
 
-st.markdown("<p style='text-align: center; font-size: 11px; color: #64748b; margin-top: 20px;'>ES Ultra 26-Shield & Movie Recap Studio | 100% Free & Unlimited</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 11px; color: #64748b; margin-top: 20px;'>ES Ultra Universal AI Storyteller Studio | 100% Free & Unlimited</p>", unsafe_allow_html=True)
