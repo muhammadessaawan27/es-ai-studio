@@ -15,49 +15,79 @@ OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", ""
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
 
 # ==========================================
-# 1. PROCESSING ENGINE (CRASH-PROOF)
+# 1. PROCESSING ENGINE (ROBUST & ERROR-RESILIENT)
 # ==========================================
 class MovieExplainerEngine:
     @staticmethod
+    def verify_dependencies():
+        """Check if FFmpeg and yt-dlp are accessible"""
+        ffmpeg_path = shutil.which("ffmpeg")
+        ytdlp_path = shutil.which("yt-dlp")
+        if not ffmpeg_path:
+            raise RuntimeError("FFmpeg سسٹم میں دستیاب نہیں ہے۔ برائے مہربانی packages.txt میں ffmpeg شامل کریں۔")
+        return ffmpeg_path, ytdlp_path
+
+    @staticmethod
     def download_video_and_audio(url, output_dir, progress_bar, status_text):
         """
-        Downloads lightweight video proxy and audio safely using yt-dlp
+        Safely downloads video & extracts audio with dynamic format fallback and full stderr capture
         """
         status_text.text("⬇️ Accessing & downloading media stream...")
         progress_bar.progress(15)
-        
-        video_output = os.path.join(output_dir, "source_movie.mp4")
-        audio_output = os.path.join(output_dir, "audio_speech.mp3")
 
-        # Download Video (720p max to save RAM)
+        output_template = os.path.join(output_dir, "source_movie.%(ext)s")
+        
+        # Smart Format Selection: Prioritize 720p, fallback to best available
+        format_selector = "bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo+bestaudio/best"
+
         cmd_vid = [
             "yt-dlp",
-            "-f", "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
-            "--merge-output-format", "mp4",
-            "-o", video_output,
             "--no-playlist",
+            "--no-warnings",
+            "--ignore-errors",
+            "-f", format_selector,
+            "--merge-output-format", "mp4",
+            "-o", output_template,
             url
         ]
-        subprocess.run(cmd_vid, capture_output=True, text=True, check=True)
 
-        # Extract lightweight 16kHz audio using robust system FFmpeg
+        result = subprocess.run(cmd_vid, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            err_msg = result.stderr.strip() or result.stdout.strip() or "نامعلوم خرابی (Unknown Error)"
+            raise RuntimeError(f"yt-dlp Download Failed:\n{err_msg}")
+
+        # Locate the downloaded file
+        downloaded_video = None
+        for f in os.listdir(output_dir):
+            if f.startswith("source_movie."):
+                downloaded_video = os.path.join(output_dir, f)
+                break
+
+        if not downloaded_video or not os.path.exists(downloaded_video):
+            raise RuntimeError(f"ویڈیو ڈاؤن لوڈ مکمل نہیں ہو سکی۔ yt-dlp تفصیلات:\n{result.stderr}")
+
+        # Extract lightweight 16kHz audio for Whisper transcription
         status_text.text("🎧 Extracting audio track for AI transcription...")
         progress_bar.progress(35)
-        
+        audio_output = os.path.join(output_dir, "audio_speech.mp3")
+
         cmd_aud = [
-            "ffmpeg", "-y", "-i", video_output,
+            "ffmpeg", "-y", "-i", downloaded_video,
             "-vn", "-acodec", "libmp3lame", "-ar", "16000", "-ac", "1", "-b:a", "64k",
             audio_output
         ]
-        subprocess.run(cmd_aud, capture_output=True, check=True)
+        res_aud = subprocess.run(cmd_aud, capture_output=True, text=True)
+        if res_aud.returncode != 0:
+            raise RuntimeError(f"FFmpeg آڈیو نکالنے میں ناکام رہا:\n{res_aud.stderr}")
 
-        return video_output, audio_output
+        return downloaded_video, audio_output
 
     @staticmethod
     def transcribe_audio(audio_path, progress_bar, status_text):
         status_text.text("📝 Transcribing story dialogues with timestamps...")
         progress_bar.progress(50)
-        
+
         if GROQ_API_KEY:
             from groq import Groq
             client = Groq(api_key=GROQ_API_KEY)
@@ -125,7 +155,7 @@ class MovieExplainerEngine:
                 response_format={"type": "json_object"}
             )
             return json.loads(res.choices[0].message.content)
-        
+
         return {
             "seo_title": f"Shocking Movie Explained in {language}",
             "seo_hashtags": "#MovieRecap #StoryExplained",
@@ -197,7 +227,9 @@ class MovieExplainerEngine:
             "-shortest", "-pix_fmt", "yuv420p",
             output_mp4
         ]
-        subprocess.run(cmd_final, capture_output=True, check=True)
+        res = subprocess.run(cmd_final, capture_output=True, text=True)
+        if res.returncode != 0:
+            raise RuntimeError(f"FFmpeg Rendering Error:\n{res.stderr}")
 
 # ==========================================
 # 2. UI LAYOUT
@@ -242,6 +274,9 @@ def render_explainer_studio():
         temp_dir = tempfile.mkdtemp()
 
         try:
+            # 0. Check Environment Dependencies
+            MovieExplainerEngine.verify_dependencies()
+
             # 1. Download Video & Extract Audio
             if url_input:
                 src_video, audio_f = MovieExplainerEngine.download_video_and_audio(url_input, temp_dir, p_bar, status)
@@ -294,7 +329,8 @@ def render_explainer_studio():
                 st.text_area("Full Narration Script", data.get("narration_script"), height=200)
 
         except Exception as e:
-            st.error(f"❌ Error: {str(e)}")
+            st.error("❌ خرابی پیش آئی ہے:")
+            st.code(str(e), language="text")
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
