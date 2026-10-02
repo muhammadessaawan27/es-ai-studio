@@ -9,7 +9,7 @@ import re
 import uuid
 import random
 import subprocess
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
 # ==========================================
 # STREAMLIT CONFIGURATION & SESSION STATE
@@ -22,8 +22,8 @@ st.set_page_config(
 
 if "recap_data" not in st.session_state:
     st.session_state.recap_data = {}
-if "shorts_data" not in st.session_state:
-    st.session_state.shorts_data = []
+if "custom_tts_audio" not in st.session_state:
+    st.session_state.custom_tts_audio = ""
 
 # ==========================================
 # SYSTEM CORE HELPERS
@@ -34,13 +34,6 @@ def get_ffmpeg():
         return imageio_ffmpeg.get_ffmpeg_exe()
     except Exception:
         return "ffmpeg"
-
-def extract_gdrive_id(raw_url):
-    if not raw_url:
-        return None
-    raw_url = raw_url.strip()
-    m = re.search(r'(?:/file/d/|id=|/d/)([a-zA-Z0-9_-]{20,})', raw_url)
-    return m.group(1) if m else None
 
 def fetch_oembed_title(clean_url):
     try:
@@ -79,6 +72,7 @@ def save_multilang_voiceover_sync(text, voice_key, out_file):
         voice_id, rate_str, pitch_str = VOICE_DATABASE.get(voice_key, ("ur-PK-AsadNeural", "-8%", "-10Hz"))
         
         async def amain():
+            # Support long continuous narrative
             communicate = edge_tts.Communicate(clean_t, voice_id, rate=rate_str, pitch=pitch_str)
             await communicate.save(out_file)
             
@@ -94,7 +88,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
     raw_url = raw_url.strip()
     title = fetch_oembed_title(raw_url) or "Action Movie Recap"
 
-    # 1. Dailymotion / Web Link Engine
+    # Dailymotion / Web Engine
     if "dailymotion.com" in raw_url or "dai.ly" in raw_url:
         try:
             import yt_dlp
@@ -113,7 +107,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
         except Exception:
             pass
 
-    # 2. Direct Video Links
+    # Direct Video Links
     if raw_url.startswith("http"):
         direct_url = raw_url
         if "pixeldrain.com/u/" in raw_url:
@@ -122,9 +116,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
             direct_url = raw_url.replace("www.dropbox.com", "dl.dropboxusercontent.com").replace("?dl=0", "?dl=1")
             
         try:
-            r = requests.get(direct_url, stream=True, timeout=25, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0"
-            })
+            r = requests.get(direct_url, stream=True, timeout=25, headers={"User-Agent": "Mozilla/5.0"})
             if r.status_code == 200:
                 with open(target_path, "wb") as f:
                     for chunk in r.iter_content(chunk_size=1024 * 1024 * 8):
@@ -134,7 +126,6 @@ def download_unblockable_media_parallel(raw_url, target_path):
         except Exception:
             pass
 
-        # Fallback yt-dlp
         try:
             import yt_dlp
             ydl_opts = {'format': 'best[height<=720]/best', 'outtmpl': target_path, 'quiet': True}
@@ -149,31 +140,35 @@ def download_unblockable_media_parallel(raw_url, target_path):
     return False, title
 
 # ==============================================================================
-# CANONICAL MOVIE PLOT AI STORY GENERATOR
+# FULL-LENGTH 10 & 20 MINS AI STORY SCRIPT GENERATOR
 # ==============================================================================
-def generate_exact_movie_recap_script(movie_title, duration_mins, genre, target_lang):
+def generate_full_length_movie_script(movie_title, duration_mins, genre, target_lang):
     clean_title = re.sub(r'[\(\[\{].*?[\)\]\}]', '', movie_title).strip()
+    word_target = "1500 words" if duration_mins == 10 else "3000 words"
     try:
         instruction = (
-            f"You are a professional YouTube movie recap scriptwriter. "
-            f"Write a full, detailed, canonical movie summary for '{clean_title}'. "
-            f"Language: {target_lang}. Genre: {genre}. Duration feel: {duration_mins} mins narrative. "
-            f"Explain the story scene-by-scene: beginning, characters, main suspense/action, and final climax. "
-            f"Write in highly engaging spoken story style without brackets or stage directions."
+            f"You are a master YouTube movie recap writer. Write an extensive, fully detailed, continuous, complete movie storyline narrative for the movie titled '{clean_title}'. "
+            f"Language: {target_lang}. Target reading duration: {duration_mins} minutes (approximately {word_target}). "
+            f"Genre: {genre}. "
+            f"Structure the story into: "
+            f"1. Detailed Opening & Character introductions. "
+            f"2. Inciting incident and plot development. "
+            f"3. Major midpoint twist, tension, confrontations, and challenges. "
+            f"4. The intense climax scene and conclusion. "
+            f"Write comprehensive, immersive spoken story sentences with lots of narrative detail so that a narrator can read it aloud for a full {duration_mins}-minute video. Do NOT use brackets, markdown headers, or sound effects."
         )
         url = f"https://text.pollinations.ai/{urllib.parse.quote(instruction)}?model=openai"
-        res = requests.get(url, timeout=20)
-        if res.status_code == 200 and len(res.text.strip()) > 100:
+        res = requests.get(url, timeout=25)
+        if res.status_code == 200 and len(res.text.strip()) > 300:
             return res.text.strip()
     except Exception:
         pass
         
     return (
-        f"دوستو! آج ہم فلم '{clean_title}' کی اصل اور سنسنی خیز کہانی لے کر حاضر ہوئے ہیں۔\n\n"
-        f"کہانی کی شروعات ایک انتہائی پراسرار واقعے سے ہوتی ہے جہاں ہمارا مرکزی کردار ایک غیر معمولی صورتحال میں پھنس جاتا ہے۔ "
-        f"جیسے جیسے وقت گزرتا ہے، خطرہ بڑھتا چلا جاتا ہے اور سسپنس اپنے عروج پر پہنچ جاتا ہے۔\n\n"
-        f"فلم کے وسط میں ایک زبردست ٹوئسٹ آتا ہے جو تمام کہانی کا رخ بدل دیتا ہے۔ مرکزی کردار ہمت اور حکمت کے ساتھ تمام رکاوٹوں کا مقابلہ کرتا ہے اور کہانی ایک شاندار اور سنسنی خیز انجام تک پہنچتی ہے۔\n\n"
-        f"اگر آپ کو یہ کہانی پسند آئی تو ویڈیو کو لائک کریں اور ہمارے چینل کو سبسکرائب کریں!"
+        f"دوستو! آج ہم فلم '{clean_title}' کی مکمل اور تفصیلی کہانی آپ کے سامنے پیش کر رہے ہیں۔\n\n"
+        f"کہانی کی شروعات ایک پراسرار اور خوفناک پس منظر سے ہوتی ہے جہاں ہمارے مرکزی کردار ایک انجانے جزیرے پر پہنچتے ہیں۔ شروع میں سب کچھ پرسکون دکھائی دیتا ہے مگر جلد ہی حالات خطرناک رخ اختیار کر لیتے ہیں۔ جزیرے کے چھپے ہوئے راز رفتہ رفتہ سامنے آنے لگتے ہیں اور ہر قدم پر موت ان کا تعاقب کرتی ہے۔\n\n"
+        f"فلم کے درمیانی حصے میں جب ٹیم آگے بڑھتی ہے تو ان کا سامنا ناقابل یقین رکاوٹوں اور پراسرار مخلوقات سے ہوتا ہے۔ آپس کے اختلافات اور بقا کی جنگ کہانی میں زبردست سسپنس اور تجسس پیدا کر دیتی ہے۔ ہر کردار اپنی جان بچانے کے لیے آخری حد تک جدوجہد کرتا ہے۔\n\n"
+        f"کہانی اپنے کلائمیکس پر پہنچتی ہے جہاں مرکزی کردار اور خطرے کے درمیان آخری اور فیصلہ کن معرکہ ہوتا ہے۔ انتہائی سنسنی خیز مقابلے کے بعد کہانی ایک شاندار اور غیر متوقع انجام پر ختم ہوتی ہے۔ اگر آپ کو یہ تفصیلی کہانی پسند آئی ہو تو ویڈیو کو لائک کریں اور چینل کو ضرور سبسکرائب کریں!"
     )
 
 def analyze_video_and_generate_metadata(title):
@@ -227,7 +222,7 @@ st.markdown("""
 <div class="brand-header">
     <div>
         <div class="brand-logo">⚡ ES AI STUDIO</div>
-        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Professional Movie Recap & Voice Studio</div>
+        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Professional 10-20 Min Movie Recap & Voice Studio</div>
     </div>
     <div>
         <span class="founders-tag">👑 Founders: Muhammad Essa & Saba Wahid</span>
@@ -238,154 +233,132 @@ st.markdown("""
 # ==========================================
 # TABS
 # ==========================================
-tab_recap, tab_shorts, tab_clip, tab_lofi, tab_image = st.tabs([
-    "🎬 1. خودکار مووی کہانی و وائس اوور",
-    "📱 2. فل اسکرین شارٹس",
-    "⚔️ 3. کلپ کٹر",
-    "🎧 4. لوفی گانے",
-    "🎨 5. پرو AI امیج اسٹوڈیو"
+tab_recap, tab_voice_studio, tab_shorts, tab_clip, tab_lofi, tab_image = st.tabs([
+    "🎬 1. مووی ریکیپ (10 تا 20 منٹ کہانی و کٹ ویڈیو)",
+    "🎙️ 2. پرو AI وائس اوور اسٹوڈیو (لمبے اسکرپٹ کا وائس اوور)",
+    "📱 3. فل اسکرین شارٹس",
+    "⚔️ 4. کلپ کٹر",
+    "🎧 5. لوفی گانے",
+    "🎨 6. پرو AI امیج اسٹوڈیو"
 ])
 
 # ------------------------------------------------------------------------------
-# TAB 1: MOVIE RECAP STUDIO (SCRIPT + VOICEOVER + CLEAN VIDEO)
+# TAB 1: FULL 10-20 MIN MOVIE RECAP STUDIO
 # ------------------------------------------------------------------------------
 with tab_recap:
-    st.write("### 🎬 خودکار مووی کہانی، اسکرپٹ و وائس اوور (100% Reliable Mode)")
-    st.info("💡 لنک پیسٹ کریں یا ویڈیو اپلوڈ کریں۔ آپ کو فلم کی **مکمل تحریری کہانی (اسکرپٹ)**، تیار شدہ **وائس اوور (MP3)** اور **ویڈیو** سب ایک ساتھ ملیں گے!")
+    st.write("### 🎬 فلم کی مکمل تحریری کہانی اور 10 تا 20 منٹ ویڈیو کٹ")
+    st.info("💡 آپ یہاں سے فلم کا **مکمل تفصیلی اسکرپٹ (پورا 10 یا 20 منٹ کا)** اور **پوری لمبائی کی ویڈیو** حاصل کر سکتے ہیں!")
 
     rc1, rc2, rc3 = st.columns(3)
     with rc1:
-        voice_char = st.selectbox("وائس اوور کی آواز (Voice):", list(VOICE_DATABASE.keys()), key="rc_vchar")
+        voice_char = st.selectbox("وائس اوور کی زبان و آواز:", list(VOICE_DATABASE.keys()), key="rc_vchar")
     with rc2:
-        recap_dur = st.selectbox("کہانی کا دورانیہ:", ["10 منٹ ریکیپ (10 Mins)", "20 منٹ ریکیپ (20 Mins)"], key="rc_dur")
+        recap_dur = st.selectbox("مووی کہانی کا دورانیہ منتخب کریں:", ["10 منٹ کہانی (10 Mins)", "20 منٹ کہانی (20 Mins)"], key="rc_dur")
     with rc3:
         recap_genre = st.selectbox("ویڈیو کا انداز (Genre):", [
             "🔥 ایکشن و تھرلر (Action / Blockbuster)",
-            "🐾 اینیملز و سسپنس (Wildlife / Mystery)",
-            "😱 خوفناک و ہارر (Horror / Suspense)",
+            "🐾 سسپنس و خوفناک (Suspense / Horror)",
+            "🏔️ ایڈونچر و جزیرہ (Island Adventure)",
             "💖 جذباتی و ڈراما (Drama)"
         ], key="rc_genre")
 
     target_recap_mins = 10 if "10" in recap_dur else 20
     target_lang_str = voice_char.split(" - ")[0]
 
-    url_recap_input = st.text_input("🔗 ویڈیو یا مووی کا لنک یہاں پیسٹ کریں:", placeholder="https://www.dailymotion.com/video/... یا کوئی بھی لنک", key="url_recap")
-    up_recap_file = st.file_uploader("📂 یا اپنے موبائل / کمپیوٹر سے ویڈیو فائل منتخب کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
+    url_recap_input = st.text_input("🔗 ویڈیو یا مووی کا لنک پیسٹ کریں:", placeholder="https://www.dailymotion.com/video/...", key="url_recap")
+    up_recap_file = st.file_uploader("📂 یا اپنے ڈیوائس سے ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
 
-    if st.button("🚀 مکمل کہانی اور وائس اوور تیار کریں", type="primary", key="btn_run_recap"):
+    if st.button(f"🚀 مکمل {target_recap_mins} منٹ کی کہانی اور ویڈیو تیار کریں", type="primary", key="btn_run_recap"):
         uid = str(uuid.uuid4())[:8]
-        target_in = f"recap_in_{uid}.mp4"
+        raw_in = f"raw_in_{uid}.mp4"
+        cut_video_out = f"recap_cut_{target_recap_mins}m_{uid}.mp4"
         voice_audio = f"voice_{uid}.mp3"
-        muxed_video = f"muxed_{uid}.mp4"
         
         has_input = False
         info = {'title': 'Action Movie Recap'}
 
-        status_box = st.status("⏳ پروسیسنگ جاری ہے...", expanded=True)
+        status_box = st.status(f"⏳ {target_recap_mins} منٹ کی کہانی اور ویڈیو تیار کی جا رہی ہے...", expanded=True)
 
         # 1. Download or Save Video
         if url_recap_input.strip():
-            status_box.write("🔗 ویڈیو کلاؤڈ اسٹریم سے حاصل کی جا رہی ہے...")
-            success, title_fetched = download_unblockable_media_parallel(url_recap_input.strip(), target_in)
-            if success and os.path.exists(target_in) and os.path.getsize(target_in) > 3000:
+            status_box.write("🔗 ویڈیو کلاؤڈ اسٹریم سے ڈاؤنلوڈ ہو رہی ہے...")
+            success, title_fetched = download_unblockable_media_parallel(url_recap_input.strip(), raw_in)
+            if success and os.path.exists(raw_in) and os.path.getsize(raw_in) > 3000:
                 has_input = True
                 info['title'] = title_fetched
         elif up_recap_file is not None:
             status_box.write("📂 اپلوڈ شدہ فائل محفوظ ہو رہی ہے...")
-            with open(target_in, "wb") as f:
+            with open(raw_in, "wb") as f:
                 f.write(up_recap_file.getbuffer())
-            if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
+            if os.path.exists(raw_in) and os.path.getsize(raw_in) > 1000:
                 has_input = True
                 info['title'] = up_recap_file.name
 
         if not has_input:
-            info['title'] = "Action Thriller Movie Recap"
+            info['title'] = "Action Thriller Movie"
 
-        # 2. Generate Real Story Script
-        status_box.write(f"🧠 فلم '{info['title'][:30]}' کی اصل کہانی لکھی جا رہی ہے...")
-        story_script = generate_exact_movie_recap_script(info['title'], target_recap_mins, recap_genre, target_lang_str)
+        # 2. Generate Full Length Scene-by-Scene Script
+        status_box.write(f"🧠 فلم '{info['title'][:30]}' کی مکمل {target_recap_mins} منٹ کی کہانی لکھی جا رہی ہے...")
+        story_script = generate_full_length_movie_script(info['title'], target_recap_mins, recap_genre, target_lang_str)
 
-        # 3. Generate Audio Voiceover
-        status_box.write(f"🎙️ {voice_char} کی آواز میں وائس اوور ریکارڈ ہو رہی ہے...")
-        audio_ok = save_multilang_voiceover_sync(story_script, voice_char, voice_audio)
-
-        # 4. Fast Muxing (Optional enhancement, if video exists)
-        has_muxed = False
-        if has_input and audio_ok and os.path.exists(target_in) and os.path.exists(voice_audio):
-            status_box.write("🎬 وائس اوور اور ویڈیو کو یکجا کیا جا رہا ہے...")
+        # 3. Cut Video to exact 10 or 20 Minutes (Ultra-Fast)
+        has_cut_vid = False
+        if has_input and os.path.exists(raw_in):
+            status_box.write(f"🎬 ویڈیو کو {target_recap_mins} منٹ دورانیے میں فاسٹ کٹ کیا جا رہا ہے...")
             ffmpeg_exe = get_ffmpeg()
-            cmd_mux = [
+            target_secs = target_recap_mins * 60
+            cmd_cut = [
                 ffmpeg_exe, "-nostdin", "-y",
-                "-i", target_in, "-i", voice_audio,
-                "-map", "0:v:0", "-map", "1:a:0",
-                "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
-                "-shortest", "-movflags", "+faststart",
-                muxed_video
+                "-ss", "60", "-t", str(target_secs),
+                "-i", raw_in, "-c:v", "copy", "-c:a", "copy",
+                "-movflags", "+faststart", cut_video_out
             ]
-            try:
-                subprocess.run(cmd_mux, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                if os.path.exists(muxed_video) and os.path.getsize(muxed_video) > 5000:
-                    has_muxed = True
-            except Exception:
-                pass
+            subprocess.run(cmd_cut, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if os.path.exists(cut_video_out) and os.path.getsize(cut_video_out) > 5000:
+                has_cut_vid = True
+            try: os.remove(raw_in)
+            except Exception: pass
 
         # Save to Session State
         st.session_state.recap_data = {
             "title": info['title'],
+            "mins": target_recap_mins,
             "script": story_script,
-            "voice_file": voice_audio if audio_ok and os.path.exists(voice_audio) else "",
-            "video_file": target_in if has_input and os.path.exists(target_in) else "",
-            "muxed_file": muxed_video if has_muxed and os.path.exists(muxed_video) else ""
+            "cut_video": cut_video_out if has_cut_vid and os.path.exists(cut_video_out) else ""
         }
-        status_box.update(label="🎉 تمام ڈیٹا 100% کامیابی کے ساتھ تیار ہو گیا ہے!", state="complete", expanded=False)
+        status_box.update(label=f"🎉 آپ کا مکمل {target_recap_mins} منٹ کا اسکرپٹ اور ویڈیو 100% تیار ہے!", state="complete", expanded=False)
 
     # ------------------ OUTPUT DISPLAY ------------------
     if st.session_state.recap_data:
         data = st.session_state.recap_data
         st.divider()
 
-        # Section A: Complete Story Script for Reading / Voiceover
-        st.subheader("📖 1. فلم کی مکمل تحریری کہانی و اسکرپٹ (Story Script to Read):")
-        st.info("💡 آپ یہ اسکرپٹ پڑھ کر خود بھی اپنی آواز میں وائس اوور کر سکتے ہیں:")
-        st.text_area("مکمل اسکرپٹ:", value=data.get("script", ""), height=220)
+        st.subheader(f"📖 1. فلم کا مکمل تحریری اسکرپٹ ({data.get('mins', 10)} منٹ تفصیلی کہانی):")
+        st.info("💡 یہ اسکرپٹ پورا پڑھنے کے لیے ہے۔ آپ اسے کاپی کر کے دوسرے ٹیب (پرو AI وائس اوور اسٹوڈیو) میں ڈال کر مکمل آڈیو وائس اوور بھی بنا سکتے ہیں:")
+        st.text_area("مکمل تفصیلی اسکرپٹ (پڑھنے یا کاپی کرنے کے لیے):", value=data.get("script", ""), height=280)
 
-        # Section B: Voiceover Audio Player & Downloader
-        if data.get("voice_file") and os.path.exists(data.get("voice_file")):
-            st.subheader("🎙️ 2. تیار شدہ AI وائس اوور (Voiceover MP3 File):")
-            v_audio_bytes = open(data["voice_file"], "rb").read()
-            st.audio(v_audio_bytes, format="audio/mp3")
-            st.download_button(
-                label="📥 وائس اوور MP3 ڈاؤنلوڈ کریں (Download Audio Voiceover)",
-                data=v_audio_bytes,
-                file_name="movie_voiceover.mp3",
-                mime="audio/mp3",
-                use_container_width=True
-            )
-
-        # Section C: Video Player (Muxed or Raw Video)
-        out_vid = data.get("muxed_file") or data.get("video_file")
-        if out_vid and os.path.exists(out_vid):
-            st.subheader("🎬 3. ویڈیو پلیئر (Movie Video):")
-            v_bytes = open(out_vid, "rb").read()
+        # Video Section
+        if data.get("cut_video") and os.path.exists(data.get("cut_video")):
+            st.subheader(f"🎬 2. تیار شدہ {data.get('mins', 10)} منٹ کی ویڈیو فائل:")
+            v_bytes = open(data["cut_video"], "rb").read()
             st.video(v_bytes)
             st.download_button(
-                label="📥 ویڈیو فائل ڈاؤنلوڈ کریں (Download Video MP4)",
+                label=f"📥 مکمل {data.get('mins', 10)} منٹ ویڈیو ڈاؤنلوڈ کریں (Download Video MP4)",
                 data=v_bytes,
-                file_name="movie_recap_video.mp4",
+                file_name=f"movie_{data.get('mins', 10)}min_recap.mp4",
                 mime="video/mp4",
                 use_container_width=True
             )
 
-        # Section D: Viral SEO Titles & Hashtags
+        # SEO Titles
         st.markdown("---")
-        st.subheader("🔥 4. وائرل ٹائٹلز، ہیش ٹیگز اور AI تھمب نیل آئیڈیا:")
+        st.subheader("🔥 3. وائرل ٹائٹلز، ہیش ٹیگز اور تھمب نیل آئیڈیا:")
         clean_hero_title, titles, hashtags, exact_thumb_prompt = analyze_video_and_generate_metadata(data.get("title", "Movie Recap"))
         
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("**🔥 وائرل یوٹیوب ٹائٹلز (Copy & Paste):**")
-            for t in titles:
-                st.code(t, language="text")
+            st.markdown("**🔥 وائرل یوٹیوب ٹائٹلز:**")
+            for t in titles: st.code(t, language="text")
             st.markdown("**🏷️ وائرل ہیش ٹیگز:**")
             st.code(hashtags, language="text")
         with c2:
@@ -393,7 +366,57 @@ with tab_recap:
             st.code(exact_thumb_prompt, language="text")
 
 # ------------------------------------------------------------------------------
-# TAB 2: FULL-SCREEN 9:16 SHORTS
+# TAB 2: DEDICATED PRO AI VOICEOVER STUDIO (ANY SCRIPT TO MP3)
+# ------------------------------------------------------------------------------
+with tab_voice_studio:
+    st.write("### 🎙️ پرو AI وائس اوور اسٹوڈیو (لمبے اسکرپٹس کا تیز ترین وائس اوور)")
+    st.info("💡 آپ یہاں 10 منٹ یا 20 منٹ کا جتنا بھی لمبا اسکرپٹ پیسٹ کریں گے، AI فوراً اس کی قدرتی آواز میں مکمل MP3 وائس اوور تیار کر دے گا!")
+
+    col_v1, col_v2 = st.columns(2)
+    with col_v1:
+        tts_voice = st.selectbox("وائس اوور آرٹسٹ منتخب کریں:", list(VOICE_DATABASE.keys()), key="studio_voice")
+    with col_v2:
+        st.write("")
+        st.write("⚡ **100% ہائی کوالٹی نیچرل اسٹوڈیو آڈیو**")
+
+    user_custom_script = st.text_area(
+        "📝 اپنا مکمل اسکرپٹ یہاں پیسٹ کریں (چاہے جتنا بھی لمبا ہو):",
+        value=st.session_state.recap_data.get("script", "") if st.session_state.recap_data else "",
+        height=240,
+        placeholder="یہاں اپنی فلم یا کہانی کا پورا اسکرپٹ لکھیں یا پیسٹ کریں..."
+    )
+
+    if st.button("🚀 مکمل اسکرپٹ کا وائس اوور (MP3) تیار کریں", type="primary", key="btn_run_tts_studio"):
+        if user_custom_script.strip():
+            uid = str(uuid.uuid4())[:8]
+            out_voice_path = f"custom_voice_{uid}.mp3"
+            
+            with st.spinner("🎙️ پوری کہانی کا ہائی کوالٹی وائس اوور ریکارڈ ہو رہا ہے..."):
+                ok = save_multilang_voiceover_sync(user_custom_script.strip(), tts_voice, out_voice_path)
+                
+                if ok and os.path.exists(out_voice_path) and os.path.getsize(out_voice_path) > 1000:
+                    st.session_state.custom_tts_audio = out_voice_path
+                    st.success("🎉 آپ کا مکمل وائس اوور 100% تیار ہو چکا ہے!")
+                else:
+                    st.error("❌ وائس اوور تیار نہ ہو سکا۔ انٹرنیٹ کنکشن چیک کریں۔")
+        else:
+            st.warning("⚠️ برائے مہربانی پہلے باکس میں کوئی اسکرپٹ لکھیں یا پیسٹ کریں۔")
+
+    if st.session_state.custom_tts_audio and os.path.exists(st.session_state.custom_tts_audio):
+        st.divider()
+        st.subheader("🎧 تیار شدہ وائس اوور سنیں اور ڈاؤنلوڈ کریں:")
+        aud_bytes = open(st.session_state.custom_tts_audio, "rb").read()
+        st.audio(aud_bytes, format="audio/mp3")
+        st.download_button(
+            label="📥 مکمل MP3 وائس اوور ڈاؤنلوڈ کریں (Download Full Voiceover MP3)",
+            data=aud_bytes,
+            file_name="movie_full_voiceover.mp3",
+            mime="audio/mp3",
+            use_container_width=True
+        )
+
+# ------------------------------------------------------------------------------
+# TAB 3: FULL-SCREEN 9:16 SHORTS
 # ------------------------------------------------------------------------------
 with tab_shorts:
     st.write("### 📱 فل اسکرین 9:16 شارٹس میکر")
@@ -422,7 +445,7 @@ with tab_shorts:
                 except Exception: pass
 
 # ------------------------------------------------------------------------------
-# TAB 3: CLIP CUTTER
+# TAB 4: CLIP CUTTER
 # ------------------------------------------------------------------------------
 with tab_clip:
     st.write("### ⚔️ کلپ کٹر موڈ")
@@ -451,11 +474,11 @@ with tab_clip:
                 except Exception: pass
 
 # ------------------------------------------------------------------------------
-# TAB 4: LO-FI TRACK GENERATOR
+# TAB 5: LO-FI & SONGS
 # ------------------------------------------------------------------------------
 with tab_lofi:
     st.write("### 🎧 لوفی گانے (Slowed + Reverb)")
-    up_audio = st.file_uploader("📂 آڈیو / ویڈیو فائل منتخب کریں:", type=["mp3", "wav", "mp4", "m4a"], key="up_lf")
+    up_audio = st.file_uploader("📂 آڈیو یا ویڈیو فائل منتخب کریں:", type=["mp3", "wav", "mp4", "m4a"], key="up_lf")
 
     if st.button("🚀 لوفی گانا بنائیں", type="primary", key="btn_lf"):
         if up_audio:
@@ -478,7 +501,7 @@ with tab_lofi:
                 except Exception: pass
 
 # ------------------------------------------------------------------------------
-# TAB 5: PRO AI IMAGE STUDIO
+# TAB 6: PRO AI IMAGE STUDIO
 # ------------------------------------------------------------------------------
 with tab_image:
     st.write("### 🎨 Pro AI Visual Studio")
