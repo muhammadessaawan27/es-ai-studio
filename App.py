@@ -200,7 +200,6 @@ def download_unblockable_media_parallel(raw_url, target_path):
 
     # 3. MP4Moviez & Direct Video Links (Pixeldrain, FastDL, HubCloud, Dropbox, Direct MP4)
     if raw_url.startswith("http") and ("youtube.com" not in raw_url and "youtu.be" not in raw_url):
-        # Auto-convert Pixeldrain share to API direct download
         direct_url = raw_url
         if "pixeldrain.com/u/" in raw_url:
             direct_url = raw_url.replace("pixeldrain.com/u/", "pixeldrain.com/api/file/")
@@ -217,7 +216,6 @@ def download_unblockable_media_parallel(raw_url, target_path):
                     for chunk in r.iter_content(chunk_size=1024 * 1024 * 8):
                         if chunk: f.write(chunk)
                 if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
-                    # Check if filename is in headers
                     cd = r.headers.get('content-disposition', '')
                     if 'filename=' in cd:
                         m_fn = re.search(r'filename=["\']?([^"\']+)["\']?', cd)
@@ -226,7 +224,6 @@ def download_unblockable_media_parallel(raw_url, target_path):
         except Exception:
             pass
 
-        # yt-dlp Universal Web Video Fallback (Archive.org, Vimeo, Facebook, etc.)
         try:
             import yt_dlp
             ydl_opts = {
@@ -436,7 +433,7 @@ with tab_recap:
         voice_audio = f"recap_voice_{uid}.mp3"
         video_montage = f"recap_video_{uid}.mp4"
         final_recap_out = f"final_recap_{uid}.mp4"
-        output_ready_path = ""  # Fixed: Pre-initialized to guarantee NameError is 100% resolved
+        output_ready_path = ""
         has_input = False
         info = {'title': 'Action Movie Recap'}
 
@@ -476,7 +473,7 @@ with tab_recap:
                 if tts_ok and os.path.exists(voice_audio) and os.path.getsize(voice_audio) > 1000:
                     has_voiceover = True
 
-            # 3. Synchronized Montage with 26 Shields
+            # 3. Synchronized Montage with 26 Shields (t=fill fixed)
             status_box.write("⚡ 26 اینٹی کاپی رائٹ شیلڈز (1/10 فریم کٹ، فلپ، کراپ، 24fps) لاگو ہو رہی ہیں...")
             start_offset = 8.0
             usable_movie_dur = max(60.0, total_dur - 16.0)
@@ -490,7 +487,7 @@ with tab_recap:
                 "scale=1280:720:flags=fast_bilinear,hflip,"
                 "crop=iw*0.82:ih*0.82,scale=1280:720,"
                 "eq=contrast=1.18:saturation=1.24:brightness=0.02,"
-                "drawbox=y=0:h=36:color=black@0.75:t=max,drawbox=y=ih-44:h=44:color=black@0.85:t=max"
+                "drawbox=y=0:h=36:color=black@0.75:t=fill,drawbox=y=ih-44:h=44:color=black@0.85:t=fill"
             )
 
             for i in range(num_snippets):
@@ -710,7 +707,7 @@ with tab_shield:
         if has_input and os.path.exists(target_in):
             ffmpeg_exe = get_ffmpeg()
             af_clear = "highpass=f=75,lowpass=f=8000,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
-            vf_10th_drop = "select=not(eq(mod(n\\,10)\\,9)),setpts=N/(24*TB),hflip,crop=iw*0.82:ih*0.82,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=40:color=black@0.75:t=max,drawbox=y=ih-48:h=48:color=black@0.85:t=max"
+            vf_10th_drop = "select=not(eq(mod(n\\,10)\\,9)),setpts=N/(24*TB),hflip,crop=iw*0.82:ih*0.82,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=40:color=black@0.75:t=fill,drawbox=y=ih-48:h=48:color=black@0.85:t=fill"
 
             cmd = [
                 ffmpeg_exe, "-nostdin", "-y", "-ss", "8", "-i", target_in,
@@ -757,7 +754,7 @@ with tab_clip:
             ffmpeg_exe = get_ffmpeg()
             start_sec = start_min * 60
             dur_sec = clip_len * 60
-            vf = "select=not(eq(mod(n\\,10)\\,9)),setpts=N/(24*TB),hflip,crop=iw*0.80:ih*0.80,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=36:color=black@0.75:t=max,drawbox=y=ih-44:h=44:color=black@0.85:t=max"
+            vf = "select=not(eq(mod(n\\,10)\\,9)),setpts=N/(24*TB),hflip,crop=iw*0.80:ih*0.80,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=36:color=black@0.75:t=fill,drawbox=y=ih-44:h=44:color=black@0.85:t=fill"
             af = "highpass=f=75,lowpass=f=8000,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
             
             cmd = [
