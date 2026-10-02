@@ -127,7 +127,7 @@ def save_multilang_voiceover_sync(text, voice_key, out_file):
         return False
 
 # ==============================================================================
-# UNIVERSAL MEDIA DOWNLOADER (DAILYMOTION + MP4MOVIEZ + DIRECT MP4 + CLOUD)
+# UNIVERSAL MEDIA DOWNLOADER
 # ==============================================================================
 def download_google_drive_robust(file_id, target_path):
     session = requests.Session()
@@ -167,14 +167,14 @@ def download_unblockable_media_parallel(raw_url, target_path):
     raw_url = raw_url.strip()
     title = fetch_oembed_title(raw_url) or "Action Movie Video"
 
-    # 1. Google Drive Auto-Detection
+    # 1. Google Drive
     g_id = extract_gdrive_id(raw_url)
     if ("drive.google.com" in raw_url or "docs.google.com" in raw_url) and g_id:
         ok, t = download_google_drive_robust(g_id, target_path)
         if ok: return True, t
         return False, "Google Drive Permission Error"
 
-    # 2. Dailymotion Link Engine (100% Fast)
+    # 2. Dailymotion Engine
     if "dailymotion.com" in raw_url or "dai.ly" in raw_url:
         try:
             import yt_dlp
@@ -198,7 +198,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
         except Exception:
             pass
 
-    # 3. MP4Moviez & Direct Video Links
+    # 3. Direct Link / MP4Moviez
     if raw_url.startswith("http") and ("youtube.com" not in raw_url and "youtu.be" not in raw_url):
         direct_url = raw_url
         if "pixeldrain.com/u/" in raw_url:
@@ -242,7 +242,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
         except Exception:
             pass
 
-    # 4. YouTube Multi-Node Fallback
+    # 4. YouTube
     m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([0-9A-Za-z_-]{11})', raw_url)
     if m:
         vid_id = m.group(1)
@@ -351,7 +351,7 @@ st.markdown("""
         padding: 5px 12px; border-radius: 20px;
     }
     .badge-26 {
-        background: #059669; color: #ffffff; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800;
+        background: #0284c7; color: #ffffff; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800;
     }
     .stTextInput>div>div>input, .stSelectbox>div>div>div {
         background-color: #f8fafc !important; color: #0f172a !important;
@@ -372,11 +372,11 @@ st.markdown("""
 <div class="brand-header">
     <div>
         <div class="brand-logo">⚡ ES AI STUDIO</div>
-        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Turbo Dubbing Engine + 26 Shields Active</div>
+        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Direct Fast AI Dubbing Engine (Zero Lag)</div>
     </div>
     <div style="display:flex; align-items:center; gap: 10px;">
         <span class="founders-tag">👑 Founders: Muhammad Essa & Saba Wahid</span>
-        <span class="badge-26">26 SHIELDS ACTIVE</span>
+        <span class="badge-26">TURBO FAST ACTIVE</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -385,21 +385,21 @@ st.markdown("""
 # 7 FULL PRODUCTION TABS
 # ==========================================
 tab_recap, tab_shorts, tab_shield, tab_clip, tab_lofi, tab_movie, tab_image = st.tabs([
-    "🎬 1. ملٹی لینگویج مووی ریکیپ (Turbo Engine)",
+    "🎬 1. مووی ریکیپ و اصلی کہانی (Direct Fast Mux)",
     "📱 2. پیور فل اسکرین 9:16 شارٹس",
-    "🛡️ 3. فل مووی شفلر (26 ہتھیار)",
-    "⚔️ 4. کلپ کٹر موڈ (10 تا 20 منٹ کٹ)",
+    "🛡️ 3. فل مووی شفلر",
+    "⚔️ 4. کلپ کٹر موڈ",
     "🎧 5. لوفی گانے (Slowed + Reverb)",
     "🎥 6. پرو AI مووی اسٹوڈیو",
     "🎨 7. پرو AI امیج اسٹوڈیو"
 ])
 
 # ------------------------------------------------------------------------------
-# TAB 1: TURBO AI MOVIE RECAP STUDIO (DIRECT FAST ENGINE)
+# TAB 1: ZERO-LAG DIRECT RECAP STUDIO (NO BREAKING FILTERS)
 # ------------------------------------------------------------------------------
 with tab_recap:
     st.write("### 🎬 خودکار AI وائس اوور، اصلی فلم کی کہانی و مووی ریکیپ")
-    st.info("💡 **ڈیلی موشن و MP4Moviez ایکٹو:** ڈیلی موشن کا لنک درج کریں۔ کلاؤڈ پر فوری ویڈیو ڈاؤنلوڈ ہو کر چند سیکنڈ میں ڈبنگ تیار ہو جائے گی!")
+    st.info("💡 **ڈیلی موشن و ڈائریکٹ لنکس ایکٹو:** ڈیلی موشن کا لنک درج کریں۔ سسٹم فوری اصلی کہانی کا وائس اوور تیار کر کے ویڈیو پر سیٹ کر دے گا!")
 
     rc1, rc2, rc3, rc4 = st.columns(4)
     with rc1:
@@ -423,10 +423,10 @@ with tab_recap:
     target_recap_mins = 10 if "10" in recap_dur else 20
     target_lang_str = voice_char.split(" - ")[0]
 
-    url_recap_input = st.text_input("🔗 مووی کا ڈیلی موشن / MP4Moviez / ویب لنک یہاں پیسٹ کریں:", placeholder="https://www.dailymotion.com/video/...", key="url_recap")
+    url_recap_input = st.text_input("🔗 مووی کا ڈیلی موشن / ویب لنک یہاں پیسٹ کریں:", placeholder="https://www.dailymotion.com/video/...", key="url_recap")
     up_recap_file = st.file_uploader("📂 یا اپنے ڈیوائس سے ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_recap")
 
-    if st.button("🚀 تیار کریں (اصلی مووی کہانی + AI وائس اوور + 26 شیلڈز)", type="primary", key="btn_run_recap"):
+    if st.button("🚀 ویڈیو وائس اوور تیار کریں (بغیر کسی رکاوٹ کے)", type="primary", key="btn_run_recap"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"recap_in_{uid}.mp4"
         voice_audio = f"recap_voice_{uid}.mp3"
@@ -455,7 +455,6 @@ with tab_recap:
                 info['title'] = up_recap_file.name
 
         if has_input and os.path.exists(target_in):
-            total_dur = get_video_duration_fast(target_in)
             ffmpeg_exe = get_ffmpeg()
 
             # 1. AI Real Story Script
@@ -471,27 +470,16 @@ with tab_recap:
                 if tts_ok and os.path.exists(voice_audio) and os.path.getsize(voice_audio) > 1000:
                     has_voiceover = True
 
-            # 3. TURBO FAST DIRECT DUBBING ENGINE (Zero Crash)
-            status_box.write("⚡ ویڈیو پر اینٹی کاپی رائٹ شیلڈ اور وائس اوور لگائی جا رہی ہے...")
-            
-            # 26-Shield Direct Filter (Flip, Crop, Color Grade, Scale, FPS)
-            vf_turbo = (
-                "hflip,crop=iw*0.85:ih*0.85,scale=1280:720,"
-                "eq=contrast=1.16:saturation=1.20:brightness=0.02,"
-                "fps=24"
-            )
-
-            start_sec = min(8.0, max(0.0, total_dur * 0.05))
+            # 3. DIRECT ZERO-RE-ENCODING STREAM MUX (Instant 2 Seconds - No Filters)
+            status_box.write("🎬 وائس اوور اور ویڈیو کو فوری مکس کیا جا رہا ہے...")
 
             if has_voiceover and os.path.exists(voice_audio):
                 cmd_render = [
                     ffmpeg_exe, "-nostdin", "-y",
-                    "-ss", str(start_sec), "-i", target_in,
+                    "-i", target_in,
                     "-i", voice_audio,
-                    "-map_metadata", "-1",
-                    "-vf", vf_turbo,
                     "-map", "0:v:0", "-map", "1:a:0",
-                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-pix_fmt", "yuv420p",
+                    "-c:v", "copy",
                     "-c:a", "aac", "-b:a", "128k",
                     "-shortest", "-movflags", "+faststart",
                     final_recap_out
@@ -499,10 +487,9 @@ with tab_recap:
             else:
                 cmd_render = [
                     ffmpeg_exe, "-nostdin", "-y",
-                    "-ss", str(start_sec), "-t", "60", "-i", target_in,
-                    "-map_metadata", "-1",
-                    "-vf", vf_turbo,
-                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-pix_fmt", "yuv420p",
+                    "-i", target_in,
+                    "-map", "0:v:0",
+                    "-c:v", "copy",
                     "-an", "-movflags", "+faststart",
                     final_recap_out
                 ]
@@ -522,12 +509,12 @@ with tab_recap:
             else:
                 status_box.update(label="❌ ویڈیو تیار نہ ہو سکی۔ دوبارہ کوشش کریں۔", state="error")
         else:
-            status_box.update(label="❌ ویڈیو حاصل نہیں ہو سکی۔ درست ڈیلی موشن یا MP4Moviez لنک درج کریں۔", state="error")
+            status_box.update(label="❌ ویڈیو حاصل نہیں ہو سکی۔ درست لنک درج کریں۔", state="error")
 
     # Display Ready Video & Full Script Section
     if st.session_state.recap_video_out and os.path.exists(st.session_state.recap_video_out):
         st.divider()
-        st.subheader("🎬 تیار شدہ مووی ریکیپ ویڈیو (26 شیلڈز و وائس اوور کے ساتھ):")
+        st.subheader("🎬 تیار شدہ مووی ریکیپ ویڈیو (AI وائس اوور کے ساتھ):")
         r_bytes = open(st.session_state.recap_video_out, 'rb').read()
         st.video(r_bytes)
         st.download_button(
@@ -606,17 +593,13 @@ with tab_shorts:
 
             for idx, start_pt in enumerate(points, 1):
                 short_out = f"pure_short_{uid}_{idx}.mp4"
-                vf_pure = (
-                    "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,"
-                    "hflip,eq=contrast=1.18:saturation=1.22:brightness=0.02,fps=24"
-                )
-                af_pure = "volume=0.9,asetrate=44100*0.96,aresample=44100,atempo=1.04"
+                vf_pure = "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,fps=24"
 
                 cmd = [
                     ffmpeg_exe, "-nostdin", "-y",
                     "-ss", str(start_pt), "-t", str(dur_sec_target),
-                    "-i", target_in, "-map_metadata", "-1", "-vf", vf_pure, "-af", af_pure,
-                    "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+                    "-i", target_in, "-map_metadata", "-1", "-vf", vf_pure,
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
                     "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k",
                     short_out
                 ]
@@ -642,10 +625,10 @@ with tab_shorts:
                 st.download_button(label=f"📥 ڈاؤنلوڈ شارٹ #{i+1}", data=s_bytes, file_name=f"short_{i+1}.mp4", mime="video/mp4", key=f"dl_p_{i}")
 
 # ------------------------------------------------------------------------------
-# TAB 3: FULL MOVIE SCENE SHUFFLER (26 WEAPONS)
+# TAB 3: FULL MOVIE SHUFFLER
 # ------------------------------------------------------------------------------
 with tab_shield:
-    st.write("### 🛡️ فل مووی شفلر (26 اینٹی کاپی رائٹ شیلڈز)")
+    st.write("### 🛡️ فل مووی شفلر")
     url_input = st.text_input("🔗 مووی کا ڈیلی موشن یا ویڈیو لنک ڈالیں:", placeholder="https://www.dailymotion.com/video/...", key="url_main")
     up_file = st.file_uploader("📂 یا ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_main")
 
@@ -671,14 +654,10 @@ with tab_shield:
 
         if has_input and os.path.exists(target_in):
             ffmpeg_exe = get_ffmpeg()
-            af_clear = "volume=0.9,asetrate=44100*0.96,aresample=44100,atempo=1.04"
-            vf_10th_drop = "hflip,crop=iw*0.84:ih*0.84,scale=1280:720,eq=contrast=1.18:saturation=1.22:brightness=0.02,fps=24"
-
             cmd = [
                 ffmpeg_exe, "-nostdin", "-y", "-ss", "5", "-i", target_in,
-                "-map_metadata", "-1", "-vf", vf_10th_drop, "-af", af_clear,
-                "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-                "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k", target_out
+                "-map_metadata", "-1", "-c:v", "copy", "-c:a", "copy",
+                "-movflags", "+faststart", target_out
             ]
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             try: os.remove(target_in)
@@ -694,13 +673,13 @@ with tab_shield:
         st.divider()
         v_bytes = open(st.session_state.current_output_video, 'rb').read()
         st.video(v_bytes)
-        st.download_button(label="📥 ڈاؤنلوڈ پروٹیکٹڈ ویڈیو", data=v_bytes, file_name="protected_video.mp4", mime="video/mp4")
+        st.download_button(label="📥 ڈاؤنلوڈ ویڈیو", data=v_bytes, file_name="output_video.mp4", mime="video/mp4")
 
 # ------------------------------------------------------------------------------
 # TAB 4: CLIP CUTTER
 # ------------------------------------------------------------------------------
 with tab_clip:
-    st.write("### ⚔️ کلپ کٹر موڈ (10 تا 20 منٹ کٹ + شیلڈز)")
+    st.write("### ⚔️ کلپ کٹر موڈ")
     c1, c2 = st.columns(2)
     with c1: scene_type = st.selectbox("سین کا آغاز:", ["⚔️ منٹ 30", "👻 منٹ 45", "🏔️ منٹ 15"], key="s_t3")
     with c2: clip_len = st.slider("دورانیہ (منٹ):", 1, 20, 10, key="len_t3")
@@ -708,7 +687,7 @@ with tab_clip:
     start_min = 30 if "30" in scene_type else 45 if "45" in scene_type else 15
     upload_opt2 = st.file_uploader("📂 ویڈیو فائل منتخب کریں:", type=["mp4", "mov", "mkv", "webm"], key="up_t3")
 
-    if st.button("🚀 کلپ کاٹیں اور شیلڈ لگائیں", type="primary", key="run_t3"):
+    if st.button("🚀 کلپ کاٹیں", type="primary", key="run_t3"):
         if upload_opt2 is not None:
             uid = str(uuid.uuid4())[:8]
             target_in = f"clip_in_{uid}.mp4"
@@ -719,14 +698,11 @@ with tab_clip:
             ffmpeg_exe = get_ffmpeg()
             start_sec = start_min * 60
             dur_sec = clip_len * 60
-            vf = "hflip,crop=iw*0.82:ih*0.82,scale=1280:720,eq=contrast=1.18:saturation=1.22:brightness=0.02,fps=24"
-            af = "volume=0.9,asetrate=44100*0.96,aresample=44100,atempo=1.04"
             
             cmd = [
                 ffmpeg_exe, "-nostdin", "-y", "-ss", str(start_sec), "-t", str(dur_sec),
-                "-i", target_in, "-map_metadata", "-1", "-vf", vf, "-af", af,
-                "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-                "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k", target_out
+                "-i", target_in, "-map_metadata", "-1",
+                "-c:v", "copy", "-c:a", "copy", "-movflags", "+faststart", target_out
             ]
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if os.path.exists(target_out) and os.path.getsize(target_out) > 3000:
@@ -736,10 +712,10 @@ with tab_clip:
                 except Exception: pass
 
 # ------------------------------------------------------------------------------
-# TAB 5: 22-SHIELD ANTI-COPYRIGHT LO-FI & SONGS
+# TAB 5: LO-FI & SONGS
 # ------------------------------------------------------------------------------
 with tab_lofi:
-    st.write("### 🎧 لوفی گانے (Slowed + Reverb & Bass Boost)")
+    st.write("### 🎧 لوفی گانے (Slowed + Reverb)")
     col_s1, col_s2, col_s3 = st.columns(3)
     with col_s1: slow_val = st.slider("سلو اسپیڈ:", 0.82, 0.96, 0.88, 0.01, key="sl_t6")
     with col_s2: reverb_val = st.slider("گونج / Reverb:", 25, 80, 50, 5, key="rev_t6")
@@ -757,11 +733,11 @@ with tab_lofi:
                 
             ffmpeg_exe = get_ffmpeg()
             sample_rate = int(44100 * slow_val)
-            af_song_22 = f"highpass=f=40,asetrate={sample_rate},aresample=44100:async=1,aecho=0.8:0.88:{reverb_val}:0.4,bass=g={bass_val}:f=105,treble=g=-3:f=3500,alimiter=limit=0.95"
+            af_song = f"asetrate={sample_rate},aresample=44100,aecho=0.8:0.88:{reverb_val}:0.4,bass=g={bass_val}:f=105"
             
             cmd_song = [
                 ffmpeg_exe, "-nostdin", "-y", "-i", target_in,
-                "-map_metadata", "-1", "-af", af_song_22, "-c:v", "copy",
+                "-map_metadata", "-1", "-af", af_song, "-c:v", "copy",
                 "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", target_out
             ]
             subprocess.run(cmd_song, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
