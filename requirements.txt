@@ -3,6 +3,4 @@ yt-dlp
 edge-tts
 openai
 groq
-imageio-ffmpeg
-pydub
 requests
