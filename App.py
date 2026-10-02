@@ -47,17 +47,78 @@ class MovieExplainerEngine:
             "--ignore-errors",
             "-f", format_selector,
             "--merge-output-format", "mp4",
+            import os
+import sys
+import json
+import time
+import shutil
+import tempfile
+import subprocess
+import asyncio
+import streamlit as st
+
+# ==========================================
+# 0. CONFIGURATION & SECRETS
+# ==========================================
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", ""))
+GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
+
+# ==========================================
+# 1. PROCESSING ENGINE (CLOUD-BYPASS ENABLED)
+# ==========================================
+class MovieExplainerEngine:
+    @staticmethod
+    def verify_dependencies():
+        ffmpeg_path = shutil.which("ffmpeg")
+        if not ffmpeg_path:
+            raise RuntimeError("FFmpeg سسٹم میں دستیاب نہیں ہے۔ برائے مہربانی packages.txt میں ffmpeg شامل کریں۔")
+        return ffmpeg_path
+
+    @staticmethod
+    def download_video_and_audio(url, output_dir, progress_bar, status_text):
+        """
+        Downloads video safely using mobile-client bypass arguments to prevent 403/Bot errors
+        """
+        status_text.text("⬇️ Accessing video stream (Bypassing Cloud IP Restrictions)...")
+        progress_bar.progress(15)
+
+        output_template = os.path.join(output_dir, "source_movie.%(ext)s")
+
+        # Bypass datacenter blocks using Android/iOS client emulation
+        cmd_vid = [
+            "yt-dlp",
+            "--no-playlist",
+            "--no-warnings",
+            "--force-ipv4",
+            "--extractor-args", "youtube:player_client=android,ios,web",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "--referer", "https://www.google.com/",
+            "-f", "best[height<=720]/bestvideo[height<=720]+bestaudio/best",
+            "--merge-output-format", "mp4",
             "-o", output_template,
             url
         ]
 
         result = subprocess.run(cmd_vid, capture_output=True, text=True)
-        
+
+        # Fallback if first client attempt fails
         if result.returncode != 0:
-            err_msg = result.stderr.strip() or result.stdout.strip() or "نامعلوم خرابی (Unknown Error)"
+            status_text.text("🔄 Retrying with fallback stream extractor...")
+            cmd_fallback = [
+                "yt-dlp",
+                "--no-playlist",
+                "-f", "b/bv*+ba",
+                "--merge-output-format", "mp4",
+                "-o", output_template,
+                url
+            ]
+            result = subprocess.run(cmd_fallback, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            err_msg = result.stderr.strip() or result.stdout.strip() or "Unknown Error"
             raise RuntimeError(f"yt-dlp Download Failed:\n{err_msg}")
 
-        # Locate the downloaded file
+        # Locate downloaded video
         downloaded_video = None
         for f in os.listdir(output_dir):
             if f.startswith("source_movie."):
@@ -65,7 +126,7 @@ class MovieExplainerEngine:
                 break
 
         if not downloaded_video or not os.path.exists(downloaded_video):
-            raise RuntimeError(f"ویڈیو ڈاؤن لوڈ مکمل نہیں ہو سکی۔ yt-dlp تفصیلات:\n{result.stderr}")
+            raise RuntimeError("ویڈیو فائل سرور پر محفوظ نہیں ہو سکی۔")
 
         # Extract lightweight 16kHz audio for Whisper transcription
         status_text.text("🎧 Extracting audio track for AI transcription...")
@@ -119,13 +180,13 @@ class MovieExplainerEngine:
         Analyze this movie transcript and generate:
         1. Catchy YouTube Title
         2. Viral Hashtags
-        3. Full original narration script (Transformative cinematic recap)
+        3. Full original narration script (Transformative review - do NOT verbatim copy dialogs)
         4. Scene cut timestamps list (in seconds)
 
         Transcript excerpt:
         \"\"\"{transcript[:7000]}\"\"\"
 
-        Respond in valid JSON format:
+        Respond strictly in valid JSON format:
         {{
             "seo_title": "Catchy Viral Title",
             "seo_hashtags": "#MovieExplained #StoryRecap #FilmReview",
