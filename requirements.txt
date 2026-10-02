@@ -1,9 +1,9 @@
 streamlit
-requests
-edge-tts
-moviepy
-Pillow
-numpy
-imageio-ffmpeg
 yt-dlp
-psycopg2-binary
+edge-tts
+openai
+groq
+ffmpeg-python
+pydub
+moviepy>=1.0.3
+requests
