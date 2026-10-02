@@ -8,13 +8,6 @@ import subprocess
 import asyncio
 import streamlit as st
 
-# Auto-detect FFmpeg binary path without server errors
-try:
-    import imageio_ffmpeg
-    FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
-except Exception:
-    FFMPEG_PATH = shutil.which("ffmpeg") or "ffmpeg"
-
 # ==========================================
 # 0. CONFIGURATION & SECRETS
 # ==========================================
@@ -22,45 +15,49 @@ OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", ""
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
 
 # ==========================================
-# 1. PROCESSING ENGINE
+# 1. PROCESSING ENGINE (CRASH-PROOF)
 # ==========================================
 class MovieExplainerEngine:
     @staticmethod
-    def download_video_stream(url, output_dir, progress_bar, status_text):
-        status_text.text("⬇️ Accessing & downloading video stream...")
+    def download_video_and_audio(url, output_dir, progress_bar, status_text):
+        """
+        Downloads lightweight video proxy and audio safely using yt-dlp
+        """
+        status_text.text("⬇️ Accessing & downloading media stream...")
         progress_bar.progress(15)
-        output_template = os.path.join(output_dir, "source_movie.%(ext)s")
-        cmd = [
+        
+        video_output = os.path.join(output_dir, "source_movie.mp4")
+        audio_output = os.path.join(output_dir, "audio_speech.mp3")
+
+        # Download Video (720p max to save RAM)
+        cmd_vid = [
             "yt-dlp",
             "-f", "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
             "--merge-output-format", "mp4",
-            "-o", output_template,
+            "-o", video_output,
             "--no-playlist",
             url
         ]
-        subprocess.run(cmd, capture_output=True, text=True, check=True)
-        for f in os.listdir(output_dir):
-            if f.startswith("source_movie."):
-                return os.path.join(output_dir, f)
-        return None
+        subprocess.run(cmd_vid, capture_output=True, text=True, check=True)
 
-    @staticmethod
-    def extract_audio(video_path, output_dir, progress_bar, status_text):
+        # Extract lightweight 16kHz audio using robust system FFmpeg
         status_text.text("🎧 Extracting audio track for AI transcription...")
-        progress_bar.progress(30)
-        audio_output = os.path.join(output_dir, "audio_speech.mp3")
-        cmd = [
-            FFMPEG_PATH, "-y", "-i", video_path,
-            "-vn", "-ar", "16000", "-ac", "1", "-b:a", "64k",
+        progress_bar.progress(35)
+        
+        cmd_aud = [
+            "ffmpeg", "-y", "-i", video_output,
+            "-vn", "-acodec", "libmp3lame", "-ar", "16000", "-ac", "1", "-b:a", "64k",
             audio_output
         ]
-        subprocess.run(cmd, capture_output=True, check=True)
-        return audio_output
+        subprocess.run(cmd_aud, capture_output=True, check=True)
+
+        return video_output, audio_output
 
     @staticmethod
     def transcribe_audio(audio_path, progress_bar, status_text):
         status_text.text("📝 Transcribing story dialogues with timestamps...")
-        progress_bar.progress(45)
+        progress_bar.progress(50)
+        
         if GROQ_API_KEY:
             from groq import Groq
             client = Groq(api_key=GROQ_API_KEY)
@@ -84,7 +81,7 @@ class MovieExplainerEngine:
     @staticmethod
     def generate_story_narration(transcript, target_duration, language, voice_style):
         prompt = f"""
-        You are an elite Movie Explainer & Content Creator.
+        You are an elite Movie Explainer & Film Critic.
         Language: {language}
         Target Duration: {target_duration}
         Voice Style: {voice_style}
@@ -92,17 +89,17 @@ class MovieExplainerEngine:
         Analyze this movie transcript and generate:
         1. Catchy YouTube Title
         2. Viral Hashtags
-        3. Full original narration script (Transformative review - do NOT verbatim copy dialogs)
+        3. Full original narration script (Transformative cinematic recap)
         4. Scene cut timestamps list (in seconds)
 
         Transcript excerpt:
         \"\"\"{transcript[:7000]}\"\"\"
 
-        Respond in valid JSON:
+        Respond in valid JSON format:
         {{
             "seo_title": "Catchy Viral Title",
             "seo_hashtags": "#MovieExplained #StoryRecap #FilmReview",
-            "narration_script": "Full original story commentary...",
+            "narration_script": "Full original story commentary in {language}...",
             "timeline_segments": [
                 {{"start": 10, "end": 40}},
                 {{"start": 120, "end": 160}},
@@ -128,6 +125,7 @@ class MovieExplainerEngine:
                 response_format={"type": "json_object"}
             )
             return json.loads(res.choices[0].message.content)
+        
         return {
             "seo_title": f"Shocking Movie Explained in {language}",
             "seo_hashtags": "#MovieRecap #StoryExplained",
@@ -177,7 +175,7 @@ class MovieExplainerEngine:
             dur = max(5, end - start)
             seg_file = os.path.join(temp_dir, f"clip_{i}.mp4")
             cmd = [
-                FFMPEG_PATH, "-y", "-ss", str(start), "-i", video_path,
+                "ffmpeg", "-y", "-ss", str(start), "-i", video_path,
                 "-t", str(dur),
                 "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2",
                 "-an", "-c:v", "libx264", "-preset", "ultrafast", seg_file
@@ -191,7 +189,7 @@ class MovieExplainerEngine:
                 f.write(f"file '{c}'\n")
 
         cmd_final = [
-            FFMPEG_PATH, "-y",
+            "ffmpeg", "-y",
             "-f", "concat", "-safe", "0", "-i", concat_txt,
             "-i", tts_audio,
             "-c:v", "libx264", "-c:a", "aac",
@@ -211,7 +209,7 @@ def render_explainer_studio():
         <p style="color:#94A3B8; margin:5px 0 0 0;">Transform Full Movies into 10–20 Min Explanations with Cinematic Voice & SEO.</p>
     </div>
     <div style="background:#18181B; padding:12px; border-radius:8px; border:1px solid #3F3F46; color:#A1A1AA; font-size:13px; margin-bottom:20px;">
-        ⚖️ <strong>Disclaimer:</strong> Transformative commentary and review format help prevent claims, but please ensure you hold proper rights to the processed media.
+        ⚖️ <strong>Notice:</strong> Transformative commentary and recap format help create original explanatory content.
     </div>
     """, unsafe_allow_html=True)
 
@@ -244,24 +242,25 @@ def render_explainer_studio():
         temp_dir = tempfile.mkdtemp()
 
         try:
-            # 1. Download
+            # 1. Download Video & Extract Audio
             if url_input:
-                src_video = MovieExplainerEngine.download_video_stream(url_input, temp_dir, p_bar, status)
+                src_video, audio_f = MovieExplainerEngine.download_video_and_audio(url_input, temp_dir, p_bar, status)
             else:
                 src_video = os.path.join(temp_dir, file_input.name)
                 with open(src_video, "wb") as f:
                     f.write(file_input.getbuffer())
+                audio_f = os.path.join(temp_dir, "audio_speech.mp3")
+                subprocess.run(["ffmpeg", "-y", "-i", src_video, "-vn", "-acodec", "libmp3lame", "-ar", "16000", "-ac", "1", audio_f], check=True)
 
-            # 2. Extract Audio & Transcribe
-            audio_f = MovieExplainerEngine.extract_audio(src_video, temp_dir, p_bar, status)
+            # 2. Transcribe
             transcript = MovieExplainerEngine.transcribe_audio(audio_f, p_bar, status)
 
             # 3. Generate Story & Script
             status.text("🧠 Generating story narration & SEO tags...")
-            p_bar.progress(60)
+            p_bar.progress(65)
             data = MovieExplainerEngine.generate_story_narration(transcript, duration, lang, voice_style)
 
-            # 4. Generate AI Voice
+            # 4. Generate AI Voice (Edge-TTS)
             status.text("🎙️ Generating AI voiceover (10% Deep & Cinematic)...")
             p_bar.progress(75)
             tts_audio = os.path.join(temp_dir, "narration.mp3")
