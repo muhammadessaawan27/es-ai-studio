@@ -8,38 +8,27 @@ import subprocess
 import asyncio
 import streamlit as st
 
+# Auto-detect FFmpeg binary path without server errors
+try:
+    import imageio_ffmpeg
+    FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
+except Exception:
+    FFMPEG_PATH = shutil.which("ffmpeg") or "ffmpeg"
+
 # ==========================================
-# 0. CONFIGURATION & SECRETS MANAGEMENT
+# 0. CONFIGURATION & SECRETS
 # ==========================================
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", ""))
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
 
-# Credit Configuration (Admin editable)
-EXPLAINER_CREDITS = {
-    "10 Minutes": 20,
-    "15 Minutes": 30,
-    "20 Minutes": 40,
-    "Custom": 50
-}
-
 # ==========================================
-# 1. HELPER / PROCESSING MODULES
+# 1. PROCESSING ENGINE
 # ==========================================
-
 class MovieExplainerEngine:
     @staticmethod
-    def check_ffmpeg():
-        """Check if FFmpeg is installed in system"""
-        return shutil.which("ffmpeg") is not None
-
-    @staticmethod
     def download_video_stream(url, output_dir, progress_bar, status_text):
-        """
-        Uses yt-dlp to download video/audio safely without crashing RAM
-        """
-        status_text.text("⬇️ Accessing and Downloading Video/Audio...")
+        status_text.text("⬇️ Accessing & downloading video stream...")
         progress_bar.progress(15)
-        
         output_template = os.path.join(output_dir, "source_movie.%(ext)s")
         cmd = [
             "yt-dlp",
@@ -49,26 +38,19 @@ class MovieExplainerEngine:
             "--no-playlist",
             url
         ]
-        
-        try:
-            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            # Find the actual downloaded file
-            for f in os.listdir(output_dir):
-                if f.startswith("source_movie."):
-                    return os.path.join(output_dir, f)
-        except Exception as e:
-            raise RuntimeError(f"Video Download Failed: {str(e)}")
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        for f in os.listdir(output_dir):
+            if f.startswith("source_movie."):
+                return os.path.join(output_dir, f)
         return None
 
     @staticmethod
-    def extract_audio_chunked(video_path, output_dir, progress_bar, status_text):
-        """Extracts lightweight 16kHz mono audio for fast AI STT"""
-        status_text.text("🎧 Extracting & Optimizing Audio for AI...")
+    def extract_audio(video_path, output_dir, progress_bar, status_text):
+        status_text.text("🎧 Extracting audio track for AI transcription...")
         progress_bar.progress(30)
-        
         audio_output = os.path.join(output_dir, "audio_speech.mp3")
         cmd = [
-            "ffmpeg", "-y", "-i", video_path,
+            FFMPEG_PATH, "-y", "-i", video_path,
             "-vn", "-ar", "16000", "-ac", "1", "-b:a", "64k",
             audio_output
         ]
@@ -76,385 +58,259 @@ class MovieExplainerEngine:
         return audio_output
 
     @staticmethod
-    def transcribe_audio_groq_or_openai(audio_path, progress_bar, status_text):
-        """Transcribe speech using Groq (Fast) or OpenAI Whisper API"""
-        status_text.text("📝 Transcribing Story Dialogues with Timestamps...")
+    def transcribe_audio(audio_path, progress_bar, status_text):
+        status_text.text("📝 Transcribing story dialogues with timestamps...")
         progress_bar.progress(45)
-
         if GROQ_API_KEY:
             from groq import Groq
             client = Groq(api_key=GROQ_API_KEY)
             with open(audio_path, "rb") as file:
-                transcription = client.audio.transcriptions.create(
+                res = client.audio.transcriptions.create(
                     file=(os.path.basename(audio_path), file.read()),
-                    model="whisper-large-v3",
-                    response_format="verbose_json",
+                    model="whisper-large-v3"
                 )
-            return transcription.text
+            return res.text
         elif OPENAI_API_KEY:
             from openai import OpenAI
             client = OpenAI(api_key=OPENAI_API_KEY)
             with open(audio_path, "rb") as file:
-                transcription = client.audio.transcriptions.create(
+                res = client.audio.transcriptions.create(
                     file=file,
-                    model="whisper-1",
-                    response_format="verbose_json"
+                    model="whisper-1"
                 )
-            return transcription.text
-        else:
-            # Fallback mock/local summary if no STT key
-            return "A mysterious story unfolds where the main protagonist faces major conflicts, leading to an unexpected ending."
+            return res.text
+        return "An engaging movie story with deep conflicts and dramatic twists."
 
     @staticmethod
-    def generate_story_narration_and_seo(transcript, target_duration, language, voice_style):
-        """
-        AI Storytelling & SEO Engine (Creates original narrative, SEO tags, and timeline)
-        """
+    def generate_story_narration(transcript, target_duration, language, voice_style):
         prompt = f"""
-        You are an elite Movie Explainer and Film Critic.
-        Analyze the following movie dialogue/transcript and generate a complete, high-retention movie explanation.
-        
+        You are an elite Movie Explainer & Content Creator.
         Language: {language}
-        Target Video Duration: {target_duration}
-        Style: {voice_style} (Deep, Engaging, Transformative Narration)
+        Target Duration: {target_duration}
+        Voice Style: {voice_style}
 
-        CRITICAL RULES:
-        1. DO NOT simply copy dialogues. Write an ORIGINAL transformative cinematic commentary.
-        2. Provide timeline cut recommendations (where key events happen).
-        3. Provide Viral SEO Content: Catchy Title, YouTube Description, Viral Hashtags.
-        
-        Movie Transcript excerpt:
-        \"\"\"{transcript[:8000]}\"\"\"
+        Analyze this movie transcript and generate:
+        1. Catchy YouTube Title
+        2. Viral Hashtags
+        3. Full original narration script (Transformative review - do NOT verbatim copy dialogs)
+        4. Scene cut timestamps list (in seconds)
 
-        Respond strictly in valid JSON format with keys:
+        Transcript excerpt:
+        \"\"\"{transcript[:7000]}\"\"\"
+
+        Respond in valid JSON:
         {{
-            "seo_title": "Catchy YouTube Title",
-            "seo_hashtags": "#MovieExplained #StoryRecap ...",
-            "seo_description": "Short SEO rich summary",
-            "narration_script": "Full continuous narration script for voiceover in {language}...",
+            "seo_title": "Catchy Viral Title",
+            "seo_hashtags": "#MovieExplained #StoryRecap #FilmReview",
+            "narration_script": "Full original story commentary...",
             "timeline_segments": [
-                {{"start": 10, "end": 45, "focus": "Character Introduction"}},
-                {{"start": 120, "end": 180, "focus": "First Plot Twist"}},
-                {{"start": 300, "end": 360, "focus": "Climax Action"}},
-                {{"start": 500, "end": 560, "focus": "Final Resolution"}}
+                {{"start": 10, "end": 40}},
+                {{"start": 120, "end": 160}},
+                {{"start": 250, "end": 290}}
             ]
         }}
         """
-
         if OPENAI_API_KEY:
             from openai import OpenAI
             client = OpenAI(api_key=OPENAI_API_KEY)
-            response = client.chat.completions.create(
+            res = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )
-            return json.loads(response.choices[0].message.content)
+            return json.loads(res.choices[0].message.content)
         elif GROQ_API_KEY:
             from groq import Groq
             client = Groq(api_key=GROQ_API_KEY)
-            response = client.chat.completions.create(
+            res = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )
-            return json.loads(response.choices[0].message.content)
-        else:
-            return {
-                "seo_title": f"Shocking Story Explained in {language}",
-                "seo_hashtags": "#MovieRecap #FilmSummary #ViralStory",
-                "seo_description": "Full transformative story breakdown and critical explanation.",
-                "narration_script": f"کہانی کی شروعات ایک غیر معمولی موڑ سے ہوتی ہے۔ مرکزی کردار حالات کے سامنے بے بس نظر آتا ہے، لیکن جلد ہی ایک بڑا انکشاف سب کچھ بدل کر رکھ دیتا ہے۔",
-                "timeline_segments": [{"start": 0, "end": 60, "focus": "Overview"}]
-            }
+            return json.loads(res.choices[0].message.content)
+        return {
+            "seo_title": f"Shocking Movie Explained in {language}",
+            "seo_hashtags": "#MovieRecap #StoryExplained",
+            "narration_script": "کہانی کی شروعات ایک پراسرار واقعے سے ہوتی ہے جو سب کچھ بدل کر رکھ دیتا ہے۔",
+            "timeline_segments": [{"start": 0, "end": 45}]
+        }
 
     @staticmethod
-    async def synthesize_voice_edge(text, output_file, language, gender, voice_style="Cinematic"):
-        """
-        Synthesizes AI Voice with Edge-TTS supporting -10% Pitch/Rate for Deep/Heavy Voice
-        """
+    async def generate_voiceover(text, output_file, language, gender, voice_style):
         import edge_tts
-
-        # Map language + gender to high quality voices
-        if language == "اردو" or language == "Roman Urdu":
+        if language in ["اردو", "Roman Urdu"]:
             voice = "ur-PK-AsadNeural" if gender == "Male" else "ur-PK-UzmaNeural"
         elif language == "Hindi":
             voice = "hi-IN-MadhurNeural" if gender == "Male" else "hi-IN-SwaraNeural"
         else:
             voice = "en-US-ChristopherNeural" if gender == "Male" else "en-US-AriaNeural"
 
-        # Apply pitch and speed tuning (10% slowed down and deeper voice)
+        # 10% Slow and Deep Voice
         rate = "-10%"
-        pitch = "-8Hz" if voice_style in ["Dramatic", "Cinematic"] else "+0Hz"
+        pitch = "-8Hz" if "Dramatic" in voice_style or "Cinematic" in voice_style else "+0Hz"
 
-        communicate = edge_tts.Communicate(text=text, voice=voice, rate=rate, pitch=pitch)
-        await communicate.save(output_file)
+        comm = edge_tts.Communicate(text=text, voice=voice, rate=rate, pitch=pitch)
+        await comm.save(output_file)
 
     @staticmethod
-    def generate_srt(script_text, output_srt):
-        """Generates RTL-compliant Urdu/Hindi/English SRT subtitles"""
-        words = script_text.split()
-        chunk_size = 8
-        lines = [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
-        
+    def create_subtitles(script, output_srt):
+        words = script.split()
+        chunk = 8
+        lines = [" ".join(words[i:i+chunk]) for i in range(0, len(words), chunk)]
         with open(output_srt, "w", encoding="utf-8") as f:
             for idx, line in enumerate(lines, 1):
-                start_sec = (idx - 1) * 4
-                end_sec = idx * 4
-                start_str = time.strftime('%H:%M:%S,000', time.gmtime(start_sec))
-                end_str = time.strftime('%H:%M:%S,000', time.gmtime(end_sec))
-                f.write(f"{idx}\n{start_str} --> {end_str}\n{line}\n\n")
+                start = time.strftime('%H:%M:%S,000', time.gmtime((idx-1)*4))
+                end = time.strftime('%H:%M:%S,000', time.gmtime(idx*4))
+                f.write(f"{idx}\n{start} --> {end}\n{line}\n\n")
 
     @staticmethod
-    def render_movie_explainer(video_file, audio_narration_file, timeline_segments, output_video, progress_bar, status_text):
-        """
-        FFmpeg Engine: Cut scenes, overlay AI narration, mute original movie audio, and produce output MP4
-        """
-        status_text.text("🎞️ Rendering Final Movie Explainer with FFmpeg...")
+    def render_video(video_path, tts_audio, segments, output_mp4, progress_bar, status_text):
+        status_text.text("🎞️ Merging scenes and AI narration with FFmpeg...")
         progress_bar.progress(85)
-        
-        # Build filter complex for concatenating selected timeline segments
-        temp_list_file = os.path.join(os.path.dirname(output_video), "concat_list.txt")
-        segment_files = []
+        temp_dir = os.path.dirname(output_mp4)
+        concat_txt = os.path.join(temp_dir, "concat.txt")
+        clips = []
 
-        for idx, seg in enumerate(timeline_segments[:10]):  # Limit segments for safety
-            start = seg.get("start", idx * 30)
+        for i, seg in enumerate(segments[:8]):
+            start = seg.get("start", i * 30)
             end = seg.get("end", start + 25)
-            duration = max(5, end - start)
-            
-            seg_out = os.path.join(os.path.dirname(output_video), f"seg_{idx}.mp4")
-            cmd_cut = [
-                "ffmpeg", "-y", "-ss", str(start), "-i", video_file,
-                "-t", str(duration),
+            dur = max(5, end - start)
+            seg_file = os.path.join(temp_dir, f"clip_{i}.mp4")
+            cmd = [
+                FFMPEG_PATH, "-y", "-ss", str(start), "-i", video_path,
+                "-t", str(dur),
                 "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2",
-                "-an", "-c:v", "libx264", "-preset", "ultrafast", seg_out
+                "-an", "-c:v", "libx264", "-preset", "ultrafast", seg_file
             ]
-            subprocess.run(cmd_cut, capture_output=True)
-            if os.path.exists(seg_out):
-                segment_files.append(seg_out)
+            subprocess.run(cmd, capture_output=True)
+            if os.path.exists(seg_file):
+                clips.append(seg_file)
 
-        # Create concat manifest
-        with open(temp_list_file, "w") as f:
-            for sf in segment_files:
-                f.write(f"file '{sf}'\n")
+        with open(concat_txt, "w") as f:
+            for c in clips:
+                f.write(f"file '{c}'\n")
 
-        # Final Render: Merging segments with AI voiceover (Original movie audio muted)
-        cmd_render = [
-            "ffmpeg", "-y",
-            "-f", "concat", "-safe", "0", "-i", temp_list_file,
-            "-i", audio_narration_file,
+        cmd_final = [
+            FFMPEG_PATH, "-y",
+            "-f", "concat", "-safe", "0", "-i", concat_txt,
+            "-i", tts_audio,
             "-c:v", "libx264", "-c:a", "aac",
             "-map", "0:v:0", "-map", "1:a:0",
-            "-shortest",
-            "-pix_fmt", "yuv420p",
-            output_video
+            "-shortest", "-pix_fmt", "yuv420p",
+            output_mp4
         ]
-        subprocess.run(cmd_render, capture_output=True, check=True)
-        return output_video
-
+        subprocess.run(cmd_final, capture_output=True, check=True)
 
 # ==========================================
-# 2. STREAMLIT UI VIEW (AI MOVIE EXPLAINER STUDIO)
+# 2. UI LAYOUT
 # ==========================================
-
-def render_movie_explainer_tab():
+def render_explainer_studio():
     st.markdown("""
-    <style>
-    .explainer-header {
-        background: linear-gradient(90deg, #1E2640 0%, #0F172A 100%);
-        padding: 24px;
-        border-radius: 12px;
-        border-left: 6px solid #E11D48;
-        margin-bottom: 25px;
-    }
-    .disclaimer-box {
-        background-color: #1c1917;
-        border: 1px solid #44403c;
-        padding: 14px 18px;
-        border-radius: 8px;
-        font-size: 0.88rem;
-        color: #d6d3d1;
-        margin-bottom: 20px;
-    }
-    .story-card {
-        background: #111827;
-        padding: 18px;
-        border-radius: 10px;
-        border: 1px solid #374151;
-        margin-top: 15px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class="explainer-header">
-        <h2 style="color: #F43F5E; margin:0;">🎬 AI Movie Explainer Studio</h2>
-        <p style="color: #94A3B8; margin: 5px 0 0 0;">Transform 2–3 hour full movies into 10–20 min cinematic recap videos with AI commentary & SEO metadata.</p>
+    <div style="background:#1E293B; padding:20px; border-radius:10px; border-left:6px solid #F43F5E; margin-bottom:20px;">
+        <h2 style="color:#F43F5E; margin:0;">🎬 AI Movie Explainer Studio</h2>
+        <p style="color:#94A3B8; margin:5px 0 0 0;">Transform Full Movies into 10–20 Min Explanations with Cinematic Voice & SEO.</p>
+    </div>
+    <div style="background:#18181B; padding:12px; border-radius:8px; border:1px solid #3F3F46; color:#A1A1AA; font-size:13px; margin-bottom:20px;">
+        ⚖️ <strong>Disclaimer:</strong> Transformative commentary and review format help prevent claims, but please ensure you hold proper rights to the processed media.
     </div>
     """, unsafe_allow_html=True)
 
-    # Transformative Disclaimer Rule
-    st.markdown("""
-    <div class="disclaimer-box">
-        ⚖️ <strong>Legal & Transformative Notice:</strong><br>
-        Transformative editing and critical review commentaries do not guarantee immunity from copyright claims. This tool automates transformative storytelling. Use only content you are authorized to process and review.
-    </div>
-    """, unsafe_allow_html=True)
+    c1, c2 = st.columns([1.5, 1])
+    with c1:
+        st.subheader("1. Video Source")
+        src_type = st.radio("Source Type", ["Video URL (YouTube/Direct)", "Upload File"], horizontal=True)
+        url_input = st.text_input("Paste Movie URL") if src_type == "Video URL (YouTube/Direct)" else ""
+        file_input = st.file_uploader("Upload Video", type=["mp4", "mkv"]) if src_type == "Upload File" else None
 
-    col1, col2 = st.columns([1.6, 1.0])
-
-    with col1:
-        st.subheader("1. Ingest Source Movie / Video")
-        input_type = st.radio("Input Source", ["Paste Video URL (YouTube / Direct)", "Upload Local Video"], horizontal=True)
-        
-        video_url = ""
-        uploaded_file = None
-        
-        if input_type == "Paste Video URL (YouTube / Direct)":
-            video_url = st.text_input("Movie / Video URL", placeholder="https://www.youtube.com/watch?v=... or .mp4 link")
-        else:
-            uploaded_file = st.file_uploader("Upload Movie File (MP4, MKV)", type=["mp4", "mkv", "mov"])
-
-    with col2:
-        st.subheader("2. Settings & Style")
-        target_duration = st.selectbox("Target Explainer Duration", ["10 Minutes", "15 Minutes", "20 Minutes", "Custom"])
-        language = st.selectbox("Explanation Language", ["اردو", "English", "Hindi", "Roman Urdu"])
-        
-        c_v1, c_v2 = st.columns(2)
-        with c_v1:
-            voice_gender = st.selectbox("AI Voice", ["Male", "Female"])
-        with c_v2:
-            voice_style = st.selectbox("Voice Style", ["Cinematic", "Dramatic (10% Deep & Slow)", "Documentary", "Normal"])
+    with c2:
+        st.subheader("2. AI Settings")
+        duration = st.selectbox("Target Duration", ["10 Minutes", "15 Minutes", "20 Minutes", "Custom"])
+        lang = st.selectbox("Language", ["اردو", "English", "Hindi", "Roman Urdu"])
+        col_v1, col_v2 = st.columns(2)
+        with col_v1:
+            voice_gender = st.selectbox("Voice", ["Male", "Female"])
+        with col_v2:
+            voice_style = st.selectbox("Voice Style", ["Dramatic (10% Deep & Slow)", "Cinematic", "Normal"])
 
     st.markdown("---")
 
-    # Credit Notice
-    required_credits = EXPLAINER_CREDITS.get(target_duration, 20)
-    st.caption(f"💳 This operation consumes **{required_credits} Credits**.")
-
-    # Action Button
     if st.button("🎬 CREATE MOVIE EXPLAINER", type="primary", use_container_width=True):
-        if not video_url and not uploaded_file:
-            st.error("⚠️ Please provide a valid Movie URL or upload a video file.")
+        if not url_input and not file_input:
+            st.error("⚠️ Please provide a video link or upload a file!")
             return
 
-        # Setup Progress UI
-        progress_box = st.container()
-        with progress_box:
-            progress_bar = st.progress(5)
-            status_text = st.empty()
-
-        temp_dir = tempfile.mkdtemp(prefix="movie_explainer_")
+        p_bar = st.progress(5)
+        status = st.empty()
+        temp_dir = tempfile.mkdtemp()
 
         try:
-            # 1. Download or Save Video
-            if video_url:
-                source_video = MovieExplainerEngine.download_video_stream(video_url, temp_dir, progress_bar, status_text)
+            # 1. Download
+            if url_input:
+                src_video = MovieExplainerEngine.download_video_stream(url_input, temp_dir, p_bar, status)
             else:
-                source_video = os.path.join(temp_dir, uploaded_file.name)
-                with open(source_video, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
+                src_video = os.path.join(temp_dir, file_input.name)
+                with open(src_video, "wb") as f:
+                    f.write(file_input.getbuffer())
 
-            # 2. Extract Audio
-            audio_path = MovieExplainerEngine.extract_audio_chunked(source_video, temp_dir, progress_bar, status_text)
+            # 2. Extract Audio & Transcribe
+            audio_f = MovieExplainerEngine.extract_audio(src_video, temp_dir, p_bar, status)
+            transcript = MovieExplainerEngine.transcribe_audio(audio_f, p_bar, status)
 
-            # 3. Transcribe
-            transcript = MovieExplainerEngine.transcribe_audio_groq_or_openai(audio_path, progress_bar, status_text)
+            # 3. Generate Story & Script
+            status.text("🧠 Generating story narration & SEO tags...")
+            p_bar.progress(60)
+            data = MovieExplainerEngine.generate_story_narration(transcript, duration, lang, voice_style)
 
-            # 4. Generate AI Story, SEO & Narration
-            status_text.text("🧠 Analyzing Story & Writing Original Narration...")
-            progress_bar.progress(60)
-            analysis_data = MovieExplainerEngine.generate_story_narration_and_seo(transcript, target_duration, language, voice_style)
+            # 4. Generate AI Voice
+            status.text("🎙️ Generating AI voiceover (10% Deep & Cinematic)...")
+            p_bar.progress(75)
+            tts_audio = os.path.join(temp_dir, "narration.mp3")
+            asyncio.run(MovieExplainerEngine.generate_voiceover(data["narration_script"], tts_audio, lang, voice_gender, voice_style))
 
-            # 5. Synthesize AI Narration Voice (with edge-tts)
-            status_text.text("🎙️ Generating Cinematic AI Narration Audio...")
-            progress_bar.progress(75)
-            tts_audio_path = os.path.join(temp_dir, "ai_narration.mp3")
-            
-            asyncio.run(
-                MovieExplainerEngine.synthesize_voice_edge(
-                    text=analysis_data.get("narration_script", ""),
-                    output_file=tts_audio_path,
-                    language=language,
-                    gender=voice_gender,
-                    voice_style=voice_style
-                )
-            )
+            # 5. Subtitles & Render Video
+            srt_f = os.path.join(temp_dir, "subtitles.srt")
+            MovieExplainerEngine.create_subtitles(data["narration_script"], srt_f)
 
-            # 6. Generate Subtitles
-            srt_path = os.path.join(temp_dir, "subtitles.srt")
-            MovieExplainerEngine.generate_srt(analysis_data.get("narration_script", ""), srt_path)
+            out_video = os.path.join(temp_dir, "final_explainer.mp4")
+            MovieExplainerEngine.render_video(src_video, tts_audio, data.get("timeline_segments", []), out_video, p_bar, status)
 
-            # 7. Render Final MP4
-            final_output_video = os.path.join(temp_dir, "final_movie_explainer.mp4")
-            MovieExplainerEngine.render_movie_explainer(
-                source_video,
-                tts_audio_path,
-                analysis_data.get("timeline_segments", []),
-                final_output_video,
-                progress_bar,
-                status_text
-            )
-
-            progress_bar.progress(100)
-            status_text.text("✅ Movie Explainer Successfully Generated!")
+            p_bar.progress(100)
+            status.text("✅ Completed Successfully!")
             st.balloons()
 
-            # Display Output
-            st.success("🎉 Your Movie Explainer is Ready!")
-
-            out_col1, out_col2 = st.columns([1.4, 1.0])
-
-            with out_col1:
-                st.subheader("🎬 Final Video Preview")
-                if os.path.exists(final_output_video):
-                    st.video(final_output_video)
-                    with open(final_output_video, "rb") as f:
-                        st.download_button("⬇️ Download Final Explainer (MP4)", f, file_name="Movie_Explainer.mp4", mime="video/mp4", use_container_width=True)
-
-            with out_col2:
-                st.subheader("📝 SEO & Script Package")
-                with open(srt_path, "rb") as f:
+            # Output UI
+            st.success("🎉 Movie Explainer is Ready!")
+            res1, res2 = st.columns([1.5, 1])
+            with res1:
+                st.video(out_video)
+                with open(out_video, "rb") as f:
+                    st.download_button("⬇️ Download Final Video (MP4)", f, file_name="Movie_Explainer.mp4", mime="video/mp4", use_container_width=True)
+            with res2:
+                with open(srt_f, "rb") as f:
                     st.download_button("⬇️ Download Subtitles (SRT)", f, file_name="subtitles.srt", mime="text/plain", use_container_width=True)
+                st.markdown(f"**🔥 Title:** `{data.get('seo_title')}`")
+                st.markdown(f"**🏷️ Hashtags:** `{data.get('seo_hashtags')}`")
 
-                st.markdown(f"**🔥 Title:** `{analysis_data.get('seo_title', '')}`")
-                st.markdown(f"**🏷️ Hashtags:** `{analysis_data.get('seo_hashtags', '')}`")
+            with st.expander("📖 View Full AI Script (کہانی پڑھیں)", expanded=True):
+                st.text_area("Full Narration Script", data.get("narration_script"), height=200)
 
-            # Script Box for manual reading or voice-over
-            with st.expander("📖 View Full AI Story & Narration Script (پوری کہانی یہاں پڑھیں)", expanded=True):
-                st.text_area("Narration Script", value=analysis_data.get("narration_script", ""), height=220)
-
-        except Exception as err:
-            st.error(f"❌ Processing Error: {str(err)}")
+        except Exception as e:
+            st.error(f"❌ Error: {str(e)}")
         finally:
-            # Temporary files cleanup
-            try:
-                shutil.rmtree(temp_dir, ignore_errors=True)
-            except:
-                pass
-
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
 # ==========================================
-# 3. MAIN APP ROUTER (Integrates into App.py)
+# 3. MAIN RUNNER
 # ==========================================
 def main():
     st.set_page_config(page_title="Sglowina AI Studio", page_icon="🎬", layout="wide")
-
-    # Navigation Sidebar
-    st.sidebar.title("🚀 Sglowina AI Hub")
-    app_mode = st.sidebar.radio(
-        "Select Studio Module",
-        [
-            "🎬 AI Movie Explainer Studio",
-            "🎙️ Voiceover & Audio Tools",
-            "✨ Other AI Features"
-        ]
-    )
-
-    if app_mode == "🎬 AI Movie Explainer Studio":
-        render_movie_explainer_tab()
+    st.sidebar.title("⚡ Navigation")
+    mode = st.sidebar.radio("Modules", ["🎬 AI Movie Explainer Studio", "🎙️ Other Studio Tools"])
+    
+    if mode == "🎬 AI Movie Explainer Studio":
+        render_explainer_studio()
     else:
-        st.info("Existing Sglowina AI Features are running seamlessly here.")
+        st.info("Other AI features are operational.")
 
 if __name__ == "__main__":
     main()
