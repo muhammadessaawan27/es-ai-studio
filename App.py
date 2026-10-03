@@ -66,7 +66,7 @@ def get_video_duration_fast(file_path):
         return 300.0
 
 # ==========================================
-# PARALLEL ULTRA-FAST MULTI-SOURCE DOWNLOADER
+# PARALLEL ULTRA-FAST MULTI-SOURCE DOWNLOADER (WITH TIKTOK & AUTO-SEARCH)
 # ==========================================
 def try_download_node(node_url, vid_id, target_path):
     try:
@@ -91,16 +91,48 @@ def try_download_node(node_url, vid_id, target_path):
         pass
     return False, ""
 
-def download_unblockable_media_parallel(raw_url, target_path):
-    raw_url = raw_url.strip()
-    vid_id = extract_yt_id(raw_url)
-    clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url
-    title = fetch_oembed_title(clean_url) or "Movie Video Scene"
+def download_unblockable_media_parallel(input_query_or_url, target_path):
+    """
+    Handles:
+    1. Direct Movie Name (Auto Searches YouTube HD Trailer)
+    2. TikTok, YouTube, Dailymotion, Facebook, Instagram URLs
+    3. Direct .mp4 / CDN links
+    """
+    input_str = input_query_or_url.strip()
+    is_url = bool(re.match(r'^https?://', input_str, re.IGNORECASE))
     
-    # 1. Direct Video Link Download (.mp4 / .mkv / direct stream)
-    if any(raw_url.lower().endswith(ext) for ext in ['.mp4', '.mkv', '.mov', '.webm']) or "cdn" in raw_url or "googlevideo" in raw_url:
+    title = "Movie Video Scene"
+
+    # CASE 1: USER PROVIDED A MOVIE NAME (AUTO-SEARCH)
+    if not is_url:
+        search_query = f"ytsearch1:{input_str} action scene trailer"
         try:
-            r = requests.get(raw_url, stream=True, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+            import yt_dlp
+            ydl_opts = {
+                'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/18/best[height<=720]/best',
+                'outtmpl': target_path,
+                'quiet': True,
+                'no_warnings': True,
+                'nocheckcertificate': True,
+                'geo_bypass': True,
+                'extractor_args': {'youtube': {'player_client': ['android', 'ios', 'web']}},
+                'http_headers': {'User-Agent': 'Mozilla/5.0'}
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                meta = ydl.extract_info(search_query, download=True)
+                if meta and 'entries' in meta and len(meta['entries']) > 0:
+                    title = meta['entries'][0].get('title', input_str)
+                elif meta:
+                    title = meta.get('title', input_str)
+            if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                return True, title
+        except Exception:
+            pass
+
+    # CASE 2: DIRECT MP4 / VIDEO LINK
+    if is_url and any(input_str.lower().endswith(ext) for ext in ['.mp4', '.mkv', '.mov', '.webm']):
+        try:
+            r = requests.get(input_str, stream=True, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
             if r.status_code == 200:
                 with open(target_path, "wb") as f:
                     for chunk in r.iter_content(chunk_size=1024*1024*4):
@@ -110,8 +142,10 @@ def download_unblockable_media_parallel(raw_url, target_path):
         except Exception:
             pass
 
-    # 2. Invidious Parallel Nodes (For YouTube)
+    # CASE 3: YOUTUBE INVIDIOUS PARALLEL SPEED ENGINE
+    vid_id = extract_yt_id(input_str)
     if vid_id:
+        title = fetch_oembed_title(f"https://www.youtube.com/watch?v={vid_id}") or title
         nodes = [
             "https://inv.tux.pizza",
             "https://invidious.nerdvpn.de",
@@ -125,8 +159,8 @@ def download_unblockable_media_parallel(raw_url, target_path):
                 success, t = future.result()
                 if success:
                     return True, t
-                    
-    # 3. Native yt-dlp Multi-Client Engine
+
+    # CASE 4: UNIVERSAL EXTRACTOR (TIKTOK, YOUTUBE, DAILYMOTION, FB)
     try:
         import yt_dlp
         ydl_opts = {
@@ -144,7 +178,7 @@ def download_unblockable_media_parallel(raw_url, target_path):
             }
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            meta = ydl.extract_info(clean_url, download=True)
+            meta = ydl.extract_info(input_str, download=True)
             if meta: title = meta.get('title', title)
         if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
             return True, title
@@ -212,7 +246,7 @@ def generate_explainer_script_ai(transcript, movie_hint, duration_type, language
     Movie / Context Hint: {movie_hint if movie_hint else 'Auto-detect from audio'}
 
     Write an ORIGINAL transformative cinematic narration script (in {language}).
-    Analyze the action and dialogues, explain the story, build suspense, and provide viral metadata.
+    Analyze the story, build suspense, explain critical plot turns, and provide viral metadata.
 
     Dialogue excerpt:
     \"\"\"{transcript[:7000]}\"\"\"
@@ -352,7 +386,7 @@ st.markdown("""
 st.markdown("""
 <div class="compact-header">
     <div class="compact-title">⚡ ES ULTRA ANTI-COPYRIGHT, AUTO SHORTS & EXPLAINER STUDIO</div>
-    <div class="badge">10 SHIELDS + VIRAL SHORTS + ASAD DEEP VOICE EXPLAINER</div>
+    <div class="badge">10 SHIELDS + VIRAL SHORTS + AUTO MOVIE EXPLAINER</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -364,7 +398,7 @@ tab_shield, tab_shorts, tab_clip, tab_lofi, tab_explainer = st.tabs([
     "📱 2. آٹومیٹک وائرل شارٹس کٹر (New - 1 تا 5 شارٹس)",
     "⚔️ 3. کلپ کٹر (10 تا 20 منٹ کٹ)",
     "🎧 4. لوفی گانے (Slowed + Reverb)",
-    "🎬 5. AI مووی و ٹریلر ایکسپلینر (اسد کی ڈیپ وائس + BGM)"
+    "🎬 5. AI مووی و ٹریلر ایکسپلینر (مووی سرچ یا لنک)"
 ])
 
 # -----------------
@@ -667,99 +701,111 @@ with tab_lofi:
             st.error("❌ گانے کا درست لنک دیں یا فائل اپلوڈ کریں۔")
 
 # -----------------
-# TAB 5: AI MOVIE & TRAILER EXPLAINER STUDIO (UNIFIED & UNBLOCKABLE)
+# TAB 5: AUTO MOVIE SEARCH & TIKTOK EXPLAINER STUDIO
 # -----------------
 with tab_explainer:
-    st.write("### 🎬 AI مووی و ٹریلر ایکسپلینر اسٹوڈیو")
-    st.info("💡 **سنیماٹک ایکسپلینر انجن:** اصل آواز بند کر کے اوپر اسد کی 10% بھاری/سلو آواز میں نیا کہانی کا ریویو + سوفٹ بیک گراؤنڈ میوزک + سب ٹائٹلز لگائے جاتے ہیں۔")
+    st.write("### 🎬 AI مووی و ٹریلر ایکسپلینر اسٹوڈیو (Auto Search Engine)")
+    st.info("💡 **جادوئی مووی تلاش:** اگر آپ کے پاس لنک نہیں ہے تو صرف مووی کا نام لکھیں! AI خود یوٹیوب/ٹک ٹاک سے ایکشن ٹریلر نکالے گا اور اسد کی 10% بھاری/سلو آواز میں مکمل ایکسپلینر ویڈیو تیار کرے گا۔")
 
     c_ex1, c_ex2 = st.columns([1.5, 1])
     with c_ex1:
-        st.subheader("1. ویڈیو / ٹریلر سورس (لنک یا فائل دونوں دستیاب)")
-        ex_file = st.file_uploader("📂 اپنے موبائل یا کمپیوٹر سے ویڈیو منتخب کریں (فوری اسپیڈ):", type=["mp4", "mov", "mkv", "avi", "webm"], key="ex_file_unified")
-        ex_url = st.text_input("🔗 یا ویڈیو / یوٹیوب / ڈیلی موشن کا لنک یہاں پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=... یا Shorts لنک", key="ex_url_unified")
-        ex_movie_hint = st.text_input("🎬 مووی یا ٹریلر کا نام (اختیاری):", placeholder="مثلاً: Alpha / Animal / Jawan / Salaar", key="ex_hint_unified")
+        st.subheader("1. مووی کا نام، لنک یا فائل")
+        ex_query_or_url = st.text_input(
+            "🎬 مووی کا نام لکھیں یا ویڈیو لنک پیسٹ کریں:",
+            placeholder="مثلاً: Animal / Alpha / Jawan یا TikTok / YouTube / Dailymotion کا لنک",
+            key="ex_query_field"
+        )
+        st.caption("💡 مثال: صرف نام لکھیں: `KGF 2` یا `Animal Movie` یا ٹک ٹاک/یوٹیوب کا کوئی بھی لنک دیں۔")
+        
+        ex_file = st.file_uploader("📂 یا اپنے فون/کمپیوٹر سے ڈائریکٹ فائل لگائیں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="ex_file_field")
 
     with c_ex2:
         st.subheader("2. سنیماٹک و ریشو سیٹنگز")
-        ex_ratio = st.selectbox("📐 ویڈیو کا سائز (Aspect Ratio):", [
+        ex_ratio = st.selectbox("📐 ویڈیو سائز (Aspect Ratio):", [
             "16:9 (یوٹیوب لینڈ اسکیپ)",
             "9:16 (Shorts / Reels / TikTok)",
             "1:1 (Square)"
-        ], key="ex_ratio_u")
+        ], key="ex_ratio_box")
         ex_dur = st.selectbox("⏱️ دورانیہ (Target Duration):", [
             "1 سے 2 منٹ (ٹریلر بریک ڈاؤن / Shorts)",
             "10 Minutes (فل مووی سمری)",
             "15 Minutes",
             "20 Minutes"
-        ], key="ex_dur_u")
-        ex_lang = st.selectbox("🗣️ وضاحتی زبان:", ["اردو", "English", "Hindi", "Roman Urdu"], key="ex_lang_u")
-        ex_gender = st.selectbox("🎙️ وائس اوور:", ["Male (اسد - Deep 10% Slow)", "Female (عظمیٰ)"], key="ex_gender_u")
+        ], key="ex_dur_box")
+        ex_lang = st.selectbox("🗣️ وضاحتی زبان:", ["اردو", "English", "Hindi", "Roman Urdu"], key="ex_lang_box")
+        ex_gender = st.selectbox("🎙️ وائس اوور:", ["Male (اسد - Deep 10% Slow)", "Female (عظمیٰ)"], key="ex_gender_box")
 
-    if st.button("🎬 مکمل ایکسپلینر ویڈیو بنائیں (Create Movie Explainer)", type="primary", key="btn_run_explainer_u"):
-        uid = str(uuid.uuid4())[:8]
-        target_in = f"exp_in_{uid}.mp4"
-        target_out = f"exp_final_{uid}.mp4"
-        audio_stt = f"exp_audio_{uid}.mp3"
-        tts_audio = f"exp_tts_{uid}.mp3"
-        srt_path = f"exp_sub_{uid}.srt"
-        has_input = False
-
-        if ex_file is not None:
-            with open(target_in, "wb") as f:
-                f.write(ex_file.getbuffer())
-            if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
-                has_input = True
-        elif ex_url.strip():
-            with st.spinner("🔗 پیرلل ملٹی سرور سے ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
-                success, _ = download_unblockable_media_parallel(ex_url.strip(), target_in)
-                if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
-                    has_input = True
-
-        if has_input and os.path.exists(target_in):
-            progress_bar = st.progress(10)
-            status_text = st.empty()
-
-            try:
-                # 1. Audio STT
-                status_text.write("🎧 آڈیو ٹریک تیار کیا جا رہا ہے...")
-                extract_audio_for_stt(target_in, audio_stt)
-                progress_bar.progress(30)
-
-                # 2. Transcribe
-                status_text.write("📝 ویڈیو کے ڈائیلاگز کا جائزہ لیا جا رہا ہے...")
-                transcript = transcribe_audio_stt(audio_stt)
-                progress_bar.progress(50)
-
-                # 3. AI Script & SEO
-                status_text.write("🧠 کہانی کا تجزیہ، وائرل ٹائٹل اور اسکرپٹ تیار ہو رہا ہے...")
-                data = generate_explainer_script_ai(transcript, ex_movie_hint, ex_dur, ex_lang)
-                progress_bar.progress(70)
-
-                # 4. Asad Voiceover
-                status_text.write("🎙️ اسد کی بھاری آواز میں وائس اوور اور بی جی ایم مکس ہو رہا ہے...")
-                gender_val = "Male" if "Male" in ex_gender else "Female"
-                asyncio.run(generate_voiceover_asad(data["narration_script"], tts_audio, ex_lang, gender_val))
-                create_srt_file(data["narration_script"], srt_path)
-                progress_bar.progress(85)
-
-                # 5. Final Render
-                status_text.write("🎞️ FFmpeg رینڈرنگ ہو رہی ہے...")
-                render_explainer_final_mp4(target_in, tts_audio, data.get("timeline_segments", []), ex_ratio, target_out)
-                progress_bar.progress(100)
-
-                if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
-                    status_text.success("🎉 آپ کا AI مووی ایکسپلینر کامیابی سے تیار ہو گیا ہے!")
-                    st.session_state.explainer_ready = True
-                    st.session_state.explainer_data = {
-                        "video": target_out,
-                        "srt": srt_path,
-                        "data": data
-                    }
-            except Exception as ex:
-                st.error(f"❌ خرابی: {str(ex)}")
+    if st.button("🎬 ایکسپلینر ویڈیو تیار کریں (Create Movie Explainer)", type="primary", key="btn_explainer_run"):
+        if not ex_query_or_url.strip() and ex_file is None:
+            st.error("⚠️ برائے مہربانی مووی کا نام لکھیں، ویڈیو لنک دیں یا فائل اپلوڈ کریں۔")
         else:
-            st.error("❌ برائے مہربانی ویڈیو لنک دیں یا اوپر 'Browse files' پر کلک کر کے ویڈیو فائل منتخب کریں۔")
+            uid = str(uuid.uuid4())[:8]
+            target_in = f"exp_in_{uid}.mp4"
+            target_out = f"exp_final_{uid}.mp4"
+            audio_stt = f"exp_audio_{uid}.mp3"
+            tts_audio = f"exp_tts_{uid}.mp3"
+            srt_path = f"exp_sub_{uid}.srt"
+            has_input = False
+            detected_movie_title = ex_query_or_url.strip()
+
+            if ex_file is not None:
+                with open(target_in, "wb") as f:
+                    f.write(ex_file.getbuffer())
+                if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
+                    has_input = True
+                    detected_movie_title = ex_file.name
+            elif ex_query_or_url.strip():
+                with st.spinner("🔍 مووی تلاش اور ڈاؤنلوڈ ہو رہی ہے (Multi-Server Engine)..."):
+                    success, title_f = download_unblockable_media_parallel(ex_query_or_url.strip(), target_in)
+                    if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
+                        has_input = True
+                        detected_movie_title = title_f
+
+            if has_input and os.path.exists(target_in):
+                progress_bar = st.progress(10)
+                status_text = st.empty()
+
+                try:
+                    # 1. Audio STT
+                    status_text.write("🎧 آڈیو ٹریک کا معائنہ ہو رہا ہے...")
+                    extract_audio_for_stt(target_in, audio_stt)
+                    progress_bar.progress(30)
+
+                    # 2. Transcribe
+                    status_text.write("📝 فلم کے ڈائیلاگز کو ٹرانسکرائب کیا جا رہا ہے...")
+                    transcript = transcribe_audio_stt(audio_stt)
+                    progress_bar.progress(50)
+
+                    # 3. AI Story & Narration
+                    status_text.write(f"🧠 '{detected_movie_title[:30]}' کی کہانی، وائرل ٹائٹل اور اسکرپٹ تیار ہو رہا ہے...")
+                    data = generate_explainer_script_ai(transcript, detected_movie_title, ex_dur, ex_lang)
+                    progress_bar.progress(70)
+
+                    # 4. Asad Voiceover (10% Deep & Slow)
+                    status_text.write("🎙️ اسد کی بھاری آواز میں وائس اوور اور بی جی ایم مکس ہو رہا ہے...")
+                    gender_val = "Male" if "Male" in ex_gender else "Female"
+                    asyncio.run(generate_voiceover_asad(data["narration_script"], tts_audio, ex_lang, gender_val))
+                    create_srt_file(data["narration_script"], srt_path)
+                    progress_bar.progress(85)
+
+                    # 5. FFmpeg Video Render
+                    status_text.write("🎞️ FFmpeg کے ذریعے وائس اوور، سینز اور بی جی ایم جوڑے جا رہے ہیں...")
+                    render_explainer_final_mp4(target_in, tts_audio, data.get("timeline_segments", []), ex_ratio, target_out)
+                    progress_bar.progress(100)
+
+                    if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
+                        status_text.success("🎉 آپ کا مووی ایکسپلینر کامیابی سے تیار ہو گیا ہے!")
+                        st.session_state.explainer_ready = True
+                        st.session_state.explainer_data = {
+                            "video": target_out,
+                            "srt": srt_path,
+                            "data": data,
+                            "title": detected_movie_title
+                        }
+                except Exception as ex:
+                    st.error(f"❌ خرابی: {str(ex)}")
+            else:
+                st.error("❌ ویڈیو حاصل نہیں ہو سکی۔ برائے مہربانی درست نام لکھیں یا ویڈیو فائل اپلوڈ کریں۔")
 
     if st.session_state.explainer_ready and st.session_state.explainer_data:
         exp_info = st.session_state.explainer_data
