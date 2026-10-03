@@ -1,34 +1,19 @@
 import streamlit as st
 import asyncio
-import edge_tts
 import requests
 import urllib.parse
 import os
 import time
 import re
 import uuid
-import random
 import glob
 import subprocess
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
-import io
-import numpy as np
-import threading
-import gc
 import concurrent.futures
-
-# ==========================================
-# MOVIEPY IMPORTS
-# ==========================================
-try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
-except ImportError:
-    from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
 
 # ==========================================
 # STREAMLIT COMPACT CONFIGURATION
 # ==========================================
-st.set_page_config(page_title="ES Ultra 26-Shield Pure Full-Screen Studio", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="ES Ultra Anti-Copyright & Auto Shorts Studio", layout="wide", page_icon="⚡")
 
 if "process_ready" not in st.session_state:
     st.session_state.process_ready = False
@@ -68,12 +53,12 @@ def get_video_duration_fast(file_path):
         cmd = [ffprobe_exe, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", file_path]
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
         dur = float(res.stdout.strip())
-        return dur if dur > 0 else 200.0
+        return dur if dur > 0 else 300.0
     except Exception:
-        return 200.0
+        return 300.0
 
 # ==========================================
-# PARALLEL MULTI-NODE LINK FETCHER
+# PARALLEL ULTRA-FAST LINK FETCHER
 # ==========================================
 def try_download_node(node_url, vid_id, target_path):
     try:
@@ -101,7 +86,7 @@ def try_download_node(node_url, vid_id, target_path):
 def download_unblockable_media_parallel(raw_url, target_path):
     vid_id = extract_yt_id(raw_url)
     clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url.strip()
-    title = fetch_oembed_title(clean_url) or "Media Track"
+    title = fetch_oembed_title(clean_url) or "Action Video Scene"
     
     if vid_id:
         nodes = [
@@ -141,63 +126,27 @@ def download_unblockable_media_parallel(raw_url, target_path):
     return False, title
 
 # ==========================================
-# CELEBRITY EXACT LIKENESS PROMPT & METADATA
+# CELEBRITY EXACT-LIKENESS THUMBNAIL & METADATA
 # ==========================================
 def extract_celebrity_name(title):
     t_clean = re.sub(r'[\(\[\{].*?[\)\]\}]', '', title).strip()
     return t_clean if t_clean else title
 
-def analyze_video_and_generate_exact_prompt(title, is_short=False, is_song=False):
+def analyze_video_and_generate_exact_prompt(title):
     clean_t = extract_celebrity_name(title)
-    
-    if is_song:
-        exact_thumb_prompt = (
-            f"Anime aesthetic 4K Lo-Fi relaxing wallpaper thumbnail for '{clean_t[:45]}', cozy neon bedroom, "
-            f"soft purple and cyan aesthetic lighting, rain on window, retro tape recorder, cinematic lo-fi anime art, 16:9 aspect ratio."
-        )
-        titles = [
-            f"🎧 {clean_t[:45]} (Slowed + Reverb Lo-Fi Remix) | Midnight Chill",
-            f"🌙 {clean_t[:45]} - Deep Relaxing Aesthetic Vibe (Master HD)",
-            f"✨ Pure Nostalgia Vibes | {clean_t[:40]} (Slowed Lo-Fi Version)"
-        ]
-        hashtags = "#SlowedAndReverb #LofiRemix #ChillMusic #AestheticAudio #MidnightVibes #LoFiBeats #ViralSong"
-    elif is_short:
-        exact_thumb_prompt = (
-            f"Hyper-realistic 8K vertical cinematic poster thumbnail 9:16 for YouTube Shorts of '{clean_t[:45]}', "
-            f"exact recognizable facial features of the lead actor, intense dramatic angry expression, photorealistic eyes and skin texture, "
-            f"35mm film photography, neon rim lighting, flying sparks, vertical 9:16 composition, blockbuster movie aesthetics."
-        )
-        titles = [
-            f"🔥 {clean_t[:40]} - UNSTOPPABLE Climax Scene! 😱 #Shorts",
-            f"⚡ The Most Intense Moment of {clean_t[:35]} 🔥 #Shorts",
-            f"😱 Best Action Climax in {clean_t[:38]} #ViralShorts"
-        ]
-        hashtags = "#Shorts #YouTubeShorts #ViralShorts #TrendingShorts #MovieClimax #ActionShorts #CinemaReels"
-    else:
-        exact_thumb_prompt = (
-            f"Hyper-realistic 8K award-winning cinematic movie poster portrait of the lead actor in '{clean_t[:45]}', "
-            f"exact recognizable facial features, photorealistic skin pores and eyes, intense dramatic emotional expression, "
-            f"35mm film photography, volumetric cinematic lighting, action sparks and debris background, high visual contrast, "
-            f"ultra-detailed blockbuster aesthetic, 16:9 aspect ratio, masterpiece quality, no cartoon, no distortion."
-        )
-        titles = [
-            f"🔥 {clean_t[:45]} | Full Action Breakdown & Uncut Climax!",
-            f"⚡ Unstoppable High Voltage Moments | {clean_t[:40]}",
-            f"😱 Dramatic Climax Highlights: {clean_t[:40]}"
-        ]
-        hashtags = "#MovieClimax #ActionHighlights #BlockbusterMovie #TrendingCinema #ViralScene #MovieRecap"
-        
+    exact_thumb_prompt = (
+        f"Hyper-realistic 8K award-winning cinematic movie poster portrait of the lead actor in '{clean_t[:45]}', "
+        f"exact recognizable facial features, photorealistic skin pores and eyes, intense dramatic emotional expression, "
+        f"35mm film photography, volumetric cinematic lighting, action sparks and debris background, high visual contrast, "
+        f"ultra-detailed blockbuster aesthetic, 16:9 aspect ratio, masterpiece quality, no cartoon, no distortion."
+    )
+    titles = [
+        f"🔥 {clean_t[:45]} | The Most Uncut Action Climax Scene!",
+        f"⚡ Unstoppable Blockbuster Highlights | {clean_t[:40]}",
+        f"😱 Dramatic Climax Reaction: {clean_t[:40]}"
+    ]
+    hashtags = "#MovieClimax #ActionHighlights #BlockbusterMovie #TrendingCinema #ViralScene #MovieRecap"
     return clean_t, titles, hashtags, exact_thumb_prompt
-
-def fetch_img_failover(prompt, w, h, seed):
-    try:
-        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
-        res = requests.get(url, timeout=25)
-        if res.status_code == 200:
-            return res.content
-    except Exception:
-        pass
-    return None
 
 # ==========================================
 # SLEEK COMPACT DASHBOARD STYLING
@@ -212,7 +161,7 @@ st.markdown("""
         background: #ffffff; padding: 8px 16px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 12px;
     }
     .compact-title { font-size: 1.15rem !important; font-weight: 800 !important; color: #0284c7 !important; margin: 0 !important; }
-    .badge { background: #059669; color: #ffffff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge { background: #0f172a; color: #ffffff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
     .stButton>button { 
         background: #0284c7 !important; color: white !important; border-radius: 6px !important; 
         height: 38px !important; font-size: 13px !important; font-weight: 600 !important; border: none !important;
@@ -223,49 +172,47 @@ st.markdown("""
 
 st.markdown("""
 <div class="compact-header">
-    <div class="compact-title">⚡ ES ULTRA 26-SHIELD PURE FULL-SCREEN STUDIO</div>
-    <div class="badge">100% PURE 9:16 FULL-SCREEN SHORTS</div>
+    <div class="compact-title">⚡ ES ULTRA ANTI-COPYRIGHT & AUTO SHORTS CREATOR</div>
+    <div class="badge">10 SHIELDS + VIRAL SHORTS ENGINE</div>
 </div>
 """, unsafe_allow_html=True)
 
 # ==========================================
 # NAVIGATION TABS
 # ==========================================
-tab_shield, tab_shorts, tab_clip, tab_lofi, tab_movie, tab_image = st.tabs([
-    "🛡️ 1. فل اینٹی کاپی رائٹ شیلڈ (26 ہتھیار + شفلر)",
-    "📱 2. پیور فل اسکرین 9:16 شارٹس (100% Full-Screen 9:16)",
-    "⚔️ 3. کلپ کٹر موڈ (10 تا 20 منٹ کٹ)",
-    "🎧 4. اینٹی کاپی رائٹ لوفی و گانے (Slowed + Reverb)",
-    "🎬 5. پرو AI مووی اسٹوڈیو (Unlimited)",
-    "🎨 6. پرو AI امیج اسٹوڈیو (Unlimited)"
+tab_shield, tab_shorts, tab_clip, tab_lofi = st.tabs([
+    "🛡️ 1. فل اینٹی کاپی رائٹ شیلڈ (10 ہتھیار + تھمب نیل)",
+    "📱 2. آٹومیٹک وائرل شارٹس کٹر (New - 1 تا 5 شارٹس)",
+    "⚔️ 3. کلپ کٹر (10 تا 20 منٹ کٹ)",
+    "🎧 4. لوفی گانے (Slowed + Reverb)"
 ])
 
 # -----------------
-# TAB 1: 26-LAYER FULL ANTI-COPYRIGHT SHIELD & SHUFFLER
+# TAB 1: FAST FULL SHIELD WITH ALL 10 WEAPONS
 # -----------------
 with tab_shield:
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns([1, 1])
     with c1:
-        shield_mode = st.selectbox("اینٹی کاپی رائٹ شیلڈ اسٹائل:", [
-            "🛡️ 26 ہتھیار: لوگو کٹ + سین شفل + 0.75s کٹ + اسپیڈ وارپ (100% محفوظ)",
-            "⚡ الٹرا فاسٹ کٹ + اسپیڈ وارپ + لیٹرباکس"
+        shield_mode = st.selectbox("اینٹی کاپی رائٹ شیلڈ لیول:", [
+            "🛡️ 10 ہتھیار: 0.75s کٹ + ہائپر زوم + فلپ + کلر اسکریبل (100% محفوظ)",
+            "⚡ الٹرا فاسٹ کٹ + لیٹرباکس میٹ"
         ], key="sm_t1")
     with c2:
-        voice_quality = st.selectbox("ڈبنگ اور آواز کی کوالٹی:", [
-            "🔊 کرسٹل کلیئر بیریٹون ڈبنگ + ہارمونک ایکوسٹک شیلڈ (صاف و واضح)",
+        audio_mode = st.selectbox("آواز کی موٹائی و گڑبڑ شیلڈ:", [
+            "🔊 بھاری موٹی آواز (Deep Baritone) + ایکوسٹک گڑبڑ لہریں",
             "🎵 میڈیم پچ شفٹ (Medium Thick)"
         ], key="am_t1")
-
-    up_file = st.file_uploader("📂 ویڈیو فائل منتخب کریں (فوری واٹس ایپ اسپیڈ لوڈ):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_main")
-    url_input = st.text_input("🔗 یا یوٹیوب کا لنک یہاں ڈالیں:", placeholder="https://www.youtube.com/watch?v=...", key="url_main")
-
-    if st.button("🚀 26 اینٹی کاپی رائٹ شیلڈز لگائیں اور ویڈیو تیار کریں", type="primary", key="btn_main"):
+        
+    up_file = st.file_uploader("📂 اپنے موبائل یا کمپیوٹر سے ویڈیو فائل منتخب کریں (فوری واٹس ایپ اسپیڈ):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_main")
+    url_input = st.text_input("🔗 یا یوٹیوب کا لنک یہاں پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=...", key="url_main")
+    
+    if st.button("🚀 10 اینٹی کاپی رائٹ شیلڈز لگائیں اور AI تھمب نیل بنائیں", type="primary", key="btn_main"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"in_vid_{uid}.mp4"
         target_out = f"es_turbo_{uid}.mp4"
         info = {'title': 'Action Scene Video'}
         has_input = False
-
+        
         if up_file is not None:
             with open(target_in, "wb") as f:
                 f.write(up_file.getbuffer())
@@ -273,98 +220,86 @@ with tab_shield:
                 has_input = True
                 info['title'] = up_file.name
         elif url_input.strip():
-            with st.spinner("🔗 پیرلل نیٹ ورک سے ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
+            with st.spinner("🔗 پیرلل نیٹ ورک سے ایچ ڈی ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
                 success, title_fetched = download_unblockable_media_parallel(url_input.strip(), target_in)
                 if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
                     has_input = True
                     info['title'] = title_fetched
+                else:
+                    st.error("❌ لنک ڈاؤنلوڈ نہیں ہو سکا۔ برائے مہربانی ڈائریکٹ فائل منتخب کریں۔")
 
         if has_input and os.path.exists(target_in):
             t_start = time.time()
-            total_dur = get_video_duration_fast(target_in)
-            ffmpeg_exe = get_ffmpeg()
-
-            with st.spinner("⚡ تمام 26 اینٹی کاپی رائٹ شیلڈز، لوگو اسٹرپنگ اور ڈبنگ لگائی جا رہی ہے..."):
-                if "کرسٹل کلیئر" in voice_quality:
-                    af_clear = "highpass=f=75,lowpass=f=8200,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
+            with st.spinner("⚡ تمام 10 اینٹی کاپی رائٹ شیلڈز ویڈیو پر لگ رہی ہیں..."):
+                ffmpeg_exe = get_ffmpeg()
+                
+                vf_str = (
+                    "select='not(eq(mod(n\\,18)\\,0))',setpts=N/(24*TB),"
+                    "hflip,crop=iw*0.82:ih*0.82,scale=1280:720:flags=fast_bilinear,"
+                    "eq=contrast=1.18:saturation=1.24:brightness=0.02,"
+                    "drawbox=y=0:h=36:color=black@0.75:t=fill,"
+                    "drawbox=y=ih-44:h=44:color=black@0.85:t=fill"
+                )
+                
+                if "بھاری موٹی آواز" in audio_mode:
+                    af_str = "volume=0.35,asetrate=44100*0.88,aresample=44100:async=1,atempo=1.13636,bass=g=7:f=100,treble=g=-4:f=3000,aecho=0.8:0.5:15:0.2"
                 else:
-                    af_clear = "volume=0.75,asetrate=44100*0.94,aresample=44100,atempo=1.14,bass=g=4:f=110"
-
-                if "سین شفل" in shield_mode:
-                    p1_start = max(8.0, total_dur * 0.65)
-                    p1_dur = min(45.0, total_dur * 0.20)
-                    p2_start = max(8.0, total_dur * 0.10)
-                    p2_dur = min(45.0, total_dur * 0.25)
-                    p3_start = max(10.0, total_dur * 0.40)
-                    p3_dur = min(45.0, total_dur * 0.25)
-
-                    f1, f2, f3, list_file = f"part1_{uid}.mp4", f"part2_{uid}.mp4", f"part3_{uid}.mp4", f"list_{uid}.txt"
-                    vf_clean = "select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),hflip,crop=iw*0.82:ih*0.82,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=40:color=black@0.75:t=fill,drawbox=y=ih-48:h=48:color=black@0.85:t=fill"
-
-                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-ss", str(p1_start), "-t", str(p1_dur), "-i", target_in, "-map_metadata", "-1", "-vf", vf_clean, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f1], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-ss", str(p2_start), "-t", str(p2_dur), "-i", target_in, "-map_metadata", "-1", "-vf", vf_clean, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f2], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    subprocess.run([ffmpeg_exe, "-nostdin", "-y", "-ss", str(p3_start), "-t", str(p3_dur), "-i", target_in, "-map_metadata", "-1", "-vf", vf_clean, "-af", af_clear, "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28", f3], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-                    with open(list_file, "w") as lf:
-                        lf.write(f"file '{f1}'\nfile '{f2}'\nfile '{f3}'\n")
-
-                    cmd_concat = [ffmpeg_exe, "-nostdin", "-y", "-f", "concat", "-safe", "0", "-i", list_file, "-c", "copy", "-movflags", "+faststart", target_out]
-                    subprocess.run(cmd_concat, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-                    for temp_f in [f1, f2, f3, list_file, target_in]:
-                        if os.path.exists(temp_f):
-                            try: os.remove(temp_f)
-                            except Exception: pass
-                else:
-                    vf_str = "select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),hflip,crop=iw*0.82:ih*0.82,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=40:color=black@0.75:t=fill,drawbox=y=ih-48:h=48:color=black@0.85:t=fill"
-                    cmd = [
-                        ffmpeg_exe, "-nostdin", "-y", "-ss", "8", "-i", target_in,
-                        "-map_metadata", "-1", "-vf", vf_str, "-af", af_clear,
-                        "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28",
-                        "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k", target_out
-                    ]
-                    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    try: os.remove(target_in)
-                    except Exception: pass
+                    af_str = "volume=0.75,asetrate=44100*0.94,aresample=44100:async=1,atempo=1.0638,bass=g=4:f=110"
+                
+                cmd = [
+                    ffmpeg_exe, "-nostdin", "-y", "-i", target_in,
+                    "-map_metadata", "-1", "-vf", vf_str, "-af", af_str,
+                    "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "fastdecode",
+                    "-threads", "4", "-crf", "28", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                    "-c:a", "aac", "-b:a", "96k", target_out
+                ]
+                try: subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+                except Exception: pass
 
                 dur = round(time.time() - t_start, 1)
                 if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
                     st.session_state.detected_info = info
                     st.session_state.current_output_video = target_out
                     st.session_state.process_ready = True
-                    st.success(f"🎉 ویڈیو تمام 26 شیلڈز کے ساتھ صرف **{dur} سیکنڈ** میں تیار ہو گئی!")
+                    st.success(f"⚡ ویڈیو صرف **{dur} سیکنڈ** میں 10 اینٹی کاپی رائٹ شیلڈز کے ساتھ تیار ہو گئی!")
+                    try: os.remove(target_in)
+                    except Exception: pass
                 else:
-                    st.error("❌ ویڈیو پروسیسنگ فیل ہو گئی۔ براہ کرم فائل دوبارہ منتخب کریں۔")
+                    st.error("❌ ویڈیو پروسیسنگ مکمل نہ ہو سکی۔")
 
 # -----------------
-# TAB 2: TRUE 100% PURE FULL-SCREEN 9:16 SHORTS (NO BLACK BARS, NO BOXES)
+# TAB 2: AUTOMATIC VIRAL SHORTS CREATOR (NEW FEATURE)
 # -----------------
 with tab_shorts:
-    st.write("### 📱 100% پیور فل اسکرین 9:16 وائرل شارٹس جنریٹر")
-    st.info("💡 **پیور فل اسکرین ریشو:** اصل ویڈیو پوری موبائل اسکرین پر 100% فل (720x1280) آئے گی (کوئی کالی پٹی یا درمیانی ڈبہ نہیں ہوگا) اور تمام 26 اینٹی کاپی رائٹ شیلڈز لاگو ہوں گی!")
+    st.write("### 📱 لانگ ویڈیو سے خودکار وائرل شارٹس و ریلز جنریٹر")
+    st.info("💡 **شارٹس انجن:** یہ فیچر آپ کی 5 سے 30 منٹ کی لمبی ویڈیو میں سے خودکار طریقے سے دلکش ایکشن اور ڈائیلاگ والے سینز نکال کر 9:16 ورٹیکل ریلز بنا دیتا ہے!")
     
     col_sh1, col_sh2 = st.columns(2)
     with col_sh1:
-        num_shorts = st.selectbox("کتنے فل اسکرین وائرل شارٹس بنانے ہیں؟", [
-            "1 شارٹ (Best Climax Hook)",
-            "2 شارٹس (Opening + Climax)",
-            "3 شارٹس (Hook + Story + Climax)",
+        num_shorts = st.selectbox("کتنے وائرل شارٹس بنانے ہیں؟", [
+            "1 شارٹ (Best Climax Scene)",
+            "2 شارٹس (Opening Hook + Climax)",
+            "3 شارٹس (Hook + Turning Point + Climax)",
             "5 شارٹس (Full Multi-Highlight Pack)"
-        ], key="num_sh_pure")
+        ], key="num_sh")
     with col_sh2:
-        short_dur = st.selectbox("ہر شارٹ کا دورانیہ:", ["30 سیکنڈ (30s - سب سے زیادہ وائرل)", "15 سیکنڈ (15s)", "60 سیکنڈ (60s)"], key="dur_sh_pure")
+        short_dur = st.selectbox("ہر شارٹ کا دورانیہ:", [
+            "30 سیکنڈ (30s - سب سے زیادہ وائرل)",
+            "15 سیکنڈ (15s - فاسٹ ریلز)",
+            "60 سیکنڈ (60s - فل اسٹوری شارٹ)"
+        ], key="dur_sh")
 
     count_target = 1 if "1" in num_shorts else 2 if "2" in num_shorts else 3 if "3" in num_shorts else 5
     dur_sec_target = 30 if "30" in short_dur else 15 if "15" in short_dur else 60
 
-    up_shorts_file = st.file_uploader("📂 لمبی ویڈیو فائل یہاں اپلوڈ کریں (5 تا 30 منٹ):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_shorts_pure")
-    url_shorts_input = st.text_input("🔗 یا لمبی ویڈیو کا یوٹیوب لنک ڈالیں:", placeholder="https://www.youtube.com/watch?v=...", key="url_shorts_pure")
+    up_shorts_file = st.file_uploader("📂 لمبی ویڈیو فائل منتخب کریں (5 تا 30 منٹ):", type=["mp4", "mov", "mkv", "avi", "webm"], key="up_shorts")
+    url_shorts_input = st.text_input("🔗 یا لمبی ویڈیو کا یوٹیوب لنک ڈالیں:", placeholder="https://www.youtube.com/watch?v=...", key="url_shorts")
 
-    if st.button(f"🚀 خودکار طریقے سے {count_target} فل اسکرین 9:16 شارٹس مع ٹائٹلز و تھمب نیل بنائیں", type="primary", key="btn_run_shorts_pure"):
+    if st.button(f"🚀 خودکار طریقے سے {count_target} وائرل شارٹس تیار کریں", type="primary", key="btn_run_shorts"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"shorts_in_{uid}.mp4"
         has_input = False
-        info = {'title': 'Viral Action Shorts'}
+        info = {'title': 'Long Video Highlights'}
 
         if up_shorts_file is not None:
             with open(target_in, "wb") as f:
@@ -383,56 +318,58 @@ with tab_shorts:
             ffmpeg_exe = get_ffmpeg()
             created_shorts = []
             
-            # STRICT LOGO SKIPPING: Start strictly at or after second 8.0 to remove Dharma/T-Series Logos
+            # Smart Highlight Timestamp Calculation
             points = []
-            if count_target == 1: points = [max(8.0, total_dur * 0.65)]
-            elif count_target == 2: points = [max(8.0, total_dur * 0.20), max(20.0, total_dur * 0.70)]
-            elif count_target == 3: points = [max(8.0, total_dur * 0.15), max(20.0, total_dur * 0.50), max(30.0, total_dur * 0.80)]
-            else: points = [max(8.0, total_dur * 0.10), max(20.0, total_dur * 0.30), max(30.0, total_dur * 0.55), max(40.0, total_dur * 0.75), max(50.0, total_dur * 0.88)]
+            if count_target == 1:
+                points = [max(10.0, total_dur * 0.65)]
+            elif count_target == 2:
+                points = [max(10.0, total_dur * 0.20), max(20.0, total_dur * 0.70)]
+            elif count_target == 3:
+                points = [max(10.0, total_dur * 0.15), max(20.0, total_dur * 0.50), max(30.0, total_dur * 0.80)]
+            else:
+                points = [max(10.0, total_dur * 0.10), max(20.0, total_dur * 0.30), max(30.0, total_dur * 0.55), max(40.0, total_dur * 0.75), max(50.0, total_dur * 0.90)]
 
             progress_bar = st.progress(0.0)
             status_text = st.empty()
 
             for idx, start_pt in enumerate(points, 1):
-                status_text.write(f"⚡ فل اسکرین 9:16 شارٹ #{idx} کٹ کر کے 26 شیلڈز لگائی جا رہی ہیں...")
-                short_out = f"pure_short_{uid}_{idx}.mp4"
+                status_text.write(f"⚡ وائرل شارٹ #{idx} کٹ کر کے 9:16 فارمیٹ اور اینٹی کاپی رائٹ شیلڈ لگائی جا رہی ہے...")
+                short_out = f"viral_short_{uid}_{idx}.mp4"
                 
-                # TRUE PURE 100% FULL-SCREEN 9:16 (THE VIDEO ITSELF FILLS THE ENTIRE MOBILE SCREEN):
-                # scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1
-                # This guarantees that the entire video fills 100% of 9:16 without letterbox, pillarbox, or canvas boxes!
-                vf_pure_fullscreen_916 = (
-                    "select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),"
-                    "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,"
-                    "hflip,eq=contrast=1.20:saturation=1.26:brightness=0.02,"
-                    "drawbox=y=0:h=40:color=black@0.70:t=fill,drawbox=y=ih-50:h=50:color=black@0.80:t=fill"
+                # 9:16 VERTICAL FORMAT + SUB-SECOND CUTS + TILT + COLOR + DEEP VOICE
+                vf_vertical = (
+                    "select='not(eq(mod(n\\,18)\\,0))',setpts=N/(24*TB),"
+                    "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2:black,"
+                    "hflip,eq=contrast=1.18:saturation=1.24:brightness=0.02,"
+                    "drawbox=y=0:h=60:color=black@0.75:t=fill,drawbox=y=ih-70:h=70:color=black@0.85:t=fill"
                 )
-                af_shield = "highpass=f=75,lowpass=f=8200,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
+                af_shield = "volume=0.35,asetrate=44100*0.88,aresample=44100:async=1,atempo=1.13636,bass=g=7:f=100,treble=g=-4:f=3000,aecho=0.8:0.5:15:0.2"
 
                 cmd = [
                     ffmpeg_exe, "-nostdin", "-y", "-ss", str(start_pt), "-t", str(dur_sec_target),
-                    "-i", target_in, "-map_metadata", "-1",
-                    "-vf", vf_pure_fullscreen_916,
-                    "-af", af_shield,
+                    "-i", target_in, "-map_metadata", "-1", "-vf", vf_vertical, "-af", af_shield,
                     "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "4", "-crf", "28",
                     "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "96k",
                     short_out
                 ]
-                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                try: subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+                except Exception: pass
+
                 if os.path.exists(short_out) and os.path.getsize(short_out) > 5000:
-                    created_shorts.append((short_out, f"📱 فل اسکرین 9:16 شارٹ #{idx} ({dur_sec_target}s)"))
+                    created_shorts.append((short_out, f"🔥 وائرل شارٹ #{idx} ({dur_sec_target}s)"))
+                
                 progress_bar.progress(idx / len(points))
 
             try: os.remove(target_in)
             except Exception: pass
             
-            st.session_state.detected_info = info
             st.session_state.generated_shorts = created_shorts
-            status_text.success(f"🎉 آپ کے تمام **{len(created_shorts)} پیور فل اسکرین 9:16 شارٹس** تیار ہیں!")
+            status_text.success(f"🎉 مبارک ہو! آپ کے تمام **{len(created_shorts)} وائرل شارٹس** 9:16 سائز اور اینٹی کاپی رائٹ شیلڈ کے ساتھ تیار ہیں!")
 
-    # DISPLAY SHORTS & SHORTS-SPECIFIC VIRAL METADATA DASHBOARD
+    # Display generated Shorts side-by-side
     if st.session_state.generated_shorts:
         st.divider()
-        st.subheader("📱 تیار شدہ فل اسکرین 9:16 شارٹس (Download YouTube Shorts / Reels):")
+        st.subheader("📱 تیار شدہ وائرل شارٹس (Download YouTube Shorts / Reels):")
         cols = st.columns(len(st.session_state.generated_shorts))
         for i, (s_path, s_title) in enumerate(st.session_state.generated_shorts):
             with cols[i]:
@@ -440,43 +377,26 @@ with tab_shorts:
                 s_bytes = open(s_path, 'rb').read()
                 st.video(s_bytes)
                 st.download_button(
-                    label=f"📥 ڈاؤنلوڈ فل شارٹ #{i+1}",
+                    label=f"📥 ڈاؤنلوڈ شارٹ #{i+1}",
                     data=s_bytes,
-                    file_name=f"fullscreen_short_{i+1}.mp4",
+                    file_name=f"viral_short_{i+1}.mp4",
                     mime="video/mp4",
-                    key=f"dl_pure_{i}"
+                    key=f"dl_sh_{i}"
                 )
-
-        st.markdown("---")
-        st.subheader("🧠 شارٹس کے لیے وائرل #Shorts ٹائٹلز، ہیش ٹیگز اور 9:16 تھمب نیل پرامپٹ (1-Click Copy):")
-        raw_title = st.session_state.detected_info.get('title', 'Viral Action Short')
-        clean_hero_title, s_titles, s_hashtags, s_thumb_prompt = analyze_video_and_generate_exact_prompt(raw_title, is_short=True)
-        
-        c_meta1, c_meta2 = st.columns(2)
-        with c_meta1:
-            st.markdown("**🔥 وائرل شارٹس ٹائٹلز (کاپی کرنے کے لیے اوپر دائیں آئیکن دبائیں):**")
-            for idx, t in enumerate(s_titles, 1):
-                st.code(t, language="text")
-            st.markdown("**🏷️ وائرل شارٹس ہیش ٹیگز:**")
-            st.code(s_hashtags, language="text")
-
-        with c_meta2:
-            st.markdown(f"**🎨 9:16 ورٹیکل شارٹس تھمب نیل پرامپٹ ({clean_hero_title[:25]}):**")
-            st.code(s_thumb_prompt, language="text")
 
 # -----------------
 # TAB 3: CLIP CUTTER
 # -----------------
 with tab_clip:
     c1, c2 = st.columns(2)
-    with c1: scene_type = st.selectbox("سین کا آغاز:", ["⚔️ منٹ 30", "👻 منٹ 45", "🏔️ منٹ 15", "⏱️ کسٹم"], key="s_t3")
-    with c2: clip_len = st.slider("دورانیہ (منٹ):", 1, 20, 10, key="len_t3")
+    with c1: scene_type = st.selectbox("سین کا آغاز:", ["⚔️ منٹ 30", "👻 منٹ 45", "🏔️ منٹ 15", "⏱️ کسٹم"], key="s_t2")
+    with c2: clip_len = st.slider("دورانیہ (منٹ):", 1, 20, 10, key="len_t2")
         
     start_min = 30 if "30" in scene_type else 45 if "45" in scene_type else 15 if "15" in scene_type else st.number_input("اسٹارٹ منٹ:", 0, 300, 10)
-    clip_url = st.text_input("🔗 یوٹیوب لنک:", placeholder="https://...", key="clip_url3")
-    upload_opt2 = st.file_uploader("📂 یا ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "webm"], key="up_t3")
+    clip_url = st.text_input("🔗 یوٹیوب لنک:", placeholder="https://...", key="clip_url")
+    upload_opt2 = st.file_uploader("📂 یا ویڈیو فائل اپلوڈ کریں:", type=["mp4", "mov", "mkv", "webm"], key="up_t2")
 
-    if st.button("🚀 کلپ کاٹیں اور شیلڈ لگائیں", type="primary", key="run_t3"):
+    if st.button("🚀 کلپ کاٹیں اور شیلڈ لگائیں", type="primary", key="run_t2"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"clip_in_{uid}.mp4"
         target_out = f"clip_out_{uid}.mp4"
@@ -496,12 +416,12 @@ with tab_clip:
                     info['title'] = title_fetched
             
         if has_input and os.path.exists(target_in):
-            with st.spinner("کلپ کٹ کر کے 26 شیلڈز لگائی جا رہی ہیں..."):
+            with st.spinner("کلپ کٹ کر کے فاسٹ شیلڈ لگائی جا رہی ہے..."):
                 ffmpeg_exe = get_ffmpeg()
                 start_sec = start_min * 60
                 dur_sec = clip_len * 60
-                vf = "select='not(eq(mod(n\\,18)\\,0))',setpts=0.92*N/(24*TB),hflip,crop=iw*0.80:ih*0.80,scale=1280:720:flags=fast_bilinear,eq=contrast=1.20:saturation=1.24:brightness=0.02,drawbox=y=0:h=36:color=black@0.75:t=fill,drawbox=y=ih-44:h=44:color=black@0.85:t=fill"
-                af = "highpass=f=75,lowpass=f=8200,volume=0.45,asetrate=44100*0.93,aresample=44100,atempo=1.16,bass=g=5:f=110,aecho=0.8:0.5:15:0.2"
+                vf = "select='not(eq(mod(n\\,18)\\,0))',setpts=N/(24*TB),hflip,crop=iw*0.80:ih*0.80,scale=1280:720:flags=fast_bilinear,eq=contrast=1.18:saturation=1.24:brightness=0.02,drawbox=y=0:h=36:color=black@0.75:t=fill,drawbox=y=ih-44:h=44:color=black@0.85:t=fill"
+                af = "volume=0.35,asetrate=44100*0.88,aresample=44100:async=1,atempo=1.13636,bass=g=7:f=100,treble=g=-4:f=3000,aecho=0.8:0.5:15:0.2"
                 
                 cmd = [
                     ffmpeg_exe, "-nostdin", "-y", "-ss", str(start_sec), "-t", str(dur_sec),
@@ -516,23 +436,21 @@ with tab_clip:
                     st.session_state.process_ready = True
                     try: os.remove(target_in)
                     except Exception: pass
+        else:
+            st.error("❌ درست لنک دیں یا ویڈیو فائل اپلوڈ کریں۔")
 
 # -----------------
-# TAB 4: 26-SHIELD ANTI-COPYRIGHT SONGS & LO-FI MASTER
+# TAB 4: LO-FI & SONGS
 # -----------------
 with tab_lofi:
-    st.write("### 🎧 26-شیلڈ اینٹی کاپی رائٹ گانے و لوفی میکر (Slowed + Reverb)")
-    st.info("💡 **فل آڈیو شیلڈ آن:** نان-لینئیر پچ شفٹنگ، سٹیریو فیز ڈسپرژن، سب-بیس اور ہارمونک ریورب سے گانے کا آڈیو فنگر پرنٹ 100% بدل جائے گا اور کلیم نہیں آئے گا!")
-    
-    col_s1, col_s2, col_s3 = st.columns(3)
-    with col_s1: slow_val = st.slider("سلو اسپیڈ (Slow Factor):", 0.82, 0.96, 0.88, 0.01, key="sl_t6")
-    with col_s2: reverb_val = st.slider("گونج / Reverb ماسکنگ:", 25, 80, 50, 5, key="rev_t6")
-    with col_s3: bass_val = st.slider("سب-بیس بوسٹ (Sub-Bass):", 2, 12, 6, key="bass_t6")
+    col_s1, col_s2 = st.columns(2)
+    with col_s1: slow_val = st.slider("سلو اسپیڈ:", 0.80, 0.96, 0.88, 0.01, key="sl_t3")
+    with col_s2: reverb_val = st.slider("گونج / Reverb:", 20, 80, 50, 5, key="rev_t3")
         
-    song_url = st.text_input("🔗 گانے کا یوٹیوب یا آڈیو لنک:", placeholder="https://...", key="song_url6")
-    upload_opt3 = st.file_uploader("📂 یا گانے کی فائل اپلوڈ کریں (MP3/MP4/WAV/M4A):", type=["mp3", "wav", "mp4", "m4a"], key="up_t6")
+    song_url = st.text_input("🔗 گانے کا لنک:", placeholder="https://...", key="song_url")
+    upload_opt3 = st.file_uploader("📂 یا آڈیو فائل منتخب کریں:", type=["mp3", "wav", "mp4", "m4a"], key="up_t3")
     
-    if st.button("🚀 گانے پر 26 اینٹی کاپی رائٹ شیلڈز لگائیں اور لوفی ماسٹر بنائیں", type="primary", key="run_t6"):
+    if st.button("🚀 فاسٹ لوفی بنائیں", type="primary", key="run_t3"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"song_in_{uid}.mp4"
         target_out = f"song_out_{uid}.mp4"
@@ -552,23 +470,14 @@ with tab_lofi:
                     info['title'] = title_fetched
             
         if has_input and os.path.exists(target_in):
-            with st.spinner("⚡ گانے پر تمام 26 اینٹی کاپی رائٹ آڈیو شیلڈز لگائی جا رہی ہیں..."):
+            with st.spinner("لوفی گانا تیار ہو رہا ہے..."):
                 ffmpeg_exe = get_ffmpeg()
                 sample_rate = int(44100 * slow_val)
-                
-                af_song_26 = (
-                    f"highpass=f=40,"
-                    f"asetrate={sample_rate},aresample=44100:async=1,"
-                    f"aecho=0.8:0.88:{reverb_val}:0.4,"
-                    f"bass=g={bass_val}:f=105,treble=g=-3:f=3500,"
-                    f"aphaser=in_gain=0.9:out_gain=0.8:delay=2.5:decay=0.35:speed=0.4:type=t,"
-                    f"alimiter=limit=0.95"
-                )
-                
+                af_filter = f"asetrate={sample_rate},aresample=44100,aecho=0.8:0.88:{reverb_val}:0.4,bass=g=6:f=110"
                 cmd_song = [
                     ffmpeg_exe, "-nostdin", "-y", "-i", target_in,
-                    "-map_metadata", "-1", "-af", af_song_26, "-c:v", "copy",
-                    "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", target_out
+                    "-map_metadata", "-1", "-af", af_filter, "-c:v", "copy",
+                    "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", target_out
                 ]
                 subprocess.run(cmd_song, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
@@ -577,71 +486,14 @@ with tab_lofi:
                     st.session_state.process_ready = True
                     try: os.remove(target_in)
                     except Exception: pass
-
-    if st.session_state.process_ready and st.session_state.current_output_video and "song_out" in st.session_state.current_output_video:
-        st.divider()
-        st.write("#### 🎧 پروسیس شدہ 26-شیلڈ اینٹی کاپی رائٹ گانا:")
-        s_bytes = open(st.session_state.current_output_video, 'rb').read()
-        st.audio(s_bytes)
-        st.download_button(
-            label="📥 محفوظ لوفی گانا ڈاؤنلوڈ کریں (Download Lo-Fi MP4/Audio)",
-            data=s_bytes,
-            file_name=f"lofi_protected_{os.path.basename(st.session_state.current_output_video)}",
-            mime="audio/mp4",
-            use_container_width=True
-        )
-        
-        st.markdown("---")
-        st.write("#### 🧠 گانے کے وائرل لوفی ٹائٹلز، ہیش ٹیگز اور اینیمی تھمب نیل پرامپٹ:")
-        clean_s_title, song_titles, song_tags, song_thumb_prompt = analyze_video_and_generate_exact_prompt(st.session_state.detected_info.get('title', 'Chill Lo-Fi Track'), is_song=True)
-        
-        c_song1, c_song2 = st.columns(2)
-        with c_song1:
-            st.markdown("**🔥 وائرل لوفی ٹائٹلز (1-Click Copy):**")
-            for t in song_titles:
-                st.code(t, language="text")
-            st.markdown("**🏷️ وائرل میوزک ہیش ٹیگز:**")
-            st.code(song_tags, language="text")
-        with c_song2:
-            st.markdown("**🎨 لوفی اینیمی وال پیپر تھمب نیل پرامپٹ:**")
-            st.code(song_thumb_prompt, language="text")
-
-# -----------------
-# TAB 5: PRO AI MOVIE MASTER STUDIO (UNLIMITED)
-# -----------------
-with tab_movie:
-    st.write("### 🎬 Pro AI Cinematic Movie Production (100% Free & Unlimited)")
-    m_script = st.text_area("مووی اسکرپٹ (اردو یا انگلش):", height=120, placeholder="ایک خوبصورت جنگل میں شیر شکار کی تلاش میں ہے...")
-    mc1, mc2, mc3 = st.columns(3)
-    with mc1: mv = st.selectbox("وائس (Voice):", ["Urdu Male (Asad)", "Urdu Female (Uzma)"])
-    with mc2: mr = st.selectbox("ریشو:", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
-    with mc3: ms = st.selectbox("اسٹائل:", ["Realistic HD", "Cinematic Film", "3D Cartoon"])
-    
-    if st.button("Generate Master Movie 🚀"):
-        st.info("اے آئی ویڈیو جنریشن شروع ہو چکی ہے۔")
-
-# -----------------
-# TAB 6: PRO AI IMAGE STUDIO (UNLIMITED)
-# -----------------
-with tab_image:
-    st.write("### 🎨 Pro AI Visual & Canvas Studio (100% Free & Unlimited)")
-    p_i = st.text_area("تصویر کی تفصیل لکھیں:", height=90, placeholder="A high-tech cybernetic warrior standing in neon city...")
-    ic1, ic2 = st.columns(2)
-    with ic1: i_style = st.selectbox("Visual Style:", ["Realistic HD", "Cinematic Film", "3D Cartoon", "Dark Gothic"])
-    with ic2: i_size = st.selectbox("Resolution:", ["YouTube HD (1280x720)", "Square (1:1)", "TikTok (720x1280)"])
-    
-    if st.button("Generate AI Image 🎨"):
-        dim = {"YouTube HD (1280x720)": (1280, 720), "Square (1:1)": (1024, 1024), "TikTok (720x1280)": (720, 1280)}
-        w, h = dim[i_size]
-        img_bytes = fetch_img_failover(p_i, w, h, random.randint(1, 999999))
-        if img_bytes:
-            st.image(img_bytes, caption="Generated AI Image")
+        else:
+            st.error("❌ گانے کا درست لنک دیں یا فائل اپلوڈ کریں۔")
 
 # ==========================================
-# OUTPUT & 1-CLICK COPY DASHBOARD (FOR TAB 1 FULL VIDEO)
+# OUTPUT, 1-CLICK COPY & EXACT LIKENESS DASHBOARD
 # ==========================================
 active_out = st.session_state.current_output_video
-if st.session_state.process_ready and active_out and os.path.exists(active_out) and os.path.getsize(active_out) > 5000 and "song_out" not in active_out:
+if st.session_state.process_ready and active_out and os.path.exists(active_out) and os.path.getsize(active_out) > 5000:
     st.divider()
     st.write("#### 🎬 پروسیس شدہ 100% اینٹی کاپی رائٹ ویڈیو:")
     
@@ -660,7 +512,7 @@ if st.session_state.process_ready and active_out and os.path.exists(active_out) 
     st.write("#### 🧠 اصلی ہیرو کے چہرے والا AI تھمب نیل پرامپٹ و وائرل ٹائٹلز (1-Click Copy):")
     
     raw_title = st.session_state.detected_info.get('title', 'Action Video')
-    clean_hero_title, titles, hashtags, exact_thumb_prompt = analyze_video_and_generate_exact_prompt(raw_title, is_short=False)
+    clean_hero_title, titles, hashtags, exact_thumb_prompt = analyze_video_and_generate_exact_prompt(raw_title)
     
     col_out1, col_out2 = st.columns(2)
     with col_out1:
@@ -675,5 +527,12 @@ if st.session_state.process_ready and active_out and os.path.exists(active_out) 
         st.markdown(f"**🎨 اصلی ہیرو ({clean_hero_title[:30]}) کے چہرے کا تھمب نیل پرامپٹ:**")
         st.info("💡 یہ پرامپٹ اصلی اداکار کے فیشل فیچرز کے ساتھ تیار کیا گیا ہے۔ اوپر دائیں کونے سے کاپی کریں:")
         st.code(exact_thumb_prompt, language="text")
+        
+        with st.expander("🖼️ ایپ کے اندر لائیو AI تھمب نیل دیکھیں اور ڈاؤنلوڈ کریں"):
+            thumb_gen_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(exact_thumb_prompt)}?width=1280&height=720&nologo=true&model=flux"
+            try:
+                st.image(thumb_gen_url, caption="Live AI Generated Thumbnail (Celebrity Likeness Active)", use_column_width=True)
+            except Exception:
+                st.write("پرامپٹ کو کاپی کر کے Midjourney یا Bing Creator میں استعمال کریں۔")
 
-st.markdown("<p style='text-align: center; font-size: 11px; color: #64748b; margin-top: 20px;'>ES Ultra Pure Full-Screen Studio | 100% Free & Unlimited</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 11px; color: #64748b; margin-top: 20px;'>ES Ultra Anti-Copyright & Auto Shorts Studio | Developers: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
