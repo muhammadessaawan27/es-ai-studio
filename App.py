@@ -66,21 +66,21 @@ def get_video_duration_fast(file_path):
         return 300.0
 
 # ==========================================
-# PARALLEL ULTRA-FAST LINK FETCHER
+# PARALLEL ULTRA-FAST MULTI-SOURCE DOWNLOADER
 # ==========================================
 def try_download_node(node_url, vid_id, target_path):
     try:
         api_url = f"{node_url}/api/v1/videos/{vid_id}"
-        res = requests.get(api_url, timeout=3)
+        res = requests.get(api_url, timeout=4)
         if res.status_code == 200:
             data = res.json()
-            title = data.get("title", "Action Video Scene")
+            title = data.get("title", "Movie Video Scene")
             streams = data.get("formatStreams", [])
             mp4s = [s for s in streams if "mp4" in s.get("container", "").lower() or "video/mp4" in s.get("type", "").lower()] or streams
             if mp4s:
                 dl_url = mp4s[-1]["url"]
                 if dl_url.startswith("/"): dl_url = node_url + dl_url
-                r_file = requests.get(dl_url, stream=True, timeout=8)
+                r_file = requests.get(dl_url, stream=True, timeout=12)
                 if r_file.status_code == 200:
                     with open(target_path, "wb") as f:
                         for chunk in r_file.iter_content(chunk_size=1024*1024*4):
@@ -92,10 +92,25 @@ def try_download_node(node_url, vid_id, target_path):
     return False, ""
 
 def download_unblockable_media_parallel(raw_url, target_path):
+    raw_url = raw_url.strip()
     vid_id = extract_yt_id(raw_url)
-    clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url.strip()
-    title = fetch_oembed_title(clean_url) or "Action Video Scene"
+    clean_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else raw_url
+    title = fetch_oembed_title(clean_url) or "Movie Video Scene"
     
+    # 1. Direct Video Link Download (.mp4 / .mkv / direct stream)
+    if any(raw_url.lower().endswith(ext) for ext in ['.mp4', '.mkv', '.mov', '.webm']) or "cdn" in raw_url or "googlevideo" in raw_url:
+        try:
+            r = requests.get(raw_url, stream=True, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code == 200:
+                with open(target_path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=1024*1024*4):
+                        if chunk: f.write(chunk)
+                if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                    return True, title
+        except Exception:
+            pass
+
+    # 2. Invidious Parallel Nodes (For YouTube)
     if vid_id:
         nodes = [
             "https://inv.tux.pizza",
@@ -111,17 +126,22 @@ def download_unblockable_media_parallel(raw_url, target_path):
                 if success:
                     return True, t
                     
+    # 3. Native yt-dlp Multi-Client Engine
     try:
         import yt_dlp
         ydl_opts = {
-            'format': '18/best[height<=720][ext=mp4]/best[ext=mp4]/best',
+            'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/18/best[height<=720]/best',
             'outtmpl': target_path,
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'geo_bypass': True,
-            'socket_timeout': 6,
-            'extractor_args': {'youtube': {'player_client': ['ios', 'android_creator', 'tvhtml5']}}
+            'socket_timeout': 10,
+            'extractor_args': {'youtube': {'player_client': ['android', 'ios', 'web', 'tvhtml5']}},
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Referer': 'https://www.google.com/'
+            }
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             meta = ydl.extract_info(clean_url, download=True)
@@ -157,7 +177,7 @@ def analyze_video_and_generate_exact_prompt(title):
     return clean_t, titles, hashtags, exact_thumb_prompt
 
 # ==========================================
-# AI MOVIE EXPLAINER ENGINE (ASAD DEEP VOICE + BGM)
+# AI MOVIE EXPLAINER ENGINE (ASAD DEEP VOICE + BGM + SUBTITLES)
 # ==========================================
 def extract_audio_for_stt(video_path, audio_out):
     ffmpeg_exe = get_ffmpeg()
@@ -189,7 +209,7 @@ def generate_explainer_script_ai(transcript, movie_hint, duration_type, language
     You are an elite Cinematic Movie & Trailer Explainer Commentator.
     Language: {language}
     Target Duration: {duration_type}
-    Movie / Context Hint: {movie_hint if movie_hint else 'Auto-detect'}
+    Movie / Context Hint: {movie_hint if movie_hint else 'Auto-detect from audio'}
 
     Write an ORIGINAL transformative cinematic narration script (in {language}).
     Analyze the action and dialogues, explain the story, build suspense, and provide viral metadata.
@@ -197,9 +217,9 @@ def generate_explainer_script_ai(transcript, movie_hint, duration_type, language
     Dialogue excerpt:
     \"\"\"{transcript[:7000]}\"\"\"
 
-    Respond in valid JSON format:
+    Respond strictly in valid JSON format:
     {{
-        "seo_title": "Catchy YouTube Title",
+        "seo_title": "Catchy Viral Title",
         "seo_hashtags": "#MovieExplained #TrailerBreakdown #FilmRecap #ViralStory",
         "narration_script": "Full original narration commentary in {language}...",
         "timeline_segments": [
@@ -294,7 +314,7 @@ def render_explainer_final_mp4(video_path, tts_audio, segments, aspect_ratio, ou
     ]
     subprocess.run(cmd_bgm, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    # Combine video + Asad voice (full) + soft ducked BGM (12% volume)
+    # Combine video + Asad voice (full) + soft ducked BGM (10% volume)
     cmd_final = [
         ffmpeg_exe, "-nostdin", "-y",
         "-f", "concat", "-safe", "0", "-i", concat_txt,
@@ -647,19 +667,18 @@ with tab_lofi:
             st.error("❌ گانے کا درست لنک دیں یا فائل اپلوڈ کریں۔")
 
 # -----------------
-# TAB 5: AI MOVIE & TRAILER EXPLAINER STUDIO (NEW INTEGRATED)
+# TAB 5: AI MOVIE & TRAILER EXPLAINER STUDIO (UNIFIED & UNBLOCKABLE)
 # -----------------
 with tab_explainer:
     st.write("### 🎬 AI مووی و ٹریلر ایکسپلینر اسٹوڈیو")
-    st.info("💡 **سنیماٹک ایکسپلینر انجن:** اصل آواز میوٹ کر کے اوپر اسد کی 10% بھاری/سلو آواز میں نیا کہانی کا ریویو + سوفٹ بیک گراؤنڈ میوزک + سب ٹائٹلز لگائے جاتے ہیں۔")
+    st.info("💡 **سنیماٹک ایکسپلینر انجن:** اصل آواز بند کر کے اوپر اسد کی 10% بھاری/سلو آواز میں نیا کہانی کا ریویو + سوفٹ بیک گراؤنڈ میوزک + سب ٹائٹلز لگائے جاتے ہیں۔")
 
     c_ex1, c_ex2 = st.columns([1.5, 1])
     with c_ex1:
-        st.subheader("1. ویڈیو / ٹریلر سورس")
-        ex_input_type = st.radio("سورس منتخب کریں:", ["ویڈیو یا یوٹیوب لنک", "لوکل ویڈیو فائل"], horizontal=True, key="ex_in_type")
-        ex_url = st.text_input("🔗 یوٹیوب / ٹریلر لنک پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=...", key="ex_url") if ex_input_type == "ویڈیو یا یوٹیوب لنک" else ""
-        ex_file = st.file_uploader("📂 یا ویڈیو فائل منتخب کریں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="ex_file") if ex_input_type == "لوکل ویڈیو فائل" else None
-        ex_movie_hint = st.text_input("🎬 مووی کا نام (اختیاری - اگر معلوم ہو):", placeholder="مثلاً: Alpha / Animal / Jawan", key="ex_hint")
+        st.subheader("1. ویڈیو / ٹریلر سورس (لنک یا فائل دونوں دستیاب)")
+        ex_file = st.file_uploader("📂 اپنے موبائل یا کمپیوٹر سے ویڈیو منتخب کریں (فوری اسپیڈ):", type=["mp4", "mov", "mkv", "avi", "webm"], key="ex_file_unified")
+        ex_url = st.text_input("🔗 یا ویڈیو / یوٹیوب / ڈیلی موشن کا لنک یہاں پیسٹ کریں:", placeholder="https://www.youtube.com/watch?v=... یا Shorts لنک", key="ex_url_unified")
+        ex_movie_hint = st.text_input("🎬 مووی یا ٹریلر کا نام (اختیاری):", placeholder="مثلاً: Alpha / Animal / Jawan / Salaar", key="ex_hint_unified")
 
     with c_ex2:
         st.subheader("2. سنیماٹک و ریشو سیٹنگز")
@@ -667,17 +686,17 @@ with tab_explainer:
             "16:9 (یوٹیوب لینڈ اسکیپ)",
             "9:16 (Shorts / Reels / TikTok)",
             "1:1 (Square)"
-        ], key="ex_ratio")
+        ], key="ex_ratio_u")
         ex_dur = st.selectbox("⏱️ دورانیہ (Target Duration):", [
             "1 سے 2 منٹ (ٹریلر بریک ڈاؤن / Shorts)",
             "10 Minutes (فل مووی سمری)",
             "15 Minutes",
             "20 Minutes"
-        ], key="ex_dur")
-        ex_lang = st.selectbox("🗣️ وضاحتی زبان:", ["اردو", "English", "Hindi", "Roman Urdu"], key="ex_lang")
-        ex_gender = st.selectbox("🎙️ وائس اوور:", ["Male (اسد - Deep 10% Slow)", "Female (عظمیٰ)"], key="ex_gender")
+        ], key="ex_dur_u")
+        ex_lang = st.selectbox("🗣️ وضاحتی زبان:", ["اردو", "English", "Hindi", "Roman Urdu"], key="ex_lang_u")
+        ex_gender = st.selectbox("🎙️ وائس اوور:", ["Male (اسد - Deep 10% Slow)", "Female (عظمیٰ)"], key="ex_gender_u")
 
-    if st.button("🎬 مکمل ایکسپلینر ویڈیو بنائیں (Create Movie Explainer)", type="primary", key="btn_run_explainer"):
+    if st.button("🎬 مکمل ایکسپلینر ویڈیو بنائیں (Create Movie Explainer)", type="primary", key="btn_run_explainer_u"):
         uid = str(uuid.uuid4())[:8]
         target_in = f"exp_in_{uid}.mp4"
         target_out = f"exp_final_{uid}.mp4"
@@ -689,9 +708,10 @@ with tab_explainer:
         if ex_file is not None:
             with open(target_in, "wb") as f:
                 f.write(ex_file.getbuffer())
-            has_input = True
+            if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
+                has_input = True
         elif ex_url.strip():
-            with st.spinner("🔗 ٹریلر / مووی ڈاؤنلوڈ ہو رہی ہے..."):
+            with st.spinner("🔗 پیرلل ملٹی سرور سے ویڈیو ڈاؤنلوڈ ہو رہی ہے..."):
                 success, _ = download_unblockable_media_parallel(ex_url.strip(), target_in)
                 if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
                     has_input = True
@@ -739,7 +759,7 @@ with tab_explainer:
             except Exception as ex:
                 st.error(f"❌ خرابی: {str(ex)}")
         else:
-            st.error("❌ درست ویڈیو لنک دیں یا فائل اپلوڈ کریں۔")
+            st.error("❌ برائے مہربانی ویڈیو لنک دیں یا اوپر 'Browse files' پر کلک کر کے ویڈیو فائل منتخب کریں۔")
 
     if st.session_state.explainer_ready and st.session_state.explainer_data:
         exp_info = st.session_state.explainer_data
