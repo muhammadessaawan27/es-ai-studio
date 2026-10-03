@@ -61,74 +61,92 @@ def get_video_duration_fast(file_path):
         cmd = [ffprobe_exe, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", file_path]
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
         dur = float(res.stdout.strip())
-        return dur if dur > 0 else 300.0
+        return dur if dur > 0 else 60.0
     except Exception:
-        return 300.0
+        return 60.0
 
 # ==========================================
-# CLOUD-STREAM AUTO SEARCH ENGINE (ZERO GB DOWNLOAD)
+# PARALLEL ULTRA-FAST MULTI-SOURCE DOWNLOADER
 # ==========================================
-def auto_fetch_movie_stream_clips(movie_name_or_url, target_path):
-    """
-    Directly extracts fast 360p/480p lightweight stream clips (under 20MB) without downloading huge 1GB files!
-    """
-    input_str = movie_name_or_url.strip()
+def try_download_node(node_url, vid_id, target_path):
+    try:
+        api_url = f"{node_url}/api/v1/videos/{vid_id}"
+        res = requests.get(api_url, timeout=4)
+        if res.status_code == 200:
+            data = res.json()
+            title = data.get("title", "Movie Video Scene")
+            streams = data.get("formatStreams", [])
+            mp4s = [s for s in streams if "mp4" in s.get("container", "").lower() or "video/mp4" in s.get("type", "").lower()] or streams
+            if mp4s:
+                dl_url = mp4s[-1]["url"]
+                if dl_url.startswith("/"): dl_url = node_url + dl_url
+                r_file = requests.get(dl_url, stream=True, timeout=12)
+                if r_file.status_code == 200:
+                    with open(target_path, "wb") as f:
+                        for chunk in r_file.iter_content(chunk_size=1024*1024*4):
+                            if chunk: f.write(chunk)
+                    if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                        return True, title
+    except Exception:
+        pass
+    return False, ""
+
+def download_unblockable_media_parallel(input_query_or_url, target_path):
+    input_str = input_query_or_url.strip()
     is_url = bool(re.match(r'^https?://', input_str, re.IGNORECASE))
-    target_query = input_str if is_url else f"ytsearch1:{input_str} movie best action climax scene"
-    
     title = input_str if not is_url else "Movie Video Scene"
-    
+
+    if is_url and any(input_str.lower().endswith(ext) for ext in ['.mp4', '.mkv', '.mov', '.webm']):
+        try:
+            r = requests.get(input_str, stream=True, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code == 200:
+                with open(target_path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=1024*1024*4):
+                        if chunk: f.write(chunk)
+                if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
+                    return True, title
+        except Exception:
+            pass
+
+    vid_id = extract_yt_id(input_str)
+    if vid_id:
+        title = fetch_oembed_title(f"https://www.youtube.com/watch?v={vid_id}") or title
+        nodes = [
+            "https://inv.tux.pizza",
+            "https://invidious.nerdvpn.de",
+            "https://invidious.privacydev.net",
+            "https://invidious.drgns.space",
+            "https://invidious.projectsegfau.lt"
+        ]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(try_download_node, node, vid_id, target_path) for node in nodes]
+            for future in concurrent.futures.as_completed(futures):
+                success, t = future.result()
+                if success:
+                    return True, t
+
     try:
         import yt_dlp
-        # Ultra lightweight 360p/480p format - finishes in 3-5 seconds!
         ydl_opts = {
-            'format': '18/best[height<=480][ext=mp4]/bestvideo[height<=480]+bestaudio/best[height<=480]/best',
+            'format': '18/best[height<=480][ext=mp4]/best[height<=480]/best',
             'outtmpl': target_path,
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'geo_bypass': True,
             'socket_timeout': 8,
-            'extractor_args': {'youtube': {'player_client': ['android', 'ios', 'web', 'tvhtml5']}},
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                'Referer': 'https://www.google.com/'
-            }
+            'extractor_args': {'youtube': {'player_client': ['android', 'ios', 'web']}},
+            'http_headers': {'User-Agent': 'Mozilla/5.0'}
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            meta = ydl.extract_info(target_query, download=True)
-            if meta and 'entries' in meta and len(meta['entries']) > 0:
-                title = meta['entries'][0].get('title', input_str)
-            elif meta:
-                title = meta.get('title', input_str)
-        if os.path.exists(target_path) and os.path.getsize(target_path) > 5000:
+            meta = ydl.extract_info(input_str, download=True)
+            if meta: title = meta.get('title', title)
+        if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
             return True, title
     except Exception:
         pass
 
-    # Direct Invidious Search Fallback
-    if not is_url:
-        try:
-            search_api = f"https://invidious.nerdvpn.de/api/v1/search?q={urllib.parse.quote(input_str + ' movie scene')}&type=video"
-            r = requests.get(search_api, timeout=4)
-            if r.status_code == 200 and len(r.json()) > 0:
-                v_id = r.json()[0].get('videoId')
-                if v_id:
-                    dl_url = f"https://invidious.nerdvpn.de/latest_version?id={v_id}&itag=18"
-                    r_f = requests.get(dl_url, stream=True, timeout=8)
-                    if r_f.status_code == 200:
-                        with open(target_path, "wb") as f:
-                            for chunk in r_f.iter_content(chunk_size=1024*1024*2):
-                                if chunk: f.write(chunk)
-                        if os.path.exists(target_path) and os.path.getsize(target_path) > 5000:
-                            return True, input_str
-        except Exception:
-            pass
-
     return False, title
-
-def download_unblockable_media_parallel(input_query_or_url, target_path):
-    return auto_fetch_movie_stream_clips(input_query_or_url, target_path)
 
 # ==========================================
 # CELEBRITY EXACT-LIKENESS THUMBNAIL & METADATA
@@ -154,28 +172,33 @@ def analyze_video_and_generate_exact_prompt(title):
     return clean_t, titles, hashtags, exact_thumb_prompt
 
 # ==========================================
-# AI MOVIE EXPLAINER ENGINE
+# MULTI-SCENE DYNAMIC RUNNING MOVIE ENGINE
 # ==========================================
-def generate_explainer_script_ai(movie_name, duration_type, language):
+def generate_rich_story_and_multi_scenes(movie_title, duration_type, language):
+    """
+    Generates a full comprehensive story with 6-8 distinct visual scenes that will change during the video
+    """
     prompt = f"""
-    You are an elite Cinematic Movie Explainer and Film Critic.
+    You are an elite Movie Explainer and Film Storyteller.
     Language: {language}
     Target Duration: {duration_type}
-    Movie / Story Title: {movie_name}
+    Movie / Story Title: {movie_title}
 
-    Write a captivating, ORIGINAL transformative cinematic narration script (in {language}).
-    Explain the full story plot, major twists, thrilling climax action, character tensions, and provide viral YouTube metadata.
-    Do NOT copy verbatim dialogues. Provide a complete compelling story breakdown.
+    Create an EPIC, continuous, gripping movie recap script in {language}.
+    Breakdown the story progression into 6 distinct action/cinematic visual scenes (with English image prompts for each scene).
 
     Respond strictly in valid JSON format:
     {{
-        "seo_title": "{movie_name} - Full Story Explained in {language} (Shocking Climax)",
-        "seo_hashtags": "#MovieExplained #StoryRecap #{movie_name.replace(' ', '')} #FilmReview",
-        "narration_script": "Full original narration commentary in {language} with dramatic suspense and storytelling...",
-        "timeline_segments": [
-            {{"start": 0, "end": 20}},
-            {{"start": 25, "end": 50}},
-            {{"start": 55, "end": 80}}
+        "seo_title": "{movie_title} - Full Story Explained in {language} (Shocking Climax)",
+        "seo_hashtags": "#MovieExplained #StoryRecap #{movie_title.replace(' ', '')} #FilmReview",
+        "narration_script": "Full complete detailed story narration in {language} with dramatic suspense, plot twists, character confrontations, and full climax resolution...",
+        "visual_scenes": [
+            "Cinematic 8K movie scene, hero introduction in dark city streets, cinematic lighting, photorealistic film still",
+            "Dramatic action shootout scene inside abandoned warehouse, fire sparks, cinematic smoke",
+            "High speed car chase night scene on highway, cinematic action explosion background",
+            "Intense emotional confrontation between hero and villain in heavy rain, dramatic facial expression",
+            "Massive hand-to-hand fight battle climax, intense martial arts action, sparks flying",
+            "Epic final sunset resolution scene, hero standing victorious, blockbuster cinematic wide shot"
         ]
     }}
     """
@@ -195,10 +218,15 @@ def generate_explainer_script_ai(movie_name, duration_type, language):
         except Exception: pass
 
     return {
-        "seo_title": f"{movie_name} - Full Story Explained in {language}",
-        "seo_hashtags": f"#MovieExplained #StoryRecap #{movie_name.replace(' ', '')}",
-        "narration_script": f"کہانی کا آغاز ایک سنسنی خیز موڑ سے ہوتا ہے۔ فلم {movie_name} میں مرکزی کردار کو جب معلوم ہوتا ہے کہ حالات اس کے قابو سے باہر ہو رہے ہیں، تو وہ تن تنہا سب سے بڑے دشمن کے سامنے ڈٹ جاتا ہے۔ ہر ایکشن اور موڑ کہانی کو ایک نیا رنگ دیتا ہے۔",
-        "timeline_segments": [{"start": 0, "end": 35}]
+        "seo_title": f"{movie_title} - Full Story Explained in {language}",
+        "seo_hashtags": f"#MovieExplained #StoryRecap #{movie_title.replace(' ', '')}",
+        "narration_script": f"کہانی کی شروعات ایک پراسرار اور خوفناک واقعے سے ہوتی ہے۔ {movie_title} میں مرکزی کردار کو جب معلوم ہوتا ہے کہ حالات اس کے خلاف ایک بڑی سازش بن چکے ہیں، تو وہ تن تنہا دشمنوں کی پوری فوج کے سامنے آ کھڑا ہوتا ہے۔ راستے میں آنے والے ہر خطرے کو پار کرتے ہوئے، وہ اپنے بدلے اور انصاف کے لیے آخری حد تک جاتا ہے۔ کلائمیکس میں ہونے والا فیصلہ کن مقابلہ کہانی کو ایک سنسنی خیز انجام تک پہنچا دیتا ہے۔",
+        "visual_scenes": [
+            f"Cinematic 8K action hero introduction shot of {movie_title}, dramatic lighting, blockbuster movie still",
+            f"Intense gunfight and car chase action scene of {movie_title}, motion blur, explosion background",
+            f"Dramatic confrontation between hero and villain of {movie_title} in rain, hyper-realistic cinematic look",
+            f"Epic climax battle and fight explosion of {movie_title}, sparks flying, award-winning cinematography"
+        ]
     }
 
 async def generate_voiceover_asad(text, output_file, language, gender="Male"):
@@ -226,22 +254,19 @@ def create_srt_file(script, output_srt):
             end = time.strftime('%H:%M:%S,000', time.gmtime(idx*3))
             f.write(f"{idx}\n{start} --> {end}\n{line}\n\n")
 
-def generate_cinematic_motion_scenes(movie_name, target_video_path, aspect_ratio, duration=45):
+def render_multi_scene_running_movie(scenes_prompts, audio_narration_path, aspect_ratio, output_mp4, progress_bar, status_text):
     """
-    Ultra-reliable cinematic HD visual generator: creates motion scene visuals for the movie instantly
+    Renders multiple dynamic changing motion scenes stitched smoothly across the entire voiceover length!
     """
     ffmpeg_exe = get_ffmpeg()
-    temp_img = target_video_path.replace(".mp4", "_poster.jpg")
+    temp_dir = os.path.dirname(output_mp4)
+    total_audio_dur = get_video_duration_fast(audio_narration_path)
     
-    prompt = f"Cinematic epic 8K action movie scene of {movie_name}, dramatic lighting, sparks and smoke, blockbuster film shot"
-    img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width=1280&height=720&nologo=true"
-    
-    try:
-        r = requests.get(img_url, timeout=8)
-        if r.status_code == 200:
-            with open(temp_img, "wb") as f:
-                f.write(r.content)
-    except Exception: pass
+    num_scenes = max(4, len(scenes_prompts))
+    per_scene_dur = max(5.0, total_audio_dur / num_scenes)
+
+    status_text.write(f"🎨 کل {num_scenes} مختلف سنیماٹک ایکشن مناظر تیار اور رینڈر ہو رہے ہیں...")
+    progress_bar.progress(55)
 
     if aspect_ratio == "9:16 (Shorts / Reels / TikTok)":
         scale_cmd = "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280"
@@ -250,67 +275,66 @@ def generate_cinematic_motion_scenes(movie_name, target_video_path, aspect_ratio
     else:
         scale_cmd = "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720"
 
-    if os.path.exists(temp_img):
-        vf_filter = f"loop=loop=-1:size=1:start=0,{scale_cmd},zoompan=z='min(zoom+0.0015,1.22)':d={duration*25}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1280x720,format=yuv420p"
-        cmd = [
-            ffmpeg_exe, "-nostdin", "-y", "-i", temp_img,
-            "-t", str(duration), "-vf", vf_filter,
-            "-r", "25", "-c:v", "libx264", "-preset", "ultrafast", target_video_path
-        ]
-    else:
-        cmd = [
-            ffmpeg_exe, "-nostdin", "-y", "-f", "lavfi", "-i", f"color=c=black:s=1280x720:d={duration}",
-            "-vf", scale_cmd, "-c:v", "libx264", "-preset", "ultrafast", target_video_path
-        ]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return target_video_path
+    scene_clips = []
+    
+    # Render each scene with different motion directions (Zoom In, Pan Left, Tilt, Zoom Out)
+    for idx, prompt in enumerate(scenes_prompts):
+        img_path = os.path.join(temp_dir, f"scene_img_{idx}.jpg")
+        clip_path = os.path.join(temp_dir, f"scene_clip_{idx}.mp4")
+        
+        # Fast Image Generation
+        img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width=1280&height=720&nologo=true&model=flux"
+        try:
+            r = requests.get(img_url, timeout=7)
+            if r.status_code == 200:
+                with open(img_path, "wb") as f:
+                    f.write(r.content)
+        except Exception: pass
 
-def render_explainer_final_mp4(video_path, tts_audio, segments, aspect_ratio, output_mp4):
-    ffmpeg_exe = get_ffmpeg()
-    temp_dir = os.path.dirname(output_mp4)
-    concat_txt = os.path.join(temp_dir, "concat_exp.txt")
-    clips = []
+        # Motion Effects variation per scene
+        if idx % 2 == 0:
+            zoom_expr = "zoompan=z='min(zoom+0.002,1.25)':d=125:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+        else:
+            zoom_expr = "zoompan=z='if(lte(zoom,1.0),1.22,max(1.001,zoom-0.0018))':d=125:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
 
-    if aspect_ratio == "9:16 (Shorts / Reels / TikTok)":
-        scale_filter = "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280"
-    elif aspect_ratio == "1:1 (Square)":
-        scale_filter = "scale=720:720:force_original_aspect_ratio=increase,crop=720:720"
-    else:
-        scale_filter = "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720"
+        if os.path.exists(img_path):
+            vf_filter = f"loop=loop=-1:size=1:start=0,{scale_cmd},{zoom_expr}:s=1280x720,format=yuv420p"
+            cmd_clip = [
+                ffmpeg_exe, "-nostdin", "-y", "-i", img_path,
+                "-t", str(per_scene_dur), "-vf", vf_filter,
+                "-r", "25", "-c:v", "libx264", "-preset", "ultrafast", clip_path
+            ]
+        else:
+            cmd_clip = [
+                ffmpeg_exe, "-nostdin", "-y", "-f", "lavfi", "-i", f"color=c=black:s=1280x720:d={per_scene_dur}",
+                "-vf", scale_cmd, "-c:v", "libx264", "-preset", "ultrafast", clip_path
+            ]
+        subprocess.run(cmd_clip, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if os.path.exists(clip_path):
+            scene_clips.append(clip_path)
 
-    for i, seg in enumerate(segments[:8]):
-        start = seg.get("start", i * 15)
-        end = seg.get("end", start + 15)
-        dur = max(3, end - start)
-        seg_file = os.path.join(temp_dir, f"exp_clip_{i}.mp4")
-        cmd = [
-            ffmpeg_exe, "-nostdin", "-y", "-ss", str(start), "-i", video_path,
-            "-t", str(dur), "-vf", scale_filter, "-an", "-c:v", "libx264", "-preset", "ultrafast", seg_file
-        ]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if os.path.exists(seg_file):
-            clips.append(seg_file)
-
-    if not clips:
-        clips = [video_path]
-
+    # Stitch all scenes together
+    concat_txt = os.path.join(temp_dir, "concat_scenes.txt")
     with open(concat_txt, "w") as f:
-        for c in clips:
-            f.write(f"file '{c}'\n")
+        for sc in scene_clips:
+            f.write(f"file '{sc}'\n")
 
-    # Generate subtle ambient background pad
+    # Ambient soft BGM
     bgm_file = os.path.join(temp_dir, "ambient_bgm.mp3")
     cmd_bgm = [
-        ffmpeg_exe, "-nostdin", "-y", "-f", "lavfi", "-i", "anoisesrc=d=120:c=pink:r=44100:a=0.012",
+        ffmpeg_exe, "-nostdin", "-y", "-f", "lavfi", "-i", f"anoisesrc=d={int(total_audio_dur)+10}:c=pink:r=44100:a=0.012",
         "-af", "lowpass=f=380,volume=0.12", bgm_file
     ]
     subprocess.run(cmd_bgm, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    # Combine video + Asad voice (full) + soft ducked BGM (10% volume)
+    status_text.write("🎞️ تمام مناظر کو اسد کی بھاری آواز اور بی جی ایم کے ساتھ جوڑا جا رہا ہے...")
+    progress_bar.progress(85)
+
+    # Final Merged Render matching exact voiceover duration
     cmd_final = [
         ffmpeg_exe, "-nostdin", "-y",
         "-f", "concat", "-safe", "0", "-i", concat_txt,
-        "-i", tts_audio,
+        "-i", audio_narration_path,
         "-i", bgm_file,
         "-filter_complex", "[1:a]volume=1.25[a1];[2:a]volume=0.10[a2];[a1][a2]amix=inputs=2:duration=first[aout]",
         "-map", "0:v:0", "-map", "[aout]",
@@ -318,6 +342,7 @@ def render_explainer_final_mp4(video_path, tts_audio, segments, aspect_ratio, ou
         output_mp4
     ]
     subprocess.run(cmd_final, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return output_mp4
 
 # ==========================================
 # SLEEK COMPACT DASHBOARD STYLING
@@ -343,20 +368,20 @@ st.markdown("""
 
 st.markdown("""
 <div class="compact-header">
-    <div class="compact-title">⚡ ES ULTRA ANTI-COPYRIGHT, AUTO SHORTS & EXPLAINER STUDIO</div>
-    <div class="badge">10 SHIELDS + VIRAL SHORTS + AUTO MOVIE EXPLAINER</div>
+    <div class="compact-title">⚡ ES ULTRA ANTI-COPYRIGHT, AUTO SHORTS & MULTI-SCENE MOVIE STUDIO</div>
+    <div class="badge">10 SHIELDS + VIRAL SHORTS + MULTI-SCENE EXPLAINER</div>
 </div>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# NAVIGATION TABS (ORIGINAL 4 LOCKED + TAB 5 EXPLAINER)
+# NAVIGATION TABS (ORIGINAL 4 LOCKED + TAB 5 MULTI-SCENE)
 # ==========================================
 tab_shield, tab_shorts, tab_clip, tab_lofi, tab_explainer = st.tabs([
     "🛡️ 1. فل اینٹی کاپی رائٹ شیلڈ (10 ہتھیار + تھمب نیل)",
     "📱 2. آٹومیٹک وائرل شارٹس کٹر (New - 1 تا 5 شارٹس)",
     "⚔️ 3. کلپ کٹر (10 تا 20 منٹ کٹ)",
     "🎧 4. لوفی گانے (Slowed + Reverb)",
-    "🎬 5. AI مووی ایکسپلینر (صرف مووی کا نام لکھیں)"
+    "🎬 5. AI ملٹی سین مووی ایکسپلینر (مکمل کہانی + تبدیل ہوتے مناظر)"
 ])
 
 # -----------------
@@ -659,122 +684,98 @@ with tab_lofi:
             st.error("❌ گانے کا درست لنک دیں یا فائل اپلوڈ کریں۔")
 
 # -----------------
-# TAB 5: ZERO-EFFORT AUTO MOVIE EXPLAINER (NAME ONLY)
+# TAB 5: MULTI-SCENE DYNAMIC MOVIE EXPLAINER STUDIO
 # -----------------
 with tab_explainer:
-    st.write("### 🎬 AI مووی ایکسپلینر اسٹوڈیو (صرف نام لکھیں)")
-    st.info("💡 **زیرو ڈیٹا موڈ:** آپ کو 1000MB کی فلم ڈاؤنلوڈ کرنے کی ضرورت نہیں! صرف مووی کا نام لکھیں، AI خود کلپس تلاش کرے گا، پوری کہانی کا جائزہ لے گا، اور اسد کی 10% بھاری آواز میں مکمل ایکسپلینر ویڈیو تیار کرے گا۔")
+    st.write("### 🎬 AI ملٹی سین مووی ایکسپلینر اسٹوڈیو (Multi-Scene Running Video)")
+    st.info("💡 **رننگ ویڈیو انجن:** صرف مووی یا کہانی کا عنوان لکھیں! AI پوری کہانی کے مطابق 6 سے 8 مختلف ایکشن مناظر کو حرکت (Motion/Pan) کے ساتھ چلائے گا اور اسد کی 10% بھاری آواز میں مکمل ویڈیو بنائے گا۔")
 
     c_ex1, c_ex2 = st.columns([1.5, 1])
     with c_ex1:
-        st.subheader("1. مووی کا نام درج کریں")
-        ex_movie_name = st.text_input(
-            "🎬 مووی کا نام یہاں لکھیں (یا لنک ڈالیں):",
-            placeholder="مثلاً: Animal / KGF 2 / Jawan / Alpha / Salaar",
-            key="ex_movie_name_field"
+        st.subheader("1. مووی کا نام یا کہانی کا عنوان لکھیں")
+        ex_movie_title = st.text_input(
+            "🎬 مووی کا نام یا کوئی بھی کہانی کا عنوان:",
+            placeholder="مثلاً: Animal / KGF 2 / Jawan / Salaar / Dracula Horror Story",
+            key="ex_movie_title_final"
         )
-        st.caption("✨ صرف نام ٹائپ کریں اور نیچے بٹن دبا دیں، باقی سارا کام AI خود کرے گا!")
-        
-        with st.expander("📂 (اختیاری) اگر آپ کے پاس اپنی ویڈیو فائل موجود ہو تو یہاں لگائیں:"):
-            ex_optional_file = st.file_uploader("ویڈیو فائل چنیں:", type=["mp4", "mov", "mkv", "avi", "webm"], key="ex_opt_file")
+        st.caption("✨ کوئی بھی عنوان لکھیں، AI خود اس کے ملٹی پل ایکشن مناظر اور کہانی تیار کر کے ویڈیو رن کرے گا۔")
 
     with c_ex2:
-        st.subheader("2. سنیماٹک و ریشو سیٹنگز")
-        ex_ratio = st.selectbox("📐 ویڈیو سائز (Aspect Ratio):", [
+        st.subheader("2. ویڈیو و وائس سیٹنگز")
+        ex_ratio = st.selectbox("📐 ویڈیو کا سائز (Aspect Ratio):", [
             "16:9 (یوٹیوب لینڈ اسکیپ)",
             "9:16 (Shorts / Reels / TikTok)",
             "1:1 (Square)"
-        ], key="ex_ratio_box_final")
+        ], key="ex_ratio_f")
         ex_dur = st.selectbox("⏱️ دورانیہ (Target Duration):", [
-            "1 سے 2 منٹ (ٹریلر بریک ڈاؤن / Shorts)",
+            "1 سے 2 منٹ (فاسٹ شارٹس / ریلز)",
             "10 Minutes (فل مووی سمری)",
             "15 Minutes",
             "20 Minutes"
-        ], key="ex_dur_box_final")
-        ex_lang = st.selectbox("🗣️ وضاحتی زبان:", ["اردو", "English", "Hindi", "Roman Urdu"], key="ex_lang_box_final")
-        ex_gender = st.selectbox("🎙️ وائس اوور:", ["Male (اسد - Deep 10% Slow)", "Female (عظمیٰ)"], key="ex_gender_box_final")
+        ], key="ex_dur_f")
+        ex_lang = st.selectbox("🗣️ وضاحتی زبان:", ["اردو", "English", "Hindi", "Roman Urdu"], key="ex_lang_f")
+        ex_gender = st.selectbox("🎙️ وائس اوور:", ["Male (اسد - Deep 10% Slow)", "Female (عظمیٰ)"], key="ex_gender_f")
 
-    if st.button("🎬 مووی ایکسپلینر تیار کریں (Create Movie Explainer)", type="primary", key="btn_run_movie_auto"):
-        if not ex_movie_name.strip() and ex_optional_file is None:
-            st.error("⚠️ برائے مہربانی مووی کا نام لکھیں (جیسے: Animal یا KGF)۔")
+    if st.button("🎬 مکمل ملٹی سین مووی تیار کریں (Create Movie Explainer)", type="primary", key="btn_run_multi_scene"):
+        if not ex_movie_title.strip():
+            st.error("⚠️ برائے مہربانی مووی کا نام یا کہانی کا عنوان درج کریں۔")
         else:
             uid = str(uuid.uuid4())[:8]
-            target_in = f"exp_in_{uid}.mp4"
-            target_out = f"exp_final_{uid}.mp4"
+            target_out = f"exp_multi_{uid}.mp4"
             tts_audio = f"exp_tts_{uid}.mp3"
             srt_path = f"exp_sub_{uid}.srt"
-            has_input = False
-            
-            movie_title = ex_movie_name.strip() if ex_movie_name.strip() else "Blockbuster Film"
+            movie_name = ex_movie_title.strip()
 
             progress_bar = st.progress(10)
             status_text = st.empty()
 
-            # 1. OPTIONAL FILE CHECK
-            if ex_optional_file is not None:
-                with open(target_in, "wb") as f:
-                    f.write(ex_optional_file.getbuffer())
-                if os.path.exists(target_in) and os.path.getsize(target_in) > 1000:
-                    has_input = True
-                    movie_title = ex_optional_file.name
+            try:
+                # 1. AI Story & Multi-Scene Prompts Breakdown
+                status_text.write(f"🧠 '{movie_name}' کی کہانی اور 6 مختلف سنیماٹک ایکشن مناظر تیار ہو رہے ہیں...")
+                progress_bar.progress(30)
+                data = generate_rich_story_and_multi_scenes(movie_name, ex_dur, ex_lang)
 
-            # 2. AUTO-STREAM CLIPS FROM MOVIE NAME (UNDER 20MB)
-            elif ex_movie_name.strip():
-                status_text.write(f"🔍 '{movie_title}' کے کلپس کلاؤڈ اسٹریم سے نکالے جا رہے ہیں...")
-                success, stream_title = auto_fetch_movie_stream_clips(movie_title, target_in)
-                if success and os.path.exists(target_in) and os.path.getsize(target_in) > 5000:
-                    has_input = True
-                    movie_title = stream_title
-                else:
-                    # 3. INSTANT AI CINEMATIC MOTION SCENE CREATOR (ZERO FAIL GUARANTEE)
-                    status_text.write(f"⚡ '{movie_title}' کے الٹرا ایچ ڈی موشن سینز تیار ہو رہے ہیں...")
-                    generate_cinematic_motion_scenes(movie_title, target_in, ex_ratio, duration=45)
-                    if os.path.exists(target_in):
-                        has_input = True
+                # 2. Asad Voiceover (10% Deep & Slow)
+                status_text.write("🎙️ اسد کی بھاری اور سلو آواز میں مکمل وائس اوور ریکارڈ ہو رہا ہے...")
+                progress_bar.progress(50)
+                gender_val = "Male" if "Male" in ex_gender else "Female"
+                asyncio.run(generate_voiceover_asad(data["narration_script"], tts_audio, ex_lang, gender_val))
+                create_srt_file(data["narration_script"], srt_path)
 
-            if has_input and os.path.exists(target_in):
-                try:
-                    # Generate Story & Narration
-                    status_text.write(f"🧠 '{movie_title[:35]}' کی مکمل کہانی اور وائرل اسکرپٹ بن رہا ہے...")
-                    progress_bar.progress(40)
-                    data = generate_explainer_script_ai(movie_title, ex_dur, ex_lang)
+                # 3. Render Multi-Scene Running Video with Motion
+                status_text.write("🎞️ تمام مناظر کو موشن زوم اور بیک گراؤنڈ میوزک کے ساتھ رینڈر کیا جا رہا ہے...")
+                progress_bar.progress(70)
+                render_multi_scene_running_movie(
+                    data.get("visual_scenes", []),
+                    tts_audio,
+                    ex_ratio,
+                    target_out,
+                    progress_bar,
+                    status_text
+                )
+                progress_bar.progress(100)
 
-                    # Asad Voiceover (10% Deep & Slow)
-                    status_text.write("🎙️ اسد کی بھاری آواز میں وائس اوور ریکارڈ ہو رہا ہے...")
-                    progress_bar.progress(65)
-                    gender_val = "Male" if "Male" in ex_gender else "Female"
-                    asyncio.run(generate_voiceover_asad(data["narration_script"], tts_audio, ex_lang, gender_val))
-                    create_srt_file(data["narration_script"], srt_path)
-
-                    # FFmpeg Video Render
-                    status_text.write("🎞️ FFmpeg رینڈرنگ اور سوفٹ بی جی ایم مکس ہو رہا ہے...")
-                    progress_bar.progress(85)
-                    render_explainer_final_mp4(target_in, tts_audio, data.get("timeline_segments", []), ex_ratio, target_out)
-                    progress_bar.progress(100)
-
-                    if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
-                        status_text.success("🎉 آپ کی مووی ایکسپلینر ویڈیو کامیابی سے تیار ہو گئی ہے!")
-                        st.session_state.explainer_ready = True
-                        st.session_state.explainer_data = {
-                            "video": target_out,
-                            "srt": srt_path,
-                            "data": data,
-                            "title": movie_title
-                        }
-                except Exception as ex:
-                    st.error(f"❌ خرابی: {str(ex)}")
-            else:
-                st.error("❌ ویڈیو پراسیس نہیں ہو سکی۔")
+                if os.path.exists(target_out) and os.path.getsize(target_out) > 5000:
+                    status_text.success("🎉 آپ کا ملٹی سین رننگ مووی ایکسپلینر کامیابی سے تیار ہو گیا ہے!")
+                    st.session_state.explainer_ready = True
+                    st.session_state.explainer_data = {
+                        "video": target_out,
+                        "srt": srt_path,
+                        "data": data,
+                        "title": movie_name
+                    }
+            except Exception as ex:
+                st.error(f"❌ خرابی: {str(ex)}")
 
     if st.session_state.explainer_ready and st.session_state.explainer_data:
         exp_info = st.session_state.explainer_data
         st.divider()
-        st.subheader("🎬 تیار شدہ مووی ایکسپلینر ویڈیو:")
+        st.subheader("🎬 تیار شدہ ملٹی سین مووی ایکسپلینر ویڈیو:")
         c_res1, c_res2 = st.columns([1.4, 1.0])
         with c_res1:
             vid_bytes = open(exp_info["video"], "rb").read()
             st.video(vid_bytes)
-            st.download_button("📥 ڈاؤنلوڈ ایکسپلینر ویڈیو (MP4)", vid_bytes, file_name="AI_Movie_Explainer.mp4", mime="video/mp4", use_container_width=True)
+            st.download_button("📥 ڈاؤنلوڈ مووی ایکسپلینر ویڈیو (MP4)", vid_bytes, file_name=f"{exp_info['title']}_Explainer.mp4", mime="video/mp4", use_container_width=True)
         with c_res2:
             st.markdown(f"**🔥 وائرل ٹائٹل:** `{exp_info['data'].get('seo_title')}`")
             st.markdown(f"**🏷️ ہیش ٹیگز:** `{exp_info['data'].get('seo_hashtags')}`")
