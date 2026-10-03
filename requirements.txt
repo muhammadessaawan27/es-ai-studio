@@ -1,6 +1,8 @@
 streamlit
-yt-dlp>=2025.1.1
 edge-tts
-openai
-groq
 requests
+Pillow
+numpy
+imageio-ffmpeg
+yt-dlp
+moviepy
