@@ -50,6 +50,9 @@ k_part2 = "095c3dzWGdyb3FYFAfofbSAEEY8HyEzretGFrg4"
 GROQ_API_KEY = k_part1 + k_part2
 client = Groq(api_key=GROQ_API_KEY)
 
+# 100% ایکٹیو ماڈل کا نام
+ACTIVE_MODEL = "llama-3.1-8b-instant"
+
 # مستقل سسٹم قانون
 SYSTEM_PROMPT = (
     "تم محمد عیسیٰ کے ذاتی، خودمختار اور بااختیار AI اسسٹنٹ ہو۔ "
@@ -65,6 +68,7 @@ if "messages" not in st.session_state:
 with st.sidebar:
     st.title("⚙️ کنٹرول روم")
     st.success("سسٹم پاور: فعال ✅")
+    st.info(f"ماڈل: {ACTIVE_MODEL}")
     st.info(f"💾 محفوظ شدہ میموری: {len(st.session_state.messages)} پیغامات")
     
     if st.button("🧹 تمام یادداشت صاف کریں (Clear Memory)"):
@@ -79,19 +83,16 @@ tab1, tab2, tab3 = st.tabs(["⚡ مشن کنٹرول (چیٹ)", "🏗️ ویب 
 with tab1:
     st.subheader("💬 لائیو مشن کمانڈ")
     
-    # پرانی تمام محفوظ شدہ چیٹ دکھائیں
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
             
     if prompt := st.chat_input("اپنا حکم یا سوال یہاں لکھیں..."):
-        # نیا پیغام شامل اور محفوظ کریں
         st.session_state.messages.append({"role": "user", "content": prompt})
         save_permanent_memory(st.session_state.messages)
         with st.chat_message("user"):
             st.markdown(prompt)
             
-        # پچھلی پوری تاریخ AI کو بھیجیں تاکہ وہ سب کچھ یاد رکھے
         messages_payload = [{"role": "system", "content": SYSTEM_PROMPT}] + [
             {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
         ]
@@ -101,7 +102,7 @@ with tab1:
             full_res = ""
             try:
                 stream = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model=ACTIVE_MODEL,
                     messages=messages_payload,
                     temperature=0.7,
                     max_tokens=3000,
@@ -114,7 +115,6 @@ with tab1:
             except Exception as e:
                 st.error(f"خرابی: {e}")
                 
-        # جواب مستقل محفوظ کریں
         st.session_state.messages.append({"role": "assistant", "content": full_res})
         save_permanent_memory(st.session_state.messages)
 
@@ -127,7 +127,7 @@ with tab2:
             with st.spinner("کوڈ لکھا جا رہا ہے..."):
                 try:
                     res = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
+                        model=ACTIVE_MODEL,
                         messages=[{"role": "user", "content": f"Create a single-file modern HTML/CSS/JS web app for: {build_prompt}. Return code inside ```html ... ``` codeblock."}],
                         temperature=0.5,
                         max_tokens=4000
@@ -155,7 +155,7 @@ with tab3:
             with st.spinner("ریسرچ جاری ہے..."):
                 try:
                     res = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
+                        model=ACTIVE_MODEL,
                         messages=[{"role": "user", "content": f"Do a deep scientific and market research report on: {topic}. Provide complete technical breakdown and business strategy."}],
                         temperature=0.6,
                         max_tokens=3000
