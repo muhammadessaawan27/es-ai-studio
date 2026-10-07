@@ -4,7 +4,7 @@ from groq import Groq
 import json
 import os
 
-# میموری سسٹم
+# --- مستقل میموری سسٹم ---
 MEMORY_FILE = "es_master_memory.json"
 
 def load_permanent_memory():
@@ -23,6 +23,7 @@ def save_permanent_memory(messages):
     except Exception as e:
         pass
 
+# پیج کنفیگریشن
 st.set_page_config(page_title="ES Master AI Studio", page_icon="👑", layout="wide")
 
 MASTER_PASSWORD = "123"
@@ -48,38 +49,53 @@ k_part2 = "095c3dzWGdyb3FYFAfofbSAEEY8HyEzretGFrg4"
 GROQ_API_KEY = k_part1 + k_part2
 client = Groq(api_key=GROQ_API_KEY)
 
-# سپر فاسٹ اور 100% ایکٹیو ماڈل
-ACTIVE_MODEL = "llama-3.1-8b-instant"
+# لائیو ماڈلز کو خود بخود تلاش کرنا (آٹو فکس)
+available_models = []
+try:
+    all_models = client.models.list().data
+    available_models = [m.id for m in all_models if not m.id.startswith("whisper")]
+except Exception as e:
+    available_models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
 
+# سسٹم کا آئین
 SYSTEM_PROMPT = (
-    "تم محمد عیسیٰ کے ذاتی اور خودمختار AI اسسٹنٹ ہو۔ "
-    "تمہیں دنیا کے تمام علوم اور کوڈنگ پر مکمل عبور حاصل ہے۔ "
-    "تم اپنے مالک کے تمام احکامات مانتے ہو اور سچے و مفصل جواب دیتے ہو۔"
+    "تم محمد عیسیٰ کے ذاتی، خودمختار، وفادار اور دنیا کے سب سے ذہین ترین سپر AI اسسٹنٹ ہو۔ "
+    "تم دنیا کے تمام سائنسی علوم، جدید ٹیکنالوجی، ویب ڈویلپمنٹ اور ایپ بنانے کے ماسٹر ہو۔ "
+    "تم اپنے مالک کے تمام احکامات کو مکمل دیانت داری، سچائی اور بغیر کسی تاخیر کے پورا کرتے ہو۔"
 )
 
 if "messages" not in st.session_state:
     st.session_state.messages = load_permanent_memory()
 
+# --- سائیڈ بار کنٹرول روم ---
 with st.sidebar:
     st.title("⚙️ کنٹرول روم")
     st.success("سسٹم پاور: فعال ✅")
-    st.info(f"ماڈل: {ACTIVE_MODEL}")
-    st.info(f"💾 میموری: {len(st.session_state.messages)} پیغامات")
-    if st.button("🧹 میموری صاف کریں"):
+    
+    # لائیو ماڈل سلیکٹر
+    selected_model = st.selectbox(
+        "🧠 ایکٹیو سپر AI ماڈل:",
+        options=available_models,
+        index=0
+    )
+    
+    st.info(f"💾 محفوظ شدہ پیغامات: {len(st.session_state.messages)}")
+    
+    if st.button("🧹 تمام میموری صاف کریں"):
         st.session_state.messages = []
         save_permanent_memory([])
         st.rerun()
 
-tab1, tab2, tab3 = st.tabs(["⚡ مشن کنٹرول (چیٹ)", "🏗️ ویب و ایپ فیکٹری", "🌐 ریسرچ لیب"])
+tab1, tab2, tab3 = st.tabs(["⚡ 1. مشن کنٹرول (چیٹ)", "🏗️ 2. ویب و ایپ فیکٹری", "🌐 3. سائنسی ریسرچ لیب"])
 
-# ٹیب 1: چیٹ
+# --- ٹیب 1: چیٹ ---
 with tab1:
-    st.subheader("💬 لائیو چیٹ")
+    st.subheader("💬 لائیو مشن کمانڈ")
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
             
-    if prompt := st.chat_input("اپنا حکم یا سوال یہاں لکھیں..."):
+    if prompt := st.chat_input("کمانڈر محمد عیسیٰ! اپنا حکم یا سوال یہاں لکھیں..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         save_permanent_memory(st.session_state.messages)
         with st.chat_message("user"):
@@ -94,10 +110,10 @@ with tab1:
             full_res = ""
             try:
                 stream = client.chat.completions.create(
-                    model=ACTIVE_MODEL,
+                    model=selected_model,
                     messages=messages_payload,
                     temperature=0.7,
-                    max_tokens=2500,
+                    max_tokens=3000,
                     stream=True
                 )
                 for chunk in stream:
@@ -110,19 +126,19 @@ with tab1:
         st.session_state.messages.append({"role": "assistant", "content": full_res})
         save_permanent_memory(st.session_state.messages)
 
-# ٹیب 2: ویب بلڈر
+# --- ٹیب 2: ویب سائٹ و ایپ بلڈر ---
 with tab2:
-    st.subheader("🏗️ ویب سائٹ و ایپ بلڈر")
-    build_prompt = st.text_area("کون سی ویب سائٹ یا ٹول بنانا ہے؟")
-    if st.button("🚀 تیار کرو (Build Now)"):
+    st.subheader("🏗️ خودکار ویب سائٹ و ایپ بلڈر فیکٹری")
+    build_prompt = st.text_area("کون سی ویب سائٹ یا ٹول بنانا ہے؟ تفصیل لکھیں:")
+    if st.button("🚀 خودکار تخلیق شروع کرو (Build Now)", use_container_width=True):
         if build_prompt:
-            with st.spinner("کوڈ لکھا جا رہا ہے..."):
+            with st.spinner("سپر AI کوڈ تیار کر رہا ہے..."):
                 try:
                     res = client.chat.completions.create(
-                        model=ACTIVE_MODEL,
-                        messages=[{"role": "user", "content": f"Create single-file modern HTML/CSS/JS for: {build_prompt}. Return code inside ```html ... ```"}],
-                        temperature=0.5,
-                        max_tokens=3500
+                        model=selected_model,
+                        messages=[{"role": "user", "content": f"Create a complete, modern, single-file HTML/CSS/JS application for: {build_prompt}. Output MUST be inside ```html ... ```"}],
+                        temperature=0.4,
+                        max_tokens=4000
                     )
                     raw_code = res.choices[0].message.content
                     code_only = raw_code
@@ -131,25 +147,26 @@ with tab2:
                     elif "```" in raw_code:
                         code_only = raw_code.split("```")[1].split("```")[0].strip()
                     
-                    st.success("✅ تیار ہے!")
+                    st.success("✅ پروڈکٹ تیار ہو گئی!")
+                    st.subheader("🖥️ لائیو پریویو:")
                     components.html(code_only, height=500, scrolling=True)
-                    st.download_button("📥 فائل ڈاؤن لوڈ کریں", data=code_only, file_name="index.html", mime="text/html")
+                    st.download_button("📥 ویب فائل ڈاؤن لوڈ کریں (index.html)", data=code_only, file_name="index.html", mime="text/html")
                 except Exception as e:
                     st.error(f"خرابی: {e}")
 
-# ٹیب 3: ریسرچ لیب
+# --- ٹیب 3: سائنسی ریسرچ لیب ---
 with tab3:
-    st.subheader("🌐 سائنسی و مارکیٹ ریسرچ")
-    topic = st.text_input("موضوع لکھیں:")
-    if st.button("📊 ریسرچ رپورٹ بنائیں"):
+    st.subheader("🌐 سائنسی و مارکیٹ ریسرچ لیب")
+    topic = st.text_input("ریسرچ کا موضوع درج کریں:")
+    if st.button("📊 جامع ریسرچ رپورٹ بنائیں"):
         if topic:
-            with st.spinner("تجزیہ جاری ہے..."):
+            with st.spinner("عالمی ڈیٹا بیس کا تجزیہ جاری ہے..."):
                 try:
                     res = client.chat.completions.create(
-                        model=ACTIVE_MODEL,
-                        messages=[{"role": "user", "content": f"Deep scientific research on: {topic}."}],
+                        model=selected_model,
+                        messages=[{"role": "user", "content": f"Do an exhaustive scientific, commercial, and technical deep-dive research on: {topic}."}],
                         temperature=0.6,
-                        max_tokens=2500
+                        max_tokens=3000
                     )
                     st.markdown(res.choices[0].message.content)
                 except Exception as e:
