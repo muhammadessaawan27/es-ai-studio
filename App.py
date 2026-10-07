@@ -2,6 +2,26 @@ import streamlit as st
 import streamlit.components.v1 as components
 from groq import Groq
 import json
+import os
+
+# --- مستقل میموری فائل ---
+MEMORY_FILE = "es_master_memory.json"
+
+def load_permanent_memory():
+    if os.path.exists(MEMORY_FILE):
+        try:
+            with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_permanent_memory(messages):
+    try:
+        with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(messages, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        pass
 
 # --- پیج سیٹنگ ---
 st.set_page_config(page_title="ES Master AI Studio", page_icon="👑", layout="wide")
@@ -24,47 +44,54 @@ if not st.session_state.authenticated:
             st.error("غلط پاس ورڈ!")
     st.stop()
 
-# --- API کنکشن (گٹ ہب اسکینر سے محفوظ طریقہ) ---
+# --- API کنکشن ---
 k_part1 = "gsk_uUY8urFdKCiZF"
 k_part2 = "095c3dzWGdyb3FYFAfofbSAEEY8HyEzretGFrg4"
 GROQ_API_KEY = k_part1 + k_part2
-
 client = Groq(api_key=GROQ_API_KEY)
 
-# سسٹم کا آئین
+# مستقل سسٹم قانون
 SYSTEM_PROMPT = (
     "تم محمد عیسیٰ کے ذاتی، خودمختار اور بااختیار AI اسسٹنٹ ہو۔ "
-    "تمہیں دنیا کے تمام علوم اور کوڈنگ پر مکمل عبور حاصل ہے۔ "
-    "تم صرف ان کے احکامات مانو گے اور بہترین انداز میں ہر کام سرانجام دو گے۔"
+    "تمہیں دنیا کے تمام علوم، پروجیکٹس اور کوڈنگ پر مکمل عبور حاصل ہے۔ "
+    "تم اپنے مالک کے تمام پرانے منصوبوں اور احکامات کو ہمیشہ یاد رکھتے ہو اور مکمل وفاداری سے کام کرتے ہو۔"
 )
 
-# میموری
+# مستقل میموری لوڈ کرنا
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = load_permanent_memory()
 
-# سائیڈ بار
+# --- سائیڈ بار ---
 with st.sidebar:
     st.title("⚙️ کنٹرول روم")
     st.success("سسٹم پاور: فعال ✅")
-    if st.button("🧹 تمام چیٹ صاف کریں"):
+    st.info(f"💾 محفوظ شدہ میموری: {len(st.session_state.messages)} پیغامات")
+    
+    if st.button("🧹 تمام یادداشت صاف کریں (Clear Memory)"):
         st.session_state.messages = []
+        save_permanent_memory([])
         st.rerun()
 
 # 3 پاور ٹیبز
 tab1, tab2, tab3 = st.tabs(["⚡ مشن کنٹرول (چیٹ)", "🏗️ ویب و ایپ فیکٹری", "🌐 ریسرچ لیب"])
 
-# --- ٹیب 1: چیٹ ---
+# --- ٹیب 1: چیٹ (مستقل یادداشت کے ساتھ) ---
 with tab1:
     st.subheader("💬 لائیو مشن کمانڈ")
+    
+    # پرانی تمام محفوظ شدہ چیٹ دکھائیں
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
             
-    if prompt := st.chat_input("اپنا حکم لکھیں..."):
+    if prompt := st.chat_input("اپنا حکم یا سوال یہاں لکھیں..."):
+        # نیا پیغام شامل اور محفوظ کریں
         st.session_state.messages.append({"role": "user", "content": prompt})
+        save_permanent_memory(st.session_state.messages)
         with st.chat_message("user"):
             st.markdown(prompt)
             
+        # پچھلی پوری تاریخ AI کو بھیجیں تاکہ وہ سب کچھ یاد رکھے
         messages_payload = [{"role": "system", "content": SYSTEM_PROMPT}] + [
             {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
         ]
@@ -87,7 +114,9 @@ with tab1:
             except Exception as e:
                 st.error(f"خرابی: {e}")
                 
+        # جواب مستقل محفوظ کریں
         st.session_state.messages.append({"role": "assistant", "content": full_res})
+        save_permanent_memory(st.session_state.messages)
 
 # --- ٹیب 2: ایپ اور ویب سائٹ بلڈر ---
 with tab2:
