@@ -1,8 +1,2 @@
 streamlit
-edge-tts
-requests
-Pillow
-numpy
-imageio-ffmpeg
-yt-dlp
-moviepy
+groq
