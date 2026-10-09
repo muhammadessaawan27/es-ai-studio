@@ -58,8 +58,8 @@ if "enable_watermark" not in st.session_state: st.session_state.enable_watermark
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
 if "msgs" not in st.session_state: st.session_state.msgs = []
 
-st.sidebar.subheader("🎬 Settings & Controls")
-enable_bg_music = st.sidebar.checkbox("Enable Background Music", value=st.session_state.enable_bg_music)
+st.sidebar.subheader("🎬 Settings & Audio Controls")
+enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=st.session_state.enable_bg_music)
 st.session_state.enable_bg_music = enable_bg_music
 
 render_semaphore = threading.Semaphore(value=1)
@@ -67,7 +67,27 @@ render_semaphore = threading.Semaphore(value=1)
 def make_even(val):
     return int(val) if int(val) % 2 == 0 else int(val) + 1
 
-# ================= CRASH-PROOF ENHANCEMENT FUNCTIONS =================
+# ================= IMAGE ENHANCEMENT & ANTI-COLLAGE =================
+def sanitize_visual_prompt(raw_prompt):
+    """Purges character sheet tokens to permanently prevent 4-panel split collages"""
+    cleaned = raw_prompt
+    for bad_token in ["character 1", "character 2", "character consistency rules", "in every image", "turnaround", "character sheet", "grid"]:
+        cleaned = re.sub(r'(?i)\b' + bad_token + r'\b', '', cleaned)
+    
+    # Enforce strict single cinematic camera frame
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    return f"{cleaned}, single continuous cinematic scene, wide camera angle, highly detailed faces, strictly NO split screen, NO multi-panel, NO collage, NO grid, 8k photorealistic resolution"
+
+def apply_color_lut_harmony(img_path):
+    """Enhances skin tones, contrast, and filmic sharpness"""
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGB")
+            im = ImageEnhance.Sharpness(im).enhance(1.20)
+            im = ImageEnhance.Contrast(im).enhance(1.08)
+            im.save(img_path, "PNG")
+    except: pass
+
 def burn_subtitles_to_image(img_path, scene_text):
     try:
         with Image.open(img_path) as im:
@@ -133,11 +153,13 @@ def translate_ur_to_en_enhanced(text):
     except: pass
     return text
 
-def get_cached_bg_music():
-    cf = os.path.join(AUDIO_CACHE_DIR, "bg_epic.mp3")
+def get_cached_bg_music(is_horror=True):
+    fn = "bg_horror.mp3" if is_horror else "bg_standard.mp3"
+    url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" if is_horror else "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+    cf = os.path.join(AUDIO_CACHE_DIR, fn)
     if os.path.exists(cf) and os.path.getsize(cf) > 100000: return cf
     try:
-        res = session.get("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3", timeout=12)
+        res = session.get(url, timeout=12)
         if res.status_code == 200:
             with open(cf, "wb") as f: f.write(res.content)
             return cf
@@ -155,79 +177,47 @@ def save_audio_safe(text, voice, rate, pitch, filename):
     except:
         return False
 
-# ================= REAL 5-SECOND MOTION VIDEO ENGINE =================
-def generate_real_motion_clip(prompt, audio_path, out_clip_path, w, h, seed=786, video_model="wan-fast"):
-    aspect = "16:9" if w > h else "9:16"
-    motion_prompt = f"high cinematic action motion, dynamic movement, lively walking, realistic physics, {prompt}"
-    vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt[:380])}?model={video_model}&aspectRatio={aspect}&duration=5&seed={seed}"
+# ================= PROFESSIONAL CINEMATIC MOTION (SMOOTH PUSH & DOLLY) =================
+def render_cinematic_motion_clip(img_path, audio_path, out_clip_path, w, h, motion="Dolly In"):
+    """Renders smooth filmic camera motion without pixelation or aspect warping"""
+    apply_color_lut_harmony(img_path)
     
-    temp_raw = out_clip_path.replace(".mp4", "_raw.mp4")
-    success = False
-    for attempt in range(2):
-        try:
-            r = session.get(vid_url, timeout=60)
-            if r.status_code == 200 and len(r.content) > 40000:
-                with open(temp_raw, "wb") as f: f.write(r.content)
-                success = True
-                break
-        except: time.sleep(1)
-
-    if success and os.path.exists(temp_raw):
-        try:
-            a_clip = AudioFileClip(audio_path)
-            target_dur = a_clip.duration
-            v_clip = VideoFileClip(temp_raw).resize((w, h))
-
-            if v_clip.duration < target_dur:
-                loops = int(np.ceil(target_dur / v_clip.duration))
-                v_clip = concatenate_videoclips([v_clip] * loops)
-
-            final_clip = v_clip.subclip(0, target_dur).set_audio(a_clip.volumex(1.2))
-            final_clip.write_videofile(out_clip_path, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", threads=4, logger=None)
-            
-            final_clip.close()
-            v_clip.close()
-            a_clip.close()
-            if os.path.exists(temp_raw): os.remove(temp_raw)
-            return True
-        except: pass
-    if os.path.exists(temp_raw): os.remove(temp_raw)
-    return False
-
-def generate_dynamic_photo_clip(prompt, audio_path, out_clip_path, w, h, seed, style):
-    img_p = out_clip_path.replace(".mp4", ".png")
-    img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt[:380])}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
-    try:
-        r = session.get(img_url, timeout=25)
-        if r.status_code == 200:
-            with open(img_p, "wb") as f: f.write(r.content)
-    except:
-        Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_p, "PNG")
-
     scale_factor = 1.15
     cw, ch = make_even(w * scale_factor), make_even(h * scale_factor)
-    temp_scaled = img_p.replace(".png", "_scaled.png")
-    try:
-        with Image.open(img_p) as im:
-            im.resize((cw, ch), Image.Resampling.LANCZOS).save(temp_scaled, "PNG")
-    except: temp_scaled = img_p
+    temp_scaled = img_path.replace(".png", "_scaled.png")
+    
+    with Image.open(img_path) as im:
+        im.resize((cw, ch), Image.Resampling.LANCZOS).save(temp_scaled, "PNG")
 
     try:
         a_clip = AudioFileClip(audio_path)
         dur = a_clip.duration
         clip = ImageClip(temp_scaled).set_duration(dur).set_fps(24)
-        animated = clip.set_position(lambda t: (int((w - cw) * (t / dur)), 'center'))
+
+        # Smooth creeping horror camera motions
+        if motion == "Dolly In": # Creeps slowly into the horror scene
+            animated = clip.set_position(lambda t: ('center', int((h - ch)/2 + (15 * (t / dur)))))
+        elif motion == "Pan Left":
+            animated = clip.set_position(lambda t: (int((w - cw) * (t / dur)), 'center'))
+        elif motion == "Pan Right":
+            animated = clip.set_position(lambda t: (int((w - cw) * (1 - t / dur)), 'center'))
+        else:
+            animated = clip.set_position('center')
+
         comp = CompositeVideoClip([animated], size=(w, h)).set_duration(dur).set_audio(a_clip.volumex(1.2))
         comp.write_videofile(out_clip_path, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", threads=4, logger=None)
+        
         comp.close()
         a_clip.close()
         clip.close()
-    except: pass
-    for f in [img_p, temp_scaled]:
-        if os.path.exists(f): os.remove(f)
+        if os.path.exists(temp_scaled): os.remove(temp_scaled)
+        return True
+    except Exception as e:
+        if os.path.exists(temp_scaled): os.remove(temp_scaled)
+        return False
 
-# ================= MASTER MOVIE PIPELINE (NO LOGIN CHECKS) =================
-def create_cinematic_v40(story, voice_gen, rate_val, pitch_val, ratio, style, seed, char_anchor="", enable_bg_music=True, video_model="wan-fast"):
+# ================= MASTER MOVIE PIPELINE (100% RELIABLE) =================
+def create_cinematic_v40(story, voice_gen, rate_val, pitch_val, ratio, style, seed, user_english_prompt="", enable_bg_music=True):
     if not MOVIEPY_AVAILABLE: return "MoviePy missing"
     u_id = str(uuid.uuid4())[:8]
 
@@ -246,40 +236,58 @@ def create_cinematic_v40(story, voice_gen, rate_val, pitch_val, ratio, style, se
         scene_clips = []
         temp_files_to_clean = []
 
-        c_anchor = char_anchor.strip() if char_anchor.strip() else "consistent protagonist character, detailed features, cohesive outfit"
-
         try:
             for idx, scene in enumerate(sentences):
-                status.info(f"🎬 منظر {idx + 1} از {total_scenes}: آواز اور 5 سیکنڈ متحرک ویڈیو کی تشکیل...")
+                status.info(f"🎬 منظر {idx + 1} از {total_scenes}: آواز اور 4K فریم کی تخلیق...")
                 progress_bar.progress((idx / total_scenes) * 0.8)
 
+                # 1. Voiceover
                 sub_audio = f"a_{u_id}_{idx}.mp3"
                 if not save_audio_safe(scene, voice_gen, rate_val, pitch_val, sub_audio):
                     continue
                 temp_files_to_clean.append(sub_audio)
 
-                trans = translate_ur_to_en_enhanced(scene)
-                prompt = f"{c_anchor}, {trans}, visual style: {style}, 8k resolution, sharp focus, cinematic motion"
+                # 2. High-Fidelity Prompt Construction
+                if user_english_prompt.strip():
+                    raw_p = f"{user_english_prompt.strip()}, {translate_ur_to_en_enhanced(scene)}"
+                else:
+                    raw_p = f"{translate_ur_to_en_enhanced(scene)}, visual style: {style}"
 
+                # Purge Collage Tokens
+                clean_prompt = sanitize_visual_prompt(raw_p)
+
+                img_p = f"img_{u_id}_{idx}.png"
+                temp_files_to_clean.append(img_p)
+                
+                # Flux Engine with Locked Seed
+                img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt[:380])}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
+                
+                try:
+                    res = session.get(img_url, timeout=25)
+                    if res.status_code == 200 and len(res.content) > 3000:
+                        with open(img_p, "wb") as f: f.write(res.content)
+                    else:
+                        Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_p, "PNG")
+                except:
+                    Image.new("RGB", (w, h), color=(15, 23, 42)).save(img_p, "PNG")
+
+                # 3. Filmic Camera Motion
                 clip_mp4 = f"clip_{u_id}_{idx}.mp4"
                 temp_files_to_clean.append(clip_mp4)
-
-                success = generate_real_motion_clip(prompt, sub_audio, clip_mp4, w, h, seed=seed, video_model=video_model)
-                if not success or not os.path.exists(clip_mp4):
-                    generate_dynamic_photo_clip(prompt, sub_audio, clip_mp4, w, h, seed=seed, style=style)
-
-                if os.path.exists(clip_mp4):
+                
+                motion_type = "Dolly In" if idx % 2 == 0 else "Pan Left"
+                if render_cinematic_motion_clip(img_p, sub_audio, clip_mp4, w, h, motion=motion_type):
                     scene_clips.append(VideoFileClip(clip_mp4))
 
-            if not scene_clips: raise Exception("No video clips generated.")
+            if not scene_clips: raise Exception("ویڈیو رینڈر نہیں ہو سکی۔")
 
             progress_bar.progress(0.85)
-            status.info("🎞️ تمام متحرک کلپس کو جوڑا جا رہا ہے اور بیک گراؤنڈ میوزک ڈک کیا جا رہا ہے...")
+            status.info("🎞️ تمام مناظر کو جوڑا جا رہا ہے اور ہارر بیک گراؤنڈ میوزک سنک ہو رہا ہے...")
 
             final_video = concatenate_videoclips(scene_clips, method="compose")
 
             if enable_bg_music:
-                bg_m = get_cached_bg_music()
+                bg_m = get_cached_bg_music(is_horror=True)
                 if bg_m and os.path.exists(bg_m):
                     try:
                         bg_track = AudioFileClip(bg_m).volumex(0.04).set_duration(final_video.duration)
@@ -297,7 +305,7 @@ def create_cinematic_v40(story, voice_gen, rate_val, pitch_val, ratio, style, se
                 except: pass
 
             progress_bar.progress(1.0)
-            status.success("🚀 متحرک سینیمیٹک مووی کامیابی سے تیار ہو گئی!")
+            status.success("🚀 ہائی ڈیفینیشن سینیمیٹک مووی تیار ہو گئی!")
             return out_name
         except Exception as e:
             for f in temp_files_to_clean:
@@ -327,16 +335,14 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# 4 TABS DIRECTLY ACCESSIBLE - ZERO AUTHENTICATION BARRIERS
 tab_movie, tab_chat, tab_image, tab_founders = st.tabs([
     "🎬 Pro Movie Studio", "💬 Electric AI Chat", "🎨 Pro Image Studio", "👤 Founders & Accounts"
 ])
 
-# 1. Pro Movie Studio (All Voice Pitch/Speed + Character Anchor + Full Story)
 with tab_movie:
-    st.write("### 🎥 Movie Studio (Full Motion & Consistent Characters)")
-    m_script = st.text_area("کہانی یا مکمل اسکرپٹ یہاں درج کریں (Urdu / English):", height=150, placeholder="ایک خوبصورت مہم جوئی کی کہانی جو جنگل کے اس پار شروع ہوتی ہے...")
-    c_anchor_input = st.text_input("کردار کا فکسڈ اینکر (Consistent Character DNA):", placeholder="مثلاً: A brave young prince wearing green royal robes with sharp eyes")
+    st.write("### 🎥 Movie Studio (Clean Single Shot & Consistent Characters)")
+    m_script = st.text_area("کہانی یا ڈائیلاگ یہاں درج کریں (Urdu / English):", height=120, placeholder="رات کو عائشہ نے اپنے کمرے میں ایک بچے کی آواز سنی...")
+    c_anchor_input = st.text_area("کردار اور ماحول کا انگلش پرامپٹ (English Visual Description):", height=100, placeholder="A terrified 22-year-old Pakistani woman in blue shalwar kameez and a small black monster with red eyes in a dark hallway...")
 
     c1, c2, c3, c4 = st.columns(4)
     with c1: mv = st.selectbox("آواز (Voice):", ["Urdu Male (Asad)", "Urdu Female (Uzma)", "English US Male (Guy)", "English US Female (Jenny)", "Arabic Egypt Male (Shakir)", "Persian Male (Farid)"])
@@ -344,10 +350,9 @@ with tab_movie:
     with c3: mv_pitch = st.selectbox("آواز کا لہجہ (Pitch):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with c4: mr = st.selectbox("سائز (Format):", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
 
-    c5, c6, c7 = st.columns(3)
-    with c5: ms = st.selectbox("اسٹائل (Style):", ["Realistic HD", "3D Cartoon", "Cinematic Hollywood", "Anime Art", "Dark Gothic / Mystery"])
-    with c6: video_engine = st.selectbox("ویڈیو موشن ماڈل:", ["wan-fast", "seedance", "veo"])
-    with c7: sd = st.number_input("فکسڈ سیڈ (Character Seed):", value=786)
+    c5, c6 = st.columns(2)
+    with c5: ms = st.selectbox("اسٹائل (Style):", ["Photorealistic Horror", "Realistic HD", "Cinematic Hollywood", "3D Cartoon", "Anime Art"])
+    with c6: sd = st.number_input("فکسڈ سیڈ (Character Seed):", value=786)
 
     voice_map = {
         "Urdu Male (Asad)": "ur-PK-AsadNeural", "Urdu Female (Uzma)": "ur-PK-UzmaNeural",
@@ -362,18 +367,16 @@ with tab_movie:
     if st.button("Generate Master Movie 🚀", use_container_width=True):
         if not m_script.strip(): st.error("پہلے اسکرپٹ درج کریں!")
         else:
-            with st.spinner("🎬 5، 5 سیکنڈ کے متحرک ویڈیو کلپس اور آڈیو تیار ہو رہے ہیں..."):
+            with st.spinner("🎬 ہائی ریزولوشن سینیمیٹک مووی تیار ہو رہی ہے..."):
                 v_res = create_cinematic_v40(
                     m_script, active_voice, rate_val, pitch_val, mr, ms, int(sd),
-                    char_anchor=c_anchor_input, enable_bg_music=st.session_state.enable_bg_music,
-                    video_model=video_engine
+                    user_english_prompt=c_anchor_input, enable_bg_music=st.session_state.enable_bg_music
                 )
             if v_res.endswith(".mp4") and os.path.exists(v_res):
                 st.video(v_res)
                 st.download_button("ڈاؤنلوڈ ویڈیو (Full HD)", open(v_res, 'rb').read(), file_name=v_res)
             else: st.error(v_res)
 
-# 2. Electric AI Chat
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
     for m in st.session_state.msgs:
@@ -389,13 +392,12 @@ with tab_chat:
             st.code(res, language="")
             st.session_state.msgs.append({"role": "assistant", "content": res})
 
-# 3. Pro Image Studio
 with tab_image:
     st.write("### 🎨 Visual Studio")
     p_i = st.text_area("تصویر کی تفصیل درج کریں:", height=100)
     canva_overlay_text = st.text_input("Canva Text Overlay:", placeholder="e.g. Movie Poster Title")
     ic1, ic2 = st.columns(2)
-    with ic1: i_style = st.selectbox("Art Style:", ["Realistic HD", "3D Cartoon", "Cinematic Film", "Anime Art"])
+    with ic1: i_style = st.selectbox("Art Style:", ["Photorealistic Horror", "Realistic HD", "3D Cartoon", "Anime Art"])
     with ic2: i_size = st.selectbox("Resolution:", ["YouTube HD", "Square (1:1)", "TikTok"])
 
     if st.button("Generate Visual 🚀"):
@@ -411,7 +413,6 @@ with tab_image:
             try: os.remove(temp_p)
             except: pass
 
-# 4. Founders & Accounts Tab
 with tab_founders:
     st.write("### 👤 فاؤنڈرز اور اکاؤنٹ تفصیلات")
     st.info("🏆 **Founders:** Muhammad Essa Awan & Saba Wahid")
