@@ -16,25 +16,17 @@ import os
 import time
 import re
 import uuid
-import random
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 import io
 import numpy as np
 import threading
-import gc
-import sqlite3
-import hashlib
-import json
 
 headers_browser = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 session = requests.Session()
 session.headers.update(headers_browser)
 
 AUDIO_CACHE_DIR = "audio_cache"
-TEMP_DIR = "temp_render_chunks"
 os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
-os.makedirs(TEMP_DIR, exist_ok=True)
-DB_BACKUP_FILE = "sglowina_saas_backup.json"
 TRANSITION_SFX_FILE = "transition_whoosh.mp3"
 
 def download_transition_sfx():
@@ -48,18 +40,11 @@ def download_transition_sfx():
 
 download_transition_sfx()
 
-if "gen_mode" not in st.session_state:
-    st.session_state.gen_mode = "Real AI Video Motion (Beta - Pollinations Video API)"
-if "pollinations_key" not in st.session_state:
-    st.session_state.pollinations_key = ""
-
 try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
     MOVIEPY_AVAILABLE = True
-    MOVIEPY_ERROR = ""
 except Exception as e:
     MOVIEPY_AVAILABLE = False
-    MOVIEPY_ERROR = str(e)
 
 try:
     import edge_tts
@@ -67,116 +52,20 @@ try:
 except ImportError:
     EDGE_TTS_AVAILABLE = False
 
-st.set_page_config(page_title="Sglowina AI - SaaS Enterprise V2.0", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Enterprise Studio", layout="wide", page_icon="🎬")
 
 if "enable_watermark" not in st.session_state: st.session_state.enable_watermark = True
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
-if "logged_in_user" not in st.session_state: st.session_state.logged_in_user = "demo_user"
 if "msgs" not in st.session_state: st.session_state.msgs = []
 
-st.sidebar.subheader("🎬 Video & Audio Settings")
-enable_watermark = st.sidebar.checkbox("Enable Sglowina Watermark", value=st.session_state.enable_watermark)
-enable_bg_music = st.sidebar.checkbox("Enable Dynamic Background Music", value=st.session_state.enable_bg_music)
-custom_watermark_file = st.sidebar.file_uploader("Upload Custom Watermark Logo (Premium Only):", type=["png", "jpg", "jpeg"])
-
-st.session_state.enable_watermark = enable_watermark
+st.sidebar.subheader("🎬 Settings & Controls")
+enable_bg_music = st.sidebar.checkbox("Enable Background Music", value=st.session_state.enable_bg_music)
 st.session_state.enable_bg_music = enable_bg_music
 
 render_semaphore = threading.Semaphore(value=1)
 
 def make_even(val):
     return int(val) if int(val) % 2 == 0 else int(val) + 1
-
-def hash_password(password):
-    salt = b"sglowina_saas_salt_1234"
-    return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000).hex()
-
-def verify_password(password, hashed):
-    salt = b"sglowina_saas_salt_1234"
-    return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000).hex() == hashed
-
-def get_public_url(uploaded_file):
-    try:
-        file_bytes = uploaded_file.getvalue()
-        url = "https://tmpfiles.org/api/v1/upload"
-        files = {'file': (uploaded_file.name, file_bytes, uploaded_file.type)}
-        res = requests.post(url, files=files, timeout=12)
-        if res.status_code == 200:
-            data = res.json()
-            if data.get("status") == "success":
-                return data["data"]["url"].replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
-    except: pass
-    return None
-
-def get_db_connection():
-    conn = sqlite3.connect("sglowina_saas_v21.db", check_same_thread=False, timeout=30.0)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def init_db_v21():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL, plan TEXT DEFAULT 'Free', credits INTEGER DEFAULT 50,
-            role TEXT DEFAULT 'User', status TEXT DEFAULT 'Active', created_at TEXT
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS projects (
-            id TEXT PRIMARY KEY, user_id INTEGER, project_name TEXT,
-            type TEXT, file_path TEXT, prompt TEXT, created_at TEXT, is_favorite INTEGER DEFAULT 0
-        )
-    """)
-    cursor.execute("CREATE TABLE IF NOT EXISTS local_payments (id TEXT PRIMARY KEY, username TEXT, method TEXT, trx_id TEXT UNIQUE, amount REAL, status TEXT DEFAULT 'Pending', created_at TEXT)")
-    cursor.execute("CREATE TABLE IF NOT EXISTS system_config (key TEXT PRIMARY KEY, value TEXT)")
-    
-    # Founders Admin Credentials: Muhammad Essa Awan & Saba Wahid (Password: 786)
-    h_admin = hash_password("786")
-    for adm in ["muhammad_essa_awan", "saba_wahid"]:
-        cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (adm,))
-        if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO users (username, email, password_hash, plan, credits, role, created_at) VALUES (?, ?, ?, 'Enterprise', 5000, 'Admin', ?)",
-                           (adm, f"{adm}@sglowina.ai", h_admin, time.strftime("%Y-%m-%d")))
-    conn.commit()
-    conn.close()
-
-init_db_v21()
-
-def authenticate_user(username, password):
-    username = username.strip().lower()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT password_hash FROM users WHERE LOWER(username) = LOWER(?)", (username,))
-        row = cursor.fetchone()
-        if row: return verify_password(password.strip(), row['password_hash'])
-        return False
-    except: return False
-    finally: conn.close()
-
-def get_user_data(username):
-    username = username.strip().lower()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,))
-        row = cursor.fetchone()
-        if row: return dict(row)
-        return None
-    except: return None
-    finally: conn.close()
-
-def deduct_user_credits(username, amount):
-    username = username.strip().lower()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE LOWER(username) = LOWER(?)", (amount, username))
-        conn.commit()
-    except: pass
-    finally: conn.close()
 
 # ================= CRASH-PROOF ENHANCEMENT FUNCTIONS =================
 def burn_subtitles_to_image(img_path, scene_text):
@@ -244,39 +133,18 @@ def translate_ur_to_en_enhanced(text):
     except: pass
     return text
 
-def download_scene_sfx(scene_text, u_id, idx):
-    text = scene_text.lower()
-    sfx_url = None
-    if any(k in text for k in ["rain", "storm", "بارش", "طوفان"]):
-        sfx_url = "https://www.soundjay.com/nature/sounds/rain-07.mp3"
-    elif any(k in text for k in ["sword", "fight", "تلوار", "جنگ"]):
-        sfx_url = "https://www.soundjay.com/mechanical/sounds/cutlery-clink-1.mp3"
-    elif any(k in text for k in ["forest", "birds", "جنگل", "پرندے"]):
-        sfx_url = "https://www.soundjay.com/nature/sounds/forest-wind-1.mp3"
-    if sfx_url:
-        fn = f"sfx_{u_id}_{idx}.mp3"
-        try:
-            r = session.get(sfx_url, timeout=10)
-            if r.status_code == 200:
-                with open(fn, "wb") as f: f.write(r.content)
-                return fn
-        except: pass
-    return None
-
-def get_cached_bg_music(is_horror, is_epic):
-    fn = "bg_horror.mp3" if is_horror else ("bg_epic.mp3" if is_epic else "bg_standard.mp3")
-    url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" if is_horror else "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-    cf = os.path.join(AUDIO_CACHE_DIR, fn)
+def get_cached_bg_music():
+    cf = os.path.join(AUDIO_CACHE_DIR, "bg_epic.mp3")
     if os.path.exists(cf) and os.path.getsize(cf) > 100000: return cf
     try:
-        res = session.get(url, timeout=12)
+        res = session.get("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3", timeout=12)
         if res.status_code == 200:
             with open(cf, "wb") as f: f.write(res.content)
             return cf
     except: pass
     return None
 
-# ================= EDGE-TTS VOICE (CLEAN ASYNC - NO NEST_ASYNCIO) =================
+# ================= EDGE-TTS VOICE ENGINE =================
 def save_audio_safe(text, voice, rate, pitch, filename):
     async def _tts_exec():
         com = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
@@ -288,11 +156,10 @@ def save_audio_safe(text, voice, rate, pitch, filename):
         return False
 
 # ================= REAL 5-SECOND MOTION VIDEO ENGINE =================
-def generate_real_motion_clip(prompt, audio_path, out_clip_path, w, h, seed=786, video_model="wan-fast", api_key=""):
+def generate_real_motion_clip(prompt, audio_path, out_clip_path, w, h, seed=786, video_model="wan-fast"):
     aspect = "16:9" if w > h else "9:16"
     motion_prompt = f"high cinematic action motion, dynamic movement, lively walking, realistic physics, {prompt}"
     vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt[:380])}?model={video_model}&aspectRatio={aspect}&duration=5&seed={seed}"
-    if api_key: vid_url += f"&key={api_key}"
     
     temp_raw = out_clip_path.replace(".mp4", "_raw.mp4")
     success = False
@@ -359,8 +226,8 @@ def generate_dynamic_photo_clip(prompt, audio_path, out_clip_path, w, h, seed, s
     for f in [img_p, temp_scaled]:
         if os.path.exists(f): os.remove(f)
 
-# ================= MASTER MOVIE PIPELINE (REAL MOTION + LOCKED CHARACTER) =================
-def create_cinematic_v40(story, voice_gen, rate_val, pitch_val, ratio, style, seed, char_anchor="", enable_watermark=True, enable_bg_music=True, video_model="wan-fast"):
+# ================= MASTER MOVIE PIPELINE (NO LOGIN CHECKS) =================
+def create_cinematic_v40(story, voice_gen, rate_val, pitch_val, ratio, style, seed, char_anchor="", enable_bg_music=True, video_model="wan-fast"):
     if not MOVIEPY_AVAILABLE: return "MoviePy missing"
     u_id = str(uuid.uuid4())[:8]
 
@@ -412,7 +279,7 @@ def create_cinematic_v40(story, voice_gen, rate_val, pitch_val, ratio, style, se
             final_video = concatenate_videoclips(scene_clips, method="compose")
 
             if enable_bg_music:
-                bg_m = get_cached_bg_music(False, True)
+                bg_m = get_cached_bg_music()
                 if bg_m and os.path.exists(bg_m):
                     try:
                         bg_track = AudioFileClip(bg_m).volumex(0.04).set_duration(final_video.duration)
@@ -431,7 +298,6 @@ def create_cinematic_v40(story, voice_gen, rate_val, pitch_val, ratio, style, se
 
             progress_bar.progress(1.0)
             status.success("🚀 متحرک سینیمیٹک مووی کامیابی سے تیار ہو گئی!")
-            deduct_user_credits(st.session_state.logged_in_user, 15)
             return out_name
         except Exception as e:
             for f in temp_files_to_clean:
@@ -461,57 +327,12 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-tab_auth, tab_chat, tab_movie, tab_image, tab_enterprise = st.tabs([
-    "🔑 Sign In", "💬 Electric AI Chat", "🎬 Pro Movie Studio", "🎨 Pro Image Studio", "👤 Enterprise Center"
+# 4 TABS DIRECTLY ACCESSIBLE - ZERO AUTHENTICATION BARRIERS
+tab_movie, tab_chat, tab_image, tab_founders = st.tabs([
+    "🎬 Pro Movie Studio", "💬 Electric AI Chat", "🎨 Pro Image Studio", "👤 Founders & Accounts"
 ])
 
-# 1. Sign-In Tab
-with tab_auth:
-    st.write("### 🔑 Sglowina Secure Authentication")
-    auth_mode = st.radio("Choose Action", ["Sign In", "Create New Account"])
-    with st.form("auth_form"):
-        u_name = st.text_input("Username")
-        u_email = st.text_input("Email") if auth_mode != "Sign In" else ""
-        p_word = st.text_input("Password", type="password")
-        if st.form_submit_button("Submit 🚀"):
-            if auth_mode == "Sign In":
-                if authenticate_user(u_name, p_word):
-                    st.session_state.logged_in_user = u_name.strip().lower()
-                    u_data = get_user_data(u_name)
-                    if u_data and u_data['role'] == 'Admin':
-                        st.success("Welcome back, Founders Muhammad Essa Awan and Saba Wahid! 🟢")
-                    else:
-                        st.success(f"Welcome to Sglowina AI, {u_name}! 🟢")
-                    time.sleep(1)
-                    st.rerun()
-                else: st.error("Invalid credentials.")
-            else:
-                conn = get_db_connection()
-                try:
-                    conn.execute("INSERT INTO users (username, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
-                                 (u_name.strip().lower(), u_email.strip().lower(), hash_password(p_word), time.strftime("%Y-%m-%d")))
-                    conn.commit()
-                    st.success("Account created successfully!")
-                except: st.error("Username or email already exists.")
-                finally: conn.close()
-
-# 2. Electric AI Chat
-with tab_chat:
-    st.write("### 💬 Sglowina Intelligence Dashboard")
-    for m in st.session_state.msgs:
-        with st.chat_message(m["role"]): st.write(m["content"])
-    if p := st.chat_input("How can I help you today?"):
-        st.session_state.msgs.append({"role": "user", "content": p})
-        with st.chat_message("user"): st.write(p)
-        web_snippets = search_web_ddg(p) if any(k in p.lower() for k in ["search", "live", "news", "گوگل"]) else ""
-        sys_p = f"You are Sglowina AI, developed by founders Muhammad Essa Awan & Saba Wahid.\nContext: {web_snippets}"
-        res = generate_text_pollinations(p, sys_p)
-        with st.chat_message("assistant"):
-            st.write(res)
-            st.code(res, language="")
-            st.session_state.msgs.append({"role": "assistant", "content": res})
-
-# 3. Pro Movie Studio (All Voice Pitch/Speed + Character Anchor + Full Story)
+# 1. Pro Movie Studio (All Voice Pitch/Speed + Character Anchor + Full Story)
 with tab_movie:
     st.write("### 🎥 Movie Studio (Full Motion & Consistent Characters)")
     m_script = st.text_area("کہانی یا مکمل اسکرپٹ یہاں درج کریں (Urdu / English):", height=150, placeholder="ایک خوبصورت مہم جوئی کی کہانی جو جنگل کے اس پار شروع ہوتی ہے...")
@@ -552,7 +373,23 @@ with tab_movie:
                 st.download_button("ڈاؤنلوڈ ویڈیو (Full HD)", open(v_res, 'rb').read(), file_name=v_res)
             else: st.error(v_res)
 
-# 4. Pro Image Studio
+# 2. Electric AI Chat
+with tab_chat:
+    st.write("### 💬 Sglowina Intelligence Dashboard")
+    for m in st.session_state.msgs:
+        with st.chat_message(m["role"]): st.write(m["content"])
+    if p := st.chat_input("How can I help you today?"):
+        st.session_state.msgs.append({"role": "user", "content": p})
+        with st.chat_message("user"): st.write(p)
+        web_snippets = search_web_ddg(p) if any(k in p.lower() for k in ["search", "live", "news", "گوگل"]) else ""
+        sys_p = f"You are Sglowina AI, developed by founders Muhammad Essa Awan & Saba Wahid.\nContext: {web_snippets}"
+        res = generate_text_pollinations(p, sys_p)
+        with st.chat_message("assistant"):
+            st.write(res)
+            st.code(res, language="")
+            st.session_state.msgs.append({"role": "assistant", "content": res})
+
+# 3. Pro Image Studio
 with tab_image:
     st.write("### 🎨 Visual Studio")
     p_i = st.text_area("تصویر کی تفصیل درج کریں:", height=100)
@@ -574,49 +411,12 @@ with tab_image:
             try: os.remove(temp_p)
             except: pass
 
-# 5. Enterprise Center
-with tab_enterprise:
-    st.write("### 👤 Enterprise Center")
-    ent_tab_user, ent_tab_billing, ent_tab_admin = st.tabs(["👤 Profile", "💳 Billing Packages", "🔒 Admin Control Panel"])
-    u_db = get_user_data(st.session_state.logged_in_user)
-
-    with ent_tab_user:
-        if u_db:
-            st.info(f"User: **{st.session_state.logged_in_user}** | Plan: **{u_db['plan']}** | Balance: **{u_db['credits']}** 🪙")
-        else: st.warning("Please sign in first.")
-
-    with ent_tab_billing:
-        st.write("### 📱 Pakistani Local Payment (EasyPaisa/JazzCash)")
-        st.info("💚 **EasyPaisa Account:** Saba Wahid | **03086834020**\n\n❤️ **JazzCash Account:** Ayisha bi bi | **03240755475**")
-        if u_db:
-            with st.form("pay_form"):
-                p_m = st.selectbox("Method:", ["EasyPaisa", "JazzCash"])
-                p_tx = st.text_input("Transaction ID (TrxID):")
-                p_a = st.number_input("Amount Sent:", value=1000.0)
-                if st.form_submit_button("Submit Proof 🚀"):
-                    conn = get_db_connection()
-                    try:
-                        conn.execute("INSERT INTO local_payments (id, username, method, trx_id, amount, status, created_at) VALUES (?, ?, ?, ?, ?, 'Pending', ?)",
-                                     (str(uuid.uuid4())[:8], u_db['username'], p_m, p_tx.strip(), p_a, time.strftime("%Y-%m-%d")))
-                        conn.commit()
-                        st.success("Payment submitted successfully!")
-                    except: st.error("TrxID already exists.")
-                    finally: conn.close()
-
-    with ent_tab_admin:
-        if u_db and u_db['role'] == 'Admin':
-            st.success("Admin Authorized.")
-            conn = get_db_connection()
-            pending_reqs = conn.execute("SELECT * FROM local_payments WHERE status = 'Pending'").fetchall()
-            for r in pending_reqs:
-                st.write(f"👤 User: `{r['username']}` | Trx: `{r['trx_id']}` | Amount: {r['amount']} PKR")
-                if st.button(f"Approve {r['trx_id']}", key=f"app_{r['id']}"):
-                    conn.execute("UPDATE local_payments SET status = 'Approved' WHERE id = ?", (r['id'],))
-                    conn.execute("UPDATE users SET credits = credits + 450, plan = 'Premium' WHERE username = ?", (r['username'],))
-                    conn.commit()
-                    st.success("Approved!")
-                    st.rerun()
-            conn.close()
-        else: st.error("Admin access denied.")
+# 4. Founders & Accounts Tab
+with tab_founders:
+    st.write("### 👤 فاؤنڈرز اور اکاؤنٹ تفصیلات")
+    st.info("🏆 **Founders:** Muhammad Essa Awan & Saba Wahid")
+    st.markdown("---")
+    st.write("### 📱 پاکستانی لوکل پیمنٹ اکاؤنٹس")
+    st.write("💚 **EasyPaisa Account:** Saba Wahid | **03086834020**\n\n❤️ **JazzCash Account:** Ayisha bi bi | **03240755475**")
 
 st.markdown("<p style='text-align: center; font-weight: bold; padding-top: 25px; color: #475569;'>Sglowina AI Enterprise | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
