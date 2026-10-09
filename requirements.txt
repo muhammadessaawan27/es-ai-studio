@@ -1,4 +1,7 @@
 streamlit
-google-api-python-client
-isodate
-pandas
+requests
+PIL
+numpy
+moviepy
+edge-tts
+psycopg2-binary
