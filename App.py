@@ -26,13 +26,6 @@ import sqlite3
 import hashlib
 import json
 
-# Safe Asyncio Patch for Edge-TTS
-try:
-    import nest_asyncio
-    nest_asyncio.apply()
-except:
-    pass
-
 headers_browser = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 session = requests.Session()
 session.headers.update(headers_browser)
@@ -116,16 +109,8 @@ def get_public_url(uploaded_file):
     return None
 
 def get_db_connection():
-    pg_url = os.environ.get("DATABASE_URL")
-    if pg_url:
-        try:
-            import psycopg2
-            return psycopg2.connect(pg_url)
-        except: pass
     conn = sqlite3.connect("sglowina_saas_v21.db", check_same_thread=False, timeout=30.0)
     conn.row_factory = sqlite3.Row
-    try: conn.execute("PRAGMA journal_mode=WAL;")
-    except: pass
     return conn
 
 def init_db_v21():
@@ -147,7 +132,7 @@ def init_db_v21():
     cursor.execute("CREATE TABLE IF NOT EXISTS local_payments (id TEXT PRIMARY KEY, username TEXT, method TEXT, trx_id TEXT UNIQUE, amount REAL, status TEXT DEFAULT 'Pending', created_at TEXT)")
     cursor.execute("CREATE TABLE IF NOT EXISTS system_config (key TEXT PRIMARY KEY, value TEXT)")
     
-    # Honors Founders: Muhammad Essa Awan & Saba Wahid
+    # Founders Admin Credentials: Muhammad Essa Awan & Saba Wahid (Password: 786)
     h_admin = hash_password("786")
     for adm in ["muhammad_essa_awan", "saba_wahid"]:
         cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", (adm,))
@@ -291,19 +276,19 @@ def get_cached_bg_music(is_horror, is_epic):
     except: pass
     return None
 
-# ================= EDGE-TTS VOICE (PITCH & SPEED PRESERVED) =================
+# ================= EDGE-TTS VOICE (CLEAN ASYNC - NO NEST_ASYNCIO) =================
 def save_audio_safe(text, voice, rate, pitch, filename):
-    async def amain():
-        communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
-        await communicate.save(filename)
+    async def _tts_exec():
+        com = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
+        await com.save(filename)
     try:
-        asyncio.run(amain())
+        asyncio.run(_tts_exec())
         return os.path.exists(filename) and os.path.getsize(filename) > 300
-    except: return False
+    except:
+        return False
 
 # ================= REAL 5-SECOND MOTION VIDEO ENGINE =================
 def generate_real_motion_clip(prompt, audio_path, out_clip_path, w, h, seed=786, video_model="wan-fast", api_key=""):
-    """Generates true 5-second animated motion clip and matches voice duration"""
     aspect = "16:9" if w > h else "9:16"
     motion_prompt = f"high cinematic action motion, dynamic movement, lively walking, realistic physics, {prompt}"
     vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt[:380])}?model={video_model}&aspectRatio={aspect}&duration=5&seed={seed}"
@@ -326,7 +311,6 @@ def generate_real_motion_clip(prompt, audio_path, out_clip_path, w, h, seed=786,
             target_dur = a_clip.duration
             v_clip = VideoFileClip(temp_raw).resize((w, h))
 
-            # Loop video smoothly if voiceover is longer than 5 seconds
             if v_clip.duration < target_dur:
                 loops = int(np.ceil(target_dur / v_clip.duration))
                 v_clip = concatenate_videoclips([v_clip] * loops)
@@ -343,7 +327,6 @@ def generate_real_motion_clip(prompt, audio_path, out_clip_path, w, h, seed=786,
     if os.path.exists(temp_raw): os.remove(temp_raw)
     return False
 
-# Dynamic Image Motion Fallback (Guarantees zero crashes if server queue is full)
 def generate_dynamic_photo_clip(prompt, audio_path, out_clip_path, w, h, seed, style):
     img_p = out_clip_path.replace(".mp4", ".png")
     img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt[:380])}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
@@ -396,7 +379,6 @@ def create_cinematic_v40(story, voice_gen, rate_val, pitch_val, ratio, style, se
         scene_clips = []
         temp_files_to_clean = []
 
-        # Locked Character Anchor
         c_anchor = char_anchor.strip() if char_anchor.strip() else "consistent protagonist character, detailed features, cohesive outfit"
 
         try:
@@ -404,20 +386,17 @@ def create_cinematic_v40(story, voice_gen, rate_val, pitch_val, ratio, style, se
                 status.info(f"🎬 منظر {idx + 1} از {total_scenes}: آواز اور 5 سیکنڈ متحرک ویڈیو کی تشکیل...")
                 progress_bar.progress((idx / total_scenes) * 0.8)
 
-                # 1. Synthesize audio with exact pitch and rate
                 sub_audio = f"a_{u_id}_{idx}.mp3"
                 if not save_audio_safe(scene, voice_gen, rate_val, pitch_val, sub_audio):
                     continue
                 temp_files_to_clean.append(sub_audio)
 
-                # 2. Translate and formulate prompt with LOCKED SEED & ANCHOR
                 trans = translate_ur_to_en_enhanced(scene)
                 prompt = f"{c_anchor}, {trans}, visual style: {style}, 8k resolution, sharp focus, cinematic motion"
 
                 clip_mp4 = f"clip_{u_id}_{idx}.mp4"
                 temp_files_to_clean.append(clip_mp4)
 
-                # 3. Generate Real 5-Second Motion Video (with dynamic fallback)
                 success = generate_real_motion_clip(prompt, sub_audio, clip_mp4, w, h, seed=seed, video_model=video_model)
                 if not success or not os.path.exists(clip_mp4):
                     generate_dynamic_photo_clip(prompt, sub_audio, clip_mp4, w, h, seed=seed, style=style)
@@ -432,7 +411,6 @@ def create_cinematic_v40(story, voice_gen, rate_val, pitch_val, ratio, style, se
 
             final_video = concatenate_videoclips(scene_clips, method="compose")
 
-            # Add Background Music (Ducked)
             if enable_bg_music:
                 bg_m = get_cached_bg_music(False, True)
                 if bg_m and os.path.exists(bg_m):
@@ -444,7 +422,6 @@ def create_cinematic_v40(story, voice_gen, rate_val, pitch_val, ratio, style, se
             out_name = f"Sglowina_{u_id}_{int(time.time())}.mp4"
             final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", threads=4, logger=None)
 
-            # Clean memory and temporary files
             final_video.close()
             for c in scene_clips: c.close()
             for f in temp_files_to_clean:
