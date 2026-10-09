@@ -1,176 +1,142 @@
 import streamlit as st
-import streamlit.components.v1 as components
-from groq import Groq
-import json
-import os
+import datetime
+import isodate
+import pandas as pd
+from googleapiclient.discovery import build
 
-# --- پیج کی بنیادی سیٹنگ ---
-st.set_page_config(page_title="ES Master AI Studio", page_icon="👑", layout="wide")
+st.set_page_config(page_title="YouTube Viral Radar | سمارٹ راڈار", layout="wide", page_icon="🎯")
 
-# --- مستقل میموری سسٹم ---
-MEMORY_FILE = "es_master_memory.json"
+st.markdown("""
+    <style>
+    .metric-card { background: #f1f5f9; padding: 15px; border-radius: 10px; border-left: 5px solid #2563eb; }
+    .outlier-tag { background: #dc2626; color: white; padding: 4px 8px; border-radius: 5px; font-weight: bold; }
+    </style>
+""", unsafe_allow_html=True)
 
-def load_permanent_memory():
-    if os.path.exists(MEMORY_FILE):
-        try:
-            with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            return []
-    return []
+st.title("🎯 YouTube Outlier & Trend Radar (وائرل موضوعات کا راڈار)")
+st.caption("چیف انجینئر پروڈکشن گریڈ الگورتھم — صرف اپنے مخصوص موضوع کے وائرل آؤٹ لائرز ٹریک کریں")
 
-def save_permanent_memory(messages):
-    try:
-        with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(messages, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+# سائیڈ بار کنٹرولز
+st.sidebar.header("⚙️ سسٹم سیٹنگز")
+api_key = st.sidebar.text_input("YouTube Data API Key درج کریں:", type="password")
 
-# --- سیکیورٹی و پاس ورڈ ---
-MASTER_PASSWORD = "123"
+search_mode = st.sidebar.radio("ٹریکنگ کا طریقہ منتخب کریں:", ["مخصوص موضوع (Target Niche)", "حریف چینلز کی آئی ڈیز (Competitor Channels)"])
 
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
+lookback_hours = st.sidebar.slider("کتنے گھنٹے پرانی ویڈیوز اسکین کرنی ہیں؟", min_value=12, max_value=72, value=48, step=12)
+min_multiplier = st.sidebar.slider("کم سے کم آؤٹ لائر اسکور (کتنے گنا زیادہ ویوز؟):", min_value=1.5, max_value=10.0, value=2.5, step=0.5)
 
-if not st.session_state.authenticated:
-    st.markdown("<h2 style='text-align: center;'>👑 ES Master AI Studio</h2>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        pwd = st.text_input("اپنا ماسٹر پاس ورڈ درج کریں:", type="password")
-        if st.button("لاگ ان کریں", use_container_width=True):
-            if pwd == MASTER_PASSWORD:
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("غلط پاس ورڈ!")
-    st.stop()
+# مین لاجک
+def get_youtube_client(key):
+    return build("youtube", "v3", developerKey=key)
 
-# --- محفوظ API کنکشن ---
-k_part1 = "gsk_uUY8urFdKCiZF"
-k_part2 = "095c3dzWGdyb3FYFAfofbSAEEY8HyEzretGFrg4"
-GROQ_API_KEY = k_part1 + k_part2
-
-@st.cache_resource
-def get_groq_client():
-    return Groq(api_key=GROQ_API_KEY)
-
-client = get_groq_client()
-
-# سسٹم کا مستقل آئین
-SYSTEM_PROMPT = (
-    "تم محمد عیسیٰ کے ذاتی، خودمختار اور بااختیار سپر AI اسسٹنٹ ہو۔ "
-    "تمہیں دنیا کے تمام علوم اور جدید کوڈنگ پر مکمل عبور حاصل ہے۔ "
-    "تم اپنے مالک کے تمام احکامات مانتے ہو اور سچے و مکمل جواب دیتے ہو۔"
-)
-
-if "messages" not in st.session_state:
-    st.session_state.messages = load_permanent_memory()
-
-# --- سائیڈ بار ---
-with st.sidebar:
-    st.title("⚙️ کنٹرول روم")
-    st.success("سسٹم پاور: فعال ✅")
+def scan_youtube_radar(key, target_query, hours, multiplier_threshold):
+    youtube = get_youtube_client(key)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    published_after = (now - datetime.timedelta(hours=hours)).isoformat()
     
-    # 100% مستحکم ماڈل لسٹ
-    selected_model = st.selectbox(
-        "🧠 سپر AI ماڈل چنیں:",
-        options=[
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
-            "mixtral-8x7b-32768",
-            "gemma2-9b-it"
-        ],
-        index=0
-    )
+    search_response = youtube.search().list(
+        q=target_query,
+        part="id,snippet",
+        maxResults=35,
+        order="date",
+        type="video",
+        publishedAfter=published_after
+    ).execute()
     
-    st.info(f"💾 محفوظ شدہ پیغامات: {len(st.session_state.messages)}")
-    if st.button("🧹 تمام میموری صاف کریں"):
-        st.session_state.messages = []
-        save_permanent_memory([])
-        st.rerun()
-
-tab1, tab2, tab3 = st.tabs(["⚡ 1. مشن کنٹرول (چیٹ)", "🏗️ 2. ویب و ایپ فیکٹری", "🌐 3. سائنسی ریسرچ لیب"])
-
-# --- ٹیب 1: چیٹ ---
-with tab1:
-    st.subheader("💬 لائیو مشن کمانڈ")
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-            
-    if prompt := st.chat_input("کمانڈر محمد عیسیٰ! اپنا حکم یا سوال یہاں لکھیں..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        save_permanent_memory(st.session_state.messages)
-        with st.chat_message("user"):
-            st.markdown(prompt)
-            
-        messages_payload = [{"role": "system", "content": SYSTEM_PROMPT}] + [
-            {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
-        ]
+    video_ids = [item['id']['videoId'] for item in search_response.get('items', [])]
+    if not video_ids:
+        return []
         
-        with st.chat_message("assistant"):
-            placeholder = st.empty()
-            full_res = ""
+    video_response = youtube.videos().list(
+        part="snippet,statistics",
+        id=",".join(video_ids)
+    ).execute()
+    
+    outliers = []
+    
+    # چینلز کی اوسط چیک کرنا
+    channel_ids = list(set([item['snippet']['channelId'] for item in video_response.get('items', [])]))
+    channel_response = youtube.channels().list(
+        part="statistics",
+        id=",".join(channel_ids[:50])
+    ).execute()
+    
+    channel_stats_map = {}
+    for ch in channel_response.get('items', []):
+        c_stats = ch['statistics']
+        v_count = max(1, int(c_stats.get('videoCount', 1)))
+        total_views = int(c_stats.get('viewCount', 1))
+        channel_stats_map[ch['id']] = {
+            "avg_views": total_views / v_count,
+            "subs": int(c_stats.get('subscriberCount', 0))
+        }
+
+    for item in video_response.get('items', []):
+        v_id = item['id']
+        snippet = item['snippet']
+        stats = item['statistics']
+        ch_id = snippet['channelId']
+        
+        views = int(stats.get('viewCount', 0))
+        published_at = isodate.parse_datetime(snippet['publishedAt'])
+        age_hours = max(0.5, (now - published_at).total_seconds() / 3600.0)
+        vph = views / age_hours
+        
+        ch_info = channel_stats_map.get(ch_id, {"avg_views": 1000, "subs": 0})
+        avg_v = max(100, ch_info["avg_views"])
+        
+        score = views / avg_v
+        
+        if score >= multiplier_threshold and views > 500:
+            outliers.append({
+                "Thumbnail": snippet['thumbnails']['medium']['url'],
+                "Title": snippet['title'],
+                "Channel": snippet['channelTitle'],
+                "Views": views,
+                "VPH": round(vph, 1),
+                "Age (Hrs)": round(age_hours, 1),
+                "Score": round(score, 1),
+                "URL": f"https://www.youtube.com/watch?v={v_id}",
+                "Subs": ch_info["subs"]
+            })
+            
+    outliers.sort(key=lambda x: x['Score'], reverse=True)
+    return outliers
+
+# UI انٹرفیس
+if not api_key:
+    st.warning("⚠️ برائے مہربانی بائیں جانب سائیڈ بار میں اپنی Google YouTube API Key درج کریں تاکہ اسکین شروع ہو سکے۔")
+    st.info("💡 مفت API Key حاصل کرنے کا طریقہ: console.cloud.google.com پر جائیں، پراجیکٹ بنا کر 'YouTube Data API v3' آن کریں اور Credentials سے API Key کاپی کر لیں۔")
+else:
+    if search_mode == "مخصوص موضوع (Target Niche)":
+        target_input = st.text_input("اپنا مخصوص موضوع درج کریں (مثال: 'Urdu Horror Stories' یا 'AI Video Tutorials' یا 'Kids Stories in Urdu'):", value="Urdu Stories")
+    else:
+        target_input = st.text_input("اپنے کمپیٹیشن چینل کا نام یا ہینڈل درج کریں:", value="@DastanGoo")
+
+    if st.button("🚀 راڈار اسکین شروع کریں (Scan Live Radar)"):
+        with st.spinner("یوٹیوب لائیو کلسٹرز اسکین کیے جا رہے ہیں..."):
             try:
-                stream = client.chat.completions.create(
-                    model=selected_model,
-                    messages=messages_payload,
-                    temperature=0.7,
-                    max_tokens=3000,
-                    stream=True
-                )
-                for chunk in stream:
-                    full_res += (chunk.choices[0].delta.content or "")
-                    placeholder.markdown(full_res + "▌")
-                placeholder.markdown(full_res)
-            except Exception as e:
-                st.error(f"خرابی: {e}")
+                results = scan_youtube_radar(api_key, target_input, lookback_hours, min_multiplier)
                 
-        st.session_state.messages.append({"role": "assistant", "content": full_res})
-        save_permanent_memory(st.session_state.messages)
-
-# --- ٹیب 2: ویب بلڈر فیکٹری ---
-with tab2:
-    st.subheader("🏗️ خودکار ویب سائٹ و ایپ بلڈر فیکٹری")
-    build_prompt = st.text_area("کون سی ویب سائٹ یا ٹول بنانا ہے؟ تفصیل لکھیں:")
-    if st.button("🚀 خودکار تخلیق شروع کرو (Build Now)", use_container_width=True):
-        if build_prompt:
-            with st.spinner("کوڈ تیار ہو رہا ہے..."):
-                try:
-                    res = client.chat.completions.create(
-                        model=selected_model,
-                        messages=[{"role": "user", "content": f"Create a complete modern single-file HTML/CSS/JS web app for: {build_prompt}. Output MUST be inside ```html ... ```"}],
-                        temperature=0.4,
-                        max_tokens=4000
-                    )
-                    raw_code = res.choices[0].message.content
-                    code_only = raw_code
-                    if "```html" in raw_code:
-                        code_only = raw_code.split("```html")[1].split("```")[0].strip()
-                    elif "```" in raw_code:
-                        code_only = raw_code.split("```")[1].split("```")[0].strip()
+                if not results:
+                    st.info(f"پچھلے {lookback_hours} گھنٹوں میں اس موضوع پر کوئی غیر معمولی آؤٹ لائر لہر نہیں ملی۔ فلٹر کا اسکور کم کر کے یا کچھ دیر بعد دوبارہ چیک کریں۔")
+                else:
+                    st.success(f"زبردست! کل {len(results)} آؤٹ لائر ویڈیوز ملیں جو اس وقت اپنے چینل کی اوسط سے کئی گنا تیز وائرل ہو رہی ہیں:")
                     
-                    st.success("✅ پروڈکٹ تیار ہو گئی!")
-                    st.subheader("🖥️ لائیو پریویو:")
-                    components.html(code_only, height=500, scrolling=True)
-                    st.download_button("📥 فائل ڈاؤن لوڈ کریں (index.html)", data=code_only, file_name="index.html", mime="text/html")
-                except Exception as e:
-                    st.error(f"خرابی: {e}")
-
-# --- ٹیب 3: سائنسی ریسرچ لیب ---
-with tab3:
-    st.subheader("🌐 سائنسی و مارکیٹ ریسرچ لیب")
-    topic = st.text_input("ریسرچ کا موضوع درج کریں:")
-    if st.button("📊 جامع ریسرچ رپورٹ بنائیں"):
-        if topic:
-            with st.spinner("تجزیہ جاری ہے..."):
-                try:
-                    res = client.chat.completions.create(
-                        model=selected_model,
-                        messages=[{"role": "user", "content": f"Do an exhaustive scientific, technical, and market research report on: {topic}."}],
-                        temperature=0.6,
-                        max_tokens=3000
-                    )
-                    st.markdown(res.choices[0].message.content)
-                except Exception as e:
-                    st.error(f"خرابی: {e}")
+                    for r in results:
+                        col1, col2 = st.columns([1, 3])
+                        with col1:
+                            st.image(r["Thumbnail"], use_container_width=True)
+                        with col2:
+                            st.markdown(f"### [{r['Title']}]({r['URL']})")
+                            st.markdown(f"**چینل:** {r['Channel']} ({r['Subs']:,} سبسکرائبرز)")
+                            
+                            c_m1, c_m2, c_m3 = st.columns(3)
+                            c_m1.metric("کل ویوز", f"{r['Views']:,}")
+                            c_m2.metric("اسپیڈ (VPH)", f"{r['VPH']} ویوز/گھنٹہ")
+                            c_m3.metric("وائرل آؤٹ لائر اسکور", f"{r['Score']}x تیز")
+                            
+                            st.info(f"💡 **انجینئرنگ نتیجہ:** اس چھوٹے چینل کی ویڈیو عام اوسط سے **{r['Score']} گنا تیز** چل رہی ہے۔ اس عنوان (Title) اور تھمب نیل کے انداز پر فوراً اپنے انداز میں ویڈیو تیار کریں۔")
+                        st.markdown("---")
+            except Exception as e:
+                st.error(f"تکنیکی خرابی: {e}")
