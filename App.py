@@ -21,10 +21,7 @@ import io
 import numpy as np
 import threading
 import gc
-import sqlite3
-import json
 
-# PRE-AUTHENTICATED MASTER API KEY
 DEFAULT_POLLINATIONS_KEY = "sk_H9xxEAoQ2EqSHACZeOBWeFlFTNNFFzm5"
 
 headers_browser = {
@@ -57,21 +54,14 @@ try:
 except ImportError:
     EDGE_TTS_AVAILABLE = False
 
-st.set_page_config(page_title="Sglowina AI - Real Motion Cinema Studio", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Titan Cinema Studio", layout="wide", page_icon="🎬")
 
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
 if "msgs" not in st.session_state: st.session_state.msgs = []
-if "movie_script_val" not in st.session_state: st.session_state.movie_script_val = ""
 
-st.sidebar.subheader("🎬 Real Motion Engine Settings")
+st.sidebar.subheader("🎬 Titan Production Master")
 enable_bg_music = st.sidebar.checkbox("Enable Filmic Background Music", value=st.session_state.enable_bg_music)
 st.session_state.enable_bg_music = enable_bg_music
-
-# ENGINE MODE TOGGLE
-engine_mode = st.sidebar.selectbox(
-    "ویڈیو جنریشن موڈ:",
-    ["Real AI Video Motion (3s Moving Clips)", "Cinematic 8K Photo Pan & Zoom"]
-)
 
 api_key_input = st.sidebar.text_input("Active Pollinations Key:", value=DEFAULT_POLLINATIONS_KEY, type="password")
 
@@ -117,18 +107,30 @@ def translate_text_dynamic(text, target_lang="en"):
     except: pass
     return text
 
+# ================= 3. SCENE & CHARACTER PROMPT WITH LOCKED DNA =================
 def build_universal_scene_prompt(scene_english_text, style, char_dna_anchor, scene_index):
     clean_scene = re.sub(r'(?i)\b(character 1|character 2|in every image|grid|collage|character sheet|turnaround)\b', '', scene_english_text)
     clean_scene = re.sub(r'\s+', ' ', clean_scene).strip()
-    dna_prefix = f"Main Character DNA: {char_dna_anchor.strip()}, " if char_dna_anchor.strip() else ""
-    return f"Cinematic action motion scene: {dna_prefix}{clean_scene}. Style: {style}, 8k photorealistic, dynamic character movement, sharp focus, strictly NO blurry close-up, NO split screen, NO collage"
+    
+    dna_prefix = f"Main Subject DNA: {char_dna_anchor.strip()}, " if char_dna_anchor.strip() else ""
+
+    camera_perspectives = [
+        "cinematic wide-angle establishing shot, glowing rim lighting",
+        "dramatic medium cinematography shot, clear sharp lighting, high dynamic range HDR",
+        "epic wide-angle landscape shot, illuminated background, sharp focus, rich contrast",
+        "low-angle cinematic shot, deep shadows with clear sharp highlights, 8k crisp details"
+    ]
+    perspective = camera_perspectives[scene_index % len(camera_perspectives)]
+    
+    return f"{perspective}: {dna_prefix}{clean_scene}. Style: {style}, 8k photorealistic, crystal-clear lighting, sharp vivid focus on all subjects, deep rich contrast, strictly NO blurry face close-up, NO muddy textures, NO split screen, NO collage, NO grid"
 
 def apply_filmic_grading(img_path):
     try:
         with Image.open(img_path) as im:
             im = im.convert("RGB")
-            im = ImageEnhance.Sharpness(im).enhance(1.25)
-            im = ImageEnhance.Contrast(im).enhance(1.10)
+            im = ImageEnhance.Sharpness(im).enhance(1.30)
+            im = ImageEnhance.Contrast(im).enhance(1.12)
+            im = ImageEnhance.Color(im).enhance(1.10)
             im.save(img_path, "PNG")
     except: pass
 
@@ -155,98 +157,85 @@ def save_audio_safe(text, voice, rate, pitch, filename):
     except:
         return False
 
-# ================= 3. AUTHENTICATED REAL 3-SECOND VIDEO MOTION ENGINE =================
-def generate_real_motion_clip(prompt, audio_path, out_clip_path, w, h, seed=786, key="", video_model="wan-fast"):
-    """
-    Downloads true moving 3-second MP4 clip using authenticated key.
-    Loops video smoothly if spoken audio is longer than 3 seconds.
-    """
-    aspect = "16:9" if w > h else "9:16"
+# ================= 4. AUTHENTICATED IMAGE DOWNLOADER =================
+def download_image_authenticated(prompt, out_path, w, h, seed, key=""):
+    clean_p = prompt[:380]
     active_key = key.strip() if key.strip() else DEFAULT_POLLINATIONS_KEY
-    motion_prompt = f"high cinematic action motion, dynamic movement, character walking, lifelike physics, {prompt}"
-    
-    vid_url = f"https://gen.pollinations.ai/video/{urllib.parse.quote(motion_prompt[:380])}?model={video_model}&aspectRatio={aspect}&duration=3&seed={seed}&key={active_key}"
-    temp_raw = out_clip_path.replace(".mp4", "_raw.mp4")
-    
     req_headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36",
         "Authorization": f"Bearer {active_key}"
     }
 
-    success = False
-    for attempt in range(2):
+    urls = [
+        f"https://gen.pollinations.ai/image/{urllib.parse.quote(clean_p)}?width={w}&height={h}&seed={seed}&model=flux&key={active_key}",
+        f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_p)}?width={w}&height={h}&seed={seed}&nologo=true&model=flux&key={active_key}",
+        f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_p)}?width={w}&height={h}&seed={seed}&nologo=true&model=turbo&key={active_key}"
+    ]
+
+    for url in urls:
         try:
-            r = session.get(vid_url, headers=req_headers, timeout=50)
-            if r.status_code == 200 and len(r.content) > 30000:
-                with open(temp_raw, "wb") as f: f.write(r.content)
-                success = True
-                break
-        except: time.sleep(1)
+            res = session.get(url, headers=req_headers, timeout=25)
+            if res.status_code == 200 and len(res.content) > 4000:
+                with open(out_path, "wb") as f: f.write(res.content)
+                with Image.open(out_path) as im: im.load()
+                return True
+        except: time.sleep(0.3)
 
-    if success and os.path.exists(temp_raw):
-        try:
-            a_clip = AudioFileClip(audio_path)
-            target_dur = a_clip.duration
-            v_clip = VideoFileClip(temp_raw).resize((w, h))
+    im = Image.new("RGB", (w, h), color=(20, 40, 75))
+    im.save(out_path, "PNG")
+    return True
 
-            # If voiceover is longer than 3 seconds, loop video seamlessly
-            if v_clip.duration < target_dur:
-                loops = int(np.ceil(target_dur / v_clip.duration))
-                v_clip = concatenate_videoclips([v_clip] * loops)
-
-            final_clip = v_clip.subclip(0, target_dur).set_audio(a_clip.volumex(1.2))
-            final_clip.write_videofile(out_clip_path, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", threads=4, logger=None)
-            
-            final_clip.close()
-            v_clip.close()
-            a_clip.close()
-            if os.path.exists(temp_raw): os.remove(temp_raw)
-            return True
-        except: pass
-
-    if os.path.exists(temp_raw): os.remove(temp_raw)
-    return False
-
-# High-Fidelity Photo Fallback (Used if network drop occurs)
-def render_photo_motion_fallback(prompt, audio_path, out_clip_path, w, h, seed, key=""):
-    clean_p = prompt[:380]
-    active_key = key.strip() if key.strip() else DEFAULT_POLLINATIONS_KEY
-    img_p = out_clip_path.replace(".mp4", ".png")
+# ================= 5. SMOOTH KINETIC CAMERA MOTION (NO JERKS / SOFT FLOW) =================
+def render_scene_clip_chunk(img_path, audio_path, out_clip_path, w, h, selected_motion="AI Director (Auto)", motion_index=0):
+    apply_filmic_grading(img_path)
     
-    url = f"https://gen.pollinations.ai/image/{urllib.parse.quote(clean_p)}?width={w}&height={h}&seed={seed}&model=flux&key={active_key}"
-    try:
-        r = session.get(url, timeout=25)
-        if r.status_code == 200 and len(r.content) > 4000:
-            with open(img_p, "wb") as f: f.write(r.content)
-    except:
-        im = Image.new("RGB", (w, h), color=(20, 40, 75))
-        im.save(img_p, "PNG")
-
-    apply_filmic_grading(img_p)
-    scale_factor = 1.20
+    scale_factor = 1.25
     cw, ch = make_even(w * scale_factor), make_even(h * scale_factor)
-    temp_scaled = img_p.replace(".png", "_scaled.png")
+    temp_scaled = img_path.replace(".png", "_scaled.png")
 
-    with Image.open(img_p) as im:
+    with Image.open(img_path) as im:
         im.resize((cw, ch), Image.Resampling.LANCZOS).save(temp_scaled, "PNG")
 
     try:
         a_clip = AudioFileClip(audio_path)
         dur = a_clip.duration
         clip = ImageClip(temp_scaled).set_duration(dur).set_fps(24)
-        animated = clip.set_position(lambda t: (int((w - cw)/2 - (15 * (t / dur))), int((h - ch)/2 - (15 * (t / dur)))))
+
+        # Smooth soft motion without hard jerk (Centered smooth drift)
+        active_mode = selected_motion
+        if selected_motion == "AI Director (Auto)":
+            modes = ["Pan Left", "Pan Right", "Smooth Zoom In", "Smooth Zoom Out"]
+            active_mode = modes[motion_index % len(modes)]
+
+        if active_mode == "Pan Left":
+            # Soft gliding from right to left
+            animated = clip.set_position(lambda t: (int((w - cw)/2 - (18 * (t / dur))), 'center'))
+        elif active_mode == "Pan Right":
+            # Soft gliding from left to right
+            animated = clip.set_position(lambda t: (int((w - cw)/2 + (18 * (t / dur))), 'center'))
+        elif active_mode == "Smooth Zoom In":
+            # Gently gliding into scene
+            animated = clip.set_position(lambda t: (int((w - cw)/2 - (14 * (t / dur))), int((h - ch)/2 - (14 * (t / dur)))))
+        elif active_mode == "Smooth Zoom Out":
+            # Gently gliding outward revealing full scene
+            animated = clip.set_position(lambda t: (int((w - cw)/2 + (14 * (t / dur))), int((h - ch)/2 + (14 * (t / dur)))))
+        else:
+            animated = clip.set_position('center')
+
         comp = CompositeVideoClip([animated], size=(w, h)).set_duration(dur).set_audio(a_clip.volumex(1.2))
         comp.write_videofile(out_clip_path, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", threads=4, logger=None)
+
         comp.close()
         a_clip.close()
         clip.close()
-    except: pass
+        if os.path.exists(temp_scaled): os.remove(temp_scaled)
+        return True
+    except:
+        if os.path.exists(temp_scaled): os.remove(temp_scaled)
+        return False
 
-    for f in [img_p, temp_scaled]:
-        if os.path.exists(f): os.remove(f)
-
-# ================= 4. MASTER CINEMATIC PRODUCTION PIPELINE =================
-def create_master_movie(story, voice_gen, rate_val, pitch_val, ratio, style, base_seed, char_dna="", mode="Real AI Video Motion (3s Moving Clips)", api_key="", enable_bg_music=True):
+# ================= 6. MASTER PRODUCTION PIPELINE =================
+def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, style, base_seed, char_dna="", selected_motion="AI Director (Auto)", api_key="", enable_bg_music=True):
     if not MOVIEPY_AVAILABLE: return "MoviePy missing."
     u_id = str(uuid.uuid4())[:8]
 
@@ -269,10 +258,10 @@ def create_master_movie(story, voice_gen, rate_val, pitch_val, ratio, style, bas
 
         try:
             for idx, raw_scene_text in enumerate(sliced_scenes):
-                status.info(f"🎬 منظر {idx + 1} از {total_scenes}: متحرک ویڈیو کلپ اور آواز رینڈر ہو رہی ہے...")
+                status.info(f"🎬 منظر {idx + 1} از {total_scenes}: آواز اور منفرد منظر کا فریم تیار ہو رہا ہے...")
                 progress_bar.progress((idx / total_scenes) * 0.8)
 
-                # 1. Spoken Audio Line
+                # 1. Spoken audio line
                 if is_urdu_voice:
                     spoken_line = translate_text_dynamic(raw_scene_text, target_lang="ur")
                 else:
@@ -283,23 +272,22 @@ def create_master_movie(story, voice_gen, rate_val, pitch_val, ratio, style, bas
                     continue
                 temp_files_to_clean.append(sub_audio)
 
-                # 2. Scene Prompt
+                # 2. Scene prompt with locked character DNA
                 english_scene_desc = translate_text_dynamic(raw_scene_text, target_lang="en")
-                scene_prompt = build_universal_scene_prompt(english_scene_desc, style, char_dna, idx)
-                scene_seed = int(base_seed) + (idx * 47)
+                scene_flux_prompt = build_universal_scene_prompt(english_scene_desc, style, char_dna, idx)
 
+                # 3. Dedicated seed per scene
+                scene_seed = int(base_seed) + (idx * 53)
+                img_p = f"img_{u_id}_{idx}.png"
+                temp_files_to_clean.append(img_p)
+                
+                download_image_authenticated(scene_flux_prompt, img_p, w, h, seed=scene_seed, key=api_key)
+
+                # 4. Smooth motion rendering
                 clip_mp4 = f"clip_{u_id}_{idx}.mp4"
                 temp_files_to_clean.append(clip_mp4)
 
-                # 3. Generate Video (True Motion or Photo Zoom)
-                if "Real AI Video" in mode:
-                    success = generate_real_motion_clip(scene_prompt, sub_audio, clip_mp4, w, h, seed=scene_seed, key=api_key, video_model="wan-fast")
-                    if not success or not os.path.exists(clip_mp4):
-                        render_photo_motion_fallback(scene_prompt, sub_audio, clip_mp4, w, h, seed=scene_seed, key=api_key)
-                else:
-                    render_photo_motion_fallback(scene_prompt, sub_audio, clip_mp4, w, h, seed=scene_seed, key=api_key)
-
-                if os.path.exists(clip_mp4):
+                if render_scene_clip_chunk(img_p, sub_audio, clip_mp4, w, h, selected_motion=selected_motion, motion_index=idx):
                     scene_chunk_paths.append(clip_mp4)
 
                 gc.collect()
@@ -307,7 +295,7 @@ def create_master_movie(story, voice_gen, rate_val, pitch_val, ratio, style, bas
             if not scene_chunk_paths: raise Exception("کوئی منظر رینڈر نہیں ہو سکا۔")
 
             progress_bar.progress(0.85)
-            status.info(f"🎞️ تمام {len(scene_chunk_paths)} متحرک مناظر کو ملا کر فائنل ویڈیو تیار ہو رہی ہے...")
+            status.info(f"🎞️ تمام {len(scene_chunk_paths)} مناظر کو ہموار موشن کے ساتھ جوڑا جا رہا ہے...")
 
             loaded_clips = [VideoFileClip(p) for p in scene_chunk_paths if os.path.exists(p)]
             final_video = concatenate_videoclips(loaded_clips, method="compose")
@@ -331,7 +319,7 @@ def create_master_movie(story, voice_gen, rate_val, pitch_val, ratio, style, bas
                 except: pass
 
             progress_bar.progress(1.0)
-            status.success(f"🚀 {len(scene_chunk_paths)} متحرک مناظر کے ساتھ مکمل مووی کامیابی سے تیار ہو گئی!")
+            status.success(f"🚀 {len(scene_chunk_paths)} الگ الگ مناظر اور کائینیٹک موشن کے ساتھ مووی تیار ہو گئی!")
             return out_name
         except Exception as e:
             for f in temp_files_to_clean:
@@ -357,35 +345,33 @@ st.markdown("""
 st.markdown("""
     <div class="dashboard-header">
         <div class="circular-s"><span class="metallic-s">S</span></div>
-        <h1 class="glow-title">Sglowina AI - Titan Motion Cinema</h1>
+        <h1 class="glow-title">Sglowina AI - Titan Cinema Studio</h1>
     </div>
 """, unsafe_allow_html=True)
 
 tab_movie, tab_chat, tab_enterprise = st.tabs([
-    "🎬 Pro Movie Studio", "💬 Electric AI Chat", "👤 Founders & Accounts"
+    "🎬 Titan Movie Studio", "💬 Electric AI Chat", "👤 Founders & Accounts"
 ])
 
 # 1. MOVIE STUDIO
 with tab_movie:
-    st.write("### 🎥 Titan Real Motion Studio (3 سیکنڈ متحرک ویڈیو کلپس + آڈیو سنک)")
+    st.write("### 🎥 Titan Movie Studio (کیمرہ موشن چوائس + مستقل انسان و جانور ڈی این اے)")
     m_script = st.text_area("کہانی یا ڈائیلاگ یہاں درج کریں (Urdu / English):", height=140, placeholder="The Forest That Eats Shadows. Deep inside a forgotten forest, a young explorer named Daniel discovered a glowing blue tree...")
-    char_dna_input = st.text_input("مستقل کردار ڈی این اے (Character DNA Memory - اختیاری):", placeholder="مثلاً: A 22-year-old explorer Daniel with short brown hair wearing a dark navy leather jacket")
+    
+    char_dna_input = st.text_input("مستقل کردار ڈی این اے (Character DNA Lock - اختیاری):", placeholder="مثلاً: A 22-year-old explorer Daniel with short brown hair wearing a dark navy leather jacket")
 
     c1, c2, c3, c4 = st.columns(4)
-    with c1: mv = st.selectbox("آواز (Voice):", ["Urdu Male (Asad)", "Urdu Female (Uzma)", "English US Male (Guy)", "English US Female (Jenny)", "Arabic Egypt Male (Shakir)", "Persian Male (Farid)"])
+    with c1: mv = st.selectbox("آواز (Voice):", ["Urdu Male (Asad)", "Urdu Female (Uzma)", "English US Male (Guy)", "English US Female (Jenny)"])
     with c2: mv_rate = st.selectbox("آواز کی رفتار (Speed):", ["-10% (Slow)", "+0% (Normal)", "+10% (Fast)", "+20% (Very Fast)"])
     with c3: mv_pitch = st.selectbox("آواز کا لہجہ (Pitch):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with c4: mr = st.selectbox("سائز (Format):", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
 
-    c5, c6 = st.columns(2)
+    c5, c6, c7 = st.columns(3)
     with c5: ms = st.selectbox("اسٹائل (Style):", ["Photorealistic Hollywood", "Realistic HD", "3D Cartoon Pixar Style", "Anime Art", "Dark Gothic / Mystery"])
-    with c6: sd = st.number_input("سیڈ (Base Seed):", value=786)
+    with c6: motion_choice = st.selectbox("کیمرہ موشن (Camera Motion):", ["AI Director (Auto)", "Pan Left", "Pan Right", "Smooth Zoom In", "Smooth Zoom Out"])
+    with c7: sd = st.number_input("سیڈ (Base Seed):", value=786)
 
-    voice_map = {
-        "Urdu Male (Asad)": "ur-PK-AsadNeural", "Urdu Female (Uzma)": "ur-PK-UzmaNeural",
-        "English US Male (Guy)": "en-US-GuyNeural", "English US Female (Jenny)": "en-US-JennyNeural",
-        "Arabic Egypt Male (Shakir)": "ar-EG-ShakirNeural", "Persian Male (Farid)": "fa-IR-FaridNeural"
-    }
+    voice_map = {"Urdu Male (Asad)": "ur-PK-AsadNeural", "Urdu Female (Uzma)": "ur-PK-UzmaNeural", "English US Male (Guy)": "en-US-GuyNeural", "English US Female (Jenny)": "en-US-JennyNeural"}
     pitch_map = {"Normal (نارمل)": "+0Hz", "Deep (بھاری آواز)": "-15Hz", "Very Deep (موٹی آواز)": "-28Hz"}
     active_voice = voice_map.get(mv, "ur-PK-AsadNeural")
     rate_val = mv_rate.split(" ")[0]
@@ -394,10 +380,10 @@ with tab_movie:
     if st.button("Generate Master Titan Movie 🚀", use_container_width=True):
         if not m_script.strip(): st.error("پہلے کہانی درج کریں!")
         else:
-            with st.spinner("🎬 تصدیق شدہ API کی کے ذریعے متحرک ویڈیوز اور آڈیو تیار ہو رہی ہے..."):
-                v_res = create_master_movie(
+            with st.spinner("🎬 تمام مناظر اور منتخب کیمرہ موشن رینڈر ہو رہے ہیں..."):
+                v_res = create_titan_cinematic_movie(
                     m_script, active_voice, rate_val, pitch_val, mr, ms, int(sd),
-                    char_dna=char_dna_input, mode=engine_mode,
+                    char_dna=char_dna_input, selected_motion=motion_choice,
                     api_key=api_key_input, enable_bg_music=st.session_state.enable_bg_music
                 )
             if v_res.endswith(".mp4") and os.path.exists(v_res):
@@ -427,4 +413,4 @@ with tab_enterprise:
     st.write("### 📱 پاکستانی لوکل پیمنٹ اکاؤنٹس")
     st.write("💚 **EasyPaisa Account:** Saba Wahid | **03086834020**\n\n❤️ **JazzCash Account:** Ayisha bi bi | **03240755475**")
 
-st.markdown("<p style='text-align: center; font-weight: bold; padding-top: 25px; color: #475569;'>Sglowina AI Titan Motion Cinema | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; padding-top: 25px; color: #475569;'>Sglowina AI Titan Studio | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
