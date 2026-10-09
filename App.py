@@ -1,4 +1,5 @@
 import sys
+# 1. Globally patch PIL.Image for Pillow 10+ compatibility with MoviePy
 try:
     import PIL.Image
     if not hasattr(PIL.Image, 'ANTIALIAS'):
@@ -27,7 +28,9 @@ session = requests.Session()
 session.headers.update(headers_browser)
 
 AUDIO_CACHE_DIR = "audio_cache"
+TEMP_DIR = "temp_render_chunks"
 os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
+os.makedirs(TEMP_DIR, exist_ok=True)
 TRANSITION_SFX_FILE = "transition_whoosh.mp3"
 
 def download_transition_sfx():
@@ -41,11 +44,17 @@ def download_transition_sfx():
 
 download_transition_sfx()
 
+# ================= BULLETPROOF UNIVERSAL MOVIEPY IMPORTS =================
+MOVIEPY_AVAILABLE = False
 try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, CompositeVideoClip
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
     MOVIEPY_AVAILABLE = True
-except Exception as e:
-    MOVIEPY_AVAILABLE = False
+except Exception:
+    try:
+        from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
+        MOVIEPY_AVAILABLE = True
+    except Exception as e:
+        MOVIEPY_AVAILABLE = False
 
 try:
     import edge_tts
@@ -58,18 +67,21 @@ st.set_page_config(page_title="Sglowina AI - Titan Enterprise Studio", layout="w
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
 if "msgs" not in st.session_state: st.session_state.msgs = []
 
-st.sidebar.subheader("🎬 Titan Audio & Video Master")
+st.sidebar.subheader("🎬 Titan Production Settings")
 enable_bg_music = st.sidebar.checkbox("Enable Filmic Background Music", value=st.session_state.enable_bg_music)
 st.session_state.enable_bg_music = enable_bg_music
+
+# FUTURE-PROOF API KEY SLOT
+user_api_key = st.sidebar.text_input("AI Video API Key (Kling / Fal.ai / Pollen):", type="password", help="Leave blank for Free High-End Cinematic Engine")
 
 render_semaphore = threading.Semaphore(value=1)
 
 def make_even(val):
     return int(val) if int(val) % 2 == 0 else int(val) + 1
 
-# ================= MANDATORY ENGLISH TRANSLATION SHIELD =================
+# ================= MANDATORY ENGLISH TRANSLATION & GENDER ANCHOR =================
 def force_translate_to_english(text):
-    """Guarantees text is converted to clean English so Flux never hallucinates or defaults to women"""
+    """Guarantees text is converted to clean English so Flux never hallucinates"""
     try:
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q={urllib.parse.quote(text)}"
         res = requests.get(url, timeout=8)
@@ -80,12 +92,19 @@ def force_translate_to_english(text):
     except: pass
     return text
 
-def sanitize_visual_prompt(raw_prompt):
-    cleaned = raw_prompt
-    for token in ["character 1", "character 2", "character consistency rules", "in every image", "turnaround", "character sheet", "grid", "collage"]:
-        cleaned = re.sub(r'(?i)\b' + token + r'\b', '', cleaned)
-    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-    return f"{cleaned}, single continuous camera shot, wide cinematic angle, highly detailed facial structure, strictly NO split screen, NO multi-panel, NO collage, NO grid, 8k resolution"
+def build_gender_locked_prompt(english_text, style):
+    """Enforces masculine or feminine anchor at the first 3 tokens so character never inverts"""
+    text_l = english_text.lower()
+    prefix = ""
+    if any(k in text_l for k in ["daniel", "boy", "man", "male", "he", "him", "his", "explorer", "son", "brother", "لڑکا", "مرد"]):
+        prefix = "A young male, masculine explorer, handsome authentic male features, strictly male, not a woman, not a girl, "
+    elif any(k in text_l for k in ["girl", "woman", "female", "she", "her", "ayesha", "daughter", "sister", "لڑکی", "عورت"]):
+        prefix = "A young female woman, authentic female features, strictly female, not a man, "
+    
+    clean = re.sub(r'(?i)\b(character 1|character 2|in every image|grid|collage|character sheet|turnaround)\b', '', english_text)
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    
+    return f"{prefix}{clean}, single continuous camera shot, wide cinematic angle, photorealistic {style}, 8k resolution, volumetric cinematic lighting, strictly NO split screen, NO multi-panel, NO collage, NO grid"
 
 def apply_filmic_grading(img_path):
     try:
@@ -94,6 +113,20 @@ def apply_filmic_grading(img_path):
             im = ImageEnhance.Sharpness(im).enhance(1.22)
             im = ImageEnhance.Contrast(im).enhance(1.08)
             im.save(img_path, "PNG")
+    except: pass
+
+def apply_canva_typography(img_path, overlay_text):
+    try:
+        with Image.open(img_path) as im:
+            im = im.convert("RGBA")
+            w, h = im.size
+            overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(overlay)
+            try: font = ImageFont.truetype("DejaVuSans-Bold.ttf", int(h * 0.06))
+            except: font = ImageFont.load_default()
+            draw.rectangle([(int(w * 0.08), int(h * 0.08)), (int(w * 0.92), int(h * 0.22))], fill=(37, 99, 235, 200))
+            draw.text((w // 2, int(h * 0.15)), overlay_text, font=font, fill=(255, 255, 255, 255), anchor="mm")
+            Image.alpha_composite(im, overlay).convert("RGB").save(img_path, "PNG")
     except: pass
 
 def get_cached_bg_music(is_horror=False):
@@ -121,10 +154,8 @@ def save_audio_safe(text, voice, rate, pitch, filename):
 
 # ================= ROBUST FLUX IMAGE DOWNLOADER (NO BLACK FRAMES) =================
 def download_flux_image_robust(prompt, out_path, w, h, seed, last_valid_path=None):
-    """Retries 3 times, uses fallback models, and NEVER creates a black image"""
-    clean_p = sanitize_visual_prompt(prompt)
-    url_flux = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_p[:380])}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
-    url_turbo = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_p[:380])}?width={w}&height={h}&seed={seed}&nologo=true&model=turbo"
+    url_flux = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt[:380])}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
+    url_turbo = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt[:380])}?width={w}&height={h}&seed={seed}&nologo=true&model=turbo"
 
     for url in [url_flux, url_turbo]:
         for attempt in range(2):
@@ -136,7 +167,6 @@ def download_flux_image_robust(prompt, out_path, w, h, seed, last_valid_path=Non
                     return True
             except: time.sleep(0.5)
 
-    # If download fails, HOLD the previous valid image instead of showing black screen!
     if last_valid_path and os.path.exists(last_valid_path):
         try:
             with Image.open(last_valid_path) as prev_im:
@@ -144,7 +174,6 @@ def download_flux_image_robust(prompt, out_path, w, h, seed, last_valid_path=Non
             return True
         except: pass
 
-    # If completely first frame fails, create high-contrast cinematic gradient (NOT BLACK)
     im = Image.new("RGB", (w, h), color=(30, 58, 138))
     im.save(out_path, "PNG")
     return True
@@ -186,8 +215,8 @@ def render_scene_clip_chunk(img_path, audio_path, out_clip_path, w, h, motion="D
         return False
 
 # ================= TITAN MASTER PRODUCTION PIPELINE =================
-def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, style, seed, enable_bg_music=True):
-    if not MOVIEPY_AVAILABLE: return "MoviePy missing."
+def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, style, seed, api_key="", enable_bg_music=True):
+    if not MOVIEPY_AVAILABLE: return "MoviePy library missing."
     u_id = str(uuid.uuid4())[:8]
 
     with render_semaphore:
@@ -196,6 +225,7 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
 
         # Step 1: Parse sentences cleanly
         raw_sentences = [s.strip() for s in re.split(r'[۔\n.!|?؛;]', story) if len(s.strip()) > 3]
+        if not sentences if 'sentences' in locals() else None: raw_sentences = [s for s in raw_sentences if s]
         if not raw_sentences: raw_sentences = [story.strip()]
         total_scenes = len(raw_sentences)
 
@@ -207,15 +237,15 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
         temp_files_to_clean = []
         last_good_image = None
 
-        is_horror = any(k in story.lower() or k in style.lower() for k in ["horror", "خوف", "مونسٹر", "جن", "ڈراونا", "موت", "قبر"])
+        is_horror = any(k in story.lower() or k in style.lower() for k in ["horror", "خوف", "مونسٹر", "جن", "ڈراونا", "موت", "قبر", "shadows"])
 
         try:
             for idx, raw_line in enumerate(raw_sentences):
-                # 1. Translate sentence strictly to English
+                # 1. Translate sentence strictly to English and inject Subject-First Anchor
                 english_line = force_translate_to_english(raw_line)
-                flux_prompt = f"A cinematic single camera frame: {english_line}, style: {style}, 8k photorealistic, volumetric cinematic lighting, sharp focus, strictly NO collage, NO split screen"
+                flux_prompt = build_gender_locked_prompt(english_line, style)
 
-                status.info(f"🎬 منظر {idx + 1} از {total_scenes}: آواز اور 4K فریم کی تیاری جاری ہے...")
+                status.info(f"🎬 منظر {idx + 1} از {total_scenes}: آواز اور 4K فریم کی تیاری...")
                 progress_bar.progress((idx / total_scenes) * 0.8)
 
                 # 2. Voiceover Synthesis
@@ -224,7 +254,7 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
                     continue
                 temp_files_to_clean.append(sub_audio)
 
-                # 3. Robust Image Generation (Zero Black Frames)
+                # 3. Robust Image Generation (Zero Black Frames & Correct Gender)
                 img_p = f"img_{u_id}_{idx}.png"
                 temp_files_to_clean.append(img_p)
                 download_flux_image_robust(flux_prompt, img_p, w, h, seed=seed, last_valid_path=last_good_image)
@@ -275,7 +305,7 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
                 try:
                     if os.path.exists(f): os.remove(f)
                 except: pass
-            return f"Error: {e}"
+            return f"Error Details: {e}"
 
 # ================= UI DASHBOARD =================
 st.markdown("""
@@ -298,14 +328,14 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-tab_movie, tab_chat, tab_enterprise = st.tabs([
-    "🎬 Titan Movie Studio", "💬 Electric AI Chat", "👤 Founders & Accounts"
+tab_movie, tab_chat, tab_image, tab_enterprise = st.tabs([
+    "🎬 Titan Movie Studio", "💬 Electric AI Chat", "🎨 Pro Image & Canva Studio", "👤 Founders & Accounts"
 ])
 
 # 1. MOVIE STUDIO
 with tab_movie:
-    st.write("### 🎥 Titan Movie Studio (100% اردو ٹرانسلیشن شیلڈ — نو بلیک اسکرین)")
-    m_script = st.text_area("کہانی یا ڈائیلاگ یہاں درج کریں (Urdu / English):", height=140, placeholder="ایک بہادر لڑکا جنگل کے راستے سے جا رہا تھا کہ اچانک سامنے ایک پراسرار غار دکھائی دی...")
+    st.write("### 🎥 Titan Movie Studio (100% صنف کا تحفظ — نو بلیک اسکرین — نو امپورٹ کریش)")
+    m_script = st.text_area("کہانی یا ڈائیلاگ یہاں درج کریں (Urdu / English):", height=140, placeholder="Deep inside a forgotten forest, a young explorer named Daniel discovered a glowing blue tree...")
 
     c1, c2, c3, c4 = st.columns(4)
     with c1: mv = st.selectbox("آواز (Voice):", ["Urdu Male (Asad)", "Urdu Female (Uzma)", "English US Male (Guy)", "English US Female (Jenny)"])
@@ -326,10 +356,10 @@ with tab_movie:
     if st.button("Generate Master Titan Movie 🚀", use_container_width=True):
         if not m_script.strip(): st.error("پہلے کہانی درج کریں!")
         else:
-            with st.spinner("🎬 ٹائٹن انجن تمام جملوں کو انگریزی میں کنورٹ کر کے فلکس فریمز رینڈر کر رہا ہے..."):
+            with st.spinner("🎬 ٹائٹن انجن تمام فریمز اور آڈیو سنک کر رہا ہے..."):
                 v_res = create_titan_cinematic_movie(
                     m_script, active_voice, rate_val, pitch_val, mr, ms, int(sd),
-                    enable_bg_music=st.session_state.enable_bg_music
+                    api_key=user_api_key, enable_bg_music=st.session_state.enable_bg_music
                 )
             if v_res.endswith(".mp4") and os.path.exists(v_res):
                 st.video(v_res)
@@ -350,7 +380,29 @@ with tab_chat:
             st.write(res)
             st.session_state.msgs.append({"role": "assistant", "content": res})
 
-# 3. FOUNDERS & ACCOUNTS
+# 3. PRO IMAGE & CANVA STUDIO
+with tab_image:
+    st.write("### 🎨 Visual & Canva Poster Studio")
+    p_i = st.text_area("تصویر کی تفصیل درج کریں:", height=100)
+    canva_overlay_text = st.text_input("Canva Poster Title Overlay:", placeholder="e.g. Sglowina Blockbuster")
+    ic1, ic2 = st.columns(2)
+    with ic1: i_style = st.selectbox("Art Style:", ["Photorealistic Hollywood", "Realistic HD", "3D Cartoon", "Anime Art"])
+    with ic2: i_size = st.selectbox("Resolution:", ["YouTube HD", "Square (1:1)", "TikTok"])
+
+    if st.button("Generate Titan Visual 🚀"):
+        dim = {"YouTube HD": (1280, 720), "Square (1:1)": (1024, 1024), "TikTok": (720, 1280)}
+        w, h = dim.get(i_size, (1280, 720))
+        img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(p_i + ', visual style: ' + i_style)}?width={w}&height={h}&nologo=true&model=flux"
+        r = session.get(img_url)
+        if r.status_code == 200:
+            temp_p = "temp_canva.jpg"
+            with open(temp_p, "wb") as f: f.write(r.content)
+            if canva_overlay_text.strip(): apply_canva_typography(temp_p, canva_overlay_text.strip())
+            st.image(temp_p)
+            try: os.remove(temp_p)
+            except: pass
+
+# 4. FOUNDERS & ACCOUNTS
 with tab_enterprise:
     st.write("### 👤 فاؤنڈرز اور اکاؤنٹ تفصیلات")
     st.info("🏆 **Founders & Owners:** Muhammad Essa Awan & Saba Wahid")
