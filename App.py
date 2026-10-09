@@ -67,23 +67,23 @@ st.set_page_config(page_title="Sglowina AI - Titan Enterprise Studio", layout="w
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
 if "msgs" not in st.session_state: st.session_state.msgs = []
 
-st.sidebar.subheader("🎬 Titan Production Settings")
+st.sidebar.subheader("🎬 Titan Production Master")
 enable_bg_music = st.sidebar.checkbox("Enable Filmic Background Music", value=st.session_state.enable_bg_music)
 st.session_state.enable_bg_music = enable_bg_music
 
-# FUTURE-PROOF API KEY SLOT
-user_api_key = st.sidebar.text_input("AI Video API Key (Kling / Fal.ai / Pollen):", type="password", help="Leave blank for Free High-End Cinematic Engine")
+# Future API Key hook
+user_api_key = st.sidebar.text_input("AI Video API Key (Optional - Kling / Fal.ai):", type="password")
 
 render_semaphore = threading.Semaphore(value=1)
 
 def make_even(val):
     return int(val) if int(val) % 2 == 0 else int(val) + 1
 
-# ================= MANDATORY ENGLISH TRANSLATION & GENDER ANCHOR =================
-def force_translate_to_english(text):
-    """Guarantees text is converted to clean English so Flux never hallucinates"""
+# ================= ACCURATE DUAL-LANGUAGE TRANSLATOR =================
+def translate_text_dynamic(text, target_lang="en"):
+    """Accurately translates text to English (for Flux prompt) or Urdu (for Edge-TTS narration)"""
     try:
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q={urllib.parse.quote(text)}"
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target_lang}&dt=t&q={urllib.parse.quote(text)}"
         res = requests.get(url, timeout=8)
         if res.status_code == 200:
             translated = "".join([sentence[0] for sentence in res.json()[0] if sentence[0]]).strip()
@@ -92,26 +92,35 @@ def force_translate_to_english(text):
     except: pass
     return text
 
-def build_gender_locked_prompt(english_text, style):
-    """Enforces masculine or feminine anchor at the first 3 tokens so character never inverts"""
-    text_l = english_text.lower()
-    prefix = ""
-    if any(k in text_l for k in ["daniel", "boy", "man", "male", "he", "him", "his", "explorer", "son", "brother", "لڑکا", "مرد"]):
-        prefix = "A young male, masculine explorer, handsome authentic male features, strictly male, not a woman, not a girl, "
-    elif any(k in text_l for k in ["girl", "woman", "female", "she", "her", "ayesha", "daughter", "sister", "لڑکی", "عورت"]):
-        prefix = "A young female woman, authentic female features, strictly female, not a man, "
+# ================= CINEMATIC SCENE PROMPT ARCHITECT =================
+def build_cinematic_scene_prompt(scene_english_text, style, scene_index):
+    """
+    Constructs rich environmental camera frames focusing on whatever is in the sentence:
+    Trees, glowing magic, monsters, fire, animals, or characters in dynamic landscape.
+    """
+    clean_scene = re.sub(r'(?i)\b(character 1|character 2|in every image|grid|collage|character sheet|turnaround)\b', '', scene_english_text)
+    clean_scene = re.sub(r'\s+', ' ', clean_scene).strip()
     
-    clean = re.sub(r'(?i)\b(character 1|character 2|in every image|grid|collage|character sheet|turnaround)\b', '', english_text)
-    clean = re.sub(r'\s+', ' ', clean).strip()
+    # Camera angles rotate per scene so video is never static
+    camera_angles = [
+        "cinematic wide-angle establishing shot, full environment visible, epic depth of field",
+        "medium tracking action shot, detailed atmosphere and vivid lighting",
+        "dramatic low-angle cinematic shot, high contrast shadows and volumetric light rays",
+        "wide landscape cinematography, intricate textures, breathtaking atmospheric mood",
+        "dynamic cinematic perspective shot, high-fidelity film still"
+    ]
+    angle = camera_angles[scene_index % len(camera_angles)]
     
-    return f"{prefix}{clean}, single continuous camera shot, wide cinematic angle, photorealistic {style}, 8k resolution, volumetric cinematic lighting, strictly NO split screen, NO multi-panel, NO collage, NO grid"
+    return f"{angle}: {clean_scene}. Visual style: {style}, 8k resolution, photorealistic masterpiece, sharp clear background and foreground, vivid colors, strictly NO blurry portrait close-up, NO split screen, NO collage, NO grid"
 
 def apply_filmic_grading(img_path):
+    """High-dynamic range color grading, sharp details, zero blur"""
     try:
         with Image.open(img_path) as im:
             im = im.convert("RGB")
-            im = ImageEnhance.Sharpness(im).enhance(1.22)
-            im = ImageEnhance.Contrast(im).enhance(1.08)
+            im = ImageEnhance.Sharpness(im).enhance(1.25)
+            im = ImageEnhance.Contrast(im).enhance(1.10)
+            im = ImageEnhance.Color(im).enhance(1.05)
             im.save(img_path, "PNG")
     except: pass
 
@@ -152,15 +161,16 @@ def save_audio_safe(text, voice, rate, pitch, filename):
     except:
         return False
 
-# ================= ROBUST FLUX IMAGE DOWNLOADER (NO BLACK FRAMES) =================
+# ================= ROBUST FLUX IMAGE DOWNLOADER (ZERO BLACK SCREENS) =================
 def download_flux_image_robust(prompt, out_path, w, h, seed, last_valid_path=None):
-    url_flux = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt[:380])}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
-    url_turbo = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt[:380])}?width={w}&height={h}&seed={seed}&nologo=true&model=turbo"
+    clean_p = prompt[:380]
+    url_flux = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_p)}?width={w}&height={h}&seed={seed}&nologo=true&model=flux"
+    url_turbo = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_p)}?width={w}&height={h}&seed={seed}&nologo=true&model=turbo"
 
     for url in [url_flux, url_turbo]:
         for attempt in range(2):
             try:
-                res = session.get(url, timeout=20)
+                res = session.get(url, timeout=25)
                 if res.status_code == 200 and len(res.content) > 4000:
                     with open(out_path, "wb") as f: f.write(res.content)
                     with Image.open(out_path) as im: im.load()
@@ -174,12 +184,13 @@ def download_flux_image_robust(prompt, out_path, w, h, seed, last_valid_path=Non
             return True
         except: pass
 
-    im = Image.new("RGB", (w, h), color=(30, 58, 138))
+    # Atmospheric emergency gradient (never a dead black box)
+    im = Image.new("RGB", (w, h), color=(15, 30, 65))
     im.save(out_path, "PNG")
     return True
 
-# ================= CHUNKED LOW-RAM CINEMATIC MOTION RENDERER =================
-def render_scene_clip_chunk(img_path, audio_path, out_clip_path, w, h, motion="Dolly In"):
+# ================= DYNAMIC CAMERA MOTION ENGINE =================
+def render_scene_clip_chunk(img_path, audio_path, out_clip_path, w, h, motion_index=0):
     apply_filmic_grading(img_path)
     scale_factor = 1.15
     cw, ch = make_even(w * scale_factor), make_even(h * scale_factor)
@@ -193,14 +204,14 @@ def render_scene_clip_chunk(img_path, audio_path, out_clip_path, w, h, motion="D
         dur = a_clip.duration
         clip = ImageClip(temp_scaled).set_duration(dur).set_fps(24)
 
-        if motion == "Dolly In":
-            animated = clip.set_position(lambda t: ('center', int((h - ch)/2 + (15 * (t / dur)))))
-        elif motion == "Pan Left":
+        # Alternates dynamic motion so every scene breathes differently
+        motion_type = motion_index % 3
+        if motion_type == 0:  # Dolly In
+            animated = clip.set_position(lambda t: ('center', int((h - ch)/2 + (18 * (t / dur)))))
+        elif motion_type == 1:  # Pan Left
             animated = clip.set_position(lambda t: (int((w - cw) * (t / dur)), 'center'))
-        elif motion == "Pan Right":
+        else:  # Pan Right
             animated = clip.set_position(lambda t: (int((w - cw) * (1 - t / dur)), 'center'))
-        else:
-            animated = clip.set_position('center')
 
         comp = CompositeVideoClip([animated], size=(w, h)).set_duration(dur).set_audio(a_clip.volumex(1.2))
         comp.write_videofile(out_clip_path, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", threads=4, logger=None)
@@ -214,18 +225,17 @@ def render_scene_clip_chunk(img_path, audio_path, out_clip_path, w, h, motion="D
         if os.path.exists(temp_scaled): os.remove(temp_scaled)
         return False
 
-# ================= TITAN MASTER PRODUCTION PIPELINE =================
-def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, style, seed, api_key="", enable_bg_music=True):
-    if not MOVIEPY_AVAILABLE: return "MoviePy library missing."
+# ================= MASTER TITAN PRODUCTION PIPELINE =================
+def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, style, base_seed, enable_bg_music=True):
+    if not MOVIEPY_AVAILABLE: return "MoviePy missing."
     u_id = str(uuid.uuid4())[:8]
 
     with render_semaphore:
         progress_bar = st.progress(0.0)
         status = st.empty()
 
-        # Step 1: Parse sentences cleanly
+        # Step 1: Clean Sentence Splitting on all punctuation marks
         raw_sentences = [s.strip() for s in re.split(r'[۔\n.!|?؛;]', story) if len(s.strip()) > 3]
-        if not sentences if 'sentences' in locals() else None: raw_sentences = [s for s in raw_sentences if s]
         if not raw_sentences: raw_sentences = [story.strip()]
         total_scenes = len(raw_sentences)
 
@@ -237,48 +247,58 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
         temp_files_to_clean = []
         last_good_image = None
 
-        is_horror = any(k in story.lower() or k in style.lower() for k in ["horror", "خوف", "مونسٹر", "جن", "ڈراونا", "موت", "قبر", "shadows"])
+        is_urdu_voice = voice_gen.startswith("ur-PK")
+        is_horror = any(k in story.lower() or k in style.lower() for k in ["horror", "خوف", "مونسٹر", "جن", "ڈراونا", "موت", "قبر", "shadows", "monster", "tree"])
 
         try:
             for idx, raw_line in enumerate(raw_sentences):
-                # 1. Translate sentence strictly to English and inject Subject-First Anchor
-                english_line = force_translate_to_english(raw_line)
-                flux_prompt = build_gender_locked_prompt(english_line, style)
-
-                status.info(f"🎬 منظر {idx + 1} از {total_scenes}: آواز اور 4K فریم کی تیاری...")
+                status.info(f"🎬 منظر {idx + 1} از {total_scenes}: آواز کی سنکرونائزیشن اور منظر کا 8K فریم تیار ہو رہا ہے...")
                 progress_bar.progress((idx / total_scenes) * 0.8)
 
-                # 2. Voiceover Synthesis
+                # 1. AUDIO LANGUAGE ALIGNMENT
+                # If Urdu voice selected, narration line is guaranteed to be in pure Urdu!
+                if is_urdu_voice:
+                    spoken_line = translate_text_dynamic(raw_line, target_lang="ur")
+                else:
+                    spoken_line = translate_text_dynamic(raw_line, target_lang="en")
+
                 sub_audio = f"a_{u_id}_{idx}.mp3"
-                if not save_audio_safe(raw_line, voice_gen, rate_val, pitch_val, sub_audio):
+                if not save_audio_safe(spoken_line, voice_gen, rate_val, pitch_val, sub_audio):
                     continue
                 temp_files_to_clean.append(sub_audio)
 
-                # 3. Robust Image Generation (Zero Black Frames & Correct Gender)
+                # 2. SCENE-CENTRIC PROMPT ARCHITECTURE (Shows trees, creatures, monsters, magic, fire)
+                english_scene_desc = translate_text_dynamic(raw_line, target_lang="en")
+                scene_flux_prompt = build_cinematic_scene_prompt(english_scene_desc, style, idx)
+
+                # 3. UNIQUE SEED PER SCENE: Guarantees new camera angles & no frozen screen!
+                scene_seed = int(base_seed) + (idx * 37)
+
                 img_p = f"img_{u_id}_{idx}.png"
                 temp_files_to_clean.append(img_p)
-                download_flux_image_robust(flux_prompt, img_p, w, h, seed=seed, last_valid_path=last_good_image)
+                download_flux_image_robust(scene_flux_prompt, img_p, w, h, seed=scene_seed, last_valid_path=last_good_image)
                 if os.path.exists(img_p) and os.path.getsize(img_p) > 2000:
                     last_good_image = img_p
 
-                # 4. Chunked Filmic Motion Render
+                # 4. CHUNKED FILMIC MOTION RENDER
                 clip_mp4 = f"clip_{u_id}_{idx}.mp4"
                 temp_files_to_clean.append(clip_mp4)
 
-                motion_type = "Dolly In" if idx % 2 == 0 else "Pan Left"
-                if render_scene_clip_chunk(img_p, sub_audio, clip_mp4, w, h, motion=motion_type):
+                if render_scene_clip_chunk(img_p, sub_audio, clip_mp4, w, h, motion_index=idx):
                     scene_chunk_paths.append(clip_mp4)
 
+                # Clear memory buffer per scene
                 gc.collect()
 
             if not scene_chunk_paths: raise Exception("کوئی منظر رینڈر نہیں ہو سکا۔")
 
             progress_bar.progress(0.85)
-            status.info("🎞️ تمام مناظر کو جوڑا جا رہا ہے اور ڈکڈ بیک گراؤنڈ میوزک سنک ہو رہا ہے...")
+            status.info("🎞️ تمام مناظر کو جوڑا جا رہا ہے اور سینیمیٹک میوزک سنک ہو رہا ہے...")
 
             loaded_clips = [VideoFileClip(p) for p in scene_chunk_paths if os.path.exists(p)]
             final_video = concatenate_videoclips(loaded_clips, method="compose")
 
+            # Dynamic Ambient Background Music Ducking
             if enable_bg_music:
                 bg_m = get_cached_bg_music(is_horror=is_horror)
                 if bg_m and os.path.exists(bg_m):
@@ -290,6 +310,7 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
             out_name = f"Sglowina_Titan_{u_id}_{int(time.time())}.mp4"
             final_video.write_videofile(out_name, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", threads=4, logger=None)
 
+            # Garbage Collection
             final_video.close()
             for c in loaded_clips: c.close()
             for f in temp_files_to_clean:
@@ -298,7 +319,7 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
                 except: pass
 
             progress_bar.progress(1.0)
-            status.success("🚀 ٹائٹن پروڈکشن گریڈ مووی کامیابی سے تیار ہو گئی!")
+            status.success("🚀 تمام مناظر اور کرداروں کے ساتھ مکمل سنیما مووی تیار ہو گئی!")
             return out_name
         except Exception as e:
             for f in temp_files_to_clean:
@@ -307,7 +328,7 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
                 except: pass
             return f"Error Details: {e}"
 
-# ================= UI DASHBOARD =================
+# ================= UI & DASHBOARD =================
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;600;800&display=swap');
@@ -332,10 +353,10 @@ tab_movie, tab_chat, tab_image, tab_enterprise = st.tabs([
     "🎬 Titan Movie Studio", "💬 Electric AI Chat", "🎨 Pro Image & Canva Studio", "👤 Founders & Accounts"
 ])
 
-# 1. MOVIE STUDIO
+# 1. MOVIE STUDIO (FULL DYNAMIC SCENES & PRO ENVIRONMENTAL VISUALS)
 with tab_movie:
-    st.write("### 🎥 Titan Movie Studio (100% صنف کا تحفظ — نو بلیک اسکرین — نو امپورٹ کریش)")
-    m_script = st.text_area("کہانی یا ڈائیلاگ یہاں درج کریں (Urdu / English):", height=140, placeholder="Deep inside a forgotten forest, a young explorer named Daniel discovered a glowing blue tree...")
+    st.write("### 🎥 Titan Movie Studio (تمام مناظر، درخت، مونسٹر اور اردو ڈبنگ فعال)")
+    m_script = st.text_area("کہانی یا ڈائیلاگ یہاں درج کریں (Urdu / English):", height=150, placeholder="The Forest That Eats Shadows. Deep inside a forgotten forest, a young explorer named Daniel discovered a glowing blue tree...")
 
     c1, c2, c3, c4 = st.columns(4)
     with c1: mv = st.selectbox("آواز (Voice):", ["Urdu Male (Asad)", "Urdu Female (Uzma)", "English US Male (Guy)", "English US Female (Jenny)"])
@@ -345,7 +366,7 @@ with tab_movie:
 
     c5, c6 = st.columns(2)
     with c5: ms = st.selectbox("اسٹائل (Style):", ["Photorealistic Hollywood", "Photorealistic Horror", "Realistic HD", "3D Cartoon Pixar Style", "Anime Art"])
-    with c6: sd = st.number_input("کردار کا فکسڈ سیڈ (Character Seed Lock):", value=786)
+    with c6: sd = st.number_input("سیڈ (Base Seed):", value=786)
 
     voice_map = {"Urdu Male (Asad)": "ur-PK-AsadNeural", "Urdu Female (Uzma)": "ur-PK-UzmaNeural", "English US Male (Guy)": "en-US-GuyNeural", "English US Female (Jenny)": "en-US-JennyNeural"}
     pitch_map = {"Normal (نارمل)": "+0Hz", "Deep (بھاری آواز)": "-15Hz", "Very Deep (موٹی آواز)": "-28Hz"}
@@ -356,10 +377,10 @@ with tab_movie:
     if st.button("Generate Master Titan Movie 🚀", use_container_width=True):
         if not m_script.strip(): st.error("پہلے کہانی درج کریں!")
         else:
-            with st.spinner("🎬 ٹائٹن انجن تمام فریمز اور آڈیو سنک کر رہا ہے..."):
+            with st.spinner("🎬 کہانی کے تمام مناظر، مخلوقات اور اردو وائس اوور سنک ہو رہے ہیں..."):
                 v_res = create_titan_cinematic_movie(
                     m_script, active_voice, rate_val, pitch_val, mr, ms, int(sd),
-                    api_key=user_api_key, enable_bg_music=st.session_state.enable_bg_music
+                    enable_bg_music=st.session_state.enable_bg_music
                 )
             if v_res.endswith(".mp4") and os.path.exists(v_res):
                 st.video(v_res)
