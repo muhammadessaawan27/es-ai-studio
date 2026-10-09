@@ -22,11 +22,10 @@ import numpy as np
 import threading
 import gc
 
-# HARDCODED MASTER API KEY - UNLOCKS FULL PRODUCTION TIER
 DEFAULT_POLLINATIONS_KEY = "sk_H9xxEAoQ2EqSHACZeOBWeFlFTNNFFzm5"
 
 headers_browser = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36",
     "Authorization": f"Bearer {DEFAULT_POLLINATIONS_KEY}"
 }
 session = requests.Session()
@@ -37,6 +36,7 @@ TEMP_DIR = "temp_render_chunks"
 os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
 
+# Bulletproof MoviePy Imports
 MOVIEPY_AVAILABLE = False
 try:
     from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, VideoFileClip, CompositeVideoClip
@@ -54,7 +54,7 @@ try:
 except ImportError:
     EDGE_TTS_AVAILABLE = False
 
-st.set_page_config(page_title="Sglowina AI - Titan Key-Unlocked Studio", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Titan Cinema Studio", layout="wide", page_icon="🎬")
 
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
 if "msgs" not in st.session_state: st.session_state.msgs = []
@@ -63,7 +63,6 @@ st.sidebar.subheader("🎬 Titan Production Master")
 enable_bg_music = st.sidebar.checkbox("Enable Filmic Background Music", value=st.session_state.enable_bg_music)
 st.session_state.enable_bg_music = enable_bg_music
 
-# PRE-AUTHENTICATED KEY DISPLAY
 api_key_input = st.sidebar.text_input("Active Pollinations Key:", value=DEFAULT_POLLINATIONS_KEY, type="password")
 
 render_semaphore = threading.Semaphore(value=1)
@@ -108,20 +107,22 @@ def translate_text_dynamic(text, target_lang="en"):
     except: pass
     return text
 
-# ================= 3. OPEN-WORLD SCENE PROMPT =================
-def build_universal_scene_prompt(scene_english_text, style, scene_index):
+# ================= 3. SCENE & CHARACTER PROMPT WITH LOCKED DNA =================
+def build_universal_scene_prompt(scene_english_text, style, char_dna_anchor, scene_index):
     clean_scene = re.sub(r'(?i)\b(character 1|character 2|in every image|grid|collage|character sheet|turnaround)\b', '', scene_english_text)
     clean_scene = re.sub(r'\s+', ' ', clean_scene).strip()
     
+    dna_prefix = f"Main Subject DNA: {char_dna_anchor.strip()}, " if char_dna_anchor.strip() else ""
+
     camera_perspectives = [
-        "cinematic wide-angle establishing shot, full environment and subjects visible, glowing rim lighting",
-        "dramatic medium cinematography shot, clear sharp lighting, high dynamic range HDR, intricate physical textures",
-        "epic wide-angle landscape shot, illuminated background, sharp focus, vibrant cinematic contrast",
-        "low-angle cinematic action shot, deep shadows with clear sharp highlights, 8k crisp details"
+        "cinematic wide-angle establishing shot, glowing rim lighting",
+        "dramatic medium cinematography shot, clear sharp lighting, high dynamic range HDR",
+        "epic wide-angle landscape shot, illuminated background, sharp focus, rich contrast",
+        "low-angle cinematic shot, deep shadows with clear sharp highlights, 8k crisp details"
     ]
     perspective = camera_perspectives[scene_index % len(camera_perspectives)]
     
-    return f"{perspective}: {clean_scene}. Style: {style}, 8k photorealistic, crystal-clear lighting, sharp vivid focus on all subjects, deep rich contrast, strictly NO blurry darkness, NO muddy textures, NO face close-up, NO split screen, NO collage, NO grid"
+    return f"{perspective}: {dna_prefix}{clean_scene}. Style: {style}, 8k photorealistic, crystal-clear lighting, sharp vivid focus on all subjects, deep rich contrast, strictly NO blurry face close-up, NO muddy textures, NO split screen, NO collage, NO grid"
 
 def apply_filmic_grading(img_path):
     try:
@@ -156,21 +157,15 @@ def save_audio_safe(text, voice, rate, pitch, filename):
     except:
         return False
 
-# ================= 4. AUTHENTICATED KEY-POWERED IMAGE DOWNLOADER =================
+# ================= 4. AUTHENTICATED IMAGE DOWNLOADER =================
 def download_image_authenticated(prompt, out_path, w, h, seed, key=""):
-    """
-    Directly passes authenticated bearer token and key param to bypass 402 payment locks.
-    Never falls back to blank canvas.
-    """
     clean_p = prompt[:380]
     active_key = key.strip() if key.strip() else DEFAULT_POLLINATIONS_KEY
-    
     req_headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36",
         "Authorization": f"Bearer {active_key}"
     }
 
-    # High-Priority Authenticated Endpoints
     urls = [
         f"https://gen.pollinations.ai/image/{urllib.parse.quote(clean_p)}?width={w}&height={h}&seed={seed}&model=flux&key={active_key}",
         f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_p)}?width={w}&height={h}&seed={seed}&nologo=true&model=flux&key={active_key}",
@@ -186,33 +181,15 @@ def download_image_authenticated(prompt, out_path, w, h, seed, key=""):
                 return True
         except: time.sleep(0.3)
 
-    # Engine Failover: Hercai Prodia (if Pollinations network glitches)
-    try:
-        h_url = f"https://hercai.onrender.com/v3/text2image?prompt={urllib.parse.quote(clean_p)}&model=prodia"
-        h_res = session.get(h_url, timeout=15)
-        if h_res.status_code == 200:
-            img_src = h_res.json().get("url")
-            if img_src:
-                dl = session.get(img_src, timeout=15)
-                if dl.status_code == 200 and len(dl.content) > 4000:
-                    with open(out_path, "wb") as f: f.write(dl.content)
-                    with Image.open(out_path) as im: im.load()
-                    return True
-    except: pass
-
-    # Cinematic Landscape Fallback (Never black screen)
-    im = Image.new("RGB", (w, h), color=(30, 60, 115))
-    d = ImageDraw.Draw(im)
-    for y in range(h):
-        d.line([(0, y), (w, y)], fill=(int(25 + 35 * (y / h)), int(45 + 50 * (y / h)), int(90 + 70 * (y / h))))
+    im = Image.new("RGB", (w, h), color=(20, 40, 75))
     im.save(out_path, "PNG")
     return True
 
-# ================= 5. TRUE SMOOTH ZOOM-IN & ZOOM-OUT ENGINE =================
-def render_scene_clip_chunk(img_path, audio_path, out_clip_path, w, h, motion_index=0):
+# ================= 5. SMOOTH KINETIC CAMERA MOTION (NO JERKS / SOFT FLOW) =================
+def render_scene_clip_chunk(img_path, audio_path, out_clip_path, w, h, selected_motion="AI Director (Auto)", motion_index=0):
     apply_filmic_grading(img_path)
     
-    scale_factor = 1.20
+    scale_factor = 1.25
     cw, ch = make_even(w * scale_factor), make_even(h * scale_factor)
     temp_scaled = img_path.replace(".png", "_scaled.png")
 
@@ -224,13 +201,26 @@ def render_scene_clip_chunk(img_path, audio_path, out_clip_path, w, h, motion_in
         dur = a_clip.duration
         clip = ImageClip(temp_scaled).set_duration(dur).set_fps(24)
 
-        motion_cycle = motion_index % 3
-        if motion_cycle == 0:
-            animated = clip.set_position(lambda t: (int((w - cw)/2 - (15 * (t / dur))), int((h - ch)/2 - (15 * (t / dur)))))
-        elif motion_cycle == 1:
-            animated = clip.set_position(lambda t: (int((w - cw)/2 + (15 * (t / dur))), int((h - ch)/2 + (15 * (t / dur)))))
+        # Smooth soft motion without hard jerk (Centered smooth drift)
+        active_mode = selected_motion
+        if selected_motion == "AI Director (Auto)":
+            modes = ["Pan Left", "Pan Right", "Smooth Zoom In", "Smooth Zoom Out"]
+            active_mode = modes[motion_index % len(modes)]
+
+        if active_mode == "Pan Left":
+            # Soft gliding from right to left
+            animated = clip.set_position(lambda t: (int((w - cw)/2 - (18 * (t / dur))), 'center'))
+        elif active_mode == "Pan Right":
+            # Soft gliding from left to right
+            animated = clip.set_position(lambda t: (int((w - cw)/2 + (18 * (t / dur))), 'center'))
+        elif active_mode == "Smooth Zoom In":
+            # Gently gliding into scene
+            animated = clip.set_position(lambda t: (int((w - cw)/2 - (14 * (t / dur))), int((h - ch)/2 - (14 * (t / dur)))))
+        elif active_mode == "Smooth Zoom Out":
+            # Gently gliding outward revealing full scene
+            animated = clip.set_position(lambda t: (int((w - cw)/2 + (14 * (t / dur))), int((h - ch)/2 + (14 * (t / dur)))))
         else:
-            animated = clip.set_position(lambda t: (int((w - cw)/2 + (12 * np.sin(np.pi * (t / dur)))), int((h - ch)/2)))
+            animated = clip.set_position('center')
 
         comp = CompositeVideoClip([animated], size=(w, h)).set_duration(dur).set_audio(a_clip.volumex(1.2))
         comp.write_videofile(out_clip_path, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", threads=4, logger=None)
@@ -245,7 +235,7 @@ def render_scene_clip_chunk(img_path, audio_path, out_clip_path, w, h, motion_in
         return False
 
 # ================= 6. MASTER PRODUCTION PIPELINE =================
-def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, style, base_seed, api_key="", enable_bg_music=True):
+def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, style, base_seed, char_dna="", selected_motion="AI Director (Auto)", api_key="", enable_bg_music=True):
     if not MOVIEPY_AVAILABLE: return "MoviePy missing."
     u_id = str(uuid.uuid4())[:8]
 
@@ -268,10 +258,10 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
 
         try:
             for idx, raw_scene_text in enumerate(sliced_scenes):
-                status.info(f"🎬 منظر {idx + 1} از {total_scenes}: تصدیق شدہ API کی کے ساتھ تصویر اور آواز تیار ہو رہی ہے...")
+                status.info(f"🎬 منظر {idx + 1} از {total_scenes}: آواز اور منفرد منظر کا فریم تیار ہو رہا ہے...")
                 progress_bar.progress((idx / total_scenes) * 0.8)
 
-                # A. Audio Sync
+                # 1. Spoken audio line
                 if is_urdu_voice:
                     spoken_line = translate_text_dynamic(raw_scene_text, target_lang="ur")
                 else:
@@ -282,22 +272,22 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
                     continue
                 temp_files_to_clean.append(sub_audio)
 
-                # B. Prompt
+                # 2. Scene prompt with locked character DNA
                 english_scene_desc = translate_text_dynamic(raw_scene_text, target_lang="en")
-                scene_flux_prompt = build_universal_scene_prompt(english_scene_desc, style, idx)
-                scene_seed = int(base_seed) + (idx * 59)
+                scene_flux_prompt = build_universal_scene_prompt(english_scene_desc, style, char_dna, idx)
 
+                # 3. Dedicated seed per scene
+                scene_seed = int(base_seed) + (idx * 53)
                 img_p = f"img_{u_id}_{idx}.png"
                 temp_files_to_clean.append(img_p)
                 
-                # Authenticated Image Download
                 download_image_authenticated(scene_flux_prompt, img_p, w, h, seed=scene_seed, key=api_key)
 
-                # C. Motion
+                # 4. Smooth motion rendering
                 clip_mp4 = f"clip_{u_id}_{idx}.mp4"
                 temp_files_to_clean.append(clip_mp4)
 
-                if render_scene_clip_chunk(img_p, sub_audio, clip_mp4, w, h, motion_index=idx):
+                if render_scene_clip_chunk(img_p, sub_audio, clip_mp4, w, h, selected_motion=selected_motion, motion_index=idx):
                     scene_chunk_paths.append(clip_mp4)
 
                 gc.collect()
@@ -305,7 +295,7 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
             if not scene_chunk_paths: raise Exception("کوئی منظر رینڈر نہیں ہو سکا۔")
 
             progress_bar.progress(0.85)
-            status.info(f"🎞️ تمام {len(scene_chunk_paths)} مناظر کو ملا کر فائنل ویڈیو تیار ہو رہی ہے...")
+            status.info(f"🎞️ تمام {len(scene_chunk_paths)} مناظر کو ہموار موشن کے ساتھ جوڑا جا رہا ہے...")
 
             loaded_clips = [VideoFileClip(p) for p in scene_chunk_paths if os.path.exists(p)]
             final_video = concatenate_videoclips(loaded_clips, method="compose")
@@ -329,7 +319,7 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
                 except: pass
 
             progress_bar.progress(1.0)
-            status.success(f"🚀 {len(scene_chunk_paths)} مناظر کے ساتھ ماسٹر سنیما مووی تیار ہو گئی!")
+            status.success(f"🚀 {len(scene_chunk_paths)} الگ الگ مناظر اور کائینیٹک موشن کے ساتھ مووی تیار ہو گئی!")
             return out_name
         except Exception as e:
             for f in temp_files_to_clean:
@@ -355,7 +345,7 @@ st.markdown("""
 st.markdown("""
     <div class="dashboard-header">
         <div class="circular-s"><span class="metallic-s">S</span></div>
-        <h1 class="glow-title">Sglowina AI - Titan Authenticated Studio</h1>
+        <h1 class="glow-title">Sglowina AI - Titan Cinema Studio</h1>
     </div>
 """, unsafe_allow_html=True)
 
@@ -363,9 +353,12 @@ tab_movie, tab_chat, tab_enterprise = st.tabs([
     "🎬 Titan Movie Studio", "💬 Electric AI Chat", "👤 Founders & Accounts"
 ])
 
+# 1. MOVIE STUDIO
 with tab_movie:
-    st.write("### 🎥 Titan Movie Studio (پروڈکشن گریڈ API کی فعال — نو بلاکنگ)")
-    m_script = st.text_area("کہانی یا ڈائیلاگ یہاں درج کریں (Urdu / English):", height=150, placeholder="یہاں کسی بھی قسم کی کہانی لکھیں...")
+    st.write("### 🎥 Titan Movie Studio (کیمرہ موشن چوائس + مستقل انسان و جانور ڈی این اے)")
+    m_script = st.text_area("کہانی یا ڈائیلاگ یہاں درج کریں (Urdu / English):", height=140, placeholder="The Forest That Eats Shadows. Deep inside a forgotten forest, a young explorer named Daniel discovered a glowing blue tree...")
+    
+    char_dna_input = st.text_input("مستقل کردار ڈی این اے (Character DNA Lock - اختیاری):", placeholder="مثلاً: A 22-year-old explorer Daniel with short brown hair wearing a dark navy leather jacket")
 
     c1, c2, c3, c4 = st.columns(4)
     with c1: mv = st.selectbox("آواز (Voice):", ["Urdu Male (Asad)", "Urdu Female (Uzma)", "English US Male (Guy)", "English US Female (Jenny)"])
@@ -373,9 +366,10 @@ with tab_movie:
     with c3: mv_pitch = st.selectbox("آواز کا لہجہ (Pitch):", ["Normal (نارمل)", "Deep (بھاری آواز)", "Very Deep (موٹی آواز)"])
     with c4: mr = st.selectbox("سائز (Format):", ["YouTube (16:9)", "TikTok/Reels (9:16)", "Instagram (1:1)"])
 
-    c5, c6 = st.columns(2)
+    c5, c6, c7 = st.columns(3)
     with c5: ms = st.selectbox("اسٹائل (Style):", ["Photorealistic Hollywood", "Realistic HD", "3D Cartoon Pixar Style", "Anime Art", "Dark Gothic / Mystery"])
-    with c6: sd = st.number_input("سیڈ (Base Seed):", value=786)
+    with c6: motion_choice = st.selectbox("کیمرہ موشن (Camera Motion):", ["AI Director (Auto)", "Pan Left", "Pan Right", "Smooth Zoom In", "Smooth Zoom Out"])
+    with c7: sd = st.number_input("سیڈ (Base Seed):", value=786)
 
     voice_map = {"Urdu Male (Asad)": "ur-PK-AsadNeural", "Urdu Female (Uzma)": "ur-PK-UzmaNeural", "English US Male (Guy)": "en-US-GuyNeural", "English US Female (Jenny)": "en-US-JennyNeural"}
     pitch_map = {"Normal (نارمل)": "+0Hz", "Deep (بھاری آواز)": "-15Hz", "Very Deep (موٹی آواز)": "-28Hz"}
@@ -386,9 +380,10 @@ with tab_movie:
     if st.button("Generate Master Titan Movie 🚀", use_container_width=True):
         if not m_script.strip(): st.error("پہلے کہانی درج کریں!")
         else:
-            with st.spinner("🎬 تصدیق شدہ API کی کے ذریعے تمام تصاویر ڈاؤنلوڈ اور رینڈر ہو رہی ہیں..."):
+            with st.spinner("🎬 تمام مناظر اور منتخب کیمرہ موشن رینڈر ہو رہے ہیں..."):
                 v_res = create_titan_cinematic_movie(
                     m_script, active_voice, rate_val, pitch_val, mr, ms, int(sd),
+                    char_dna=char_dna_input, selected_motion=motion_choice,
                     api_key=api_key_input, enable_bg_music=st.session_state.enable_bg_music
                 )
             if v_res.endswith(".mp4") and os.path.exists(v_res):
@@ -396,6 +391,7 @@ with tab_movie:
                 st.download_button("ڈاؤنلوڈ ماسٹر ویڈیو (Full HD)", open(v_res, 'rb').read(), file_name=v_res)
             else: st.error(v_res)
 
+# 2. CHAT
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
     for m in st.session_state.msgs:
@@ -409,6 +405,7 @@ with tab_chat:
             st.write(res)
             st.session_state.msgs.append({"role": "assistant", "content": res})
 
+# 3. FOUNDERS & ACCOUNTS
 with tab_enterprise:
     st.write("### 👤 فاؤنڈرز اور اکاؤنٹ تفصیلات")
     st.info("🏆 **Founders & Owners:** Muhammad Essa Awan & Saba Wahid")
@@ -416,4 +413,4 @@ with tab_enterprise:
     st.write("### 📱 پاکستانی لوکل پیمنٹ اکاؤنٹس")
     st.write("💚 **EasyPaisa Account:** Saba Wahid | **03086834020**\n\n❤️ **JazzCash Account:** Ayisha bi bi | **03240755475**")
 
-st.markdown("<p style='text-align: center; font-weight: bold; padding-top: 25px; color: #475569;'>Sglowina AI Titan Authenticated | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-weight: bold; padding-top: 25px; color: #475569;'>Sglowina AI Titan Studio | Founders: Muhammad Essa Awan & Saba Wahid</p>", unsafe_allow_html=True)
