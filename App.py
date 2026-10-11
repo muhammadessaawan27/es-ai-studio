@@ -344,21 +344,12 @@ tab_movie, tab_chat, tab_enterprise = st.tabs([
     "🎬 Titan Movie Studio", "💬 Electric AI Chat", "👤 Founders & Accounts"
 ])
 
-# Default Dragon / Demon custom story template requested by user
-default_dragon_story = (
-    "گھنے جنگل کے راستے میں ریان اور مایا جا رہے ہیں۔ اچانک آسمان پر اندھیرا چھاتا ہے، ایک خوفناک ڈریگن نما شیطانی مخلوق نمودار ہوتی ہے اور مایا کو پنجوں میں دبوچ کر غائب کر جاتی ہے۔ "
-    "ریان پاگلوں کی طرح پیچھا کرتا ہوا غار میں پہنچتا ہے۔ وہاں وہ ڈریگن ایک خوفناک مسخ شدہ انسانی درندے کی شکل میں بدل چکا ہوتا ہے اور مایا کی عزت لوٹ رہا ہوتا ہے۔ ریان حملہ کرتا ہے، لیکن وہ درندہ مایا کو وہیں پھینک کر غائب ہو جاتا ہے۔ "
-    "کچھ ماہ بعد، جب بچے کی پیدائش کا وقت ہوتا ہے، وہ ڈریگن دوبارہ آتا ہے تاکہ اس بچے کو مار سکے کیونکہ وہ اپنے جیسا حریف نہیں چاہتا۔ ریان اور دوست آ جاتے ہیں تو وہ بھاگ جاتا ہے۔ مایا تڑپتی ہے، ایک شیطانی شکل کا بچہ پیدا ہوتا ہے، اور مایا مرتے مرتے کہتی ہے مجھے مار دو، اور وہیں دم توڑ دیتی ہے۔ "
-    "ریان بچے کو لے کر ایک پرانے بابے کے پاس جاتا ہے۔ بابا کہتا ہے کہ اسے بچانا ہے تو اس ڈریگن کو مارنا ہوگا۔ ریان جب بچے کو چھوڑنے لگتا ہے، تو بچہ باپ سے لپٹ جاتا ہے۔ ریان اسے اٹھا لیتا ہے اور نکل پڑتا ہے۔ راستے میں ایک ہولناک معجزہ ہوتا ہے—وہ ڈریگن بچہ گھنٹوں میں تیزی سے بڑا ہونے لگتا ہے! راستے کے درندوں سے وہ اپنے باپ کو بچاتا ہے، اور بڑا ہو کر ایک خطرناک ہائبرڈ ڈریگن شکل اختیار کر لیتا ہے۔ "
-    "سفر میں باپ ریان شدید زخمی ہو جاتا ہے۔ وہ بیٹا اپنے باپ کو اپنے کندھے پر اٹھا لیتا ہے اور آسمان کی طرف اڑ جاتا ہے۔ وہ اپنے باپ کو محفوظ مقام پر بٹھا کر اس ڈریگن کے اصل قلعے پر آسمان سے غوطہ لگاتے ہوئے حملہ کرتا ہے۔ محل کے اندر شیطانی غلاموں کے ساتھ ہولناک جنگ ہوتی ہے۔ بیٹا اس ڈریگن سے لڑ کر ایک خاص لاکر سے آبِ حیات کی شیشی حاصل کر لیتا ہے۔"
-)
-
-# 1. MOVIE STUDIO
+# 1. MOVIE STUDIO (FULLY DYNAMIC & BLANK INPUT FOR ANY STORY)
 with tab_movie:
-    st.write("### 🎥 Titan Movie Studio (ڈریگن اور مانستر فائنل کسٹم سکرپٹ کے ساتھ)")
-    m_script = st.text_area("کہانی یا ڈائیلاگ یہاں درج کریں (Urdu / English):", value=default_dragon_story, height=220)
+    st.write("### 🎥 Titan Movie Studio (مکمل طور پر خود مختار - کوئی بھی نئی کہانی درج کریں)")
+    m_script = st.text_area("کوئی بھی کہانی، ڈائیلاگ یا سکرپٹ یہاں درج کریں (Urdu / English):", value="", height=180, placeholder="یہاں اپنی مرضی کی کوئی بھی نئی کہانی لکھیں...")
     
-    char_dna_input = st.text_input("مستقل کردار ڈی این اے (Character DNA Lock - اختیاری):", value="A fierce hybrid demonic warrior boy with glowing yellow eyes and a brave human father Ryan", placeholder="مثلاً: A fierce hybrid demonic warrior boy")
+    char_dna_input = st.text_input("مستقل کردار ڈی این اے (Character DNA Lock - اختیاری):", value="", placeholder="مثلاً: A brave young hero with a black cape")
 
     c1, c2, c3, c4 = st.columns(4)
     with c1: mv = st.selectbox("آواز (Voice):", ["Urdu Male (Asad)", "Urdu Female (Uzma)", "English US Male (Guy)", "English US Female (Jenny)"])
@@ -375,13 +366,12 @@ with tab_movie:
     pitch_map = {"Normal (نارمل)": "+0Hz", "Deep (بھاری آواز)": "-15Hz", "Very Deep (موٹی آواز)": "-28Hz"}
     active_voice = voice_map.get(mv, "ur-PK-AsadNeural")
     rate_val = mv_rate.split(" ")[0]
-    pitch_val = pitch_map.get(pitch_map_key := mv_pitch, "+0Hz") # safer mapping below
     pitch_val = pitch_map.get(mv_pitch, "+0Hz")
 
     if st.button("Generate Master Titan Movie 🚀", use_container_width=True):
-        if not m_script.strip(): st.error("پہلے کہانی درج کریں!")
+        if not m_script.strip(): st.error("پہلے کوئی نئی کہانی یا سکرپٹ درج کریں!")
         else:
-            with st.spinner("🎬 تمام مناظر، ڈریگن سکرپٹ اور کیمرہ موشن رینڈر ہو رہے ہیں..."):
+            with st.spinner("🎬 آپ کی دی گئی نئی کہانی کے مطابق مناظر اور کیمرہ موشن رینڈر ہو رہے ہیں..."):
                 v_res = create_titan_cinematic_movie(
                     m_script, active_voice, rate_val, pitch_val, mr, ms, int(sd),
                     char_dna=char_dna_input, selected_motion=motion_choice,
