@@ -54,7 +54,7 @@ try:
 except ImportError:
     EDGE_TTS_AVAILABLE = False
 
-st.set_page_config(page_title="Sglowina AI - Titan Cinema Studio", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Titan Cinema & Voice Studio", layout="wide", page_icon="🎬")
 
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
 if "msgs" not in st.session_state: st.session_state.msgs = []
@@ -336,20 +336,69 @@ st.markdown("""
 st.markdown("""
     <div class="dashboard-header">
         <div class="circular-s"><span class="metallic-s">S</span></div>
-        <h1 class="glow-title">Sglowina AI - Titan Cinema Studio</h1>
+        <h1 class="glow-title">Sglowina AI - Titan Cinema & Voice Studio</h1>
     </div>
 """, unsafe_allow_html=True)
 
-tab_movie, tab_chat, tab_enterprise = st.tabs([
-    "🎬 Titan Movie Studio", "💬 Electric AI Chat", "👤 Founders & Accounts"
+# تینوں ٹیبز بالکل الگ اور محفوظ: (1) ہوم، (2) صرف خالص آڈیو وائس اسٹوڈیو، (3) ماسٹر مووی جنریٹر
+tab_home, tab_voice_studio, tab_movie, tab_chat, tab_enterprise = st.tabs([
+    "🏠 Home", "🎙️ Dedicated Voice Studio", "🎬 Titan Movie Generator", "💬 Electric AI Chat", "👤 Founders & Accounts"
 ])
 
-# 1. MOVIE STUDIO (FULLY DYNAMIC & BLANK INPUT FOR ANY STORY)
+# 1. HOME TAB
+with tab_home:
+    st.title("خوش آمدید - Sglowina AI Studio")
+    st.write("یہ آپ کا مین ڈیش بورڈ ہے۔ اوپر دیے گئے ٹیبز سے 'Dedicated Voice Studio' یا 'Titan Movie Generator' منتخب کریں۔")
+
+# 2. DEDICATED VOICE STUDIO TAB (صرف خالص آڈیو اور وائس اوور کے لیے)
+with tab_voice_studio:
+    st.subheader("🎙️ Dedicated AI Voice & Audio Studio")
+    st.markdown("یہاں اپنی کوئی بھی سکرپٹ درج کریں اور اس کا خالص آڈیو وائس اوور (MP3) تیار کریں۔")
+
+    voice_script_input = st.text_area(
+        "یہاں صرف وائس اوور کے لیے سکرپٹ درج کریں:",
+        height=180,
+        placeholder="گھنے جنگل کے راستے میں ریان اور مایا جا رہے ہیں..."
+    )
+
+    c_v1, c_v2 = st.columns(2)
+    with c_v1:
+        v_lang_choice = st.selectbox("زبان (Language):", ["Urdu / Hindi", "English"])
+    with c_v2:
+        v_speed_choice = st.selectbox("رفتار (Speed):", ["Normal", "Slow"])
+
+    if st.button("🚀 آڈیو وائس اوور جنریٹ کریں (Generate Audio)", use_container_width=True):
+        if not voice_script_input.strip():
+            st.error("براہ کرم پہلے سکرپٹ درج کریں!")
+        else:
+            with st.spinner("آڈیو تیار ہو رہی ہے..."):
+                try:
+                    lang_code = 'ur' if "Urdu" in v_lang_choice else 'en'
+                    is_slow = True if v_speed_choice == "Slow" else False
+
+                    tts = gTTS(text=voice_script_input, lang=lang_code, slow=is_slow)
+                    output_audio_file = "pure_voice_output.mp3"
+                    tts.save(output_audio_file)
+
+                    st.success("وائس اوور کامیابی سے تیار ہو گیا ہے!")
+                    st.audio(output_audio_file, format='audio/mp3')
+
+                    with open(output_audio_file, "rb") as f:
+                        st.download_button(
+                            label="📥 آڈیو فائل ڈاؤن لوڈ کریں (MP3)",
+                            data=f,
+                            file_name="AI_Voice_Studio_Output.mp3",
+                            mime="audio/mp3"
+                        )
+                except Exception as e:
+                    st.error(f"خرابی پیش آئی: {e}")
+
+# 3. TITAN MOVIE GENERATOR TAB (تیرا اصل ویڈیو جنریٹر)
 with tab_movie:
-    st.write("### 🎥 Titan Movie Studio (مکمل طور پر خود مختار - کوئی بھی نئی کہانی درج کریں)")
-    m_script = st.text_area("کوئی بھی کہانی، ڈائیلاگ یا سکرپٹ یہاں درج کریں (Urdu / English):", value="", height=180, placeholder="یہاں اپنی مرضی کی کوئی بھی نئی کہانی لکھیں...")
+    st.write("### 🎥 Titan Movie Studio (مکمل ویڈیو اور کیمرہ موشن جنریٹر)")
+    m_script = st.text_area("کوئی بھی کہانی یا مووی سکرپٹ یہاں درج کریں (Urdu / English):", value="", height=180, placeholder="یہاں مووی سکرپٹ لکھیں...")
     
-    char_dna_input = st.text_input("مستقل کردار ڈی این اے (Character DNA Lock - اختیاری):", value="", placeholder="مثلاً: A brave young hero with a black cape")
+    char_dna_input = st.text_input("مستقل کردار ڈی این اے (Character DNA Lock - اختیاری):", value="", placeholder="مثلاً: A fierce hybrid demonic warrior boy")
 
     c1, c2, c3, c4 = st.columns(4)
     with c1: mv = st.selectbox("آواز (Voice):", ["Urdu Male (Asad)", "Urdu Female (Uzma)", "English US Male (Guy)", "English US Female (Jenny)"])
@@ -369,9 +418,9 @@ with tab_movie:
     pitch_val = pitch_map.get(mv_pitch, "+0Hz")
 
     if st.button("Generate Master Titan Movie 🚀", use_container_width=True):
-        if not m_script.strip(): st.error("پہلے کوئی نئی کہانی یا سکرپٹ درج کریں!")
+        if not m_script.strip(): st.error("پہلے مووی سکرپٹ درج کریں!")
         else:
-            with st.spinner("🎬 آپ کی دی گئی نئی کہانی کے مطابق مناظر اور کیمرہ موشن رینڈر ہو رہے ہیں..."):
+            with st.spinner("🎬 تمام مناظر، وائس اوور اور کیمرہ موشن رینڈر ہو رہے ہیں..."):
                 v_res = create_titan_cinematic_movie(
                     m_script, active_voice, rate_val, pitch_val, mr, ms, int(sd),
                     char_dna=char_dna_input, selected_motion=motion_choice,
@@ -382,7 +431,7 @@ with tab_movie:
                 st.download_button("ڈاؤنلوڈ ماسٹر ویڈیو (Full HD)", open(v_res, 'rb').read(), file_name=v_res)
             else: st.error(v_res)
 
-# 2. CHAT
+# 4. CHAT
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
     for m in st.session_state.msgs:
@@ -396,7 +445,7 @@ with tab_chat:
             st.write(res)
             st.session_state.msgs.append({"role": "assistant", "content": res})
 
-# 3. FOUNDERS & ACCOUNTS
+# 5. FOUNDERS & ACCOUNTS
 with tab_enterprise:
     st.write("### 👤 فاؤنڈرز اور اکاؤنٹ تفصیلات")
     st.info("🏆 **Founders & Owners:** Muhammad Essa Awan & Saba Wahid")
