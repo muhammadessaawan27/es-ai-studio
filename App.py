@@ -1,4 +1,5 @@
 import sys
+# 1. Globally patch PIL.Image for Pillow 10+ compatibility with MoviePy
 try:
     import PIL.Image
     if not hasattr(PIL.Image, 'ANTIALIAS'):
@@ -20,7 +21,6 @@ import io
 import numpy as np
 import threading
 import gc
-from gtts import gTTS
 
 DEFAULT_POLLINATIONS_KEY = "sk_H9xxEAoQ2EqSHACZeOBWeFlFTNNFFzm5"
 
@@ -54,7 +54,7 @@ try:
 except ImportError:
     EDGE_TTS_AVAILABLE = False
 
-st.set_page_config(page_title="Sglowina AI - Titan Cinema & Master Voice Studio", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Sglowina AI - Titan Cinema Studio", layout="wide", page_icon="🎬")
 
 if "enable_bg_music" not in st.session_state: st.session_state.enable_bg_music = True
 if "msgs" not in st.session_state: st.session_state.msgs = []
@@ -147,48 +147,45 @@ def get_cached_bg_music(is_horror=False):
     except: pass
     return None
 
-# ================= 4. MASTER AUDIO MIXER (VOICE + BGM + SFX) =================
-def mix_master_studio_audio(voice_path, output_path, add_bgm=True, add_sfx=True, is_horror=False):
-    if not MOVIEPY_AVAILABLE:
-        return voice_path # If moviepy not available, fallback to raw voice
+def save_audio_safe(text, voice, rate, pitch, filename):
+    async def _tts_exec():
+        com = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
+        await com.save(filename)
     try:
-        voice_clip = AudioFileClip(voice_path)
-        duration = voice_clip.duration
-        audio_layers = [voice_clip]
-
-        # 1. Background Music Layer
-        if add_bgm:
-            bgm_file = get_cached_bg_music(is_horror=is_horror)
-            if bgm_file and os.path.exists(bgm_file):
-                bgm_clip = AudioFileClip(bgm_file).volumex(0.06).set_duration(duration)
-                audio_layers.append(bgm_clip)
-
-        # 2. Simulated Cinematic SFX Layer (Wind / Cinematic Impact)
-        if add_sfx:
-            # We use a gentle subtle atmospheric sound or wind effect layer
-            sfx_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-            sfx_cf = os.path.join(AUDIO_CACHE_DIR, "sfx_layer.mp3")
-            if not os.path.exists(sfx_cf):
-                try:
-                    r = session.get(sfx_url, timeout=5)
-                    if r.status_code == 200:
-                        with open(sfx_cf, "wb") as f: f.write(r.content)
-                except: pass
-            if os.path.exists(sfx_cf):
-                sfx_clip = AudioFileClip(sfx_cf).volumex(0.03).set_duration(duration)
-                audio_layers.append(sfx_clip)
-
-        final_composite = CompositeAudioClip(audio_layers)
-        final_composite.write_audiofile(output_path, fps=44100, logger=None)
-        
-        voice_clip.close()
-        final_composite.close()
-        return True
-    except Exception as e:
-        print(f"Master Audio Mixing Exception: {e}")
+        asyncio.run(_tts_exec())
+        return os.path.exists(filename) and os.path.getsize(filename) > 300
+    except:
         return False
 
-# ================= 5. RENDER CHUNK PIPELINE =================
+# ================= 4. AUTHENTICATED IMAGE DOWNLOADER =================
+def download_image_authenticated(prompt, out_path, w, h, seed, key=""):
+    clean_p = prompt[:380]
+    active_key = key.strip() if key.strip() else DEFAULT_POLLINATIONS_KEY
+    req_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36",
+        "Authorization": f"Bearer {active_key}"
+    }
+
+    urls = [
+        f"https://gen.pollinations.ai/image/{urllib.parse.quote(clean_p)}?width={w}&height={h}&seed={seed}&model=flux&key={active_key}",
+        f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_p)}?width={w}&height={h}&seed={seed}&nologo=true&model=flux&key={active_key}",
+        f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_p)}?width={w}&height={h}&seed={seed}&nologo=true&model=turbo&key={active_key}"
+    ]
+
+    for url in urls:
+        try:
+            res = session.get(url, headers=req_headers, timeout=25)
+            if res.status_code == 200 and len(res.content) > 4000:
+                with open(out_path, "wb") as f: f.write(res.content)
+                with Image.open(out_path) as im: im.load()
+                return True
+        except: time.sleep(0.3)
+
+    im = Image.new("RGB", (w, h), color=(20, 40, 75))
+    im.save(out_path, "PNG")
+    return True
+
+# ================= 5. SMOOTH KINETIC CAMERA MOTION =================
 def render_scene_clip_chunk(img_path, audio_path, out_clip_path, w, h, selected_motion="AI Director (Auto)", motion_index=0):
     apply_filmic_grading(img_path)
     
@@ -232,6 +229,7 @@ def render_scene_clip_chunk(img_path, audio_path, out_clip_path, w, h, selected_
         if os.path.exists(temp_scaled): os.remove(temp_scaled)
         return False
 
+# ================= 6. MASTER PRODUCTION PIPELINE =================
 def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, style, base_seed, char_dna="", selected_motion="AI Director (Auto)", api_key="", enable_bg_music=True):
     if not MOVIEPY_AVAILABLE: return "MoviePy missing."
     u_id = str(uuid.uuid4())[:8]
@@ -255,7 +253,7 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
 
         try:
             for idx, raw_scene_text in enumerate(sliced_scenes):
-                status.info(f"🎬 منظر {idx + 1} از {total_scenes}: فریم اور وائس اوور تیار ہو رہا ہے...")
+                status.info(f"🎬 منظر {idx + 1} از {total_scenes}: آواز اور منفرد منظر کا فریم تیار ہو رہا ہے...")
                 progress_bar.progress((idx / total_scenes) * 0.8)
 
                 if is_urdu_voice:
@@ -264,22 +262,8 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
                     spoken_line = translate_text_dynamic(raw_scene_text, target_lang="en")
 
                 sub_audio = f"a_{u_id}_{idx}.mp3"
-                
-                # Use edge_tts if available for high quality, else gTTS fallback
-                audio_success = False
-                if EDGE_TTS_AVAILABLE:
-                    async def _tts():
-                        com = edge_tts.Communicate(spoken_line, voice_gen, rate=rate_val, pitch=pitch_val)
-                        await com.save(sub_audio)
-                    try:
-                        asyncio.run(_tts())
-                        audio_success = os.path.exists(sub_audio) and os.path.getsize(sub_audio) > 300
-                    except: audio_success = False
-
-                if not audio_success:
-                    tts = gTTS(text=spoken_line, lang='ur' if is_urdu_voice else 'en')
-                    tts.save(sub_audio)
-
+                if not save_audio_safe(spoken_line, voice_gen, rate_val, pitch_val, sub_audio):
+                    continue
                 temp_files_to_clean.append(sub_audio)
 
                 english_scene_desc = translate_text_dynamic(raw_scene_text, target_lang="en")
@@ -302,7 +286,7 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
             if not scene_chunk_paths: raise Exception("کوئی منظر رینڈر نہیں ہو سکا۔")
 
             progress_bar.progress(0.85)
-            status.info(f"🎞️ تمام مناظر اور بیک گراؤنڈ میوزک کو جوڑا جا رہا ہے...")
+            status.info(f"🎞️ تمام {len(scene_chunk_paths)} مناظر کو ہموار موشن کے ساتھ جوڑا جا رہا ہے...")
 
             loaded_clips = [VideoFileClip(p) for p in scene_chunk_paths if os.path.exists(p)]
             final_video = concatenate_videoclips(loaded_clips, method="compose")
@@ -326,7 +310,7 @@ def create_titan_cinematic_movie(story, voice_gen, rate_val, pitch_val, ratio, s
                 except: pass
 
             progress_bar.progress(1.0)
-            status.success(f"🚀 مووی کامیابی سے تیار ہو گئی ہے!")
+            status.success(f"🚀 {len(scene_chunk_paths)} الگ الگ مناظر اور کائینیٹک موشن کے ساتھ مووی تیار ہو گئی!")
             return out_name
         except Exception as e:
             for f in temp_files_to_clean:
@@ -352,75 +336,20 @@ st.markdown("""
 st.markdown("""
     <div class="dashboard-header">
         <div class="circular-s"><span class="metallic-s">S</span></div>
-        <h1 class="glow-title">Sglowina AI - Titan Cinema & Master Voice Studio</h1>
+        <h1 class="glow-title">Sglowina AI - Titan Cinema Studio</h1>
     </div>
 """, unsafe_allow_html=True)
 
-tab_home, tab_voice_studio, tab_movie, tab_chat, tab_enterprise = st.tabs([
-    "🏠 Home", "🎙️ Master Voice & SFX Studio", "🎬 Titan Movie Generator", "💬 Electric AI Chat", "👤 Founders & Accounts"
+tab_movie, tab_chat, tab_enterprise = st.tabs([
+    "🎬 Titan Movie Studio", "💬 Electric AI Chat", "👤 Founders & Accounts"
 ])
 
-# 1. HOME TAB
-with tab_home:
-    st.title("خوش آمدید - Sglowina AI Studio")
-    st.write("یہ آپ کا مین ڈیش بورڈ ہے۔ اوپر دیے گئے ٹیبز سے 'Master Voice & SFX Studio' یا 'Titan Movie Generator' منتخب کریں۔")
-
-# 2. MASTER VOICE & SFX STUDIO TAB (مکمل آڈیو + بیک گراؤنڈ میوزک + ایفیکٹس مکسر)
-with tab_voice_studio:
-    st.subheader("🎙️ Master AI Voice, BGM & SFX Studio")
-    st.markdown("یہاں سکرپٹ درج کریں، آواز چنیں، اور بیک گراؤنڈ میوزک اور ساؤنڈ ایفیکٹس کے ساتھ ماسٹر آڈیو ٹریک تیار کریں۔")
-
-    voice_script_input = st.text_area(
-        "یہاں وائس اوور اور آڈیو مکسنگ کے لیے سکرپٹ درج کریں:",
-        height=180,
-        placeholder="گھنے جنگل کے راستے میں ریان اور مایا جا رہے ہیں..."
-    )
-
-    c_v1, c_v2, c_v3 = st.columns(3)
-    with c_v1:
-        v_lang_choice = st.selectbox("زبان (Language):", ["Urdu / Hindi", "English"])
-    with c_v2:
-        include_bgm = st.checkbox("آٹو بیک گراؤنڈ میوزک (BGM) شامل کریں", value=True)
-    with c_v3:
-        include_sfx = st.checkbox("آٹو سینیمیটিক ایفیکٹس (SFX) شامل کریں", value=True)
-
-    if st.button("🚀 ماسٹر آڈیو اور مکسچر جنریٹ کریں", use_container_width=True):
-        if not voice_script_input.strip():
-            st.error("براہ کرم پہلے سکرپٹ درج کریں!")
-        else:
-            with st.spinner("وائس اوور اور سائنیمیটিক ساؤنڈ مکس ہو رہا ہے..."):
-                try:
-                    lang_code = 'ur' if "Urdu" in v_lang_choice else 'en'
-                    raw_audio_path = "temp_raw_voice.mp3"
-                    
-                    tts = gTTS(text=voice_script_input, lang=lang_code)
-                    tts.save(raw_audio_path)
-
-                    master_output_path = "master_mixed_studio_audio.mp3"
-                    is_horror_theme = any(k in voice_script_input.lower() for k in ["خوف", "ڈریگن", "مانسٹر", "درندہ", "horror", "monster"])
-                    
-                    # Mixing voice + BGM + SFX using MoviePy master mixer
-                    mix_master_studio_audio(raw_audio_path, master_output_path, add_bgm=include_bgm, add_sfx=include_sfx, is_horror=is_horror_theme)
-
-                    st.success("ماسٹرو آڈیو اور بیک گراؤنڈ مکسنگ مکمل ہو گئی ہے!")
-                    st.audio(master_output_path, format='audio/mp3')
-
-                    with open(master_output_path, "rb") as f:
-                        st.download_button(
-                            label="📥 ماسٹر آڈیو ڈاؤن لوڈ کریں (MP3)",
-                            data=f,
-                            file_name="Master_AI_Voice_BGM.mp3",
-                            mime="audio/mp3"
-                        )
-                except Exception as e:
-                    st.error(f"آڈیو مکسنگ میں خرابی پیش آئی: {e}")
-
-# 3. TITAN MOVIE GENERATOR TAB
+# 1. MOVIE STUDIO (FULLY DYNAMIC & BLANK INPUT FOR ANY STORY)
 with tab_movie:
-    st.write("### 🎥 Titan Movie Studio (مکمل ویڈیو جنریٹر)")
-    m_script = st.text_area("کوئی بھی کہانی یا مووی سکرپٹ یہاں درج کریں (Urdu / English):", value="", height=180, placeholder="یہاں مووی سکرپٹ لکھیں...")
+    st.write("### 🎥 Titan Movie Studio (مکمل طور پر خود مختار - کوئی بھی نئی کہانی درج کریں)")
+    m_script = st.text_area("کوئی بھی کہانی، ڈائیلاگ یا سکرپٹ یہاں درج کریں (Urdu / English):", value="", height=180, placeholder="یہاں اپنی مرضی کی کوئی بھی نئی کہانی لکھیں...")
     
-    char_dna_input = st.text_input("مستقل کردار ڈی این اے (Character DNA Lock - اختیاری):", value="", placeholder="مثلاً: A fierce hybrid demonic warrior boy")
+    char_dna_input = st.text_input("مستقل کردار ڈی این اے (Character DNA Lock - اختیاری):", value="", placeholder="مثلاً: A brave young hero with a black cape")
 
     c1, c2, c3, c4 = st.columns(4)
     with c1: mv = st.selectbox("آواز (Voice):", ["Urdu Male (Asad)", "Urdu Female (Uzma)", "English US Male (Guy)", "English US Female (Jenny)"])
@@ -440,9 +369,9 @@ with tab_movie:
     pitch_val = pitch_map.get(mv_pitch, "+0Hz")
 
     if st.button("Generate Master Titan Movie 🚀", use_container_width=True):
-        if not m_script.strip(): st.error("پہلے مووی سکرپٹ درج کریں!")
+        if not m_script.strip(): st.error("پہلے کوئی نئی کہانی یا سکرپٹ درج کریں!")
         else:
-            with st.spinner("🎬 تمام مناظر، وائس اوور اور کیمرہ موشن رینڈر ہو رہے ہیں..."):
+            with st.spinner("🎬 آپ کی دی گئی نئی کہانی کے مطابق مناظر اور کیمرہ موشن رینڈر ہو رہے ہیں..."):
                 v_res = create_titan_cinematic_movie(
                     m_script, active_voice, rate_val, pitch_val, mr, ms, int(sd),
                     char_dna=char_dna_input, selected_motion=motion_choice,
@@ -453,7 +382,7 @@ with tab_movie:
                 st.download_button("ڈاؤنلوڈ ماسٹر ویڈیو (Full HD)", open(v_res, 'rb').read(), file_name=v_res)
             else: st.error(v_res)
 
-# 4. CHAT
+# 2. CHAT
 with tab_chat:
     st.write("### 💬 Sglowina Intelligence Dashboard")
     for m in st.session_state.msgs:
@@ -467,7 +396,7 @@ with tab_chat:
             st.write(res)
             st.session_state.msgs.append({"role": "assistant", "content": res})
 
-# 5. FOUNDERS & ACCOUNTS
+# 3. FOUNDERS & ACCOUNTS
 with tab_enterprise:
     st.write("### 👤 فاؤنڈرز اور اکاؤنٹ تفصیلات")
     st.info("🏆 **Founders & Owners:** Muhammad Essa Awan & Saba Wahid")
