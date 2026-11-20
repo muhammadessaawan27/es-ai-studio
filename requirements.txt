@@ -1,7 +1,2 @@
 streamlit
-moviepy<2.0.0
-edge-tts
-Pillow
-requests
-numpy
 imageio-ffmpeg
