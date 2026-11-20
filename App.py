@@ -1,19 +1,21 @@
 import streamlit as st
 import subprocess
 import imageio_ffmpeg
+import requests
+import base64
 import os
 import re
 import uuid
 import math
 import glob
 
-st.set_page_config(page_title="Sglowina Long-to-Shorts Pro Editor", page_icon="✂️", layout="wide")
+st.set_page_config(page_title="Sglowina AI Auto-Director", page_icon="🎬", layout="wide")
 
 FFMPEG_BIN = imageio_ffmpeg.get_ffmpeg_exe()
 
 
 def get_video_info(video_path):
-    """ویڈیو کی کل لمبائی اور آڈیو کی موجودگی چیک کرتا ہے"""
+    """ویڈیو کی کل لمبائی اور آڈیو چیک کرتا ہے"""
     proc = subprocess.run([FFMPEG_BIN, "-i", video_path], capture_output=True, text=True)
     stderr = proc.stderr
     dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", stderr)
@@ -25,151 +27,175 @@ def get_video_info(video_path):
     return duration, has_audio
 
 
-def run_ffmpeg(args):
-    proc = subprocess.run([FFMPEG_BIN, "-y"] + args, capture_output=True, text=True)
+def run_ffmpeg(args, timeout_sec=180):
+    proc = subprocess.run([FFMPEG_BIN, "-y"] + args, capture_output=True, text=True, timeout=timeout_sec)
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr[-500:])
 
 
-def extract_and_normalize_clip(
-    raw_path, out_clip_path, start_sec, dur_sec,
-    bw, bh, framing_mode, extra_zoom, focus_x, has_audio
-):
-    """لونگ یا شارٹ ویڈیو کے مطلوبہ حصے کو کاٹ کر فل اسکرین (بڑی اسکرین) 9:16 یا 16:9 میں ڈھالتا ہے"""
-    zw = (int(bw * extra_zoom) // 2) * 2
-    zh = (int(bh * extra_zoom) // 2) * 2
+def auto_director_find_action_clips(raw_path, total_dur, target_short_dur=34.0):
+    """
+    آٹو ڈائریکٹر: 10-20 منٹ کی لمبی ویڈیو میں سے تیز ایکشن / فائٹنگ والے حصے خود ڈھونڈتا ہے۔
+    """
+    if total_dur <= 45.0:
+        return [(0.0, total_dur)]
 
-    if framing_mode == "Blurred Background + Fit (پوری چوڑائی نظر آئے)":
-        vf = (
-            f"split[bg][fg];"
-            f"[bg]scale={bw}:{bh}:force_original_aspect_ratio=increase,crop={bw}:{bh},boxblur=20:5[bgb];"
-            f"[fg]scale={bw}:{bh}:force_original_aspect_ratio=decrease[fgs];"
-            f"[bgb][fgs]overlay=(W-w)/2:(H-h)/2,fps=30,format=yuv420p"
+    clip_len = 3.6  # ہر ایکشن کلپ 3.6 سیکنڈ کا (جو آگے 1.8s کے دو بیٹس میں کٹے گا)
+    num_clips = max(4, min(10, int(target_short_dur / clip_len)))
+
+    action_times = []
+    try:
+        # کی-فریمز پر انتہائی تیز ایکشن/سین چینج اسکین (20 منٹ کی ویڈیو چند سیکنڈ میں اسکین)
+        proc = subprocess.run(
+            [
+                FFMPEG_BIN, "-skip_frame", "nokey", "-i", raw_path,
+                "-vf", "scale=160:90,select='gt(scene,0.16)',showinfo",
+                "-an", "-f", "null", "-"
+            ],
+            capture_output=True, text=True, timeout=45
         )
+        for m in re.finditer(r"pts_time:(\d+(?:\.\d+)?)", proc.stderr):
+            t = float(m.group(1))
+            if 2.0 < t < (total_dur - clip_len - 2.0):
+                action_times.append(t)
+    except Exception:
+        action_times = []
+
+    selected = []
+    if len(action_times) >= num_clips:
+        # 4 سیکنڈ کی ونڈوز بنا کر سب سے زیادہ ایکشن کثافت والے حصے چننا
+        buckets = {}
+        for t in action_times:
+            b = int(t // 4.0)
+            buckets[b] = buckets.get(b, 0) + 1
+
+        ranked_buckets = sorted(buckets.items(), key=lambda x: x[1], reverse=True)
+        for b, _score in ranked_buckets:
+            cand_start = max(0.0, min(b * 4.0, total_dur - clip_len))
+            # یقینی بنائیں کہ دو کلپس آپس میں ٹکرائیں نہیں (کم از کم 6 سیکنڈ کا فاصلہ)
+            if all(abs(cand_start - s) >= 6.0 for s, _ in selected):
+                selected.append((cand_start, clip_len))
+            if len(selected) >= num_clips:
+                break
+
+    # اگر ایکشن پوائنٹس کم ملیں تو پوری ویڈیو کے بہترین درمیانی حصوں سے کلپس لینا
+    if len(selected) < num_clips:
+        selected = []
+        usable_start = total_dur * 0.08
+        usable_end = max(usable_start + clip_len, total_dur * 0.92 - clip_len)
+        step = (usable_end - usable_start) / max(1, num_clips - 1)
+        for i in range(num_clips):
+            selected.append((usable_start + i * step, clip_len))
+
+    # سب سے پہلا کلپ زبردست وائرل ہُک (Hook) کے طور پر رکھیں اور باقی ترتیب سے
+    if len(selected) > 2:
+        hook = selected[0]
+        rest = sorted(selected[1:], key=lambda x: x[0])
+        selected = [hook] + rest
     else:
-        vf = (
-            f"scale={zw}:{zh}:force_original_aspect_ratio=increase,"
-            f"crop={bw}:{bh}:(iw-{bw})*{focus_x:.2f}:(ih-{bh})/2,"
-            f"fps=30,format=yuv420p"
-        )
+        selected.sort(key=lambda x: x[0])
 
+    return selected
+
+
+def extract_fullscreen_clip(raw_path, out_clip, start_sec, dur_sec, has_audio):
+    """کسی بھی لونگ یا شارٹ ویڈیو کو فل اسکرین (9:16 بڑی اسکرین) میں زوم کر کے کاٹتا ہے"""
+    vf = (
+        "scale=1140:2026:force_original_aspect_ratio=increase,"
+        "crop=1080:1920:(iw-1080)/2:(ih-1920)/2,"
+        "fps=30,format=yuv420p"
+    )
     cmd = [
         "-ss", f"{start_sec:.3f}",
         "-i", raw_path,
         "-t", f"{dur_sec:.3f}",
         "-vf", vf,
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "17",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "16",
     ]
     if has_audio:
         cmd += ["-c:a", "pcm_s16le", "-ar", "44100", "-ac", "2"]
     else:
         cmd += ["-an"]
-
-    cmd.append(out_clip_path)
+    cmd.append(out_clip)
     run_ffmpeg(cmd)
 
 
-def render_scene_segment(source_clip, seg_out_path, start_t, dur_t, bw, bh, effect_idx, style_pack, keep_seg_audio):
-    """ہر سین پر الگ زوم، شیک، فلیش اور پین ایفیکٹ لگاتا ہے"""
-    zw_zoom = (int(bw * 1.16) // 2) * 2
-    zh_zoom = (int(bh * 1.16) // 2) * 2
-
-    zw_shake = (int(bw * 1.07) // 2) * 2
-    zh_shake = (int(bh * 1.07) // 2) * 2
-    sx = (zw_shake - bw) // 2
-    sy = (zh_shake - bh) // 2
-    amp = max(4, min(20, sx - 2, sy - 2))
-
-    zw_pan = (int(bw * 1.14) // 2) * 2
-    zh_pan = (int(bh * 1.14) // 2) * 2
-    px_max = zw_pan - bw
-    py_mid = (zh_pan - bh) // 2
-
-    if style_pack == "Action & Viral Shorts (زوم + شیک + فلیش)":
-        effects = [
-            f"scale={zw_zoom}:{zh_zoom},zoompan=z='min(1.0+0.005*on,1.20)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={bw}x{bh}:fps=30,fade=t=in:st=0:d=0.14:color=white",
-            f"scale={zw_shake}:{zh_shake},crop={bw}:{bh}:x='{sx}+if(lt(t,0.30),{amp}*sin(t*55),0)':y='{sy}+if(lt(t,0.30),{amp}*cos(t*48),0)',eq=contrast=1.10:saturation=1.18",
-            f"scale={zw_pan}:{zh_pan},crop={bw}:{bh}:x='min({px_max},{px_max}*t/{dur_t:.3f})':y={py_mid}",
-            f"scale={zw_zoom}:{zh_zoom},zoompan=z='max(1.20-0.005*on,1.0)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={bw}x{bh}:fps=30,fade=t=in:st=0:d=0.14:color=white",
-            f"scale={zw_pan}:{zh_pan},crop={bw}:{bh}:x='max(0,{px_max}*(1-t/{dur_t:.3f}))':y={py_mid},vignette=PI/5",
-            f"scale={zw_shake}:{zh_shake},crop={bw}:{bh}:x='{sx}+if(lt(t,0.28),{amp}*cos(t*50),0)':y='{sy}+if(lt(t,0.28),{amp}*sin(t*50),0)',eq=saturation=1.22:gamma=0.97",
-        ]
-    else:
-        effects = [
-            f"scale={zw_zoom}:{zh_zoom},zoompan=z='min(1.0+0.003*on,1.16)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={bw}x{bh}:fps=30,fade=t=in:st=0:d=0.15:color=black",
-            f"scale={zw_pan}:{zh_pan},crop={bw}:{bh}:x='min({px_max},{px_max}*t/{dur_t:.3f})':y={py_mid}",
-            f"scale={zw_zoom}:{zh_zoom},zoompan=z='max(1.16-0.003*on,1.0)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={bw}x{bh}:fps=30",
-            f"scale={zw_pan}:{zh_pan},crop={bw}:{bh}:x='max(0,{px_max}*(1-t/{dur_t:.3f}))':y={py_mid},vignette=PI/5",
-        ]
-
-    vf = effects[effect_idx % len(effects)] + ",setpts=PTS-STARTPTS,format=yuv420p"
+def apply_auto_director_beat(source_clip, seg_out, start_t, dur_t, beat_idx, keep_audio):
+    """آٹو ڈائریکٹر ہر 1.8 سیکنڈ کے سین پر خودکار وائرل ایکشن ایفیکٹ لگاتا ہے"""
+    effects = [
+        # 0: Punch Zoom-In + White Flash
+        "scale=1252:2226,zoompan=z='min(1.0+0.006*on,1.20)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920:fps=30,fade=t=in:st=0:d=0.12:color=white",
+        # 1: Fighting Impact Shake
+        "scale=1154:2054,crop=1080:1920:x='37+if(lt(t,0.32),22*sin(t*58),0)':y='67+if(lt(t,0.32),22*cos(t*50),0)'",
+        # 2: Smooth Action Pan Right
+        f"scale=1230:2186,crop=1080:1920:x='min(150,150*t/{dur_t:.3f})':y=133",
+        # 3: Zoom-Out Reveal + White Flash
+        "scale=1252:2226,zoompan=z='max(1.20-0.006*on,1.0)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920:fps=30,fade=t=in:st=0:d=0.12:color=white",
+        # 4: Smooth Action Pan Left + Vignette
+        f"scale=1230:2186,crop=1080:1920:x='max(0,150*(1-t/{dur_t:.3f}))':y=133,vignette=PI/6",
+        # 5: Impact Shake + Punch
+        "scale=1154:2054,crop=1080:1920:x='37+if(lt(t,0.28),18*cos(t*52),0)':y='67+if(lt(t,0.28),18*sin(t*52),0)'",
+    ]
+    vf = effects[beat_idx % len(effects)] + ",setpts=PTS-STARTPTS,format=yuv420p"
 
     cmd = [
         "-ss", f"{start_t:.3f}",
         "-i", source_clip,
         "-t", f"{dur_t:.3f}",
         "-vf", vf,
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "17",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "16",
     ]
-    if keep_seg_audio:
+    if keep_audio:
         cmd += ["-c:a", "pcm_s16le", "-ar", "44100", "-ac", "2"]
     else:
         cmd += ["-an"]
-
-    cmd.append(seg_out_path)
+    cmd.append(seg_out)
     run_ffmpeg(cmd)
 
 
-def finalize_master_video(
-    seg_paths, out_path, is_landscape, has_audio_stream,
-    quality_choice, speed_factor, pitch_factor,
-    mirror_flip, color_grade, sharpen_on,
-    audio_mode, custom_audio_path, wm_path, work_dir
+def render_crystal_beauty_master(
+    seg_paths, out_path, has_audio, quality_choice,
+    custom_audio_path, wm_path, work_dir
 ):
-    """تمام سینز کو جوڑ کر کلر گریڈنگ، شاپنس، آڈیو، واٹر مارک اور HD/4K/8K فائنل آؤٹ پٹ بناتا ہے"""
+    """
+    بیوٹی کیمرہ + شیشے جیسا کرسٹل کلر گریڈ، آڈیو ٹرانسفارمیشن، اور 1080p/4K/8K ماسٹر ایکسپورٹ
+    """
     list_file = os.path.join(work_dir, "concat_list.txt")
     with open(list_file, "w", encoding="utf-8") as f:
         for sp in seg_paths:
             f.write(f"file '{os.path.abspath(sp)}'\n")
 
-    merged_path = os.path.join(work_dir, "merged_master.mkv")
+    merged_path = os.path.join(work_dir, "merged.mkv")
     run_ffmpeg(["-f", "concat", "-safe", "0", "-i", list_file, "-c", "copy", merged_path])
 
-    if is_landscape:
-        res_map = {
-            "1080p Full HD+ (تیز اور کلاؤڈ محفوظ)": (1920, 1080, "18"),
-            "4K UHD (انٹرنیشنل معیار)": (3840, 2160, "16"),
-            "8K Ultra (صرف طاقتور PC/VPS)": (7680, 4320, "15"),
-        }
-    else:
-        res_map = {
-            "1080p Full HD+ (تیز اور کلاؤڈ محفوظ)": (1080, 1920, "18"),
-            "4K UHD (انٹرنیشنل معیار)": (2160, 3840, "16"),
-            "8K Ultra (صرف طاقتور PC/VPS)": (4320, 7680, "15"),
-        }
+    res_map = {
+        "Crystal 1080p HD (تیز اور فری کلاؤڈ محفوظ - تجویز کردہ)": (1080, 1920, "16"),
+        "4K UHD Crystal (2160x3840 - طاقتور PC/VPS)": (2160, 3840, "15"),
+        "8K Ultra Crystal (4320x7680 - صرف ہائی-اینڈ PC/GPU)": (4320, 7680, "14"),
+    }
     tw, th, crf_val = res_map[quality_choice]
 
-    vf_chain = [f"setpts={1.0/speed_factor:.4f}*PTS"]
-    if mirror_flip:
-        vf_chain.append("hflip")
-    if color_grade:
-        vf_chain.append("eq=contrast=1.09:brightness=0.01:saturation=1.20:gamma=0.97")
-    if sharpen_on:
-        vf_chain.append("unsharp=5:5:1.10:5:5:0.0")
-    vf_chain.append(f"scale={tw}:{th}:flags=lanczos,setsar=1")
+    # آٹو ڈائریکٹر پروفیشنل سیٹنگز: 1.04x وائرل سپیڈ + بیوٹی کیم شیشہ کلرز + کرسپ شاپنس
+    speed = 1.04
+    pitch = 1.03
+    vf_chain = [
+        f"setpts={1.0/speed:.4f}*PTS",
+        "hqdn3d=1.4:1.4:3:3",                                      # بیوٹی کیم سموتھنس (دانہ اور شور ختم)
+        "eq=contrast=1.09:brightness=0.03:saturation=1.24:gamma=1.02",  # شیشے جیسے چمکدار اور خوبصورت رنگ
+        "unsharp=5:5:1.22:5:5:0.0",                                # ہائی ڈیفینیشن کرسپ شاپنس
+        f"scale={tw}:{th}:flags=lanczos,setsar=1"
+    ]
 
     args = ["-i", merged_path]
 
-    use_custom_audio = (audio_mode == "اپنا نیا میوزک/آواز لگائیں (کاپی رائٹ سے سب سے محفوظ)" and custom_audio_path)
-    use_orig_audio = (audio_mode == "اصل آڈیو تبدیل کریں (Pitch + Speed + Bass EQ)" and has_audio_stream)
-
+    use_custom_audio = bool(custom_audio_path)
     if use_custom_audio:
         args += ["-stream_loop", "-1", "-i", custom_audio_path]
-        audio_input_idx = 1
-    elif use_orig_audio:
-        audio_input_idx = 0
+        audio_idx = 1
+    elif has_audio:
+        audio_idx = 0
     else:
-        audio_input_idx = None
+        audio_idx = None
 
     wm_idx = None
     if wm_path and os.path.exists(wm_path):
@@ -183,11 +209,15 @@ def finalize_master_video(
     else:
         args += ["-vf", vf_str, "-map", "0:v"]
 
-    if audio_input_idx is not None:
-        args += ["-map", f"{audio_input_idx}:a"]
-        if use_orig_audio:
-            atempo_val = max(0.55, min(1.9, speed_factor / pitch_factor))
-            af = f"aformat=sample_rates=44100,asetrate=44100*{pitch_factor:.3f},aresample=44100,atempo={atempo_val:.4f},equalizer=f=110:width_type=h:width=100:g=3"
+    if audio_idx is not None:
+        args += ["-map", f"{audio_idx}:a"]
+        if not use_custom_audio:
+            atempo_val = speed / pitch
+            af = (
+                f"aformat=sample_rates=44100,asetrate=44100*{pitch:.3f},"
+                f"aresample=44100,atempo={atempo_val:.4f},"
+                f"equalizer=f=110:width_type=h:width=100:g=3"
+            )
             args += ["-af", af]
         args += ["-c:a", "aac", "-b:a", "192k", "-shortest"]
     else:
@@ -199,90 +229,101 @@ def finalize_master_video(
         "-pix_fmt", "yuv420p",
         out_path
     ]
-    run_ffmpeg(args)
+    run_ffmpeg(args, timeout_sec=300)
+
+
+def generate_viral_metadata_from_video(video_path, work_dir, api_key=""):
+    """تیار شدہ ویڈیو کے فریم دیکھ کر خودکار وائرل ٹائٹل، ڈسکرپشن اور ہیش ٹیگز لکھتا ہے"""
+    dur, _ = get_video_info(video_path)
+    sample_times = [max(0.2, dur * 0.2), max(0.5, dur * 0.5), max(0.8, dur * 0.8)]
+    content_parts = [{
+        "type": "text",
+        "text": (
+            "Look closely at these frames from a viral Short video. "
+            "Understand what is happening (e.g. fighting, action, drama, comedy, motivation, etc.) "
+            "and write in Urdu + English:\n"
+            "1) 3 Viral Click-Worthy Titles\n"
+            "2) A Short Catchy Description\n"
+            "3) 15 High-Reach Viral Hashtags for YouTube Shorts & TikTok."
+        )
+    }]
+
+    for idx, t in enumerate(sample_times):
+        img_p = os.path.join(work_dir, f"frame_{idx}.jpg")
+        try:
+            run_ffmpeg(["-ss", f"{t:.2f}", "-i", video_path, "-vframes", "1", "-vf", "scale=480:-1", img_p])
+            if os.path.exists(img_p):
+                with open(img_p, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode("utf-8")
+                content_parts.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
+        except Exception:
+            pass
+
+    headers = {"Content-Type": "application/json"}
+    if api_key and api_key.strip():
+        headers["Authorization"] = f"Bearer {api_key.strip()}"
+
+    payload = {
+        "model": "openai",
+        "messages": [
+            {"role": "system", "content": "You are an expert viral YouTube Shorts & TikTok SEO strategist."},
+            {"role": "user", "content": content_parts}
+        ]
+    }
+    try:
+        res = requests.post("https://gen.pollinations.ai/v1/chat/completions", json=payload, headers=headers, timeout=25)
+        if res.status_code == 200:
+            txt = res.json()["choices"][0]["message"]["content"].strip()
+            if len(txt) > 20:
+                return txt, True
+    except Exception:
+        pass
+
+    # اگر AI Vision سرور دستیاب نہ ہو تو اسمارٹ فال بیک
+    fallback_seo = (
+        "🔥 وائرل ٹائٹلز (Viral Titles):\n"
+        "1. آخر میں جو ہوا دیکھ کر ہوش اڑ جائیں گے! 😱🔥 #Shorts\n"
+        "2. یہ سین مس مت کرنا! Unbelievable Action Moment 💥\n"
+        "3. Wait For The End! سب سے خطرناک اور کمال کا سین 🤯\n\n"
+        "📝 ڈسکرپشن:\n"
+        "یہ زبردست فل اسکرین ایکشن شارٹ آخر تک ضرور دیکھیں! ویڈیو پسند آئے تو لائک اور سبسکرائب ضرور کریں۔\n\n"
+        "🏷️ وائرل ہیش ٹیگز:\n"
+        "#Shorts #YouTubeShorts #ViralShorts #Trending #ActionShorts #FullScreen #4KStatus "
+        "#FYP #ForYou #PakistaniShorts #UrduShorts #EpicMoments #MustWatch #Reels #ViralVideo"
+    )
+    return fallback_seo, False
 
 
 # ==========================
-# Streamlit User Interface
+# سادہ اور آسان یوزر انٹرفیس (صرف 1 کلک آٹو ڈائریکٹر)
 # ==========================
-st.title("✂️ Sglowina Long-to-Shorts Auto Editor")
-st.markdown("چاہے **لونگ ویڈیو (16:9)** دیں یا **شارٹ ویڈیو** — ایک کلک پر اسے **بڑی اسکرین (Full-Screen 9:16)** میں بدل کر ہر سین پر زوم، شیک، فلیش اور 4K/8K رزلٹ حاصل کریں!")
+st.title("🎬 Sglowina AI Auto-Director")
+st.markdown("آپ کو کوئی سیٹنگ کرنے کی ضرورت نہیں! بس **10-20 منٹ کی لمبی ویڈیو** یا **شارٹ ویڈیو** اپلوڈ کریں — **آٹو ڈائریکٹر** خود فائٹنگ/ایکشن سین نکال کر، شیشے جیسے رنگ، زوم ایفیکٹس اور وائرل ٹائٹل و ہیش ٹیگز بنا کر دے گا۔")
 
-up_video = st.file_uploader("📥 اپنی لونگ یا شارٹ ویڈیو اپلوڈ کریں (MP4 / MOV / MKV):", type=["mp4", "mov", "mkv"])
+up_video = st.file_uploader("📥 اپنی کوئی بھی ویڈیو اپلوڈ کریں (MP4 / MOV / MKV):", type=["mp4", "mov", "mkv"])
 
-st.subheader("1️⃣ آؤٹ پٹ سائز اور بڑی اسکرین (Long → Short) سیٹنگز")
-c_top1, c_top2, c_top3 = st.columns(3)
-with c_top1:
-    output_format = st.selectbox("📱 ویڈیو کا فارمیٹ منتخب کریں:", [
-        "Shorts Full-Screen (9:16 بڑی اسکرین)",
-        "YouTube Long Video (16:9 ہوریزونٹل)"
-    ])
-    framing_mode = st.selectbox("🔍 بڑی اسکرین کیسے بنے؟", [
-        "Full-Screen Zoom Fill (پوری اسکرین بڑی ہو، کالا بارڈر نہیں)",
-        "Blurred Background + Fit (پوری چوڑائی نظر آئے)"
-    ])
-with c_top2:
-    long_extract_mode = st.selectbox("🎞️ لمبی ویڈیو میں سے کتنا حصہ شارٹ بنے؟", [
-        "Continuous Clip (کسی ایک حصے سے مسلسل شارٹ بنائیں)",
-        "Auto Highlight Montage (پوری لونگ ویڈیو سے بہترین کلپس جوڑیں)"
-    ])
-    short_target_dur = st.slider("⏳ شارٹ ویڈیو کی کل لمبائی (سیکنڈ):", 10, 60, 30, 5)
-with c_top3:
-    clip_start_sec = st.number_input("⏩ ویڈیو کس سیکنڈ سے شروع ہو (Continuous موڈ):", min_value=0, value=0, step=5)
-    extra_zoom = st.slider("🔎 اسکرین کو مزید بڑا (Zoom) کریں:", 1.00, 1.40, 1.05, 0.05)
-    focus_label = st.selectbox("🎯 فوکس کہاں رکھیں (بڑی اسکرین کراپ):", ["درمیان (Center)", "بائیں طرف (Left)", "دائیں طرف (Right)"])
+quality_choice = st.selectbox("📺 ویڈیو رزلٹ کوالٹی منتخب کریں:", [
+    "Crystal 1080p HD (تیز اور فری کلاؤڈ محفوظ - تجویز کردہ)",
+    "4K UHD Crystal (2160x3840 - طاقتور PC/VPS)",
+    "8K Ultra Crystal (4320x7680 - صرف ہائی-اینڈ PC/GPU)"
+])
 
-focus_map = {"درمیان (Center)": 0.50, "بائیں طرف (Left)": 0.22, "دائیں طرف (Right)": 0.78}
-focus_x = focus_map[focus_label]
+with st.expander("⚙️ اختیاری چیزیں (اگر اپنا میوزک، لوگو یا API Key لگانا ہو)"):
+    custom_audio_file = st.file_uploader("🎶 اپنا میوزک یا آواز لگائیں (کاپی رائٹ سے بچاؤ کے لیے بہترین):", type=["mp3", "wav", "m4a"])
+    wm_file = st.file_uploader("🏷️ اپنا لوگو / واٹر مارک لگائیں:", type=["png", "jpg"])
+    vision_api_key = st.text_input("🔑 AI Vision API Key (ویڈیو دیکھ کر 100% درست ٹائٹل/ہیش ٹیگ لکھوانے کے لیے - اختیاری):", type="password")
 
-st.subheader("2️⃣ ایڈیٹنگ ایفیکٹس، کوالٹی اور کاپی رائٹ پروٹیکشن")
-col1, col2, col3 = st.columns(3)
-with col1:
-    style_pack = st.selectbox("🎬 ایڈیٹنگ اسٹائل:", [
-        "Action & Viral Shorts (زوم + شیک + فلیش)",
-        "Cinematic Smooth Shorts (سلو زوم + پین)"
-    ])
-    scene_beat = st.slider("⚡ ہر کتنے سیکنڈ بعد نیا ایفیکٹ لگے:", 1.2, 4.0, 2.0, 0.2)
-
-with col2:
-    quality_choice = st.selectbox("📺 آؤٹ پٹ کوالٹی:", [
-        "1080p Full HD+ (تیز اور کلاؤڈ محفوظ)",
-        "4K UHD (انٹرنیشنل معیار)",
-        "8K Ultra (صرف طاقتور PC/VPS)"
-    ])
-    speed_factor = st.slider("🏃 ویڈیو اسپیڈ (Micro-Shift):", 0.95, 1.15, 1.04, 0.01)
-    pitch_factor = st.slider("🎵 آواز کی پِچ (Pitch Shift):", 0.94, 1.06, 1.03, 0.01)
-
-with col3:
-    color_grade = st.checkbox("🎨 انٹرنیشنل کلر گریڈنگ", value=True)
-    sharpen_on = st.checkbox("✨ کرسپ شاپنس (4K/8K Detail Boost)", value=True)
-    mirror_flip = st.checkbox("🪞 ویڈیو مرر / پلٹیں (Mirror Flip)", value=False)
-    wm_file = st.file_uploader("🏷️ اپنا لوگو / واٹر مارک (اختیاری):", type=["png", "jpg"])
-
-st.markdown("---")
-audio_mode = st.radio("🔊 آڈیو اور کاپی رائٹ پروٹیکشن موڈ:", [
-    "اصل آڈیو تبدیل کریں (Pitch + Speed + Bass EQ)",
-    "اپنا نیا میوزک/آواز لگائیں (کاپی رائٹ سے سب سے محفوظ)",
-    "آواز بند کر دیں (Mute Video)"
-], horizontal=True)
-
-custom_audio_file = None
-if audio_mode == "اپنا نیا میوزک/آواز لگائیں (کاپی رائٹ سے سب سے محفوظ)":
-    custom_audio_file = st.file_uploader("🎶 اپنا میوزک یا وائس اوور اپلوڈ کریں (MP3 / WAV):", type=["mp3", "wav", "m4a"])
-
-if st.button("🚀 1-Click Edit & Export Video", use_container_width=True):
+if st.button("🎬 آٹو ڈائریکٹر: خودکار وائرل شارٹ بنائیں 🚀", use_container_width=True):
     if not up_video:
         st.error("براہ کرم پہلے کوئی ویڈیو اپلوڈ کریں۔")
-    elif audio_mode.startswith("اپنا نیا") and not custom_audio_file:
-        st.error("براہ کرم اپنا میوزک یا وائس اوور فائل اپلوڈ کریں۔")
     else:
         job_id = str(uuid.uuid4())[:8]
         work_dir = f"job_{job_id}"
         os.makedirs(work_dir, exist_ok=True)
 
         vid_ext = os.path.splitext(up_video.name)[1] or ".mp4"
-        raw_path = os.path.join(work_dir, f"raw_input{vid_ext}")
-        out_path = f"Edited_Pro_{job_id}.mp4"
+        raw_path = os.path.join(work_dir, f"raw{vid_ext}")
+        out_path = f"Viral_AutoDirector_{job_id}.mp4"
 
         with open(raw_path, "wb") as f:
             f.write(up_video.getvalue())
@@ -304,83 +345,74 @@ if st.button("🚀 1-Click Edit & Export Video", use_container_width=True):
         status = st.empty()
 
         try:
-            status.info("🔍 ویڈیو کی لمبائی اور آڈیو کا تجزیہ ہو رہا ہے...")
+            status.info("🤖 آٹو ڈائریکٹر ویڈیو کا جائزہ لے رہا ہے...")
             total_dur, has_orig_audio = get_video_info(raw_path)
             if total_dur <= 0.5:
-                raise ValueError("ویڈیو درست نہیں یا بہت چھوٹی ہے۔")
+                raise ValueError("ویڈیو فائل درست نہیں یا بہت چھوٹی ہے۔")
 
-            is_landscape = (output_format == "YouTube Long Video (16:9 ہوریزونٹل)")
-            bw, bh = (1920, 1080) if is_landscape else (1080, 1920)
-            keep_seg_audio = (audio_mode == "اصل آڈیو تبدیل کریں (Pitch + Speed + Bass EQ)" and has_orig_audio)
+            status.info("🔥 آٹو ڈائریکٹر ویڈیو میں سے بہترین فائٹنگ / ایکشن سین تلاش کر رہا ہے...")
+            selected_clips = auto_director_find_action_clips(raw_path, total_dur, target_short_dur=34.0)
+            progress.progress(0.15)
 
+            keep_orig_audio = (has_orig_audio and not custom_audio_path)
             seg_paths = []
+            beat_dur = 1.8  # ہر 1.8 سیکنڈ پر نیا وائرل ایکشن ایفیکٹ
+            beat_counter = 0
 
-            if long_extract_mode.startswith("Auto Highlight") and total_dur > short_target_dur:
-                num_clips = max(2, int(short_target_dur / scene_beat))
-                per_clip_dur = short_target_dur / num_clips
-                step = (total_dur - per_clip_dur) / max(1, num_clips - 1)
+            total_beats_est = sum(max(1, math.ceil(d / beat_dur)) for _, d in selected_clips)
 
-                for i in range(num_clips):
-                    c_start = min(i * step, max(0.0, total_dur - per_clip_dur))
-                    status.info(f"🎬 لونگ ویڈیو سے کلپ {i+1}/{num_clips} نکال کر فل اسکرین اور ایفیکٹ لگایا جا رہا ہے...")
-                    temp_clip = os.path.join(work_dir, f"norm_{i:03d}.mkv")
-                    extract_and_normalize_clip(
-                        raw_path, temp_clip, c_start, per_clip_dur,
-                        bw, bh, framing_mode, extra_zoom, focus_x, keep_seg_audio
-                    )
-                    seg_path = os.path.join(work_dir, f"seg_{i:03d}.mkv")
-                    render_scene_segment(temp_clip, seg_path, 0.0, per_clip_dur, bw, bh, i, style_pack, keep_seg_audio)
-                    seg_paths.append(seg_path)
-                    progress.progress(0.10 + 0.65 * ((i + 1) / num_clips))
-            else:
-                safe_start = min(float(clip_start_sec), max(0.0, total_dur - 1.0))
-                active_dur = min(float(short_target_dur), total_dur - safe_start)
+            for c_idx, (c_start, c_dur) in enumerate(selected_clips):
+                status.info(f"📐 کلپ {c_idx+1}/{len(selected_clips)} کو فل اسکرین (بڑی اسکرین 9:16) میں ڈھالا جا رہا ہے...")
+                norm_clip = os.path.join(work_dir, f"norm_{c_idx:03d}.mkv")
+                extract_fullscreen_clip(raw_path, norm_clip, c_start, c_dur, keep_orig_audio)
 
-                status.info("📐 ویڈیو کو فل اسکرین (بڑی اسکرین) فارمیٹ میں سیٹ کیا جا رہا ہے...")
-                norm_clip = os.path.join(work_dir, "norm_clip.mkv")
-                extract_and_normalize_clip(
-                    raw_path, norm_clip, safe_start, active_dur,
-                    bw, bh, framing_mode, extra_zoom, focus_x, keep_seg_audio
-                )
-                progress.progress(0.25)
-
-                num_scenes = max(1, math.ceil(active_dur / scene_beat))
-                for i in range(num_scenes):
-                    s_t = i * scene_beat
-                    d_t = min(scene_beat, active_dur - s_t)
-                    if d_t < 0.3:
+                n_beats = max(1, math.ceil(c_dur / beat_dur))
+                for b in range(n_beats):
+                    s_t = b * beat_dur
+                    d_t = min(beat_dur, c_dur - s_t)
+                    if d_t < 0.35:
                         continue
-                    status.info(f"⚡ سین {i+1}/{num_scenes} پر زوم، شیک اور فلیش ایفیکٹ لگ رہا ہے...")
-                    seg_path = os.path.join(work_dir, f"seg_{i:03d}.mkv")
-                    render_scene_segment(norm_clip, seg_path, s_t, d_t, bw, bh, i, style_pack, keep_seg_audio)
-                    seg_paths.append(seg_path)
-                    progress.progress(0.25 + 0.50 * ((i + 1) / num_scenes))
+                    status.info(f"⚡ آٹو ڈائریکٹر سین {beat_counter+1} پر زوم، شیک اور فلیش ایفیکٹ لگا رہا ہے...")
+                    seg_p = os.path.join(work_dir, f"seg_{beat_counter:03d}.mkv")
+                    apply_auto_director_beat(norm_clip, seg_p, s_t, d_t, beat_counter, keep_orig_audio)
+                    seg_paths.append(seg_p)
+                    beat_counter += 1
+                    progress.progress(min(0.78, 0.15 + 0.63 * (beat_counter / max(1, total_beats_est))))
 
             if not seg_paths:
                 raise ValueError("کوئی ویڈیو سین تیار نہیں ہو سکا۔")
 
-            status.info(f"🚀 تمام سینز کو جوڑ کر {quality_choice.split(' ')[0]} میں فائنل ویڈیو تیار ہو رہی ہے...")
-            finalize_master_video(
-                seg_paths, out_path, is_landscape, keep_seg_audio,
-                quality_choice, speed_factor, pitch_factor,
-                mirror_flip, color_grade, sharpen_on,
-                audio_mode, custom_audio_path, wm_path, work_dir
+            status.info("💎 شیشے جیسے بیوٹی کیم رنگ، کرسٹل شاپنس اور فائنل ماسٹر تیار ہو رہا ہے...")
+            render_crystal_beauty_master(
+                seg_paths, out_path, keep_orig_audio, quality_choice,
+                custom_audio_path, wm_path, work_dir
             )
-            progress.progress(1.0)
-            status.success("✅ آپ کی فل اسکرین ایڈٹ شدہ ویڈیو تیار ہے!")
+            progress.progress(0.90)
 
-            st.video(out_path)
-            with open(out_path, "rb") as vid_f:
-                st.download_button(
-                    "📥 ویڈیو ڈاؤن لوڈ کریں (Download MP4)",
-                    vid_f.read(),
-                    file_name=out_path,
-                    mime="video/mp4",
-                    use_container_width=True
-                )
+            status.info("✍️ ویڈیو دیکھ کر وائرل ٹائٹل، ڈسکرپشن اور ہیش ٹیگز لکھے جا رہے ہیں...")
+            seo_text, used_ai_vision = generate_viral_metadata_from_video(out_path, work_dir, vision_api_key)
+            progress.progress(1.0)
+            status.success("✅ آٹو ڈائریکٹر نے آپ کا پروفیشنل وائرل شارٹ اور ٹائٹل/ہیش ٹیگز تیار کر دیے ہیں!")
+
+            col_res1, col_res2 = st.columns([1, 1])
+            with col_res1:
+                st.video(out_path)
+                with open(out_path, "rb") as vid_f:
+                    st.download_button(
+                        "📥 ویڈیو ڈاؤن لوڈ کریں (Download MP4)",
+                        vid_f.read(),
+                        file_name=out_path,
+                        mime="video/mp4",
+                        use_container_width=True
+                    )
+            with col_res2:
+                st.subheader("🔥 وائرل ٹائٹل، ڈسکرپشن اور ہیش ٹیگز")
+                if not used_ai_vision:
+                    st.caption("نوٹ: AI Vision سرور سے کنکشن نہیں ہو سکا (یا API Key نہیں دی گئی)، اس لیے آٹو ڈائریکٹر نے وائرل ایکشن ٹیمپلیٹ تیار کیا ہے۔")
+                st.code(seo_text, language="")
 
         except Exception as e:
-            st.error(f"❌ ایڈیٹنگ کے دوران خرابی آئی: {e}")
+            st.error(f"❌ خرابی: {e}")
         finally:
             for f_tmp in glob.glob(os.path.join(work_dir, "*")):
                 try:
