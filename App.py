@@ -28,17 +28,29 @@ def run_ffmpeg(args):
         raise RuntimeError(proc.stderr[-600:])
 
 def download_youtube_video(url, output_path):
-    """یوٹوب یا کسی بھی لنک سے ویڈیو خودکار ڈاؤن لوڈ کرتا ہے"""
+    """یوٹیوب یا کسی بھی لنک سے بہترین فارمیٹ خودکار ڈاؤن لوڈ کرتا ہے"""
     try:
         import yt_dlp
         ydl_opts = {
-            'format': 'best[ext=mp4]/best',
-            'outtmpl': output_path,
+            'format': 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4] / bv*+ba/b',  # فالس بیک کے ساتھ بہترین فارمیٹ سلیکٹر
+            'outtmpl': output_path.replace('.mp4', ''),
+            'merge_output_format': 'mp4',
             'quiet': True,
             'no_warnings': True,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+            if not filename.endswith('.mp4'):
+                filename_mp4 = filename.rsplit('.', 1)[0] + '.mp4'
+                if os.path.exists(filename_mp4):
+                    if filename_mp4 != output_path:
+                        if os.path.exists(output_path): os.remove(output_path)
+                        os.rename(filename_mp4, output_path)
+            else:
+                if filename != output_path:
+                    if os.path.exists(output_path): os.remove(output_path)
+                    os.rename(filename, output_path)
         return True
     except Exception as e:
         return str(e)
@@ -47,7 +59,6 @@ def extract_thumbnail_frame(video_path, thumb_out_path):
     run_ffmpeg(["-ss", "00:00:01", "-i", video_path, "-vframes", "1", thumb_out_path])
 
 def pro_action_viral_edit(raw_path, out_path, target_dur, audio_action, custom_audio_path, wm_path, add_sticker, work_dir):
-    """کپ کٹ (CapCut) اسٹائل میں ایکشن کٹس، فلیش، بیوٹی کلرز اور سخت کاپی رائٹ پروٹیکشن کے ساتھ ایڈیٹنگ کرتا ہے"""
     total_dur, has_audio = get_video_info(raw_path)
     
     start_sec = 0.0
@@ -59,13 +70,12 @@ def pro_action_viral_edit(raw_path, out_path, target_dur, audio_action, custom_a
         start_sec = 0.0
         active_dur = min(float(target_dur), total_dur)
 
-    # کیپ کٹ اسٹائل سنیمائی لُک: شیشے جیسے شفاف رنگ (Contrast/Vibrance), شارپنس، اور فریم زوم فل سکرین
     video_filter = (
         "scale=1080:1920:force_original_aspect_ratio=increase,"
         "crop=1080:1920:(iw-1080)/2:(ih-1920)/2,"
         "eq=contrast=1.16:brightness=0.02:saturation=1.30:gamma=0.94,"
         "unsharp=7:7:1.30:5:5:0.0,"
-        "setpts=1.03*PTS,"  # کاپی رائٹ سے بچنے کے لیے اسپیڈ مائیکرو شفٹ
+        "setpts=1.03*PTS,"
         "format=yuv420p"
     )
 
@@ -108,7 +118,7 @@ def pro_action_viral_edit(raw_path, out_path, target_dur, audio_action, custom_a
         cmd += ["-an"]
 
     cmd += [
-        "-map_metadata", "-1",  # کاپی رائٹ میٹاڈیٹا مکمل صاف کرنے کے لیے
+        "-map_metadata", "-1",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "17",
         out_path
     ]
@@ -117,10 +127,10 @@ def pro_action_viral_edit(raw_path, out_path, target_dur, audio_action, custom_a
     return active_dur
 
 # ==========================
-# Streamlit UI (Pure Roman English)
+# Streamlit UI
 # ==========================
 st.title("⚡ Sglowina AI Viral Short Studio Pro")
-st.markdown("Upload a video file **OR** paste a YouTube/Social video link. AI Auto-Director will instantly transform it into a breathtaking **CapCut-style 9:16 Action Short** with crystal clear beauty colors, stickers, and anti-copyright protection!")
+st.markdown("Upload a video file **OR** paste a YouTube/Social video link. AI Auto-Director will instantly transform it into a breathtaking **CapCut-style 9:16 Action Short**!")
 
 input_method = st.radio("Choose Input Method:", ["Upload Video File", "Paste YouTube / Video Link"], horizontal=True)
 
@@ -175,11 +185,11 @@ if st.button("🚀 Pro AI Edit & Export Viral Short", use_container_width=True):
                     f.write(up_file.getvalue())
                 prog.progress(0.20)
             else:
-                stat.info("🌐 Connecting to YouTube and downloading video via link...")
+                stat.info("🌐 Connecting to YouTube and downloading best format via link...")
                 dl_res = download_youtube_video(yt_url.strip(), raw_p)
                 if dl_res is not True:
                     raise RuntimeError(f"YouTube download failed: {dl_res}")
-                prog.progress(0.20)
+                prog.progress(0.30)
 
             wm_p = None
             if wm_file:
@@ -195,7 +205,7 @@ if st.button("🚀 Pro AI Edit & Export Viral Short", use_container_width=True):
                     f.write(custom_aud.getvalue())
 
             stat.info("⚡ CapCut AI Director: Applying action cuts, beauty grading, and anti-copyright shield...")
-            prog.progress(0.50)
+            prog.progress(0.60)
 
             actual_dur = pro_action_viral_edit(raw_p, out_p, target_duration, audio_choice, aud_p, wm_p, add_sticker, work_dir)
             prog.progress(0.85)
@@ -227,7 +237,6 @@ if st.button("🚀 Pro AI Edit & Export Viral Short", use_container_width=True):
                             use_container_width=True
                         )
 
-            # Professional SEO Metadata in Roman English
             st.markdown("---")
             st.markdown("### 🔥 AI Generated Viral Metadata & SEO Kit (Roman English)")
             
