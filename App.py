@@ -7,7 +7,7 @@ import uuid
 import math
 import glob
 
-st.set_page_config(page_title="Sglowina AI Viral Short Studio", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="Sglowina AI Viral Short Studio Pro", page_icon="⚡", layout="wide")
 
 FFMPEG_BIN = imageio_ffmpeg.get_ffmpeg_exe()
 
@@ -27,12 +27,27 @@ def run_ffmpeg(args):
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr[-600:])
 
+def download_youtube_video(url, output_path):
+    """یوٹوب یا کسی بھی لنک سے ویڈیو خودکار ڈاؤن لوڈ کرتا ہے"""
+    try:
+        import yt_dlp
+        ydl_opts = {
+            'format': 'best[ext=mp4]/best',
+            'outtmpl': output_path,
+            'quiet': True,
+            'no_warnings': True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        return True
+    except Exception as e:
+        return str(e)
+
 def extract_thumbnail_frame(video_path, thumb_out_path):
-    """ویڈیو کے درمیان سے یا پہلے سیکنڈ سے ایک شاندار تھمب نیل فریم نکالتا ہے"""
     run_ffmpeg(["-ss", "00:00:01", "-i", video_path, "-vframes", "1", thumb_out_path])
 
-def ai_lightning_fast_edit(raw_path, out_path, target_dur, audio_action, custom_audio_path, wm_path, add_sticker, work_dir):
-    """سپر فاسٹ الٹرا آپٹمائزڈ ایڈیٹنگ انجن جو چند سیکنڈ میں بیوٹی کلرز اور فل سکرین شارٹ تیار کرتا ہے"""
+def pro_action_viral_edit(raw_path, out_path, target_dur, audio_action, custom_audio_path, wm_path, add_sticker, work_dir):
+    """کپ کٹ (CapCut) اسٹائل میں ایکشن کٹس، فلیش، بیوٹی کلرز اور سخت کاپی رائٹ پروٹیکشن کے ساتھ ایڈیٹنگ کرتا ہے"""
     total_dur, has_audio = get_video_info(raw_path)
     
     start_sec = 0.0
@@ -44,14 +59,13 @@ def ai_lightning_fast_edit(raw_path, out_path, target_dur, audio_action, custom_
         start_sec = 0.0
         active_dur = min(float(target_dur), total_dur)
 
-    # بیوٹی کیمرے جیسے کلرز، شیشے جیسی شفافیت اور پکسل شفٹ کافیسٹ پائپ لائن
-    # ultrafast preset کی وجہ سے اب 24MB کی ویڈیو چند سیکنڈ میں رینڈر ہوگی
+    # کیپ کٹ اسٹائل سنیمائی لُک: شیشے جیسے شفاف رنگ (Contrast/Vibrance), شارپنس، اور فریم زوم فل سکرین
     video_filter = (
         "scale=1080:1920:force_original_aspect_ratio=increase,"
         "crop=1080:1920:(iw-1080)/2:(ih-1920)/2,"
-        "eq=contrast=1.14:brightness=0.03:saturation=1.28:gamma=0.95,"
-        "unsharp=5:5:1.15:3:3:0.0,"
-        "setpts=1.02*PTS,"
+        "eq=contrast=1.16:brightness=0.02:saturation=1.30:gamma=0.94,"
+        "unsharp=7:7:1.30:5:5:0.0,"
+        "setpts=1.03*PTS,"  # کاپی رائٹ سے بچنے کے لیے اسپیڈ مائیکرو شفٹ
         "format=yuv420p"
     )
 
@@ -75,16 +89,15 @@ def ai_lightning_fast_edit(raw_path, out_path, target_dur, audio_action, custom_
         cmd += ["-i", wm_path]
         wm_idx = 2 if audio_map_idx == 1 else (1 if audio_map_idx == 0 else 1)
 
-    # اگر یوزر نے ایڈونچر/وائرل بیج (Sticker Overlay) سلیکٹ کیا ہو
     if wm_idx is not None:
         if add_sticker:
-            filter_complex = f"[0:v]{video_filter}[vbase];[{wm_idx}:v]scale=180:-1[wm];[vbase][wm]overlay=W-w-40:40[v1];color=red@0.8:s=320x60[box];[v1][box]overlay=(W-w)/2:H-h-80[vout]"
+            filter_complex = f"[0:v]{video_filter}[vbase];[{wm_idx}:v]scale=180:-1[wm];[vbase][wm]overlay=W-w-40:40[v1];color=red@0.85:s=340x65[box];[v1][box]overlay=(W-w)/2:H-h-90[vout]"
         else:
             filter_complex = f"[0:v]{video_filter}[vbase];[{wm_idx}:v]scale=180:-1[wm];[vbase][wm]overlay=W-w-40:40[vout]"
         cmd += ["-filter_complex", filter_complex, "-map", "[vout]"]
     else:
         if add_sticker:
-            filter_complex = f"[0:v]{video_filter}[vbase];color=red@0.8:s=320x60[box];[vbase][box]overlay=(W-w)/2:H-h-80[vout]"
+            filter_complex = f"[0:v]{video_filter}[vbase];color=red@0.85:s=340x65[box];[vbase][box]overlay=(W-w)/2:H-h-90[vout]"
             cmd += ["-filter_complex", filter_complex, "-map", "[vout]"]
         else:
             cmd += ["-vf", video_filter, "-map", "0:v"]
@@ -94,10 +107,9 @@ def ai_lightning_fast_edit(raw_path, out_path, target_dur, audio_action, custom_
     else:
         cmd += ["-an"]
 
-    # ultrafast preset سے پروسیسنگ سپیڈ 10 گنا تیز ہو جائے گی
     cmd += [
-        "-map_metadata", "-1",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+        "-map_metadata", "-1",  # کاپی رائٹ میٹاڈیٹا مکمل صاف کرنے کے لیے
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "17",
         out_path
     ]
     
@@ -107,17 +119,25 @@ def ai_lightning_fast_edit(raw_path, out_path, target_dur, audio_action, custom_
 # ==========================
 # Streamlit UI (Pure Roman English)
 # ==========================
-st.title("⚡ Sglowina AI Viral Short Studio")
-st.markdown("Upload any long or short video. AI Auto-Director will instantly convert it into a stunning **Full-Screen 9:16 Viral Masterpiece** with glass-like beauty colors, anti-copyright shield, and lightning-fast speed!")
+st.title("⚡ Sglowina AI Viral Short Studio Pro")
+st.markdown("Upload a video file **OR** paste a YouTube/Social video link. AI Auto-Director will instantly transform it into a breathtaking **CapCut-style 9:16 Action Short** with crystal clear beauty colors, stickers, and anti-copyright protection!")
 
-up_file = st.file_uploader("📥 Upload Your Video File (MP4, MOV, MKV):", type=["mp4", "mov", "mkv"])
+input_method = st.radio("Choose Input Method:", ["Upload Video File", "Paste YouTube / Video Link"], horizontal=True)
+
+up_file = None
+yt_url = ""
+
+if input_method == "Upload Video File":
+    up_file = st.file_uploader("📥 Upload Your Video File (MP4, MOV, MKV):", type=["mp4", "mov", "mkv"])
+else:
+    yt_url = st.text_input("🔗 Paste YouTube Video or Short Link (URL):", placeholder="https://www.youtube.com/shorts/...")
 
 c1, c2 = st.columns(2)
 with c1:
     target_duration = st.slider("⏱️ Target Short Duration (Seconds):", 15, 60, 30, 5)
-    add_sticker = st.checkbox("🔥 Add Trending Action Badge Overlay (Sticker Effect)", value=True)
+    add_sticker = st.checkbox("🔥 Add Action Viral Badge Overlay (CapCut Style)", value=True)
 with c2:
-    audio_choice = st.selectbox("🎵 Audio & Copyright Protection Mode:", [
+    audio_choice = st.selectbox("🎵 Audio & Anti-Copyright Protection Mode:", [
         "Use Custom Copyright-Free Music / Voiceover",
         "Keep Original Audio (Crystal Clear)",
         "Mute Audio (No Sound)"
@@ -129,51 +149,60 @@ if audio_choice.startswith("Use Custom"):
 
 wm_file = st.file_uploader("🏷️ Upload Custom Logo / Watermark (Optional):", type=["png", "jpg"])
 
-if st.button("🚀 Lightning Fast AI Edit & Export", use_container_width=True):
-    if not up_file:
+if st.button("🚀 Pro AI Edit & Export Viral Short", use_container_width=True):
+    if input_method == "Upload Video File" and not up_file:
         st.error("Please upload a video file first.")
+    elif input_method == "Paste YouTube / Video Link" and not yt_url.strip():
+        st.error("Please paste a valid YouTube video link.")
     elif audio_choice.startswith("Use Custom") and not custom_aud:
-        st.error("Please upload your custom music/audio file.")
+        st.error("Please upload your custom background music file.")
     else:
         job_id = str(uuid.uuid4())[:8]
         work_dir = f"job_{job_id}"
         os.makedirs(work_dir, exist_ok=True)
 
-        ext = os.path.splitext(up_file.name)[1] or ".mp4"
-        raw_p = os.path.join(work_dir, f"raw{ext}")
-        out_p = f"Viral_Short_{job_id}.mp4"
+        raw_p = os.path.join(work_dir, f"raw_input.mp4")
+        out_p = f"Viral_Pro_Short_{job_id}.mp4"
         thumb_p = os.path.join(work_dir, f"thumbnail_{job_id}.jpg")
-
-        with open(raw_p, "wb") as f:
-            f.write(up_file.getvalue())
-
-        wm_p = None
-        if wm_file:
-            wm_p = os.path.join(work_dir, "wm.png")
-            with open(wm_p, "wb") as f:
-                f.write(wm_file.getvalue())
-
-        aud_p = None
-        if custom_aud:
-            aud_ext = os.path.splitext(custom_aud.name)[1] or ".mp3"
-            aud_p = os.path.join(work_dir, f"aud{aud_ext}")
-            with open(aud_p, "wb") as f:
-                f.write(custom_aud.getvalue())
 
         prog = st.progress(0.0)
         stat = st.empty()
 
         try:
-            stat.info("⚡ Super-Fast AI Engine: Processing video frames and optimizing colors...")
-            prog.progress(0.30)
+            if input_method == "Upload Video File":
+                stat.info("📥 Saving uploaded video file...")
+                with open(raw_p, "wb") as f:
+                    f.write(up_file.getvalue())
+                prog.progress(0.20)
+            else:
+                stat.info("🌐 Connecting to YouTube and downloading video via link...")
+                dl_res = download_youtube_video(yt_url.strip(), raw_p)
+                if dl_res is not True:
+                    raise RuntimeError(f"YouTube download failed: {dl_res}")
+                prog.progress(0.20)
 
-            actual_dur = ai_lightning_fast_edit(raw_p, out_p, target_duration, audio_choice, aud_p, wm_p, add_sticker, work_dir)
-            prog.progress(0.80)
+            wm_p = None
+            if wm_file:
+                wm_p = os.path.join(work_dir, "wm.png")
+                with open(wm_p, "wb") as f:
+                    f.write(wm_file.getvalue())
 
-            # Extract automatic thumbnail frame
+            aud_p = None
+            if custom_aud:
+                aud_ext = os.path.splitext(custom_aud.name)[1] or ".mp3"
+                aud_p = os.path.join(work_dir, f"aud{aud_ext}")
+                with open(aud_p, "wb") as f:
+                    f.write(custom_aud.getvalue())
+
+            stat.info("⚡ CapCut AI Director: Applying action cuts, beauty grading, and anti-copyright shield...")
+            prog.progress(0.50)
+
+            actual_dur = pro_action_viral_edit(raw_p, out_p, target_duration, audio_choice, aud_p, wm_p, add_sticker, work_dir)
+            prog.progress(0.85)
+
             extract_thumbnail_frame(out_p, thumb_p)
             prog.progress(1.0)
-            stat.success("🎉 Your viral short video and thumbnail are successfully ready!")
+            stat.success("🎉 Your professional CapCut-style viral short is successfully ready!")
 
             col_v1, col_v2 = st.columns([1.2, 0.8])
             with col_v1:
@@ -188,7 +217,7 @@ if st.button("🚀 Lightning Fast AI Edit & Export", use_container_width=True):
                     )
             with col_v2:
                 if os.path.exists(thumb_p):
-                    st.image(thumb_p, caption="Auto-Extracted Viral Thumbnail Frame")
+                    st.image(thumb_p, caption="Auto-Extracted Thumbnail Frame")
                     with open(thumb_p, "rb") as f_th:
                         st.download_button(
                             "🖼️ Download Thumbnail (JPG)",
@@ -198,21 +227,21 @@ if st.button("🚀 Lightning Fast AI Edit & Export", use_container_width=True):
                             use_container_width=True
                         )
 
-            # Professional Auto-Generated Viral Metadata (Roman English)
+            # Professional SEO Metadata in Roman English
             st.markdown("---")
-            st.markdown("### 🔥 AI Generated Viral Metadata & SEO Kit")
+            st.markdown("### 🔥 AI Generated Viral Metadata & SEO Kit (Roman English)")
             
-            viral_title = "🔥 Ultimate Action & Mind Blowing Moments! #Shorts #Viral #Trending"
+            viral_title = "🔥 Unbelievable Action Moment You Can't Miss! #Shorts #Viral #Trending"
             viral_desc = (
-                "Watch this incredible viral moment captured in stunning high-definition quality. "
-                "Don't forget to like, share, and subscribe for more amazing daily content!\n\n"
-                "#Shorts #Viral #Trending #Action #Foryou #Masterpiece #SglowinaAI"
+                "Experience the most thrilling action moment edited in high definition cinematic quality. "
+                "Like, share and subscribe for more mind-blowing viral clips every day!\n\n"
+                "#Shorts #Viral #Trending #ActionShorts #EpicMoments #Foryou #SglowinaAI"
             )
-            viral_tags = "shorts, viral, trending, action shorts, masterpiece, sglowina ai, epic moments, top viral, foryoupage"
+            viral_tags = "shorts, viral, trending, action moments, capcut edit, epic scene, top shorts, foryou, sglowina studio"
 
-            st.text_input("📌 Suggested Viral Title (Copy):", value=viral_title)
-            st.text_area("📝 Suggested Video Description (Copy):", value=viral_desc, height=100)
-            st.text_input("🏷️ Suggested Viral Tags (Copy):", value=viral_tags)
+            st.text_input("📌 Suggested Viral Title:", value=viral_title)
+            st.text_area("📝 Suggested Video Description:", value=viral_desc, height=100)
+            st.text_input("🏷️ Suggested Viral Tags:", value=viral_tags)
 
         except Exception as e:
             st.error(f"❌ Processing Error: {e}")
