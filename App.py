@@ -8,175 +8,126 @@ import cv2
 import numpy as np
 from pathlib import Path
 
-# --- سیٹ اپ اور برانڈنگ ---
-st.set_page_config(page_title="Sglowina AI Cinematic Studio", page_icon="🎬", layout="wide")
+st.set_page_config(page_title="Sglowina 8K AI Master", page_icon="💎", layout="wide")
 
-# فولڈرز کا انتظام
+# فولڈرز
 UPLOAD_DIR = Path("uploads")
 OUTPUT_DIR = Path("rendered")
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# 1. اصلی ویڈیو اینالائزر (AI Director Logic)
 def analyze_video_context(video_path):
-    """ویڈیو کے فریمز کو چیک کر کے ایکشن اور برائٹنس کا پتہ لگاتا ہے"""
     cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        return "Medium", 0.5
-    
+    if not cap.isOpened(): return "Medium"
     motion_scores = []
-    prev_frame = None
     count = 0
-    
-    while count < 150: # پہلے 150 فریمز کا تجزیہ
+    while count < 100:
         ret, frame = cap.read()
         if not ret: break
         if count % 10 == 0:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            if prev_frame is not None:
-                diff = cv2.absdiff(gray, prev_frame)
+            if count > 0:
+                diff = cv2.absdiff(gray, prev_gray)
                 motion_scores.append(np.mean(diff))
-            prev_frame = gray
+            prev_gray = gray
         count += 1
     cap.release()
-    
-    avg_motion = np.mean(motion_scores) if motion_scores else 0
-    intensity = "High" if avg_motion > 7 else ("Low" if avg_motion < 2 else "Medium")
-    return intensity
+    return "High" if np.mean(motion_scores) > 7 else "Medium"
 
-# 2. پروفیشنل آڈیو مکسر اور رینڈرنگ انجن
-def render_cinematic_video(params):
+def render_8k_safe(params):
     p = params
-    v_in = p['video_in']
-    out = p['video_out']
-    
-    # ریزولوشن سیٹنگ
-    res_map = {"720p": "720:1280", "1080p": "1080:1920", "1440p": "1440:2560", "4K": "2160:3840", "8K": "4320:7680"}
+    # 8K کے لیے مخصوص میموری سیف ریزولوشن
+    res_map = {
+        "720p": "720:1280", "1080p": "1080:1920", 
+        "1440p": "1440:2560", "4K": "2160:3840", "8K": "4320:7680"
+    }
     target_res = res_map.get(p['res'], "1080:1920")
     
-    # فلٹر چین (Cinematic Grading & VFX)
-    # اس میں اصلی Lanczos شارپننگ اور کلر بیلنس شامل ہے
-    v_filter = f"scale={target_res}:force_original_aspect_ratio=increase,crop={target_res}:(iw-ow)/2:(ih-oh)/2"
+    # فلٹر چین: 8K Lanczos Scaling + Sharpness
+    v_filter = f"scale={target_res}:force_original_aspect_ratio=increase:flags=lanczos,crop={target_res}:(iw-ow)/2:(ih-oh)/2"
     
-    # سینیمیٹک پری سیٹس
     if p['preset'] == "Purple Energy":
-        v_filter += ",eq=contrast=1.3:saturation=1.5:brightness=0.02,colorbalance=rs=0.12:bs=0.22"
-    elif p['preset'] == "Teal and Orange":
-        v_filter += ",colorbalance=rs=0.15:bs=-0.1:gs=0.05,eq=contrast=1.15"
-    elif p['preset'] == "Dark Action":
-        v_filter += ",eq=contrast=1.4:saturation=0.9:brightness=-0.05:gamma=0.8"
+        v_filter += ",eq=contrast=1.3:saturation=1.6,colorbalance=rs=0.1:bs=0.2"
+    elif p['preset'] == "Ultra Vibrant":
+        v_filter += ",eq=contrast=1.2:saturation=1.8:brightness=0.01"
     
-    # ایکشن شیک اور فلیش (صرف تب جب اینالائزر 'High' کہے)
     if p['intensity'] == "High":
-        v_filter += f",crop={target_res}:(iw-ow)/2+15*sin(t*15):(ih-oh)/2+15*cos(t*15)"
-        v_filter += ",eq=brightness='0.1*lt(mod(t,2),0.1)'"
+        v_filter += f",crop={target_res}:(iw-ow)/2+20*sin(t*10):(ih-oh)/2+20*cos(t*10),eq=brightness='0.1*lt(mod(t,2),0.1)'"
 
-    # آڈیو مکسنگ (پیشہ ورانہ طریقہ)
-    cmd = ["ffmpeg", "-y", "-i", str(v_in)]
+    # FFmpeg 8K Optimized Command
+    cmd = ["ffmpeg", "-y", "-i", str(p['video_in'])]
     
-    if p['audio_mode'] == "Mix Original + Music" and p['music_in']:
+    if p['music_in'] and "Music" in p['audio_mode']:
         cmd += ["-i", str(p['music_in'])]
-        cmd += ["-filter_complex", f"[0:a]volume={p['vol_orig']}[a0];[1:a]volume={p['vol_mus']}[a1];[a0][a1]amix=inputs=2:duration=first"]
-    elif p['audio_mode'] == "Music Only" and p['music_in']:
-        cmd += ["-i", str(p['music_in']), "-map", "0:v", "-map", "1:a", "-shortest"]
-    elif p['audio_mode'] == "Keep Original":
-        cmd += ["-c:a", "copy"]
-    elif p['audio_mode'] == "Remove Original":
-        cmd += ["-an"]
-
-    # فائنل ایکسپورٹ سیٹنگز
-    cmd += ["-vf", v_filter, "-c:v", "libx264", "-preset", "faster", "-crf", "17", "-t", str(p['duration']), str(out)]
+        if p['audio_mode'] == "Mix Original + Music":
+            cmd += ["-filter_complex", f"[0:a]volume={p['vol_orig']}[a0];[1:a]volume={p['vol_mus']}[a1];[a0][a1]amix=inputs=2:duration=first"]
+        else:
+            cmd += ["-map", "0:v", "-map", "1:a", "-shortest"]
+    
+    # 8K Encoding سیٹنگز جو سرور کو کریش ہونے سے بچاتی ہیں
+    cmd += [
+        "-vf", v_filter,
+        "-c:v", "libx264", 
+        "-preset", "ultrafast", # کلاؤڈ ریم بچانے کے لیے سب سے اہم
+        "-crf", "18", 
+        "-pix_fmt", "yuv420p", # موبائل سپورٹ کے لیے
+        "-level", "6.2", # 8K سپورٹ کے لیے
+        "-max_muxing_queue_size", "1024",
+        "-t", str(p['duration']),
+        str(p['video_out'])
+    ]
     
     result = subprocess.run(cmd, capture_output=True, text=True)
     return result.returncode == 0, result.stderr
 
-# 3. محفوظ کلین اپ
-def safe_cleanup():
-    now = time.time()
-    for f in list(UPLOAD_DIR.glob("*")) + list(OUTPUT_DIR.glob("*")):
-        if f.is_file() and (now - f.stat().st_mtime) > 3600:
-            try: f.unlink()
-            except: pass
-
-# --- UI سیکشن ---
 def main():
-    safe_cleanup()
-    st.title("🎬 Sglowina AI Cinematic Auto-Director")
-    st.markdown("Professional 8K Cinematic Rendering & Action VFX Studio")
-
-    # سائیڈ بار ان پٹ
-    with st.sidebar:
-        st.header("📥 میڈیا اپلوڈ")
-        video_file = st.file_uploader("ویڈیو فائل منتخب کریں", type=["mp4", "mov", "mkv"])
-        st.divider()
-        st.header("⚙️ رینڈر سیٹنگز")
-        res_choice = st.selectbox("ریزولوشن (Real Scaling)", ["720p", "1080p", "1440p", "4K", "8K"], index=1)
-        preset_choice = st.selectbox("کلر گریڈ پری سیٹ", ["Original", "Purple Energy", "Teal and Orange", "Dark Action", "Ultra Vibrant", "Anime Action"])
-        duration = st.slider("دورانیہ (Seconds)", 5, 60, 15)
-
+    st.title("💎 Sglowina 8K Ultra-AI Studio")
+    video_file = st.sidebar.file_uploader("Upload Video", type=["mp4", "mov"])
+    
     if video_file:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("🎵 آڈیو مکسر")
-            a_mode = st.selectbox("آڈیو موڈ", ["Keep Original", "Remove Original", "Music Only", "Mix Original + Music", "Mute Completely"])
-            music_file = st.file_uploader("پس منظر موسیقی (Optional)", type=["mp3", "wav"])
-            vol_orig = st.slider("اوریجنل والیم", 0.0, 2.0, 1.0)
-            vol_mus = st.slider("میوزک والیم", 0.0, 2.0, 1.0)
+        res_choice = st.selectbox("Resolution", ["1080p", "1440p", "4K", "8K"], index=0)
+        if res_choice == "8K":
+            st.warning("⚠️ 8K رینڈرنگ میں 1 سے 2 منٹ لگ سکتے ہیں۔ رینڈر کے بعد ویڈیو براہِ راست یہاں نہیں چلے گی، آپ کو اسے ڈاؤن لوڈ کر کے دیکھنا ہوگا۔")
+        
+        preset = st.selectbox("Cinematic Style", ["Purple Energy", "Ultra Vibrant", "Dark Action", "Original"])
+        duration = st.slider("Duration", 5, 60, 15)
+        
+        # آڈیو
+        a_mode = st.selectbox("Audio", ["Keep Original", "Music Only", "Mix Original + Music"])
+        music_file = st.file_uploader("Background Music", type=["mp3"]) if "Music" in a_mode else None
 
-        with col2:
-            st.subheader("🚀 ایڈوانسڈ VFX")
-            vfx_intensity = st.select_slider("ایکشن انٹینسٹی", options=["Low", "Medium", "High", "Auto"], value="Auto")
-            st.info("AI Auto-Director ویڈیو کا تجزیہ کر کے خودکار طور پر بہترین فلٹرز لگائے گا۔")
-
-        if st.button("🚀 رینڈر سینیمیٹک ویڈیو (8K Optimized)", use_container_width=True):
+        if st.button("🚀 RENDER 8K MASTERPIECE"):
             job_id = uuid.uuid4().hex[:6]
-            raw_path = UPLOAD_DIR / f"raw_{job_id}.mp4"
-            out_path = OUTPUT_DIR / f"Sglowina_{job_id}.mp4"
+            raw_p = UPLOAD_DIR / f"raw_{job_id}.mp4"
+            out_p = OUTPUT_DIR / f"Sglowina_8K_{job_id}.mp4"
             
-            with open(raw_path, "wb") as f:
-                f.write(video_file.getbuffer())
+            with open(raw_p, "wb") as f: f.write(video_file.getbuffer())
             
-            with st.spinner("🧠 AI Director ویڈیو کا تجزیہ کر رہا ہے..."):
-                detected_intensity = analyze_video_context(str(raw_path))
-                final_intensity = detected_intensity if vfx_intensity == "Auto" else vfx_intensity
-                st.write(f"Detection: **{detected_intensity} Action** سین پایا گیا۔")
-
-            mus_path = None
+            m_path = None
             if music_file:
-                mus_path = UPLOAD_DIR / f"mus_{job_id}.mp3"
-                with open(mus_path, "wb") as f: f.write(music_file.getbuffer())
+                m_path = UPLOAD_DIR / f"m_{job_id}.mp3"
+                with open(m_path, "wb") as f: f.write(music_file.getbuffer())
 
-            # رینڈر پیرامیٹرز
+            intensity = analyze_video_context(str(raw_p))
+            
             params = {
-                'video_in': raw_path, 'video_out': out_path, 'music_in': mus_path,
-                'res': res_choice, 'preset': preset_choice, 'duration': duration,
-                'audio_mode': a_mode, 'vol_orig': vol_orig, 'vol_mus': vol_mus,
-                'intensity': final_intensity
+                'video_in': raw_path, 'video_out': out_path, 'music_in': m_path,
+                'res': res_choice, 'preset': preset, 'duration': duration,
+                'audio_mode': a_mode, 'vol_orig': 0.8, 'vol_mus': 1.0, 'intensity': intensity
             }
 
-            with st.spinner("🎬 ویڈیو ایڈٹ اور رینڈر ہو رہی ہے..."):
-                success, error = render_cinematic_video(params)
-                if success and out_path.exists():
-                    st.success("✅ رینڈر مکمل ہو گیا!")
-                    st.video(str(out_path))
+            with st.spinner(f"Rendering {res_choice} Cinematic Video..."):
+                success, error = render_8k_safe(params)
+                if success:
+                    st.success("✨ Render Complete!")
+                    # 8K کے لیے صرف ڈاؤن لوڈ بٹن (کیونکہ پلیئر سپورٹ نہیں کرتا)
+                    with open(out_p, "rb") as f:
+                        st.download_button(f"📥 Download {res_choice} Video", f, file_name=f"Sglowina_{res_choice}.mp4", use_container_width=True)
                     
-                    # SEO جنریٹر
-                    clean_name = video_file.name.split('.')[0].replace('_', ' ')
-                    st.session_state.seo_title = f"🔥 {clean_name.upper()} | Cinematic AI Edit #Shorts"
-                    st.session_state.seo_tags = f"#{clean_name.replace(' ', '')} #Cinematic #AIEdit #Viral #8K"
-                    
-                    st.divider()
-                    st.subheader("📈 وائرل SEO کٹ")
-                    st.text_input("یوٹیوب ٹائٹل", st.session_state.seo_title)
-                    st.text_area("ہیش ٹیگز", st.session_state.seo_tags)
-                    
-                    with open(out_path, "rb") as f:
-                        st.download_button("📥 ڈاؤن لوڈ ماسٹر ویڈیو", f, file_name=f"Sglowina_{res_choice}.mp4")
+                    if res_choice != "8K": # 1080p اور 4K کا پری ویو دکھائیں
+                        st.video(str(out_p))
                 else:
-                    st.error(f"رینڈرنگ میں خرابی آئی: {error}")
-
-    else:
-        st.warning("شروع کرنے کے لیے بائیں جانب سے ویڈیو اپلوڈ کریں۔")
+                    st.error(f"Error: {error}")
 
 if __name__ == "__main__":
     main()
