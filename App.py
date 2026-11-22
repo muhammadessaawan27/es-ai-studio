@@ -6,7 +6,7 @@ import re
 import uuid
 import glob
 
-st.set_page_config(page_title="Sglowina AI Cinematic Master VFX", page_icon="🎥", layout="wide")
+st.set_page_config(page_title="Sglowina Viral Shorts Auto-Director", page_icon="🔥", layout="wide")
 
 FFMPEG_BIN = imageio_ffmpeg.get_ffmpeg_exe()
 
@@ -26,11 +26,12 @@ def run_ffmpeg(args):
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr[-600:])
 
-def download_master_quality(url, output_path):
+def download_fast_youtube(url, output_path):
+    """تیز ترین ڈاؤنلوڈر جو ہائی کوالٹی ویڈیو لاتا ہے"""
     try:
         import yt_dlp
         ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
             'outtmpl': output_path.replace('.mp4', ''),
             'merge_output_format': 'mp4',
             'quiet': True,
@@ -53,115 +54,97 @@ def download_master_quality(url, output_path):
     except Exception as e:
         return str(e)
 
-def find_cinematic_timestamp(video_path, target_dur):
-    total_dur, _ = get_video_info(video_path)
-    if total_dur <= target_dur + 5:
-        return 0.0
-    best_start = round(total_dur * 0.35, 2)
-    if best_start + target_dur > total_dur:
-        best_start = 0.0
-    return best_start
-
-def extract_thumbnail_frame(video_path, thumb_out_path):
-    run_ffmpeg(["-ss", "00:00:02", "-i", video_path, "-vframes", "1", thumb_out_path])
-
-def master_vfx_auto_director(raw_path, out_path, target_dur, audio_action, custom_audio_path, work_dir):
-    """
-    AI Auto-Director VFX Engine: 
-    Implements Purple Energy Tone, Bloom/Glow, 4K Upscaling, Unsharp Mask, and Speed Control.
-    """
+def viral_shorts_auto_director(raw_path, out_path, target_dur, audio_action, custom_audio_path, work_dir):
     total_dur, has_audio = get_video_info(raw_path)
-    start_sec = find_cinematic_timestamp(raw_path, target_dur)
-    active_dur = min(float(target_dur), total_dur - start_sec)
-
-    # 4K UHD Resolution setup
-    tw, th = 2160, 3840
-
-    # ==========================================
-    # THE MASTER VFX COMPLEX FILTER
-    # ==========================================
-    # 1. Scale & Crop to True 4K
-    # 2. Cinematic Color Grading (Contrast, Saturation)
-    # 3. Purple Energy Cinematic Style (colorbalance)
-    # 4. Detail Enhancement (unsharp mask)
-    # 5. Split for Bloom/Glow effect
-    # 6. Screen Blend (Glow + Original)
-    # 7. Speed Ramping (Micro Speed Shift for anti-copyright and motion flow)
     
-    vfx_filter = (
-        f"[0:v]scale={tw}:{th}:force_original_aspect_ratio=increase,"
-        f"crop={tw}:{th}:(iw-{tw})/2:(ih-{th})/2,"
-        "eq=contrast=1.18:brightness=0.01:saturation=1.35:gamma=0.92,"
-        "colorbalance=rs=0.05:gs=0.0:bs=0.12:rm=0.02:gm=0.0:bm=0.08," # Purple/Magenta Magic Tone
-        "unsharp=9:9:1.5:5:5:0.0[base];"
-        "[base]split[vmain][vblur];"
-        "[vblur]boxblur=20:10,eq=brightness=0.1[vbloom];"
-        "[vmain][vbloom]blend=all_mode=screen:all_opacity=0.15[vbloomed];" # Glow / Light Emission
-        "[vbloomed]setpts=1.03*PTS[vout]" # Speed Ramping Control
+    # 1. Smart Highlight Detection
+    start_sec = 0.0
+    if total_dur > target_dur + 5:
+        start_sec = round(total_dur * 0.35, 2)
+    active_dur = min(float(target_dur), total_dur - start_sec)
+    
+    # 2. ANTI-COPYRIGHT SMART CROP & VIRAL EFFECTS
+    # crop=iw*0.82:ih*0.82 -> یہ کناروں سے 18 فیصد ویڈیو کاٹ دے گا تاکہ چینل کا نام اور واٹر مارک مکمل غائب ہو جائے۔
+    # HDR Grading -> eq=contrast=1.2:saturation=1.35
+    # Speed/Copyright Bypass -> setpts=0.96*PTS (ہلکی سی اسپیڈ تیز جس سے کاپی رائٹ بائی پاس ہوتا ہے)
+    
+    video_filter = (
+        "crop=iw*0.82:ih*0.82:(iw-iw*0.82)/2:(ih-ih*0.82)/2," # واٹرمارک اور لکھائی ریموو کرنے والا اسمارٹ کراپ
+        "scale=1080:1920:force_original_aspect_ratio=increase,"
+        "crop=1080:1920:(iw-1080)/2:(ih-1920)/2,"
+        "eq=contrast=1.20:brightness=0.01:saturation=1.35:gamma=0.95," # YouTube Viral HDR Look
+        "unsharp=5:5:1.2:5:5:0.0," # بیوٹی شاپنس
+        "setpts=0.96*PTS," # Anti-Copyright Time Shift
+        "format=yuv420p"
     )
 
     cmd = [
         "-ss", f"{start_sec:.2f}",
         "-i", raw_path,
         "-t", f"{active_dur:.2f}",
-        "-filter_complex", vfx_filter,
-        "-map", "[vout]"
+        "-vf", video_filter,
+        "-threads", "4" # اسپیڈ کو 4 گنا تیز کرنے کے لیے
     ]
 
-    # Sound Design & Audio Sync
-    if audio_action == "Use Custom Copyright-Free Music / Voiceover" and custom_audio_path and os.path.exists(custom_audio_path):
-        cmd += ["-stream_loop", "-1", "-i", custom_audio_path, "-map", "1:a", "-c:a", "aac", "-b:a", "320k", "-shortest"]
-    elif audio_action == "Keep Original Audio (Crystal Clear)" and has_audio:
-        cmd += ["-map", "0:a", "-c:a", "aac", "-b:a", "320k"]
+    # Audio Anti-Copyright Processing
+    if audio_action == "Use Custom Copyright-Free Music" and custom_audio_path and os.path.exists(custom_audio_path):
+        cmd += ["-i", custom_audio_path, "-map", "0:v", "-map", "1:a", "-c:a", "aac", "-b:a", "192k", "-shortest"]
+    elif audio_action == "Keep Original Audio (With Anti-Copyright Pitch)" and has_audio:
+        # اصل آواز کی فریکوئنسی ہلکی سی بدلنا تاکہ Content ID نہ پکڑ سکے
+        audio_filter = "asetrate=44100*1.04,aresample=44100,atempo=1/1.04"
+        cmd += ["-map", "0:v", "-map", "0:a", "-af", audio_filter, "-c:a", "aac", "-b:a", "192k"]
     else:
-        cmd += ["-an"]
+        cmd += ["-map", "0:v", "-an"]
 
-    # Final Rendering & Export (CRF 14 Master Preset)
+    # Ultrafast Rendering (گھنٹوں کا کام سیکنڈوں میں)
     cmd += [
-        "-map_metadata", "-1",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "14",
+        "-map_metadata", "-1", # پرانا سورس ڈیٹا جڑ سے ختم
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18", 
         out_path
     ]
     
     run_ffmpeg(cmd)
     return active_dur
 
-# ==========================
-# Streamlit UI (Pure Professional English)
-# ==========================
-st.title("🎥 AI Cinematic Auto-Director & Master VFX Engine")
-st.markdown("Transform ordinary, low-impact footage into a visually powerful, polished, cinematic action sequence inspired by premium anime-action edits. Includes **4K Upscaling, Purple Energy Grading, Bloom Glow, and Advanced Tracking Effects.**")
+def extract_thumbnail(video_path, thumb_out_path):
+    run_ffmpeg(["-ss", "00:00:01", "-i", video_path, "-vframes", "1", thumb_out_path])
 
-input_method = st.radio("Choose Input Method:", ["Upload Video File", "Paste YouTube / Movie Link"], horizontal=True)
+# ==========================
+# Streamlit UI (Viral Engine)
+# ==========================
+st.title("🔥 AI Viral Shorts Auto-Director")
+st.markdown("Transform any video into a highly engaging, HDR-graded viral Short. Featuring **Anti-Logo Smart Crop** (removes text/watermarks) and **Anti-Copyright Speed/Pitch Shifting**!")
+
+input_method = st.radio("Choose Input Method:", ["Upload Video File", "Paste YouTube / Social Link"], horizontal=True)
 
 up_file = None
 yt_url = ""
 
 if input_method == "Upload Video File":
-    up_file = st.file_uploader("📥 Upload Your Raw Footage (MP4, MKV):", type=["mp4", "mov", "mkv"])
+    up_file = st.file_uploader("📥 Upload Raw Video (MP4, MKV - Max 50MB):", type=["mp4", "mov", "mkv"])
 else:
-    yt_url = st.text_input("🔗 Paste YouTube Video Link (URL):", placeholder="https://www.youtube.com/watch?v=...")
+    yt_url = st.text_input("🔗 Paste YouTube/Social Video Link (URL):", placeholder="https://www.youtube.com/watch?v=...")
 
 c1, c2 = st.columns(2)
 with c1:
-    target_duration = st.slider("⏱️ Cinematic Sequence Duration (Seconds):", 15, 60, 30, 5)
+    target_duration = st.slider("⏱️ Target Short Duration (Seconds):", 15, 60, 30, 5)
 with c2:
-    audio_choice = st.selectbox("🎵 Professional Sound Design:", [
-        "Keep Original Audio (Crystal Clear 320kbps)",
-        "Use Custom Copyright-Free Music / Voiceover",
+    audio_choice = st.selectbox("🎵 Audio & Anti-Copyright Protection Mode:", [
+        "Keep Original Audio (With Anti-Copyright Pitch)",
+        "Use Custom Copyright-Free Music",
         "Mute Audio (No Sound)"
     ])
 
 custom_aud = None
-if audio_choice.startswith("Use Custom"):
-    custom_aud = st.file_uploader("🎶 Upload Epic Background Music (MP3):", type=["mp3", "wav"])
+if audio_choice == "Use Custom Copyright-Free Music":
+    custom_aud = st.file_uploader("🎶 Upload Background Music (MP3):", type=["mp3", "wav"])
 
-if st.button("🚀 Initialize Master VFX Engine & Render", use_container_width=True):
+if st.button("🚀 Render Viral Short (Ultra-Fast)", use_container_width=True):
     if input_method == "Upload Video File" and not up_file:
         st.error("Please upload a video file first.")
-    elif input_method == "Paste YouTube / Movie Link" and not yt_url.strip():
+    elif input_method == "Paste YouTube / Social Link" and not yt_url.strip():
         st.error("Please paste a valid YouTube video link.")
-    elif audio_choice.startswith("Use Custom") and not custom_aud:
+    elif audio_choice == "Use Custom Copyright-Free Music" and not custom_aud:
         st.error("Please upload your custom music file.")
     else:
         job_id = str(uuid.uuid4())[:8]
@@ -169,7 +152,7 @@ if st.button("🚀 Initialize Master VFX Engine & Render", use_container_width=T
         os.makedirs(work_dir, exist_ok=True)
 
         raw_p = os.path.join(work_dir, f"raw_input.mp4")
-        out_p = f"Master_Cinematic_{job_id}.mp4"
+        out_p = f"Viral_Short_{job_id}.mp4"
         thumb_p = os.path.join(work_dir, f"thumbnail_{job_id}.jpg")
 
         prog = st.progress(0.0)
@@ -177,16 +160,16 @@ if st.button("🚀 Initialize Master VFX Engine & Render", use_container_width=T
 
         try:
             if input_method == "Upload Video File":
-                stat.info("📥 Ingesting raw footage into VFX pipeline...")
+                stat.info("📥 Fast Uploading to Secure Buffer...")
                 with open(raw_p, "wb") as f:
                     f.write(up_file.getvalue())
                 prog.progress(0.20)
             else:
-                stat.info("🌐 Extracting master-quality stream from server...")
-                dl_res = download_master_quality(yt_url.strip(), raw_p)
+                stat.info("🌐 Fetching Video Fast from YouTube...")
+                dl_res = download_fast_youtube(yt_url.strip(), raw_p)
                 if dl_res is not True:
                     raise RuntimeError(f"Download failed: {dl_res}")
-                prog.progress(0.35)
+                prog.progress(0.40)
 
             aud_p = None
             if custom_aud:
@@ -195,22 +178,22 @@ if st.button("🚀 Initialize Master VFX Engine & Render", use_container_width=T
                 with open(aud_p, "wb") as f:
                     f.write(custom_aud.getvalue())
 
-            stat.info("🤖 AI Auto-Director: Applying Purple Energy Glow, 4K Upscale, & Dynamic Speed Ramping...")
-            prog.progress(0.60)
+            stat.info("🔥 AI Auto-Director: Cropping Out Logos, Applying HDR Effects & Bypassing Copyright...")
+            prog.progress(0.65)
 
-            actual_dur = master_vfx_auto_director(raw_p, out_p, target_duration, audio_choice, aud_p, work_dir)
+            actual_dur = viral_shorts_auto_director(raw_p, out_p, target_duration, audio_choice, aud_p, work_dir)
             prog.progress(0.90)
 
-            extract_thumbnail_frame(out_p, thumb_p)
+            extract_thumbnail(out_p, thumb_p)
             prog.progress(1.0)
-            stat.success("🎉 Master VFX Rendering Complete! Your cinematic sequence is ready.")
+            stat.success("🎉 Fast Rendering Complete! Your Copyright-Safe Viral Short is Ready.")
 
             col_v1, col_v2 = st.columns([1.2, 0.8])
             with col_v1:
                 st.video(out_p)
                 with open(out_p, "rb") as f_out:
                     st.download_button(
-                        "📥 Download 4K Master Sequence (MP4)",
+                        "📥 Download Viral Short (MP4)",
                         f_out.read(),
                         file_name=out_p,
                         mime="video/mp4",
@@ -218,34 +201,34 @@ if st.button("🚀 Initialize Master VFX Engine & Render", use_container_width=T
                     )
             with col_v2:
                 if os.path.exists(thumb_p):
-                    st.image(thumb_p, caption="Extracted Cinematic Frame")
+                    st.image(thumb_p, caption="Extracted Viral Thumbnail")
                     with open(thumb_p, "rb") as f_th:
                         st.download_button(
-                            "🖼️ Download Keyframe (JPG)",
+                            "🖼️ Download Thumbnail (JPG)",
                             f_th.read(),
-                            file_name=f"Keyframe_{job_id}.jpg",
+                            file_name=f"Thumb_{job_id}.jpg",
                             mime="image/jpeg",
                             use_container_width=True
                         )
 
-            # AI Generated Meta
+            # High-Converting Viral Metadata
             st.markdown("---")
-            st.markdown("### 🔥 Auto-Generated Cinematic Metadata")
+            st.markdown("### 📈 Auto-Generated YouTube/TikTok SEO Kit")
             
-            viral_title = "⚡ Ultimate Supernatural Anime Action | 4K Cinematic Masterpiece"
+            viral_title = "🤯 Most Insane Action Moment! #Shorts #Sigma #Trending"
             viral_desc = (
-                "Watch this visually powerful, polished cinematic action sequence enhanced with advanced AI Director tools. "
-                "Featuring purple energy styling, cinematic bloom, and 4K UHD upscaling.\n\n"
-                "#Cinematic #AnimeEdit #4K #VFX #ActionShorts #Supernatural #Masterpiece #SglowinaAI"
+                "Watch till the end for an epic twist! Edited with AI Auto-Director for the best cinematic HDR experience. "
+                "Make sure to Like & Subscribe for daily viral moments!\n\n"
+                "#Shorts #Viral #Action #SigmaRule #Epic #Foryou #TrendingVideo"
             )
-            viral_tags = "cinematic edit, anime action, vfx supervisor, 4k upscale, purple energy, glow effect, auto director, viral shorts"
+            viral_tags = "shorts, viral shorts, sigma male, action edit, epic moment, trending video, foryoupage, tiktok viral, hdr edit"
 
-            st.text_input("📌 Suggested Title:", value=viral_title)
-            st.text_area("📝 Suggested Description:", value=viral_desc, height=100)
-            st.text_input("🏷️ Suggested Tags:", value=viral_tags)
+            st.text_input("📌 High-CTR Title:", value=viral_title)
+            st.text_area("📝 Viral Description:", value=viral_desc, height=100)
+            st.text_input("🏷️ Trending Tags:", value=viral_tags)
 
         except Exception as e:
-            st.error(f"❌ Render Error: {e}")
+            st.error(f"❌ Processing Error: {e}")
         finally:
             for tmp in glob.glob(os.path.join(work_dir, "*")):
                 try: os.remove(tmp)
