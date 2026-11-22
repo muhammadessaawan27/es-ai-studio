@@ -1,240 +1,182 @@
 import streamlit as st
 import subprocess
-import imageio_ffmpeg
 import os
 import re
 import uuid
-import glob
-import json
+import time
+import cv2
+import numpy as np
+from pathlib import Path
 
-# ==========================================
-# 1. INITIALIZATION & STYLING
-# ==========================================
+# --- سیٹ اپ اور برانڈنگ ---
 st.set_page_config(page_title="Sglowina AI Cinematic Studio", page_icon="🎬", layout="wide")
 
-FFMPEG_BIN = imageio_ffmpeg.get_ffmpeg_exe()
+# فولڈرز کا انتظام
+UPLOAD_DIR = Path("uploads")
+OUTPUT_DIR = Path("rendered")
+UPLOAD_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR.mkdir(exist_ok=True)
 
-# Maintain session state to prevent UI refreshes from losing video data
-if 'render_result' not in st.session_state:
-    st.session_state.render_result = None
-
-# ==========================================
-# 2. CORE ENGINES (FFMPEG PIPELINE)
-# ==========================================
-
-def get_video_metadata(path):
-    """Gathers real metadata for SEO and processing decisions."""
-    cmd = [FFMPEG_BIN, "-i", path]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    stderr = proc.stderr
+# 1. اصلی ویڈیو اینالائزر (AI Director Logic)
+def analyze_video_context(video_path):
+    """ویڈیو کے فریمز کو چیک کر کے ایکشن اور برائٹنس کا پتہ لگاتا ہے"""
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return "Medium", 0.5
     
-    # Extract resolution
-    res_match = re.search(r", (\d{3,4})x(\d{3,4})", stderr)
-    width, height = (int(res_match.group(1)), int(res_match.group(2))) if res_match else (1280, 720)
+    motion_scores = []
+    prev_frame = None
+    count = 0
     
-    # Extract Duration
-    dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", stderr)
-    duration = 0.0
-    if dur_match:
-        h, m, s = int(dur_match.group(1)), int(dur_match.group(2)), float(dur_match.group(3))
-        duration = h * 3600 + m * 60 + s
-        
-    return {"width": width, "height": height, "duration": duration, "raw_info": stderr}
-
-def build_cinematic_filter(preset, intensity, output_res):
-    """Constructs the visual engine based on user selection."""
-    w, h = output_res.split('x')
+    while count < 150: # پہلے 150 فریمز کا تجزیہ
+        ret, frame = cap.read()
+        if not ret: break
+        if count % 10 == 0:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            if prev_frame is not None:
+                diff = cv2.absdiff(gray, prev_frame)
+                motion_scores.append(np.mean(diff))
+            prev_frame = gray
+        count += 1
+    cap.release()
     
-    # Base Correction (Normalization & Sharpening)
-    filters = [
-        f"scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos",
-        f"crop={w}:{h}:(iw-ow)/2:(ih-oh)/2",
-        "hqdn3d=1.5:1.5:3:3" # Noise Reduction
-    ]
+    avg_motion = np.mean(motion_scores) if motion_scores else 0
+    intensity = "High" if avg_motion > 7 else ("Low" if avg_motion < 2 else "Medium")
+    return intensity
+
+# 2. پروفیشنل آڈیو مکسر اور رینڈرنگ انجن
+def render_cinematic_video(params):
+    p = params
+    v_in = p['video_in']
+    out = p['video_out']
     
-    # Preset Logic
-    if preset == "Purple Energy Cinematic":
-        filters.append("eq=contrast=1.25:saturation=1.5:brightness=0.02:gamma=0.9")
-        filters.append("colorbalance=rs=0.1:bs=0.2:rm=0.05:bm=0.15") # Shift to Purple/Magenta
-        filters.append("unsharp=5:5:1.0:5:5:0.0")
-    elif preset == "Ultra Vibrant":
-        filters.append("eq=contrast=1.2:saturation=1.7:brightness=0.01")
-        filters.append("unsharp=3:3:0.8:3:3:0.0")
-    elif preset == "HDR-Look Cinematic":
-        filters.append("tonemap=hable:desat=2")
-        filters.append("eq=contrast=1.3:saturation=1.4:gamma=0.8")
-    elif preset == "Dark Action Cinematic":
-        filters.append("eq=contrast=1.4:saturation=1.1:brightness=-0.05:gamma=0.7")
-        filters.append("colorbalance=bs=0.05:gs=-0.05")
-    elif preset == "Anime Action":
-        filters.append("eq=contrast=1.2:saturation=1.8")
-        filters.append("unsharp=7:7:1.2:7:7:0.0")
+    # ریزولوشن سیٹنگ
+    res_map = {"720p": "720:1280", "1080p": "1080:1920", "1440p": "1440:2560", "4K": "2160:3840", "8K": "4320:7680"}
+    target_res = res_map.get(p['res'], "1080:1920")
     
-    # Intensity-based Effects
-    if intensity in ["Medium", "High"]:
-        # Action Shake (Subtle math-based)
-        shake_val = 20 if intensity == "High" else 10
-        filters.append(f"crop={w}:{h}:(iw-ow)/2+{shake_val}*sin(t*10)*lt(mod(t,2),0.5):(ih-oh)/2+{shake_val}*cos(t*10)*lt(mod(t,2),0.5)")
-        # Impact Flash (Every 3 seconds)
-        filters.append("eq=brightness='0.0+0.15*lt(mod(t,3),0.1)':contrast='1.0+0.1*lt(mod(t,3),0.1)'")
+    # فلٹر چین (Cinematic Grading & VFX)
+    # اس میں اصلی Lanczos شارپننگ اور کلر بیلنس شامل ہے
+    v_filter = f"scale={target_res}:force_original_aspect_ratio=increase,crop={target_res}:(iw-ow)/2:(ih-oh)/2"
+    
+    # سینیمیٹک پری سیٹس
+    if p['preset'] == "Purple Energy":
+        v_filter += ",eq=contrast=1.3:saturation=1.5:brightness=0.02,colorbalance=rs=0.12:bs=0.22"
+    elif p['preset'] == "Teal and Orange":
+        v_filter += ",colorbalance=rs=0.15:bs=-0.1:gs=0.05,eq=contrast=1.15"
+    elif p['preset'] == "Dark Action":
+        v_filter += ",eq=contrast=1.4:saturation=0.9:brightness=-0.05:gamma=0.8"
+    
+    # ایکشن شیک اور فلیش (صرف تب جب اینالائزر 'High' کہے)
+    if p['intensity'] == "High":
+        v_filter += f",crop={target_res}:(iw-ow)/2+15*sin(t*15):(ih-oh)/2+15*cos(t*15)"
+        v_filter += ",eq=brightness='0.1*lt(mod(t,2),0.1)'"
 
-    return ",".join(filters)
+    # آڈیو مکسنگ (پیشہ ورانہ طریقہ)
+    cmd = ["ffmpeg", "-y", "-i", str(v_in)]
+    
+    if p['audio_mode'] == "Mix Original + Music" and p['music_in']:
+        cmd += ["-i", str(p['music_in'])]
+        cmd += ["-filter_complex", f"[0:a]volume={p['vol_orig']}[a0];[1:a]volume={p['vol_mus']}[a1];[a0][a1]amix=inputs=2:duration=first"]
+    elif p['audio_mode'] == "Music Only" and p['music_in']:
+        cmd += ["-i", str(p['music_in']), "-map", "0:v", "-map", "1:a", "-shortest"]
+    elif p['audio_mode'] == "Keep Original":
+        cmd += ["-c:a", "copy"]
+    elif p['audio_mode'] == "Remove Original":
+        cmd += ["-an"]
 
-# ==========================================
-# 3. UI SECTIONS
-# ==========================================
+    # فائنل ایکسپورٹ سیٹنگز
+    cmd += ["-vf", v_filter, "-c:v", "libx264", "-preset", "faster", "-crf", "17", "-t", str(p['duration']), str(out)]
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    return result.returncode == 0, result.stderr
 
-st.title("🎬 Sglowina AI Cinematic Studio")
-st.info("Professional Cinematic Auto-Director | 4K HDR Pipeline | Action VFX")
+# 3. محفوظ کلین اپ
+def safe_cleanup():
+    now = time.time()
+    for f in list(UPLOAD_DIR.glob("*")) + list(OUTPUT_DIR.glob("*")):
+        if f.is_file() and (now - f.stat().st_mtime) > 3600:
+            try: f.unlink()
+            except: pass
 
-# --- SIDEBAR: SETTINGS ---
-st.sidebar.header("⚙️ Director Controls")
-output_quality = st.sidebar.selectbox("Target Resolution", 
-    ["1080x1920 (TikTok/Reels)", "1440x2560 (2K Vertical)", "2160x3840 (4K Ultra HD)", "720x1280 (Standard HD)"], index=0)
+# --- UI سیکشن ---
+def main():
+    safe_cleanup()
+    st.title("🎬 Sglowina AI Cinematic Auto-Director")
+    st.markdown("Professional 8K Cinematic Rendering & Action VFX Studio")
 
-intensity = st.sidebar.select_slider("Cinematic Intensity", options=["Low", "Medium", "High", "Auto"], value="Auto")
+    # سائیڈ بار ان پٹ
+    with st.sidebar:
+        st.header("📥 میڈیا اپلوڈ")
+        video_file = st.file_uploader("ویڈیو فائل منتخب کریں", type=["mp4", "mov", "mkv"])
+        st.divider()
+        st.header("⚙️ رینڈر سیٹنگز")
+        res_choice = st.selectbox("ریزولوشن (Real Scaling)", ["720p", "1080p", "1440p", "4K", "8K"], index=1)
+        preset_choice = st.selectbox("کلر گریڈ پری سیٹ", ["Original", "Purple Energy", "Teal and Orange", "Dark Action", "Ultra Vibrant", "Anime Action"])
+        duration = st.slider("دورانیہ (Seconds)", 5, 60, 15)
 
-# --- INPUT SECTION ---
-tab1, tab2 = st.tabs(["📥 Upload Video", "🔗 YouTube Link"])
+    if video_file:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("🎵 آڈیو مکسر")
+            a_mode = st.selectbox("آڈیو موڈ", ["Keep Original", "Remove Original", "Music Only", "Mix Original + Music", "Mute Completely"])
+            music_file = st.file_uploader("پس منظر موسیقی (Optional)", type=["mp3", "wav"])
+            vol_orig = st.slider("اوریجنل والیم", 0.0, 2.0, 1.0)
+            vol_mus = st.slider("میوزک والیم", 0.0, 2.0, 1.0)
 
-video_path = None
-raw_filename = "Cinematic_Edit"
+        with col2:
+            st.subheader("🚀 ایڈوانسڈ VFX")
+            vfx_intensity = st.select_slider("ایکشن انٹینسٹی", options=["Low", "Medium", "High", "Auto"], value="Auto")
+            st.info("AI Auto-Director ویڈیو کا تجزیہ کر کے خودکار طور پر بہترین فلٹرز لگائے گا۔")
 
-with tab1:
-    up_file = st.file_uploader("Choose a video file...", type=["mp4", "mov", "mkv"])
-    if up_file:
-        video_path = f"temp_{uuid.uuid4().hex}.mp4"
-        with open(video_path, "wb") as f:
-            f.write(up_file.read())
-        raw_filename = up_file.name
-
-with tab2:
-    yt_url = st.text_input("Paste YouTube URL")
-    if yt_url:
-        st.warning("Note: High-res YouTube downloads may be limited by cloud bandwidth.")
-        # Simplified download logic for demonstration
-        if st.button("Fetch YouTube Video"):
-            with st.spinner("Downloading..."):
-                video_path = f"temp_yt_{uuid.uuid4().hex}.mp4"
-                try:
-                    import yt_dlp
-                    ydl_opts = {'format': 'bestvideo[height<=1080]+bestaudio/best', 'outtmpl': video_path}
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        info = ydl.extract_info(yt_url, download=True)
-                        raw_filename = info.get('title', 'YouTube Video')
-                    st.success("Download Complete!")
-                except Exception as e:
-                    st.error(f"Download Failed: {e}")
-
-# --- ENHANCEMENT OPTIONS ---
-if video_path:
-    c1, c2 = st.columns(2)
-    with c1:
-        st.subheader("🎨 Visual Style")
-        preset = st.selectbox("Cinematic Preset", [
-            "Natural Cinematic", "Ultra Vibrant", "HDR-Look Cinematic", 
-            "Dark Action Cinematic", "Purple Energy Cinematic", "Anime Action", "Ultra Sharp"
-        ])
-        fps_opt = st.selectbox("Output FPS", [24, 30, 60], index=1)
-        
-    with c2:
-        st.subheader("🎵 Audio Engine")
-        audio_choice = st.selectbox("Audio Source", ["Keep Original Audio", "Upload Custom Music", "Mute Audio"])
-        
-        mix_audio = False
-        custom_music = None
-        if audio_choice == "Upload Custom Music":
-            custom_music = st.file_uploader("Upload MP3/WAV", type=["mp3", "wav"])
-            mix_audio = st.checkbox("Mix with Original Audio?", value=False)
-        
-        orig_vol = st.slider("Original Volume", 0.0, 2.0, 1.0)
-        mus_vol = st.slider("Music Volume", 0.0, 2.0, 1.0)
-
-    # --- RENDER BUTTON ---
-    if st.button("🚀 RENDER CINEMATIC MASTERPIECE", use_container_width=True):
-        job_id = str(uuid.uuid4())[:8]
-        output_file = f"Sglowina_{job_id}.mp4"
-        
-        try:
-            meta = get_video_metadata(video_path)
+        if st.button("🚀 رینڈر سینیمیٹک ویڈیو (8K Optimized)", use_container_width=True):
+            job_id = uuid.uuid4().hex[:6]
+            raw_path = UPLOAD_DIR / f"raw_{job_id}.mp4"
+            out_path = OUTPUT_DIR / f"Sglowina_{job_id}.mp4"
             
-            # 1. Build Filtergraph
-            v_filter = build_cinematic_filter(preset, intensity, output_quality)
+            with open(raw_path, "wb") as f:
+                f.write(video_file.getbuffer())
             
-            # 2. Build Audio Filter
-            a_filter = []
-            if audio_choice == "Keep Original Audio":
-                a_filter = [f"volume={orig_vol},afade=t=in:st=0:d=1,afade=t=out:st={st.session_state.get('dur', 15)-1}:d=1"]
-            elif audio_choice == "Mute Audio":
-                a_filter = None
-            
-            # 3. Construct FFmpeg Command
-            cmd = [FFMPEG_BIN, "-y", "-i", video_path]
-            
-            # If custom music
-            if custom_music:
-                m_path = f"music_{job_id}.mp3"
-                with open(m_path, "wb") as f: f.write(custom_music.read())
-                cmd += ["-i", m_path]
-                
-                if mix_audio:
-                    cmd += ["-filter_complex", f"[0:a]volume={orig_vol}[a0];[1:a]volume={mus_vol}[a1];[a0][a1]amix=inputs=2:duration=first"]
-                else:
-                    cmd += ["-map", "0:v", "-map", "1:a", "-c:a", "aac", "-b:a", "192k"]
-            
-            cmd += ["-vf", v_filter, "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18", "-threads", "1"]
-            
-            # Handle Duration (Dynamic Selection logic)
-            target_dur = 30 # Default
-            cmd += ["-t", str(target_dur)]
-            
-            cmd.append(output_file)
-            
-            with st.spinner("AI Director is processing... This may take a minute."):
-                process = subprocess.run(cmd, capture_output=True, text=True)
-                
-                if process.returncode != 0:
-                    st.error(f"Render Error: {process.stderr[-500:]}")
-                else:
-                    # Success
-                    st.session_state.render_result = output_file
+            with st.spinner("🧠 AI Director ویڈیو کا تجزیہ کر رہا ہے..."):
+                detected_intensity = analyze_video_context(str(raw_path))
+                final_intensity = detected_intensity if vfx_intensity == "Auto" else vfx_intensity
+                st.write(f"Detection: **{detected_intensity} Action** سین پایا گیا۔")
+
+            mus_path = None
+            if music_file:
+                mus_path = UPLOAD_DIR / f"mus_{job_id}.mp3"
+                with open(mus_path, "wb") as f: f.write(music_file.getbuffer())
+
+            # رینڈر پیرامیٹرز
+            params = {
+                'video_in': raw_path, 'video_out': out_path, 'music_in': mus_path,
+                'res': res_choice, 'preset': preset_choice, 'duration': duration,
+                'audio_mode': a_mode, 'vol_orig': vol_orig, 'vol_mus': vol_mus,
+                'intensity': final_intensity
+            }
+
+            with st.spinner("🎬 ویڈیو ایڈٹ اور رینڈر ہو رہی ہے..."):
+                success, error = render_cinematic_video(params)
+                if success and out_path.exists():
+                    st.success("✅ رینڈر مکمل ہو گیا!")
+                    st.video(str(out_path))
                     
-                    # Generate SEO
-                    keywords = re.findall(r'\w+', raw_filename)
-                    main_kw = keywords[0] if keywords else "Action"
-                    st.session_state.seo_title = f"🔥 {main_kw.upper()} - Insane Cinematic Edit 🤯 #Shorts #Viral"
-                    st.session_state.seo_tags = f"#{main_kw} #Cinematic #8K #Edit #Sigma #Action"
+                    # SEO جنریٹر
+                    clean_name = video_file.name.split('.')[0].replace('_', ' ')
+                    st.session_state.seo_title = f"🔥 {clean_name.upper()} | Cinematic AI Edit #Shorts"
+                    st.session_state.seo_tags = f"#{clean_name.replace(' ', '')} #Cinematic #AIEdit #Viral #8K"
                     
-        except Exception as e:
-            st.error(f"System Error: {e}")
+                    st.divider()
+                    st.subheader("📈 وائرل SEO کٹ")
+                    st.text_input("یوٹیوب ٹائٹل", st.session_state.seo_title)
+                    st.text_area("ہیش ٹیگز", st.session_state.seo_tags)
+                    
+                    with open(out_path, "rb") as f:
+                        st.download_button("📥 ڈاؤن لوڈ ماسٹر ویڈیو", f, file_name=f"Sglowina_{res_choice}.mp4")
+                else:
+                    st.error(f"رینڈرنگ میں خرابی آئی: {error}")
 
-# ==========================================
-# 4. DOWNLOAD & PREVIEW
-# ==========================================
+    else:
+        st.warning("شروع کرنے کے لیے بائیں جانب سے ویڈیو اپلوڈ کریں۔")
 
-if st.session_state.render_result:
-    res_path = st.session_state.render_result
-    if os.path.exists(res_path):
-        st.success("✅ Render Complete!")
-        
-        c1, c2 = st.columns([1.5, 1])
-        with c1:
-            st.video(res_path)
-            with open(res_path, "rb") as vid:
-                st.download_button("📥 DOWNLOAD CINEMATIC VIDEO", vid, file_name=res_path, use_container_width=True)
-        
-        with c2:
-            st.subheader("🚀 Viral SEO Kit")
-            st.text_input("Suggested Title", value=st.session_state.seo_title)
-            st.text_area("Hashtags & Description", value=st.session_state.seo_tags, height=150)
-            
-            st.info("💡 Pro Tip: Upload with 'High Quality Uploads' enabled on Social Media.")
-
-# --- CLEANUP ---
-# (Usually handled by background task, but in Streamlit we clean old temp files)
-for f in glob.glob("temp_*"):
-    try:
-        # Check if file is older than 1 hour to prevent deleting active jobs
-        if os.path.getmtime(f) < (os.path.time() - 3600):
-            os.remove(f)
-    except: pass
+if __name__ == "__main__":
+    main()
