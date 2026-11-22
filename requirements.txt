@@ -1,3 +1,5 @@
 streamlit
-imageio-ffmpeg
+opencv-python-headless
+numpy
 yt-dlp
+imageio
